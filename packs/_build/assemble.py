@@ -85,6 +85,14 @@ def main():
                         errors.append(f"{iid}: mcq answerIndex out of range")
                 else:
                     errors.append(f"{iid}: unknown type '{t}'")
+                # Referenced diagrams hosted in this pack must exist on disk.
+                marker = f"/packs/{args.id}/images/"
+                for key in ("image", "backImage"):
+                    url = item.get(key)
+                    if url and marker in url:
+                        rel = url.split(marker, 1)[1]
+                        if not os.path.exists(os.path.join(out_dir, "images", rel)):
+                            errors.append(f"{iid}: {key} -> missing images/{rel}")
         subtopics.append(st)
 
     subtopics.sort(key=lambda s: s.get("order", 0))

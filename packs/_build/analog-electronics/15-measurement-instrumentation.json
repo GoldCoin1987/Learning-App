@@ -5,401 +5,378 @@
   "lessons": [
     {
       "id": "dmm",
-      "title": "The Digital Multimeter",
+      "title": "The Digital Multimeter: Loading, Burden & True-RMS",
       "order": 1,
       "difficulty": 1,
+      "content": "The DMM is the workhorse, but it lies in predictable ways. **Input impedance** on the voltage ranges is typically $10\\,\\mathrm{M}\\Omega$ (sometimes $>10\\,\\mathrm{G}\\Omega$ on a sensitive DC range). When you probe a high-impedance node, the meter forms a divider with the source resistance: a $10\\,\\mathrm{M}\\Omega$ meter across a $1\\,\\mathrm{M}\\Omega$ source reads $\\frac{10}{11}\\approx 91\\%$ of the true voltage. That ~9% droop is *loading error*, not a fault.\n\nOn current ranges the meter inserts a **shunt** and develops a **burden voltage** ($V_\\mathrm{burden}=I\\cdot R_\\mathrm{shunt}$). In a low-voltage circuit this burden can starve the very current you are trying to measure. Lower ranges have larger shunts and worse burden, so use the highest range that gives resolution.\n\n**True-RMS vs. average-responding:** an average-responding meter rectifies, averages, and scales by $1.111$ assuming a sine. On a non-sinusoid (PWM, triangle, noisy radar pulse) that scale factor is wrong, so the reading is off by the waveform's crest/form factor. A true-RMS meter computes $V_\\mathrm{rms}=\\sqrt{\\frac{1}{T}\\int v^2\\,dt}$ and is correct for any shape within its **crest-factor** and bandwidth limits.\n\n**Specs:** accuracy is quoted as $\\pm(\\%\\,\\text{of reading} + \\text{counts})$. A $3\\tfrac{1}{2}$-digit meter resolves 2000 counts; $4\\tfrac{1}{2}$ digits, 20000. Resolution is not accuracy. Coming from radar maintenance, treat the DMM like any tracked test set: know its spec, its last cal, and how it perturbs the unit under test.",
       "items": [
         {
           "id": "measurement-instrumentation-dmm-001",
           "type": "flashcard",
-          "front": "What core measurements does a typical handheld DMM provide?",
-          "back": "DC/AC voltage, DC/AC current, resistance, continuity (audible beep), diode test (shows forward voltage drop), and on many models capacitance and frequency. Higher-end units add temperature and true-RMS AC.",
-          "hint": "V, I, R, plus a few junction-level tests."
+          "front": "Why does a 10 MΩ DMM misread the voltage at a high-impedance node?",
+          "back": "The meter's input impedance forms a voltage divider with the source resistance. For a 1 MΩ source and 10 MΩ meter, you read 10/11 (~91%) of the true open-circuit voltage. This loading error grows as source impedance approaches the meter impedance.",
+          "hint": "Divider between R_source and R_meter."
         },
         {
           "id": "measurement-instrumentation-dmm-002",
           "type": "flashcard",
-          "front": "What does the diode-test mode on a DMM actually display?",
-          "back": "It forces a small known current through the junction and displays the forward voltage drop in volts (e.g. ~0.6 V for silicon, ~0.3 V for Schottky/germanium, ~1.8-3 V for an LED). A good diode reads its Vf one way and 'OL' (open) reversed.",
-          "hint": "Not resistance, but a voltage."
+          "front": "What is burden voltage and when does it bite?",
+          "back": "On current ranges the DMM inserts a shunt resistor; the voltage across it, V_burden = I * R_shunt, is subtracted from the circuit. In low-voltage circuits it can significantly reduce the current being measured. Lower current ranges use larger shunts and have worse burden.",
+          "hint": "I times the internal shunt resistance."
         },
         {
           "id": "measurement-instrumentation-dmm-003",
           "type": "flashcard",
-          "front": "Why can a DMM's resistance (ohms) range fail to give a meaningful reading on an in-circuit component?",
-          "back": "Other components in parallel with the part under test (and any semiconductor junctions) provide alternate current paths, so the meter reads the parallel combination, not the part. Resistance should generally be measured with the component isolated and the circuit unpowered.",
-          "hint": "Parallel paths."
+          "front": "True-RMS vs. average-responding: where do they diverge?",
+          "back": "Average-responding meters rectify, average, and multiply by 1.111 (valid only for sines). On non-sinusoids (PWM, triangle, pulses) that factor is wrong. True-RMS computes sqrt(mean of v^2) and is correct for any waveform within its crest-factor and bandwidth limits.",
+          "hint": "The 1.111 fudge factor assumes a sine."
         },
         {
           "id": "measurement-instrumentation-dmm-004",
-          "type": "mcq",
-          "prompt": "A DMM is specified as a 6000-count meter. What does the 'count' specification tell you?",
-          "choices": [
-            "The maximum sample rate in samples per second",
-            "The maximum number the display can show before it must up-range (here 0 to 5999), which sets resolution",
-            "The input impedance in kilo-ohms",
-            "The number of internal calibration points"
-          ],
-          "answerIndex": 1,
-          "explanation": "Counts describe display resolution. A 6000-count meter shows up to 5999 then jumps range. On a 6.000 V range that is 1 mV resolution; a 2000-count meter on the same range would only resolve 10 mV."
+          "type": "flashcard",
+          "front": "Distinguish resolution, accuracy, and counts.",
+          "back": "Counts/digits = the smallest displayable step (resolution). Accuracy is the spec'd deviation from truth, given as +/-(% of reading + N counts). A meter can have fine resolution and poor accuracy. A 3.5-digit meter = 2000 counts; 4.5-digit = 20000.",
+          "hint": "Fine display steps don't guarantee correctness."
         },
         {
           "id": "measurement-instrumentation-dmm-005",
           "type": "mcq",
-          "prompt": "A DMM's DC voltage accuracy is given as +/-(0.5% of reading + 2 counts). Reading 10.00 V on a range with 0.01 V resolution, what is the worst-case uncertainty?",
+          "prompt": "You measure a 1.000 V source with output resistance 1 MΩ using a 10 MΩ DMM. Approximately what does it read?",
           "choices": [
-            "+/-0.05 V",
-            "+/-0.02 V",
-            "+/-0.07 V",
-            "+/-0.50 V"
+            "1.000 V",
+            "0.909 V",
+            "0.500 V",
+            "1.100 V"
           ],
-          "answerIndex": 2,
-          "explanation": "0.5% of 10.00 V = 0.05 V. Two counts at 0.01 V resolution = 0.02 V. They add: 0.05 + 0.02 = 0.07 V. The 'plus counts' term is a fixed floor that dominates at small readings."
+          "answerIndex": 1,
+          "explanation": "The 10 MΩ meter and 1 MΩ source form a divider: 10/(10+1) = 0.909, so the meter reads ~0.909 V. This is loading error, not a meter fault."
         },
         {
           "id": "measurement-instrumentation-dmm-006",
           "type": "mcq",
-          "prompt": "You measure a 1.5 V signal that sits across a 10 Mohm source resistance using a DMM with 10 Mohm input impedance. What happens?",
+          "prompt": "An average-responding meter reads a symmetric triangle wave. Compared with the true RMS value, the reading is:",
           "choices": [
-            "Nothing; the DMM never loads a voltage source",
-            "The meter forms a voltage divider with the source and reads about half the true voltage",
-            "The reading is high by exactly 0.5 V",
-            "The meter draws so much current it damages the source"
+            "Exactly correct",
+            "Too high, because the meter assumes a sine",
+            "Too low, because a triangle has a higher form factor than a sine",
+            "Indeterminate without the frequency"
           ],
-          "answerIndex": 1,
-          "explanation": "The 10 Mohm meter input in series with the 10 Mohm source forms a 2:1 divider, so the DMM reads ~0.75 V. Loading is significant whenever the meter's input impedance is comparable to the source impedance; use a higher-impedance meter or a buffer."
+          "answerIndex": 2,
+          "explanation": "The meter scales rectified-average by 1.111 (sine form factor). A triangle's true form factor is 1.155 (Vrms/Vavg = (1/sqrt3)/(1/2)), so the sine-calibrated meter under-reads its RMS."
         },
         {
           "id": "measurement-instrumentation-dmm-007",
-          "type": "flashcard",
-          "front": "What is burden voltage in DMM current measurement, and why does it matter?",
-          "back": "To measure current the DMM inserts a shunt resistor in series with the circuit; the voltage developed across that shunt (plus fuse/lead resistance) is the burden voltage. It subtracts from the circuit's supply and can disturb low-voltage or current-limited circuits, causing the measured current to read low.",
-          "hint": "The price of a series shunt."
+          "type": "mcq",
+          "prompt": "To minimize burden voltage when measuring a small current, you should:",
+          "choices": [
+            "Use the lowest current range available",
+            "Use the highest current range that still gives adequate resolution",
+            "Switch the meter to AC coupling",
+            "Add a series resistor"
+          ],
+          "answerIndex": 1,
+          "explanation": "Higher current ranges use smaller shunt resistors, so V_burden = I*R_shunt is smaller. Pick the highest range that still resolves the reading to limit the perturbation of the circuit."
         },
         {
           "id": "measurement-instrumentation-dmm-008",
-          "type": "flashcard",
-          "front": "Why does measuring current require breaking the circuit while measuring voltage does not?",
-          "back": "Current must flow through the meter, so the ammeter goes in series (you open the loop and insert it). A voltmeter measures potential difference and goes in parallel across the points of interest. Connecting a low-impedance ammeter in parallel across a supply is effectively a short and can blow its fuse.",
-          "hint": "Series vs parallel."
+          "type": "mcq",
+          "prompt": "A DMM is spec'd at +/-(0.5% of reading + 3 counts) on a 2 V range reading 1.000 V. The worst-case uncertainty is about:",
+          "choices": [
+            "+/-5 mV",
+            "+/-3 mV",
+            "+/-8 mV",
+            "+/-0.5 mV"
+          ],
+          "answerIndex": 2,
+          "explanation": "0.5% of 1.000 V = 5 mV. On a 2 V, 2000-count range, 1 count ~ 1 mV, so 3 counts ~ 3 mV. Total worst case ~ 5 + 3 = 8 mV."
         },
         {
           "id": "measurement-instrumentation-dmm-009",
-          "type": "mcq",
-          "prompt": "You must measure the RMS value of a 60 Hz square wave with significant harmonic content. Which DMM gives the correct answer?",
-          "choices": [
-            "An average-responding meter, because square waves have no harmonics",
-            "A true-RMS meter, because average-responding meters are calibrated only for pure sine waves",
-            "Either; the RMS reading is independent of waveform",
-            "Neither; DMMs cannot measure AC"
-          ],
-          "answerIndex": 1,
-          "explanation": "Average-responding meters rectify, average, and scale by the sine-specific form factor (1.11). On non-sinusoidal waveforms that scaling is wrong. A true-RMS meter computes the actual root-mean-square and is correct for arbitrary waveshapes (within its crest-factor and bandwidth limits)."
+          "type": "flashcard",
+          "front": "Why can't you trust a true-RMS meter on a very high crest-factor signal?",
+          "back": "True-RMS meters specify a maximum crest factor (peak/RMS), often ~3 at full scale and higher at lower scale. Narrow pulses (radar-like) exceed it, clipping the peak in the RMS converter and under-reading. Also check the meter's AC bandwidth.",
+          "hint": "Peak-to-RMS ratio has a spec'd ceiling."
         }
       ]
     },
     {
-      "id": "scope",
-      "title": "The Oscilloscope & Probes",
+      "id": "oscilloscope",
+      "title": "Oscilloscope: Bandwidth, Sampling & Triggering",
       "order": 2,
       "difficulty": 2,
+      "content": "The scope shows you voltage vs. time, but three independent specs decide whether you see truth or an artifact.\n\n**Analog bandwidth** is the $-3\\,\\mathrm{dB}$ frequency. It ties to the fastest edge it can render through the Gaussian-response rule $BW\\approx\\frac{0.35}{t_r}$, where $t_r$ is the $10\\%\\text{-}90\\%$ rise time. To see an edge faithfully you want scope bandwidth roughly $3\\text{-}5\\times$ the signal's highest significant frequency; a $100\\,\\mathrm{MHz}$ scope shows its own $t_r\\approx 3.5\\,\\mathrm{ns}$ floor, and measured rise time adds in quadrature: $t_\\mathrm{meas}=\\sqrt{t_\\mathrm{signal}^2+t_\\mathrm{scope}^2}$.\n\n**Sample rate** is separate. Nyquist demands $f_s>2f_\\mathrm{max}$, but a real-time DSO wants $\\sim 5\\times$ for a faithful single-shot. Violate it and you get **aliasing**: a fast tone folds down to a believable but wrong low frequency. Long memory depth lets you keep that sample rate over a long time window.\n\n**Triggering** stabilizes the display by starting each sweep at the same event. **Edge** trigger (level + slope) is the default; **pulse-width**, runt, and serial triggers catch specific anomalies. **Coupling** matters: DC coupling shows the true level; AC coupling blocks DC so you can see small ripple riding on a rail, at the cost of low-frequency distortion.\n\nThe **FFT/math** function turns the scope into a coarse spectrum analyzer, but its noise floor and resolution are set by record length and window. Use it to spot harmonics, not to certify them.",
       "items": [
         {
-          "id": "measurement-instrumentation-scope-001",
+          "id": "measurement-instrumentation-oscilloscope-001",
           "type": "flashcard",
-          "front": "State the rule of thumb relating an oscilloscope's bandwidth to the rise time it can display.",
-          "back": "BW ~= 0.35 / t_r (for a single-pole/Gaussian response). A 100 MHz scope resolves rise times no faster than ~3.5 ns. To measure a signal's rise time accurately, the scope (and probe) bandwidth should be roughly 3-5x the signal's highest significant frequency.",
-          "hint": "0.35 over rise time."
+          "front": "State the bandwidth/rise-time relation and what it assumes.",
+          "back": "BW \\approx 0.35 / t_r for a Gaussian (single-pole-dominated) frequency response, where t_r is the 10%-90% rise time. The 0.35 constant rises toward ~0.45 for sharper, more brick-wall responses.",
+          "hint": "Constant ~0.35 over rise time."
         },
         {
-          "id": "measurement-instrumentation-scope-002",
+          "id": "measurement-instrumentation-oscilloscope-002",
           "type": "flashcard",
-          "front": "What is the difference between a 1x and a 10x oscilloscope probe?",
-          "back": "A 1x probe passes the signal directly (full amplitude, low bandwidth, high capacitive loading). A 10x probe inserts a 9 Mohm series resistor forming a 10:1 divider with the scope's 1 Mohm input: it attenuates by 10 (so signals are smaller) but raises input impedance, lowers capacitance, and extends usable bandwidth.",
-          "hint": "Attenuation vs loading trade-off."
+          "front": "How do scope and signal rise times combine?",
+          "back": "They add in quadrature: t_measured = sqrt(t_signal^2 + t_scope^2). If the scope's own rise time is comparable to the signal's, the displayed edge is noticeably slowed; pick a scope whose t_scope is well below the signal's t_r.",
+          "hint": "Root-sum-square of the two rise times."
         },
         {
-          "id": "measurement-instrumentation-scope-003",
+          "id": "measurement-instrumentation-oscilloscope-003",
+          "type": "flashcard",
+          "front": "What is aliasing on a DSO and how do you avoid it?",
+          "back": "If the sample rate is below ~2x the highest signal frequency, a fast tone folds to a false low frequency that looks real. Avoid by sampling >5x the highest frequency, using the scope's bandwidth limit/anti-alias, and watching for frequencies that change with timebase.",
+          "hint": "Nyquist violated -> false low-frequency ghost."
+        },
+        {
+          "id": "measurement-instrumentation-oscilloscope-004",
+          "type": "flashcard",
+          "front": "When would you use AC coupling instead of DC coupling?",
+          "back": "AC coupling inserts a series capacitor to block DC, letting you see small AC content (e.g., mV-level ripple) riding on a large DC rail at high vertical sensitivity. It distorts low frequencies and hides the true DC level, so use DC coupling for absolute level and timing.",
+          "hint": "Block the rail to see the ripple."
+        },
+        {
+          "id": "measurement-instrumentation-oscilloscope-005",
           "type": "mcq",
-          "prompt": "Why must a 10x probe be 'compensated' (adjusted with the small trimmer) before precise measurements?",
+          "prompt": "A signal has a 1 ns rise time. The minimum scope bandwidth to display it reasonably (BW ~= 0.35/t_r, with 3-5x margin) is about:",
           "choices": [
-            "To set the vertical zero offset",
-            "To match the probe's capacitance to the scope input capacitance so the 10:1 division is flat across frequency",
-            "To calibrate the scope's timebase",
-            "To zero out ground-lead inductance"
-          ],
-          "answerIndex": 1,
-          "explanation": "The probe forms an RC divider with scope input capacitance. If the probe's trimmer cap is mis-set the division ratio varies with frequency, distorting square-wave edges (over/undershoot or rounded). Adjust the trimmer against the cal square wave until the corners are flat."
-        },
-        {
-          "id": "measurement-instrumentation-scope-004",
-          "type": "mcq",
-          "prompt": "An aliased signal appears on a digital scope. What is the root cause?",
-          "choices": [
-            "The probe was not compensated",
-            "The sample rate was less than twice the highest frequency present (Nyquist violated), folding high frequencies down to false low frequencies",
-            "The trigger level was set too high",
-            "AC coupling removed the DC component"
-          ],
-          "answerIndex": 1,
-          "explanation": "Per Nyquist, you must sample faster than 2x the signal's highest frequency. Undersampling folds energy above Nyquist down into the displayed band as a false lower-frequency waveform. Increase sample rate, reduce timebase span, or band-limit the input."
-        },
-        {
-          "id": "measurement-instrumentation-scope-005",
-          "type": "flashcard",
-          "front": "What does oscilloscope triggering do, and what does edge triggering specify?",
-          "back": "Triggering defines the event that starts each acquisition/sweep so the waveform appears stable instead of drifting. Edge trigger fires when the chosen source crosses a set voltage level in a chosen direction (rising or falling). Other modes include pulse-width, runt, and serial-pattern triggers.",
-          "hint": "Stabilizes a repetitive display."
-        },
-        {
-          "id": "measurement-instrumentation-scope-006",
-          "type": "flashcard",
-          "front": "When should you use AC coupling versus DC coupling on a scope channel?",
-          "back": "DC coupling shows the true signal including its DC offset. AC coupling inserts a series capacitor that blocks DC, letting you view a small ripple or AC signal riding on a large DC level (e.g. supply ripple on a 12 V rail). AC coupling also high-pass filters, so it distorts low-frequency content.",
-          "hint": "Block DC to see small ripple on a big offset."
-        },
-        {
-          "id": "measurement-instrumentation-scope-007",
-          "type": "mcq",
-          "prompt": "Using a long ground clip lead on a 10x probe to view a fast digital edge causes ringing on the trace. Best explanation?",
-          "choices": [
-            "The scope bandwidth is too high",
-            "The ground-lead inductance resonates with the probe tip capacitance, forming an LC tank that rings on fast edges",
-            "The probe attenuation switched to 1x",
-            "The trigger is unstable"
-          ],
-          "answerIndex": 1,
-          "explanation": "The long ground lead adds series inductance that, with the probe's tip capacitance, forms a resonant LC circuit. Fast edges excite it and you see ringing/overshoot that is a measurement artifact. Use the shortest possible ground (a spring/ground-spring tip) for high-speed work."
-        },
-        {
-          "id": "measurement-instrumentation-scope-008",
-          "type": "mcq",
-          "prompt": "You need to measure the voltage between two non-grounded nodes (e.g. across a high-side current-sense resistor floating at 48 V). Which probe is appropriate?",
-          "choices": [
-            "A standard 10x passive probe with its ground clip on one node",
-            "A differential probe, which measures the difference between two inputs while rejecting common-mode voltage",
-            "A current probe",
-            "A 1x probe for maximum amplitude"
-          ],
-          "answerIndex": 1,
-          "explanation": "A passive probe ground clip ties one node to scope/earth ground, which would short the floating node and be dangerous. A differential probe measures V(+)-V(-) with high common-mode rejection, so neither node is forced to ground. (A current probe measures current, not this voltage.)"
-        },
-        {
-          "id": "measurement-instrumentation-scope-009",
-          "type": "flashcard",
-          "front": "What does a digital scope's FFT math function give you, and name one key limitation versus a spectrum analyzer.",
-          "back": "FFT transforms the captured time-domain record into a frequency-domain magnitude display, useful for spotting harmonics and dominant tones. Limitations vs a dedicated spectrum analyzer: much higher noise floor / smaller dynamic range, coarser frequency resolution (set by record length), and no swept tuned front-end, so it is best for quick qualitative checks.",
-          "hint": "Time record -> frequency bins; worse dynamic range."
-        },
-        {
-          "id": "measurement-instrumentation-scope-010",
-          "type": "flashcard",
-          "front": "What advantage does a digital storage oscilloscope (DSO) have over an analog scope for single-shot events?",
-          "back": "A DSO digitizes and stores the waveform in memory, so it can capture a single non-repetitive event (a glitch, a power-up transient) and hold it for inspection, measurement, and saving. An analog scope draws directly to the CRT and effectively requires a repetitive signal to build a persistent image.",
-          "hint": "Capture-and-hold a one-time glitch."
-        }
-      ]
-    },
-    {
-      "id": "sources",
-      "title": "Signal Sources & Power Supplies",
-      "order": 3,
-      "difficulty": 3,
-      "items": [
-        {
-          "id": "measurement-instrumentation-sources-001",
-          "type": "flashcard",
-          "front": "What waveforms and capabilities does a function/arbitrary waveform generator (AWG) provide?",
-          "back": "Standard functions: sine, square, triangle, ramp, pulse, noise, DC. Arbitrary mode plays a user-defined sample array. Common extras: adjustable amplitude/offset/duty cycle, frequency sweep, and modulation (AM/FM/PM/PWM/FSK) plus burst and trigger modes.",
-          "hint": "Sine/square/tri/arb plus sweep and modulation."
-        },
-        {
-          "id": "measurement-instrumentation-sources-002",
-          "type": "mcq",
-          "prompt": "A function generator has a 50 ohm output impedance and is set to '1 Vpp'. With the output driving a high-impedance scope input (1 Mohm), what amplitude appears?",
-          "choices": [
-            "0.5 Vpp, because the load halves it",
-            "1 Vpp as set",
-            "About 2 Vpp, because the displayed value assumed a matched 50 ohm load but the high-Z load draws no current across the internal 50 ohm",
-            "2 V DC offset is added"
+            "35 MHz",
+            "350 MHz",
+            "~1 GHz or more",
+            "100 kHz"
           ],
           "answerIndex": 2,
-          "explanation": "Many generators display amplitude assuming a 50 ohm termination, forming a 50/50 divider with the internal source resistance. Into a high-Z (unterminated) load there is no division, so the open-circuit voltage is double: ~2 Vpp. Either set the instrument's load setting to 'High-Z' or terminate in 50 ohm."
+          "explanation": "0.35/1 ns = 350 MHz just to match the edge. For a faithful display you want 3-5x that, so ~1 GHz or more of scope bandwidth."
         },
         {
-          "id": "measurement-instrumentation-sources-003",
-          "type": "flashcard",
-          "front": "Why is 50 ohm the conventional output/termination impedance in RF and high-speed signal work?",
-          "back": "Matching source, cable, and load to a common characteristic impedance (50 ohm for most RF/test gear) prevents reflections on transmission lines, giving clean edges and flat frequency response. 50 ohm is a practical compromise between low loss and high power handling for coax. Terminate the far end in 50 ohm for accurate fast-signal measurements.",
-          "hint": "Impedance matching to kill reflections on coax."
-        },
-        {
-          "id": "measurement-instrumentation-sources-004",
+          "id": "measurement-instrumentation-oscilloscope-006",
           "type": "mcq",
-          "prompt": "A bench supply is set to 5 V with a 0.5 A current limit. You connect a load that tries to draw 2 A. What does the supply do?",
+          "prompt": "A 100 MHz scope (t_scope ~ 3.5 ns) measures a signal with a true 3 ns rise time. The displayed rise time is approximately:",
           "choices": [
-            "It delivers 2 A at 5 V regardless of the limit",
-            "It transitions from constant-voltage (CV) into constant-current (CC) mode, holding 0.5 A and dropping the output voltage as needed",
-            "It shuts off immediately and latches off",
-            "It raises the voltage to push 2 A through"
+            "3.0 ns",
+            "6.5 ns",
+            "4.6 ns",
+            "0.5 ns"
+          ],
+          "answerIndex": 2,
+          "explanation": "t_meas = sqrt(3^2 + 3.5^2) = sqrt(9 + 12.25) = sqrt(21.25) ~ 4.6 ns. The scope's own bandwidth visibly slows the edge."
+        },
+        {
+          "id": "measurement-instrumentation-oscilloscope-007",
+          "type": "mcq",
+          "prompt": "You under-sample a 90 MHz sine at 100 MSa/s. The displayed frequency is approximately:",
+          "choices": [
+            "90 MHz",
+            "10 MHz",
+            "50 MHz",
+            "190 MHz"
           ],
           "answerIndex": 1,
-          "explanation": "In CV mode the supply regulates voltage. When load demand exceeds the current limit, it crosses over to CC mode, holding current at 0.5 A and reducing output voltage to whatever the load needs at that current. This protects the load and supply; the front panel typically lights a 'CC' indicator."
+          "explanation": "An alias folds about f_s: |90 - 100| = 10 MHz. The scope shows a convincing 10 MHz tone that does not exist. This is the classic aliasing trap."
         },
         {
-          "id": "measurement-instrumentation-sources-005",
-          "type": "flashcard",
-          "front": "How can you use a bench supply's current limit as a safety tool when powering an untested board?",
-          "back": "Pre-set the current limit just above the board's expected normal draw. If a short or fault exists, the supply enters CC mode and clamps current instead of dumping unlimited current into the fault, preventing damage and smoke. Watch for an unexpected CC indication on power-up as a quick fault check.",
-          "hint": "Set the limit before powering a suspect board."
-        },
-        {
-          "id": "measurement-instrumentation-sources-006",
+          "id": "measurement-instrumentation-oscilloscope-008",
           "type": "mcq",
-          "prompt": "You configure a 1 kHz sine with AM modulation at 100 Hz, 50% depth. On a spectrum analyzer, what do you expect to see?",
+          "prompt": "Pulse-width triggering is most useful for:",
           "choices": [
-            "A single tone at 1 kHz only",
-            "A carrier at 1 kHz with sidebands at 900 Hz and 1100 Hz",
-            "Tones at 100 Hz and 1 kHz with no sidebands",
-            "Broadband noise centered at 1 kHz"
+            "Setting the absolute DC level reference",
+            "Catching a runt or glitch whose width differs from normal pulses",
+            "Increasing the sample rate",
+            "Compensating a 10x probe"
           ],
           "answerIndex": 1,
-          "explanation": "Amplitude modulation produces a carrier plus two sidebands offset by the modulation frequency: f_c +/- f_m = 900 Hz and 1100 Hz. The 50% depth sets the sideband amplitude (each sideband is depth/2 of the carrier voltage). This is the classic AM spectral signature."
+          "explanation": "Pulse-width (and runt) triggers fire only when a pulse's duration meets a condition, isolating anomalous narrow/wide pulses that an edge trigger would not single out."
         },
         {
-          "id": "measurement-instrumentation-sources-007",
+          "id": "measurement-instrumentation-oscilloscope-009",
           "type": "flashcard",
-          "front": "What does a frequency sweep (chirp) on a generator let you measure quickly?",
-          "back": "Sweeping the output across a frequency range while observing a circuit's response lets you trace its frequency response / transfer function (e.g. filter passband, resonance, rolloff) without manually stepping points. Paired with a detector or scope it approximates a network/Bode measurement.",
-          "hint": "Trace a frequency response in one pass."
-        },
-        {
-          "id": "measurement-instrumentation-sources-008",
-          "type": "mcq",
-          "prompt": "Why might a square wave from a function generator look rounded or show overshoot at the load even though the generator is fine?",
-          "choices": [
-            "The generator cannot produce square waves above DC",
-            "The generator's output bandwidth/slew and an impedance mismatch (reflections) at the load shape the edges",
-            "Square waves are always displayed as sines",
-            "The current limit is engaged"
-          ],
-          "answerIndex": 1,
-          "explanation": "A square wave's fast edges need wide bandwidth; the generator's finite rise time rounds them, and an unterminated or mismatched cable/load reflects the edges, producing overshoot/ringing. Proper 50 ohm termination and adequate bandwidth clean this up. It is a system effect, not necessarily a fault."
-        },
-        {
-          "id": "measurement-instrumentation-sources-009",
-          "type": "flashcard",
-          "front": "What is the practical effect of a generator's output impedance on a low-impedance load?",
-          "back": "The source impedance forms a divider with the load. Driving a load comparable to or below the source impedance pulls the delivered voltage down and limits available current/slew. For accurate amplitude you must account for the divider (or use the instrument's load setting), and the generator cannot drive arbitrarily low impedances at full amplitude.",
-          "hint": "Source-load divider again."
+          "front": "Why is memory depth important even when sample rate is adequate?",
+          "back": "Capture time = memory depth / sample rate. To hold a high sample rate across a long time window you need deep memory; otherwise the scope drops its sample rate as you zoom out, re-introducing aliasing and missing fast detail on a long record.",
+          "hint": "Time window equals samples divided by sample rate."
         }
       ]
     },
     {
-      "id": "spectrum",
-      "title": "Spectrum Analysis, LCR/VNA & Trusting Your Gear",
-      "order": 4,
-      "difficulty": 4,
+      "id": "probes-and-fgen",
+      "title": "Probes & Function Generators: The Classic Gotchas",
+      "order": 3,
+      "difficulty": 2,
+      "content": "Two of the most common bench self-deceptions live here.\n\n**10x probes.** A 1x probe puts the scope's full input capacitance (~$15\\text{-}50\\,\\mathrm{pF}$ plus cable) on your node, loading high-frequency and high-impedance circuits. A 10x probe adds a $9\\,\\mathrm{M}\\Omega$ series resistor (giving $10\\,\\mathrm{M}\\Omega$ total with the scope's $1\\,\\mathrm{M}\\Omega$) and a small tip capacitance, raising input impedance and cutting capacitive loading by ~10x at the cost of $10\\times$ attenuation. For the divider to be flat across frequency, the RC time constants must match: this is **compensation**. Probe a $1\\,\\mathrm{kHz}$ square wave and adjust the trimmer until the corners are square; rounded corners = under-compensated, peaked = over-compensated. Also keep the **ground lead short**: its inductance with the tip capacitance rings and can fake overshoot.\n\n**Function generators and the 50-ohm gotcha.** A generator has a $50\\,\\Omega$ source impedance. Its amplitude setting assumes a $50\\,\\Omega$ load, forming a 2:1 divider. Drive a high-impedance input (a scope's $1\\,\\mathrm{M}\\Omega$) and you get **twice** the set voltage: set $1\\,\\mathrm{V_{pp}}$, see $2\\,\\mathrm{V_{pp}}$. Fix it by setting the generator's output-load menu to *High-Z*, or by terminating in $50\\,\\Omega$. The same source impedance source-terminates a matched line for clean fast edges.",
       "items": [
         {
-          "id": "measurement-instrumentation-spectrum-001",
+          "id": "measurement-instrumentation-probes-and-fgen-001",
           "type": "flashcard",
-          "front": "What does a spectrum analyzer display, and what are its key axes?",
-          "back": "It displays signal power versus frequency (frequency domain). X-axis is frequency (set by center frequency and span); Y-axis is amplitude, usually in dBm on a logarithmic scale. It reveals carriers, harmonics, spurs, modulation sidebands, and the noise floor that a time-domain scope hides.",
-          "hint": "Power vs frequency, dBm."
+          "front": "10x probe compensation: identify under-, correctly-, and over-compensated square-wave responses.",
+          "back": "Rounded/sagging corners = under-compensated (tip C too low). Flat square corners = correct. Peaked/overshooting corners = over-compensated (tip C too high). Adjust the probe trimmer against a 1 kHz cal square wave until corners are square.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/analog-electronics/images/measurement-instrumentation-1.svg"
         },
         {
-          "id": "measurement-instrumentation-spectrum-002",
+          "id": "measurement-instrumentation-probes-and-fgen-002",
           "type": "flashcard",
-          "front": "What is resolution bandwidth (RBW) on a spectrum analyzer and what does narrowing it do?",
-          "back": "RBW is the bandwidth of the final IF filter that determines how closely two tones can be resolved as separate peaks. Narrowing RBW improves frequency resolution AND lowers the displayed noise floor (less noise power per bin), letting you see small signals, but it greatly slows the sweep.",
-          "hint": "IF filter width; smaller = lower noise floor, slower sweep."
+          "front": "What does a 10x probe trade away to reduce loading?",
+          "back": "It adds a 9 MΩ series resistor (10 MΩ total) and small tip capacitance, raising input impedance and cutting capacitive loading by ~10x. The cost is 10x signal attenuation (lower amplitude / worse SNR) -- the scope rescales if told the probe ratio.",
+          "hint": "Less loading, but 10x smaller signal."
         },
         {
-          "id": "measurement-instrumentation-spectrum-003",
+          "id": "measurement-instrumentation-probes-and-fgen-003",
+          "type": "flashcard",
+          "front": "Why must a 10x probe be compensated, and how?",
+          "back": "The 9 M:1 M resistive divider must match the capacitive divider for a flat response across frequency (equal RC time constants). Adjust the probe's trimmer capacitor against a 1 kHz square wave until the corners are square -- not rounded (under) or peaked (over).",
+          "hint": "Match the RC time constants of both dividers."
+        },
+        {
+          "id": "measurement-instrumentation-probes-and-fgen-004",
+          "type": "flashcard",
+          "front": "Why does a long probe ground lead cause ringing/overshoot?",
+          "back": "The ground-lead inductance forms an LC resonator with the probe tip and input capacitance. A fast edge excites it, adding overshoot/ringing that is a measurement artifact, not real signal. Use the short spring-tip ground for fast edges.",
+          "hint": "Lead inductance resonates with tip capacitance."
+        },
+        {
+          "id": "measurement-instrumentation-probes-and-fgen-005",
           "type": "mcq",
-          "prompt": "You reduce RBW from 10 kHz to 1 kHz (a 10x reduction). Approximately what happens to the displayed noise floor?",
+          "prompt": "You set a function generator to 1 Vpp and probe its output with a high-impedance scope input, seeing 2 Vpp. Why?",
           "choices": [
-            "It rises by about 10 dB",
-            "It drops by about 10 dB",
-            "It stays the same; RBW does not affect noise",
-            "It drops by about 3 dB"
+            "The scope is faulty",
+            "The generator assumes a 50 Ω load; into high-Z its 50 Ω source no longer halves the output",
+            "The probe is set to 10x",
+            "Aliasing doubled the reading"
           ],
           "answerIndex": 1,
-          "explanation": "Thermal noise is broadband, so displayed noise power scales with RBW: a 10x narrower filter passes 10x less noise power, lowering the noise floor by 10*log10(10) = 10 dB. Discrete signals (which fit within the RBW) do not change level, so the signal-to-noise improves and small spurs emerge."
+          "explanation": "The generator's amplitude is calibrated assuming a 50 Ω load, which forms a 2:1 divider with the 50 Ω source. Into a 1 MΩ input there is essentially no divider, so you see 2x the set value."
         },
         {
-          "id": "measurement-instrumentation-spectrum-004",
+          "id": "measurement-instrumentation-probes-and-fgen-006",
           "type": "mcq",
-          "prompt": "On a spectrum analyzer you see a strong fundamental at 10 MHz and smaller peaks at 20, 30, and 40 MHz. What are the smaller peaks most likely?",
+          "prompt": "The correct fixes for the 50 Ω amplitude gotcha are:",
           "choices": [
-            "Phase noise skirts",
-            "Harmonics of the 10 MHz fundamental (2nd, 3rd, 4th)",
-            "The instrument's noise floor",
-            "Aliases from undersampling"
+            "Set the generator's output load to High-Z, or terminate in 50 Ω",
+            "Use a 10x probe",
+            "Switch the scope to AC coupling",
+            "Increase the sample rate"
+          ],
+          "answerIndex": 0,
+          "explanation": "Either tell the generator the actual load (High-Z mode, so it compensates internally) or physically terminate the line in 50 Ω so the assumed divider is real."
+        },
+        {
+          "id": "measurement-instrumentation-probes-and-fgen-007",
+          "type": "mcq",
+          "prompt": "An uncompensated 10x probe shows a 1 kHz square wave with rounded leading corners. The trimmer should be adjusted to:",
+          "choices": [
+            "Decrease tip capacitance further",
+            "Increase tip capacitance until corners are square",
+            "Leave it; rounding is normal for 10x probes",
+            "Switch to a 1x probe"
           ],
           "answerIndex": 1,
-          "explanation": "Peaks at exact integer multiples of the fundamental (2f, 3f, 4f) are harmonics, produced by nonlinearity/distortion in the source or device under test. Spurs by contrast appear at non-harmonic frequencies; phase noise appears as a skirt right around the carrier, not at distant integer multiples."
+          "explanation": "Rounded corners indicate under-compensation (tip capacitance too low relative to match). Increase the trimmer capacitance until the corners are flat and square."
         },
         {
-          "id": "measurement-instrumentation-spectrum-005",
+          "id": "measurement-instrumentation-probes-and-fgen-008",
+          "type": "mcq",
+          "prompt": "Why is a function generator's 50 Ω source impedance actually desirable when driving fast edges down a coax line?",
+          "choices": [
+            "It increases output amplitude",
+            "It source-terminates the line, absorbing reflections for a clean edge",
+            "It lowers the noise floor",
+            "It eliminates the need for triggering"
+          ],
+          "answerIndex": 1,
+          "explanation": "Matching the 50 Ω line at the source absorbs reflected energy (source/back termination), preventing reflections from corrupting fast edges -- standard transmission-line practice."
+        }
+      ]
+    },
+    {
+      "id": "spectrum-and-cal",
+      "title": "Spectrum Analyzer, Calibration & Uncertainty",
+      "order": 4,
+      "difficulty": 3,
+      "content": "The spectrum analyzer (SA) measures power vs. frequency and is where your radar/RF instinct pays off.\n\n**Resolution bandwidth (RBW)** is the IF filter width that sets how finely you can separate two tones, and it sets the displayed **noise floor**: thermal noise integrates over the filter, so $\\Delta P_\\mathrm{noise}=10\\log_{10}\\frac{RBW_2}{RBW_1}$. Narrowing RBW by $10\\times$ drops the noise floor by $10\\,\\mathrm{dB}$ (revealing small spurs) but slows the sweep, since sweep time scales roughly as $1/RBW^2$. **VBW** (video bandwidth) smooths the trace without changing the noise floor's mean.\n\n**Dynamic range** is the span from the largest signal that does not overload the front end (above which it generates its own internal harmonics/intermod) down to the noise floor. Set the **reference level / input attenuation** so the signal sits high without compressing the mixer.\n\n**Measuring harmonics, spurs, and phase noise:** a square wave shows odd harmonics falling as $1/n$; a real amplifier shows $2f_0,3f_0,\\dots$ whose levels relative to the fundamental (in $\\mathrm{dBc}$) quantify distortion. **Phase noise** appears as skirts close to the carrier, specified in $\\mathrm{dBc/Hz}$ at an offset.\n\n**Calibration and uncertainty:** every instrument has a traceable cal interval. Combine independent error sources in quadrature: $u_\\mathrm{total}=\\sqrt{\\sum u_i^2}$. The discipline you used maintaining radar test sets -- trust, but verify against a known reference -- is exactly the habit that separates a believable measurement from a confident wrong answer.",
+      "items": [
+        {
+          "id": "measurement-instrumentation-spectrum-and-cal-001",
           "type": "flashcard",
-          "front": "Define dynamic range and noise floor for a spectrum analyzer.",
-          "back": "Noise floor is the analyzer's own displayed average noise level (DANL) below which signals are buried; it depends on RBW, attenuation, and any preamp. Dynamic range is the amplitude span between the largest signal you can measure (before compression/spurious from overload) and the smallest detectable signal above the noise floor.",
-          "hint": "Smallest detectable up to largest distortion-free."
+          "front": "Read this spectrum display: identify the fundamental, harmonics, and what RBW controls.",
+          "back": "The tallest line at f0 is the fundamental; lines at 2f0, 3f0, ... are harmonics (distortion), measured in dBc below the fundamental. RBW sets the width of each line's skirt and the displayed noise floor: narrower RBW = lower noise floor but slower sweep.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/analog-electronics/images/measurement-instrumentation-2.svg"
         },
         {
-          "id": "measurement-instrumentation-spectrum-006",
-          "type": "mcq",
-          "prompt": "Why does a real oscillator show a 'skirt' of energy spreading out from the carrier peak rather than an infinitely thin line?",
-          "choices": [
-            "Because of harmonic distortion",
-            "Because of phase noise: short-term random frequency/phase fluctuations spread power into a skirt around the carrier",
-            "Because RBW is set too narrow",
-            "Because of 50 ohm mismatch"
-          ],
-          "answerIndex": 1,
-          "explanation": "An ideal tone is a delta function. Real oscillators jitter in phase, smearing energy into close-in sidebands - phase noise - measured in dBc/Hz at an offset from the carrier. It limits how close two signals can be distinguished and degrades receiver sensitivity and modulation accuracy."
-        },
-        {
-          "id": "measurement-instrumentation-spectrum-007",
+          "id": "measurement-instrumentation-spectrum-and-cal-002",
           "type": "flashcard",
-          "front": "What does an LCR meter measure, and how is its excitation chosen?",
-          "back": "An LCR meter applies a known AC excitation (selectable test frequency such as 100 Hz, 1 kHz, 100 kHz) and measures the complex impedance, resolving it into L, C, R plus quality factor Q or dissipation factor D. Because reactance is frequency-dependent, the chosen test frequency matters and should reflect the part's operating conditions.",
-          "hint": "Complex impedance at a chosen AC test frequency."
+          "front": "How does resolution bandwidth (RBW) affect the displayed noise floor?",
+          "back": "Noise integrates over the RBW filter, so the floor changes by 10*log10(RBW2/RBW1). Narrowing RBW by 10x lowers the noise floor by 10 dB, revealing small spurs -- but sweep time grows roughly as 1/RBW^2, so the sweep slows dramatically.",
+          "hint": "10 dB per decade of RBW; slower sweep is the cost."
         },
         {
-          "id": "measurement-instrumentation-spectrum-008",
+          "id": "measurement-instrumentation-spectrum-and-cal-003",
           "type": "flashcard",
-          "front": "What does a Vector Network Analyzer (VNA) measure, and what are S-parameters?",
-          "back": "A VNA measures the complex (magnitude and phase) reflection and transmission of a device versus frequency, expressed as scattering parameters: S11 (input reflection / return loss), S21 (forward transmission / gain), S12, S22. It is the primary tool for characterizing RF components - filters, antennas, amplifiers, matching networks.",
-          "hint": "Reflection/transmission vs frequency; S11/S21."
+          "front": "What is dynamic range on a spectrum analyzer bounded by?",
+          "back": "Upper bound: the input level above which the mixer/front end compresses and generates its own internal harmonics and intermod products. Lower bound: the displayed noise floor (set by RBW and noise figure). Input attenuation and reference level position the signal within it.",
+          "hint": "Top = self-distortion onset; bottom = noise floor."
         },
         {
-          "id": "measurement-instrumentation-spectrum-009",
-          "type": "mcq",
-          "prompt": "Why is calibration essential before trusting precision measurements, especially on a VNA?",
-          "choices": [
-            "It increases the instrument's bandwidth",
-            "It characterizes and mathematically removes systematic errors (cable loss, connector mismatch, directivity, drift) by measuring known standards, referencing the measurement plane to the DUT",
-            "It is only a legal formality with no measurement effect",
-            "It replaces the need to read the manual"
-          ],
-          "answerIndex": 1,
-          "explanation": "Calibration (e.g. SOLT - short/open/load/thru on a VNA) measures known standards so the instrument can solve for and subtract its systematic errors, moving the reference plane to the DUT connectors. Without it, cable and fixture effects corrupt magnitude and especially phase. Periodic factory cal also keeps absolute accuracy traceable."
+          "id": "measurement-instrumentation-spectrum-and-cal-004",
+          "type": "flashcard",
+          "front": "How is phase noise specified and where does it appear on the display?",
+          "back": "Phase noise appears as skirts/sidebands close to the carrier and is specified in dBc/Hz at a given offset frequency (e.g., -100 dBc/Hz at 10 kHz offset) -- power relative to the carrier, normalized to a 1 Hz bandwidth.",
+          "hint": "dBc/Hz at an offset from the carrier."
         },
         {
-          "id": "measurement-instrumentation-spectrum-010",
+          "id": "measurement-instrumentation-spectrum-and-cal-005",
+          "type": "flashcard",
+          "front": "How do you combine independent measurement uncertainties?",
+          "back": "Add them in quadrature (root-sum-square): u_total = sqrt(sum of u_i^2), assuming the sources are independent and random. Systematic offsets are corrected separately. This is the same RSS combination used for the scope rise-time and noise-quadrature rules.",
+          "hint": "Root-sum-square the independent terms."
+        },
+        {
+          "id": "measurement-instrumentation-spectrum-and-cal-006",
           "type": "mcq",
-          "prompt": "Best practice for trusting an unexpected reading from any single instrument?",
+          "prompt": "You reduce RBW from 10 kHz to 1 kHz. The displayed noise floor changes by about:",
           "choices": [
-            "Always believe the most expensive instrument without question",
-            "Sanity-check it: predict the expected value, cross-check with a second method/instrument, verify settings/ranges, and confirm the instrument is calibrated and not loading the circuit",
-            "Increase the resolution until the number looks reasonable",
-            "Disconnect the ground to reduce noise"
+            "-10 dB",
+            "+10 dB",
+            "-3 dB",
+            "No change"
+          ],
+          "answerIndex": 0,
+          "explanation": "Noise floor shift = 10*log10(1k/10k) = 10*log10(0.1) = -10 dB. A 10x narrower RBW lowers the noise floor 10 dB, exposing smaller spurs (at the cost of a much slower sweep)."
+        },
+        {
+          "id": "measurement-instrumentation-spectrum-and-cal-007",
+          "type": "mcq",
+          "prompt": "An ideal symmetric square wave at f0 shows, on a spectrum analyzer:",
+          "choices": [
+            "Only the fundamental",
+            "Odd harmonics (3f0, 5f0, ...) with amplitude falling as 1/n",
+            "All harmonics with equal amplitude",
+            "Even harmonics only"
           ],
           "answerIndex": 1,
-          "explanation": "Good measurement discipline: form an expectation first, then verify with an independent method, check ranges/coupling/probe factors and calibration, and consider whether the instrument itself perturbs the circuit (loading, burden voltage, aliasing). A reading that contradicts a solid prediction is a prompt to investigate, not to trust blindly."
+          "explanation": "A symmetric square wave's Fourier series contains only odd harmonics with amplitudes proportional to 1/n. Significant even harmonics indicate asymmetry/duty-cycle error in the real signal."
+        },
+        {
+          "id": "measurement-instrumentation-spectrum-and-cal-008",
+          "type": "mcq",
+          "prompt": "New harmonics appear when you raise the SA reference level / lower input attenuation. The likely cause is:",
+          "choices": [
+            "Real harmonics you were missing",
+            "The front-end mixer is compressing and generating its own harmonics",
+            "RBW is too narrow",
+            "Phase noise from the source"
+          ],
+          "answerIndex": 1,
+          "explanation": "If harmonics grow when you increase the power into the mixer (less attenuation), they are internally generated by front-end compression. Add 10 dB attenuation: real harmonics stay put in dBc; internal ones drop. Trust-but-verify."
+        },
+        {
+          "id": "measurement-instrumentation-spectrum-and-cal-009",
+          "type": "mcq",
+          "prompt": "Two independent error sources of +/-2% and +/-1.5% combine to a total uncertainty of about:",
+          "choices": [
+            "+/-3.5%",
+            "+/-0.5%",
+            "+/-2.5%",
+            "+/-1.75%"
+          ],
+          "answerIndex": 2,
+          "explanation": "RSS: sqrt(2^2 + 1.5^2) = sqrt(4 + 2.25) = sqrt(6.25) = 2.5%. Independent uncertainties add in quadrature, not linearly (a linear sum of 3.5% over-states it)."
         }
       ]
     }

@@ -8,374 +8,403 @@
       "title": "Hypothesis Testing & The Detection Problem",
       "order": 1,
       "difficulty": 1,
+      "content": "Radar detection is a **binary hypothesis test**. The receiver observes data $x$ and must choose between $H_0$ (**target absent**, noise only) and $H_1$ (**target present**, signal plus noise). Because the data is noisy, the decision is statistical, not certain.\n\nEvery decision lands in one of four boxes. A correct call of $H_1$ is a **detection**; a missed target is a **miss**; correctly declaring $H_0$ is a correct rejection; and declaring a target when there is none is a **false alarm**. These are summarized by two probabilities you will live and die by:\n\n$$P_d = \\Pr(\\text{decide } H_1 \\mid H_1), \\qquad P_{fa} = \\Pr(\\text{decide } H_1 \\mid H_0).$$\n\nThe probability of a miss is $P_m = 1 - P_d$. A detector applies a **threshold** $\\gamma$ to a test statistic: cross it and you declare a target. Raise $\\gamma$ and you suppress false alarms but also miss weak targets; lower it and you catch faint targets at the cost of more false alarms. There is no free lunch, only a tunable trade-off.\n\nThis exact framing is shared by machine learning: $H_0$/$H_1$ become the negative/positive class, $P_d$ is **recall (true-positive rate)**, and $P_{fa}$ is the **false-positive rate**. The radar instinct of moving a threshold to trade misses against false alarms is the same move as sliding a classifier's decision threshold.",
       "items": [
         {
           "id": "detection-estimation-hypothesis-001",
           "type": "flashcard",
-          "front": "In binary detection, what do the null hypothesis H0 and alternative hypothesis H1 represent in a radar context?",
-          "back": "H0 (null) = 'target absent', the received signal is noise only. H1 (alternative) = 'target present', the received signal is signal-plus-noise. The detector must decide which hypothesis is true from the observation, so detection is fundamentally a two-hypothesis test.",
+          "front": "In binary detection, what do the null hypothesis $H_0$ and alternative hypothesis $H_1$ represent in a radar context?",
+          "back": "$H_0$ (null) = 'target absent', the received signal is noise only. $H_1$ (alternative) = 'target present', the received signal is signal-plus-noise. The detector decides which hypothesis holds from the observation, so detection is fundamentally a two-hypothesis test.",
           "hint": "Target absent vs target present."
         },
         {
           "id": "detection-estimation-hypothesis-002",
           "type": "flashcard",
-          "front": "Define the four outcomes of a binary decision and name the two error types.",
-          "back": "Decide H1 when H1 true = detection (correct). Decide H0 when H0 true = correct rejection. Decide H1 when H0 true = false alarm (Type I error). Decide H0 when H1 true = miss (Type II error). Detection and false alarm are the two we usually design around.",
-          "hint": "Two correct, two wrong; false alarm and miss are the errors."
+          "front": "Define probability of detection $P_d$ and probability of false alarm $P_{fa}$.",
+          "back": "$P_d = \\Pr(\\text{decide } H_1 \\mid H_1)$ is the probability of declaring a target when one is truly present. $P_{fa} = \\Pr(\\text{decide } H_1 \\mid H_0)$ is the probability of declaring a target when only noise is present. A good detector maximizes $P_d$ for a fixed, acceptable $P_{fa}$.",
+          "hint": "Both are conditional probabilities of deciding H1."
         },
         {
           "id": "detection-estimation-hypothesis-003",
-          "type": "flashcard",
-          "front": "Define Pd, Pfa, and Pm (probability of detection, false alarm, and miss) and give the relation between Pd and Pm.",
-          "back": "Pd = P(decide H1 | H1 true). Pfa = P(decide H1 | H0 true). Pm = P(decide H0 | H1 true) = 1 - Pd. Pd is the probability you catch a real target; Pfa is the probability noise alone fires the alarm; Pm is the probability you miss a present target.",
-          "hint": "Pm = 1 - Pd."
+          "type": "mcq",
+          "prompt": "A radar declares 'target present' but no target actually exists. This outcome is a:",
+          "choices": [
+            "Detection",
+            "Miss",
+            "False alarm",
+            "Correct rejection"
+          ],
+          "answerIndex": 2,
+          "explanation": "Declaring $H_1$ when $H_0$ is true is a false alarm, quantified by $P_{fa}$. A miss is the opposite error (deciding $H_0$ when $H_1$ is true). A detection is correctly deciding $H_1$, and a correct rejection is correctly deciding $H_0$."
         },
         {
           "id": "detection-estimation-hypothesis-004",
-          "type": "flashcard",
-          "front": "What is a decision threshold and how does moving it trade off Pd against Pfa?",
-          "back": "The detector compares a test statistic to a threshold gamma and declares H1 if it exceeds gamma. Lowering gamma raises both Pd and Pfa (more sensitive); raising gamma lowers both (more conservative). You cannot increase Pd without increasing Pfa for a fixed sensor SNR; you can only pick where on the curve to sit.",
-          "hint": "One knob trades sensitivity for false alarms."
+          "type": "mcq",
+          "prompt": "The probability of a miss $P_m$ is related to $P_d$ by:",
+          "choices": [
+            "$P_m = P_d$",
+            "$P_m = 1 - P_d$",
+            "$P_m = 1 - P_{fa}$",
+            "$P_m = P_{fa} - P_d$"
+          ],
+          "answerIndex": 1,
+          "explanation": "Given a target is present, you either detect it or miss it, so $P_d + P_m = 1$, giving $P_m = 1 - P_d$. The miss probability is conditioned on $H_1$, just like $P_d$."
         },
         {
           "id": "detection-estimation-hypothesis-005",
-          "type": "mcq",
-          "prompt": "A radar declares a target where there is none (only noise). Which outcome is this?",
-          "choices": ["Miss (Type II error)", "False alarm (Type I error)", "Correct rejection", "Detection"],
-          "answerIndex": 1,
-          "explanation": "Declaring H1 (target present) when H0 (noise only) is true is a false alarm, the Type I error. A miss is the opposite mistake: declaring H0 when a target is actually present."
+          "type": "flashcard",
+          "front": "What happens to $P_d$ and $P_{fa}$ as you raise the detection threshold $\\gamma$?",
+          "back": "Raising $\\gamma$ makes the detector more conservative: both $P_{fa}$ and $P_d$ decrease. You buy fewer false alarms at the cost of missing weak targets. Lowering $\\gamma$ does the reverse. This monotonic trade-off is exactly what an ROC curve traces out.",
+          "hint": "Both move the same direction; it is a trade-off, not a win."
         },
         {
           "id": "detection-estimation-hypothesis-006",
           "type": "mcq",
-          "prompt": "If a detector's Pd = 0.9, what is its probability of miss Pm under the same conditions?",
-          "choices": ["0.9", "0.1", "0.5", "Cannot be determined without Pfa"],
+          "prompt": "In the machine-learning translation of detection, $P_d$ corresponds to which metric?",
+          "choices": [
+            "Precision",
+            "Recall (true-positive rate)",
+            "Accuracy",
+            "F1 score"
+          ],
           "answerIndex": 1,
-          "explanation": "Pm = 1 - Pd because, given a target is present, you either detect it or miss it. So Pm = 1 - 0.9 = 0.1. Pfa concerns the H0 case and does not enter this relation."
+          "explanation": "$P_d = \\Pr(\\text{decide } H_1 \\mid H_1)$ is the fraction of true positives that are caught, i.e. recall / true-positive rate. $P_{fa}$ corresponds to the false-positive rate. Precision involves the prior/base rate of positives, which $P_d$ does not."
         },
         {
           "id": "detection-estimation-hypothesis-007",
-          "type": "mcq",
-          "prompt": "An operator raises the detection threshold gamma. What is the expected effect?",
-          "choices": ["Both Pd and Pfa increase", "Both Pd and Pfa decrease", "Pd increases, Pfa decreases", "Pd and Pfa are unaffected by gamma"],
-          "answerIndex": 1,
-          "explanation": "A higher threshold makes the detector harder to trigger, so fewer noise spikes cross it (lower Pfa) but also fewer genuine targets cross it (lower Pd). The threshold cannot independently improve one without the other at fixed SNR."
+          "type": "flashcard",
+          "front": "Why is a single fixed decision rule insufficient to characterize a detector's performance?",
+          "back": "Performance is a curve, not a point. For any detector, $P_d$ and $P_{fa}$ both depend on the threshold, so one operating point hides the trade-off. You characterize the whole detector by sweeping the threshold and plotting $P_d$ versus $P_{fa}$ (the ROC). Comparing detectors fairly means comparing them at equal $P_{fa}$.",
+          "hint": "One threshold gives one point; you need the whole sweep."
         },
         {
           "id": "detection-estimation-hypothesis-008",
           "type": "mcq",
-          "prompt": "Why is binary hypothesis testing the natural framework for radar detection?",
-          "choices": ["Because radar only measures range", "Because the receiver must repeatedly decide between 'target present' and 'target absent' from a noisy signal", "Because noise is always Gaussian", "Because antennas have two ports"],
+          "prompt": "Two PDFs $p(x|H_0)$ and $p(x|H_1)$ overlap, with a vertical threshold $\\gamma$. The area of $p(x|H_0)$ to the right of $\\gamma$ is:",
+          "choices": [
+            "$P_d$",
+            "$P_{fa}$",
+            "$P_m$",
+            "The prior probability of $H_1$"
+          ],
           "answerIndex": 1,
-          "explanation": "At each range-Doppler cell the receiver faces a yes/no decision (target present vs absent) corrupted by noise. That is exactly a two-hypothesis test, which is why Pd, Pfa, thresholds, and likelihood ratios apply directly."
+          "explanation": "Deciding $H_1$ means the statistic exceeds $\\gamma$. Integrating the noise-only density $p(x|H_0)$ over that region gives the probability of declaring a target when none is present, which is $P_{fa}$. The area of $p(x|H_1)$ to the right of $\\gamma$ is $P_d$.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/mathematics/images/detection-estimation-1.svg"
         },
         {
           "id": "detection-estimation-hypothesis-009",
           "type": "flashcard",
-          "front": "How does raising SNR change the Pd/Pfa tradeoff compared to merely moving the threshold?",
-          "back": "Moving the threshold only slides you along a fixed operating curve. Raising SNR (more signal energy relative to noise) separates the H0 and H1 distributions, so you can achieve higher Pd at the SAME Pfa. SNR moves you to a better curve; the threshold picks a point on it.",
-          "hint": "Threshold = point on a curve; SNR = which curve."
+          "front": "How does the noise PDF determine the threshold for a target false-alarm budget?",
+          "back": "Given $p(x|H_0)$, you set $\\gamma$ so that the tail probability $\\int_{\\gamma}^{\\infty} p(x|H_0)\\,dx = P_{fa}$ equals your allowed false-alarm rate. Only the noise distribution and the desired $P_{fa}$ fix $\\gamma$; the signal distribution then determines the resulting $P_d$. This is the seed of the Neyman-Pearson approach.",
+          "hint": "Threshold comes from the noise tail and your Pfa budget."
         }
       ]
     },
     {
       "id": "lrt-roc",
-      "title": "Likelihood Ratio, Neyman-Pearson & ROC",
+      "title": "Likelihood Ratio Test, Neyman-Pearson & ROC",
       "order": 2,
       "difficulty": 2,
+      "content": "How do you choose the *best* detector, not just a detector? The **Neyman-Pearson (NP) criterion** answers it: among all tests with false-alarm rate $\\le P_{fa}$, the one that maximizes $P_d$ compares the **likelihood ratio** to a threshold.\n\n$$\\Lambda(x) = \\frac{p(x \\mid H_1)}{p(x \\mid H_0)} \\;\\underset{H_0}{\\overset{H_1}{\\gtrless}}\\; \\eta.$$\n\nThis is the **likelihood ratio test (LRT)**. The number $\\eta$ is chosen so the false-alarm constraint $P_{fa} = \\alpha$ is met with equality. The NP lemma proves no other rule can do better at that $P_{fa}$, so the LRT is *optimal*. It is often easier to work with the **log-likelihood ratio** $\\ln \\Lambda(x)$, which turns products of densities into sums and, for Gaussian noise, into a linear (matched-filter) statistic.\n\nSweeping $\\eta$ from $\\infty$ down to $0$ traces the **receiver operating characteristic (ROC)**: a plot of $P_d$ (vertical) versus $P_{fa}$ (horizontal). Key facts: the ROC is monotonically increasing, lies on or above the chance diagonal $P_d = P_{fa}$, and bows toward the top-left corner as SNR improves. Its slope at any point equals the threshold $\\eta$ there, and the **area under the curve (AUC)** is a single-number quality summary.\n\nML practitioners use the same ROC and AUC to grade classifiers, and a Bayes-optimal classifier thresholds the posterior ratio, which is just the likelihood ratio weighted by priors. Detection theory and classification are the same mathematics in different clothes.",
       "items": [
         {
           "id": "detection-estimation-lrt-roc-001",
           "type": "flashcard",
-          "front": "Write the likelihood ratio L(x) for observation x and state the likelihood ratio test (LRT) decision rule.",
-          "back": "L(x) = p(x | H1) / p(x | H0), the ratio of the data likelihood under target-present to target-absent. The LRT decides H1 if L(x) >= gamma, else H0. Equivalently, in log form, decide H1 if ln L(x) >= ln gamma. The threshold gamma sets where you draw the line.",
-          "hint": "Ratio of the two likelihoods vs a threshold."
+          "front": "State the likelihood ratio test (LRT) and the role of its threshold $\\eta$.",
+          "back": "Form the likelihood ratio $\\Lambda(x) = p(x\\mid H_1)/p(x\\mid H_0)$ and decide $H_1$ if $\\Lambda(x) \\geq \\eta$, else $H_0$. The threshold $\\eta$ is chosen to meet the false-alarm constraint $P_{fa} = \\alpha$. Large $\\Lambda$ means the data is far more probable under 'target present' than under 'noise only'.",
+          "hint": "Compare a ratio of likelihoods to a threshold."
         },
         {
           "id": "detection-estimation-lrt-roc-002",
-          "type": "flashcard",
-          "front": "State the Neyman-Pearson (NP) criterion and the lemma's main result.",
-          "back": "NP criterion: maximize Pd subject to a constraint Pfa <= alpha (a fixed false-alarm budget). The Neyman-Pearson lemma proves the optimal test is the likelihood ratio test L(x) >= gamma, with gamma chosen so that Pfa exactly equals alpha. No other test gives higher Pd at that Pfa.",
-          "hint": "Max Pd for a fixed Pfa; LRT is optimal."
+          "type": "mcq",
+          "prompt": "The Neyman-Pearson lemma states that the LRT is the detector that:",
+          "choices": [
+            "Minimizes the total number of decisions",
+            "Maximizes $P_d$ subject to a fixed constraint $P_{fa} \\leq \\alpha$",
+            "Minimizes $P_d$ for a given $P_{fa}$",
+            "Requires no knowledge of the noise distribution"
+          ],
+          "answerIndex": 1,
+          "explanation": "Neyman-Pearson is a constrained optimization: among all tests with $P_{fa} \\leq \\alpha$, the likelihood ratio test achieves the largest possible $P_d$. It needs the densities under both hypotheses and does not use prior probabilities, unlike the Bayesian formulation."
         },
         {
           "id": "detection-estimation-lrt-roc-003",
           "type": "flashcard",
-          "front": "Why do we usually work with the log-likelihood ratio (LLR) instead of the raw likelihood ratio?",
-          "back": "Likelihoods of independent samples multiply; taking the log turns products into sums, which is far easier to handle. For Gaussian noise the log removes the exponential and leaves a quadratic/linear statistic. Since ln is monotonic, the test ln L(x) >= ln gamma is equivalent to L(x) >= gamma.",
-          "hint": "Log turns products into sums and is monotonic."
+          "front": "Why is the log-likelihood ratio $\\ln \\Lambda(x)$ usually preferred in practice?",
+          "back": "Taking the log is monotonic, so thresholding $\\ln \\Lambda(x) \\gtrless \\ln \\eta$ gives the identical decision. It converts products of densities (independent samples) into sums, avoids numerical underflow, and for Gaussian noise collapses to a linear statistic, the matched-filter output. ML losses are negative log-likelihoods for the same reasons.",
+          "hint": "Monotone transform that turns products into sums."
         },
         {
           "id": "detection-estimation-lrt-roc-004",
-          "type": "flashcard",
-          "front": "What does an ROC curve plot, and what do the corners and the diagonal mean?",
-          "back": "An ROC (Receiver Operating Characteristic) plots Pd (y-axis) versus Pfa (x-axis) as the threshold sweeps. Top-left (Pd=1, Pfa=0) is a perfect detector; the diagonal Pd=Pfa is a useless detector (no better than guessing). Curves that bow toward the top-left correspond to higher SNR / better detectors.",
-          "hint": "Pd vs Pfa; diagonal = guessing, top-left = perfect."
+          "type": "mcq",
+          "prompt": "On a receiver operating characteristic (ROC) curve, the axes are:",
+          "choices": [
+            "Threshold $\\eta$ (x) vs SNR (y)",
+            "$P_{fa}$ (x) vs $P_d$ (y)",
+            "$P_d$ (x) vs threshold (y)",
+            "SNR (x) vs $P_{fa}$ (y)"
+          ],
+          "answerIndex": 1,
+          "explanation": "The ROC plots probability of detection $P_d$ on the vertical axis against probability of false alarm $P_{fa}$ on the horizontal axis, generated by sweeping the threshold. Each threshold maps to one operating point on the curve.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/mathematics/images/detection-estimation-2.svg"
         },
         {
           "id": "detection-estimation-lrt-roc-005",
-          "type": "flashcard",
-          "front": "On an ROC curve, what does a single operating point correspond to, and what does the curve's bow toward the top-left indicate?",
-          "back": "Each point corresponds to one choice of threshold gamma, giving a specific (Pfa, Pd) pair. Sweeping gamma traces the whole curve. The more the curve bows toward the upper-left corner, the higher the SNR and the better the detector, since you get high Pd at low Pfa.",
-          "hint": "A point is a threshold; the bow is SNR."
+          "type": "mcq",
+          "prompt": "An ROC curve that lies exactly on the diagonal line $P_d = P_{fa}$ indicates a detector that:",
+          "choices": [
+            "Is perfect",
+            "Performs no better than random guessing",
+            "Has infinite SNR",
+            "Has zero false alarms"
+          ],
+          "answerIndex": 1,
+          "explanation": "The chance diagonal $P_d = P_{fa}$ means the detector is equally likely to declare a target under $H_1$ and $H_0$, i.e. it carries no discriminating information, which is random guessing. Better detectors bow toward the upper-left corner; a perfect detector reaches $(0,1)$."
         },
         {
           "id": "detection-estimation-lrt-roc-006",
-          "type": "mcq",
-          "prompt": "Under the Neyman-Pearson criterion, the optimal detector is:",
-          "choices": ["The detector minimizing total error probability", "The likelihood ratio test with threshold set to meet Pfa <= alpha", "Any detector with Pd > 0.5", "The detector with the lowest computational cost"],
-          "answerIndex": 1,
-          "explanation": "Neyman-Pearson fixes a false-alarm budget alpha and maximizes Pd. The NP lemma shows the likelihood ratio test L(x) >= gamma, with gamma chosen so Pfa = alpha, is optimal. Minimizing total error is the Bayes criterion, a different objective."
+          "type": "flashcard",
+          "front": "What does the area under the ROC curve (AUC) summarize, and what is the chance value?",
+          "back": "AUC is a single scalar in $[0,1]$ measuring overall discriminability: it equals the probability that the test statistic for a random $H_1$ case exceeds that of a random $H_0$ case. AUC $= 0.5$ is chance (diagonal), AUC $= 1$ is perfect separation. Higher SNR pushes AUC toward 1, and ML uses the identical metric to compare classifiers.",
+          "hint": "0.5 is random, 1.0 is perfect."
         },
         {
           "id": "detection-estimation-lrt-roc-007",
           "type": "mcq",
-          "prompt": "On an ROC curve, which point represents an ideal (perfect) detector?",
-          "choices": ["Bottom-left (Pfa=0, Pd=0)", "Top-right (Pfa=1, Pd=1)", "Top-left (Pfa=0, Pd=1)", "The center of the diagonal"],
-          "answerIndex": 2,
-          "explanation": "A perfect detector catches every target (Pd=1) while never firing on noise (Pfa=0), which is the top-left corner. The diagonal Pd=Pfa is chance-level performance; points below it are worse than guessing."
+          "prompt": "How does the Bayesian (minimum-risk) detector differ from the Neyman-Pearson detector?",
+          "choices": [
+            "It does not use the likelihood ratio at all",
+            "It compares the likelihood ratio to a threshold set by priors and costs, rather than by a $P_{fa}$ constraint",
+            "It always uses threshold $\\eta = 1$",
+            "It maximizes $P_{fa}$ instead of $P_d$"
+          ],
+          "answerIndex": 1,
+          "explanation": "Both detectors threshold the same likelihood ratio $\\Lambda(x)$. They differ only in how the threshold is chosen: NP picks $\\eta$ to satisfy a false-alarm constraint, while the Bayesian rule sets $\\eta = \\frac{\\Pr(H_0)(C_{10}-C_{00})}{\\Pr(H_1)(C_{01}-C_{11})}$ from priors and misclassification costs."
         },
         {
           "id": "detection-estimation-lrt-roc-008",
-          "type": "mcq",
-          "prompt": "Two detectors are compared on the same axes. Detector A's ROC lies entirely above Detector B's. What can you conclude?",
-          "choices": ["A has higher Pfa everywhere", "A is uniformly better: higher Pd at every Pfa", "B has higher SNR", "They are equivalent at the diagonal"],
-          "answerIndex": 1,
-          "explanation": "If A's ROC dominates (is above) B's at every Pfa, then for any allowed false-alarm rate A delivers higher Pd. This usually reflects A operating at higher effective SNR or using a better (e.g. matched) statistic."
+          "type": "flashcard",
+          "front": "For two equal-variance Gaussians (means $0$ under $H_0$, $A$ under $H_1$), what does the LRT reduce to?",
+          "back": "The log-likelihood ratio simplifies to a comparison of the observation against a threshold: decide $H_1$ when $x \\geq \\gamma$. The achievable performance depends only on the separation $d = A/\\sigma$, the detection index. Performance is governed by $d^2$, the SNR, so doubling amplitude (4x power) sharply improves the ROC.",
+          "hint": "It becomes a simple threshold on x; SNR sets the separation."
         },
         {
           "id": "detection-estimation-lrt-roc-009",
           "type": "mcq",
-          "prompt": "In an LRT for independent Gaussian samples, why is the log-likelihood ratio preferred over the raw ratio?",
-          "choices": ["It changes which hypothesis is optimal", "It converts a product of likelihoods into a sum and is monotonic, preserving the decision", "It eliminates the need for a threshold", "It guarantees Pfa = 0"],
+          "prompt": "At a given operating point, the local slope of the ROC curve equals:",
+          "choices": [
+            "The AUC",
+            "The likelihood-ratio threshold $\\eta$ used at that point",
+            "$P_{fa}$ itself",
+            "The noise variance $\\sigma^2$"
+          ],
           "answerIndex": 1,
-          "explanation": "Independent-sample likelihoods multiply; the log turns the product into a sum and, for Gaussians, cancels the exponential to leave a tractable linear/quadratic statistic. Because ln is monotonic increasing, comparing ln L to ln gamma gives the identical decision."
-        },
-        {
-          "id": "detection-estimation-lrt-roc-010",
-          "type": "mcq",
-          "prompt": "You must guarantee no more than one false alarm per hour. Which design philosophy does this reflect?",
-          "choices": ["Maximum likelihood estimation", "Minimum mean-square error", "Neyman-Pearson (constrain Pfa, then maximize Pd)", "Maximum a posteriori"],
-          "answerIndex": 2,
-          "explanation": "Fixing an acceptable false-alarm rate and then making Pd as large as possible under that constraint is precisely the Neyman-Pearson formulation. The other three are estimation criteria, not detection design rules."
+          "explanation": "A classic result: $dP_d/dP_{fa} = \\eta$, the likelihood-ratio threshold at that operating point. Because the slope is non-increasing as you move right, the ROC is concave, which also implies $\\eta$ decreases as you tolerate more false alarms."
         }
       ]
     },
     {
       "id": "matched-cfar",
-      "title": "Matched Filter, Correlation & CFAR Detection",
+      "title": "Matched Filter & CFAR Detection",
       "order": 3,
       "difficulty": 3,
+      "content": "When the transmitted pulse $s[n]$ is *known* and the noise is **additive white Gaussian (AWGN)**, the NP-optimal detector has a beautiful form: the **matched filter**. It correlates the received data with a time-reversed, conjugated copy of the pulse,\n\n$$y[n] = \\sum_k r[k]\\, s^{*}[k-n],$$\n\nand the test statistic is the correlator output. The matched filter is optimal because it **maximizes the output SNR** among all linear filters, achieving\n\n$$\\text{SNR}_{out} = \\frac{2E}{N_0},$$\n\nwhere $E$ is the pulse energy and $N_0/2$ is the noise PSD. Crucially this depends only on energy, not pulse shape, which is why **pulse compression** (long coded/chirp pulses) gets range resolution and detection energy simultaneously. Watch the convolution-vs-correlation sign convention: the matched filter is correlation, a *time-reversed* convolution.\n\nA fixed threshold fails in the real world because clutter and interference make the noise level vary across range and time. **CFAR (constant false-alarm rate)** detection fixes this by estimating the local noise power from neighboring **reference cells** around the **cell under test**, skipping **guard cells** so target energy does not leak into the estimate, and scaling that estimate by a factor $\\alpha$ to set an adaptive threshold. **Cell-averaging CFAR (CA-CFAR)** averages the reference cells; the multiplier $\\alpha = N(P_{fa}^{-1/N} - 1)$ holds $P_{fa}$ constant as the noise floor drifts.\n\nThe matched-filter idea echoes in ML: a convolutional filter learns a template and correlates it across the input, firing strongly where the pattern matches, exactly a learned matched filter.",
       "items": [
         {
           "id": "detection-estimation-matched-cfar-001",
           "type": "flashcard",
-          "front": "What is the matched filter and in what sense is it optimal?",
-          "back": "The matched filter is a linear filter whose impulse response is the time-reversed, conjugated copy of the known transmitted pulse: h(t) = s(T - t)*. In additive white Gaussian noise (AWGN) it maximizes the output peak SNR at the sampling instant, which (via the NP lemma) makes it the optimal detector statistic for a known signal in AWGN.",
-          "hint": "Time-reversed conjugate of the pulse; maximizes output SNR."
+          "front": "What is a matched filter, and in what sense is it optimal?",
+          "back": "A matched filter correlates the received signal with a time-reversed, conjugated replica of the known transmitted pulse, $h[n] = s^{*}[-n]$. In additive white Gaussian noise it is the linear filter that **maximizes the output SNR** at the sampling instant, and it implements the NP-optimal detector for a known signal in AWGN.",
+          "hint": "Correlate with a reversed/conjugated copy of the known pulse."
         },
         {
           "id": "detection-estimation-matched-cfar-002",
-          "type": "flashcard",
-          "front": "What output peak SNR does a matched filter achieve, and why is it independent of pulse shape?",
-          "back": "The matched filter output peak SNR equals 2E/N0, where E is the received signal energy and N0/2 is the noise power spectral density. It depends only on total energy E, not on the pulse's shape or bandwidth. This is why you can shape the waveform (e.g. for resolution) without losing detection SNR.",
-          "hint": "Depends on energy E, not shape; SNR = 2E/N0."
+          "type": "mcq",
+          "prompt": "The peak output SNR of a matched filter for a pulse of energy $E$ in white noise of PSD $N_0/2$ is:",
+          "choices": [
+            "$E / N_0$",
+            "$2E / N_0$",
+            "$E^2 / N_0$",
+            "$N_0 / (2E)$"
+          ],
+          "answerIndex": 1,
+          "explanation": "The matched filter achieves $\\text{SNR}_{out} = 2E/N_0$, which depends only on pulse energy $E$ and noise PSD, not on pulse shape. This shape-independence is what allows long coded waveforms to retain detection performance while improving range resolution."
         },
         {
           "id": "detection-estimation-matched-cfar-003",
           "type": "flashcard",
-          "front": "How is the correlation receiver related to the matched filter?",
-          "back": "The correlation receiver computes the inner product (integral of received signal times a stored replica of the transmitted pulse) and compares it to a threshold. For a known signal in AWGN it produces exactly the same decision statistic as sampling the matched-filter output at the optimal instant: convolution with the time-reversed pulse equals correlation with the pulse.",
-          "hint": "Correlate-with-replica equals matched-filter output at the peak."
+          "front": "Why does matched-filter SNR depending only on energy enable pulse compression?",
+          "back": "Since $\\text{SNR}_{out} = 2E/N_0$ ignores pulse shape, you can spread the energy over a long, wideband coded pulse (e.g. an LFM chirp) to gain range resolution and average transmit power, then compress it in the matched filter to recover a sharp peak. You get detection energy and resolution without a huge peak power.",
+          "hint": "Energy, not shape, sets SNR, so spread it out then compress."
         },
         {
           "id": "detection-estimation-matched-cfar-004",
-          "type": "flashcard",
-          "front": "What is pulse compression and how does it relate to the matched filter?",
-          "back": "Pulse compression transmits a long, coded (e.g. linear-FM chirp or phase-coded) pulse for high energy, then matched-filters it to compress the return into a narrow peak. This decouples detection range (set by energy E) from range resolution (set by bandwidth), giving long-range detection AND fine resolution. The compressor IS the matched filter for the coded waveform.",
-          "hint": "Long coded pulse for energy, matched filter compresses to narrow peak."
+          "type": "mcq",
+          "prompt": "A common implementation pitfall is confusing the matched filter with convolution. The matched filter is actually:",
+          "choices": [
+            "Convolution with the pulse (no time reversal)",
+            "Correlation, i.e. convolution with a time-reversed (and conjugated) copy of the pulse",
+            "The Fourier transform of the pulse",
+            "Differentiation of the received signal"
+          ],
+          "answerIndex": 1,
+          "explanation": "Matched filtering is correlation, which equals convolution with a time-reversed conjugated replica $s^{*}[-n]$. Forgetting the time reversal (or the conjugate, for complex signals) is a classic silent bug that shifts or distorts the compressed peak."
         },
         {
           "id": "detection-estimation-matched-cfar-005",
           "type": "flashcard",
-          "front": "What problem does CFAR (Constant False-Alarm Rate) detection solve, and what is its core idea?",
-          "back": "A fixed threshold gives a constant Pfa only if the noise/clutter level is known and constant. In reality clutter varies across range and azimuth, so a fixed threshold causes false-alarm storms in strong clutter. CFAR estimates the local noise/clutter power from neighboring reference cells and sets the threshold adaptively, keeping Pfa roughly constant regardless of background level.",
-          "hint": "Adaptive threshold from local background to hold Pfa fixed."
+          "front": "What problem does CFAR solve that a fixed threshold cannot?",
+          "back": "In real environments the noise-plus-clutter power varies across range, azimuth, and time, so a single fixed threshold yields a wildly varying false-alarm rate, flooding the tracker in clutter and going blind in quiet regions. CFAR estimates the local interference power from neighboring cells and adapts the threshold to hold $P_{fa}$ constant.",
+          "hint": "Noise floor drifts; the threshold must adapt to keep Pfa fixed."
         },
         {
           "id": "detection-estimation-matched-cfar-006",
-          "type": "flashcard",
-          "front": "In cell-averaging CFAR (CA-CFAR), what are the cell under test, guard cells, and reference cells?",
-          "back": "Cell under test (CUT) is the range/Doppler cell being tested. Guard cells immediately flank the CUT and are excluded so target energy leaking into neighbors does not bias the estimate. Reference (training) cells beyond the guards estimate the local noise/clutter level by averaging; the threshold = scaling factor alpha times that average.",
-          "hint": "CUT in the middle, guards next to it, reference cells outside."
+          "type": "mcq",
+          "prompt": "In a CFAR detector, what is the purpose of the GUARD cells immediately around the cell under test?",
+          "choices": [
+            "To increase the number of reference samples",
+            "To prevent target energy from leaking into the noise-power estimate",
+            "To store the previous frame's threshold",
+            "To apply the matched filter"
+          ],
+          "answerIndex": 1,
+          "explanation": "Guard cells are excluded from the noise estimate so that energy spillover from a real target in the cell under test does not inflate the estimated noise floor, which would self-suppress the detection. Only the reference cells beyond the guard cells are averaged."
         },
         {
           "id": "detection-estimation-matched-cfar-007",
-          "type": "mcq",
-          "prompt": "In AWGN, the matched filter is optimal because it:",
-          "choices": ["Minimizes the transmitted bandwidth", "Maximizes the output peak signal-to-noise ratio at the sampling instant", "Removes all noise from the signal", "Always produces zero false alarms"],
-          "answerIndex": 1,
-          "explanation": "The matched filter maximizes the peak output SNR (= 2E/N0) for a known signal in white Gaussian noise. By the NP lemma, maximizing that SNR yields the optimal detection statistic. It does not eliminate noise or guarantee zero false alarms."
+          "type": "flashcard",
+          "front": "How does cell-averaging CFAR (CA-CFAR) set its threshold?",
+          "back": "It averages the power in $N$ reference cells to estimate the local noise level $\\hat{P}$, then sets the threshold $T = \\alpha \\hat{P}$. The scale factor $\\alpha = N\\,(P_{fa}^{-1/N} - 1)$ is derived so the false-alarm rate stays at the design value regardless of the absolute noise power. The cell under test is declared a target if it exceeds $T$.",
+          "hint": "Average reference cells, multiply by a constant alpha set from Pfa and N."
         },
         {
           "id": "detection-estimation-matched-cfar-008",
           "type": "mcq",
-          "prompt": "The matched-filter output peak SNR for a pulse in AWGN depends primarily on:",
-          "choices": ["The pulse's shape and bandwidth", "The total received signal energy E and noise PSD N0", "The carrier frequency only", "The receiver's clock rate"],
-          "answerIndex": 1,
-          "explanation": "Peak output SNR = 2E/N0: it is set by total received energy E and noise power spectral density N0/2, and is independent of the specific pulse shape. This is exactly why pulse compression can shape the waveform for resolution without sacrificing detection SNR."
+          "prompt": "CA-CFAR degrades badly at a clutter edge or with a second nearby target. A variant that mitigates the multiple-target masking case is:",
+          "choices": [
+            "CA-CFAR with more reference cells",
+            "GO-CFAR (greatest-of)",
+            "OS-CFAR (ordered-statistic) or SO-CFAR (smallest-of)",
+            "A fixed-threshold detector"
+          ],
+          "answerIndex": 2,
+          "explanation": "When an interfering target sits in the reference window, CA-CFAR overestimates the noise and masks the true target. Ordered-statistic CFAR (OS-CFAR) picks a ranked reference value, and smallest-of CFAR (SO-CFAR) is more robust to interferers, at some cost in homogeneous-clutter performance. GO-CFAR instead targets clutter edges."
         },
         {
           "id": "detection-estimation-matched-cfar-009",
-          "type": "mcq",
-          "prompt": "Why does CFAR use guard cells around the cell under test?",
-          "choices": ["To increase the transmitted power", "To prevent target energy spilling into adjacent cells from corrupting the noise estimate", "To compress the pulse", "To lower the carrier frequency"],
-          "answerIndex": 1,
-          "explanation": "A target's energy can leak into cells immediately adjacent to the CUT. If those were used as reference cells, the estimated background would be inflated, raising the threshold and masking the target. Guard cells are excluded from the average to avoid this self-masking."
-        },
-        {
-          "id": "detection-estimation-matched-cfar-010",
-          "type": "mcq",
-          "prompt": "How does CA-CFAR keep the false-alarm rate approximately constant as clutter level changes?",
-          "choices": ["By using a single fixed threshold for the whole scan", "By scaling the threshold to a running estimate of the local background power from reference cells", "By increasing the pulse repetition frequency", "By switching the matched filter off in clutter"],
-          "answerIndex": 1,
-          "explanation": "CFAR estimates the local noise/clutter power from the reference cells and sets threshold = alpha times that estimate. When the background rises, the estimate and threshold rise together, so the probability that noise alone crosses the threshold (Pfa) stays roughly fixed."
-        },
-        {
-          "id": "detection-estimation-matched-cfar-011",
-          "type": "mcq",
-          "prompt": "Pulse compression lets a radar achieve which combination?",
-          "choices": ["Short pulse energy with coarse resolution", "Long-pulse detection range together with fine range resolution", "Zero false alarms with infinite range", "Lower SNR but simpler hardware"],
-          "answerIndex": 1,
-          "explanation": "A long coded pulse carries high energy (good detection range), and matched-filtering it compresses the return to a narrow peak whose width is set by bandwidth (fine range resolution). This decouples range from resolution, which a single short pulse cannot do."
-        },
-        {
-          "id": "detection-estimation-matched-cfar-012",
-          "type": "mcq",
-          "prompt": "The correlation receiver and the matched filter produce the same detection statistic for a known signal in AWGN because:",
-          "choices": ["Both ignore the noise spectrum", "Correlating the input with a stored replica equals convolving with the time-reversed pulse sampled at the peak", "Both require a Fourier transform", "Neither uses a threshold"],
-          "answerIndex": 1,
-          "explanation": "Convolution with a time-reversed conjugated replica (the matched filter), sampled at the optimal instant, is mathematically identical to correlating the received waveform against the stored replica. They are two implementations of the same optimal operation."
+          "type": "flashcard",
+          "front": "How does a convolutional neural network filter relate to a matched filter?",
+          "back": "A CNN kernel slides (correlates) across the input and produces a large response where the input matches the learned template, identical in form to a matched filter correlating a known pulse. The difference is that the radar matched filter uses a known replica derived from physics, while the CNN *learns* its templates from data by minimizing a loss.",
+          "hint": "A learned, data-driven correlation template."
         }
       ]
     },
     {
-      "id": "estimation-ml",
-      "title": "Estimation Theory, CRLB & the Bridge to Machine Learning",
+      "id": "estimation-crb",
+      "title": "Estimation: MLE, MAP, MMSE & the Cramer-Rao Bound",
       "order": 4,
       "difficulty": 4,
+      "content": "Detection asks *whether* a target is present; **estimation** asks *what* its parameters are, range, Doppler, angle. Given data $x$ with likelihood $p(x \\mid \\theta)$, three estimators dominate.\n\nThe **maximum likelihood estimator (MLE)** picks the parameter that makes the observed data most probable:\n\n$$\\hat{\\theta}_{ML} = \\arg\\max_{\\theta} \\; p(x \\mid \\theta) = \\arg\\max_{\\theta} \\; \\ln p(x \\mid \\theta).$$\n\nThe **maximum a posteriori (MAP)** estimator adds a prior $p(\\theta)$ and maximizes the posterior $p(\\theta \\mid x) \\propto p(x \\mid \\theta)\\,p(\\theta)$; it reduces to MLE when the prior is flat. The **minimum mean-square error (MMSE)** estimator minimizes $E[(\\hat{\\theta}-\\theta)^2]$ and equals the posterior mean $E[\\theta \\mid x]$.\n\nEvery estimator has a **bias** $b = E[\\hat\\theta]-\\theta$ and a **variance**; mean-square error decomposes as $\\text{MSE} = \\text{bias}^2 + \\text{variance}$, the same bias-variance trade-off ML practitioners obsess over. There is a hard floor on how good any *unbiased* estimator can be: the **Cramer-Rao lower bound (CRB)**,\n\n$$\\operatorname{Var}(\\hat\\theta) \\geq \\frac{1}{I(\\theta)}, \\qquad I(\\theta) = -E\\!\\left[\\frac{\\partial^2 \\ln p(x\\mid\\theta)}{\\partial\\theta^2}\\right],$$\n\nwhere $I(\\theta)$ is the **Fisher information**. More information (sharper log-likelihood, higher SNR, more samples) means a lower variance floor, which is why radar accuracy improves with integration time and bandwidth. The deep tie to ML: training by minimizing cross-entropy / negative log-likelihood *is* MLE, and adding L2 regularization (a Gaussian prior) turns it into MAP.",
       "items": [
         {
-          "id": "detection-estimation-estimation-ml-001",
+          "id": "detection-estimation-estimation-crb-001",
           "type": "flashcard",
-          "front": "Define the maximum likelihood estimator (MLE) of a parameter theta.",
-          "back": "The MLE picks the parameter value that makes the observed data most probable: theta_ML = argmax over theta of p(x | theta), equivalently argmax of the log-likelihood ln p(x | theta). It uses no prior on theta and is the foundation of countless estimators (and of supervised-learning training).",
-          "hint": "Argmax of the likelihood (or log-likelihood)."
+          "front": "Define the maximum likelihood estimator (MLE).",
+          "back": "$\\hat{\\theta}_{ML} = \\arg\\max_{\\theta} p(x\\mid\\theta)$, the parameter value that makes the observed data most probable. In practice you maximize the log-likelihood $\\ln p(x\\mid\\theta)$, often by setting its derivative (the score) to zero. MLE uses no prior on $\\theta$.",
+          "hint": "Pick the theta that best explains the data; no prior."
         },
         {
-          "id": "detection-estimation-estimation-ml-002",
-          "type": "flashcard",
-          "front": "Define the maximum a posteriori (MAP) estimator and contrast it with MLE.",
-          "back": "MAP maximizes the posterior: theta_MAP = argmax of p(theta | x) = argmax of p(x | theta) p(theta). It is MLE plus a prior p(theta). When the prior is flat (uninformative) MAP reduces to MLE. The prior acts like regularization, pulling the estimate toward likely values when data are scarce.",
-          "hint": "MAP = MLE weighted by a prior; flat prior gives MLE."
-        },
-        {
-          "id": "detection-estimation-estimation-ml-003",
-          "type": "flashcard",
-          "front": "Define the minimum mean-square error (MMSE) estimator.",
-          "back": "The MMSE estimator minimizes E[(theta_hat - theta)^2]. The optimal MMSE estimate is the posterior mean: theta_MMSE = E[theta | x]. Unlike MAP (posterior mode) or MLE, it averages over the posterior, which makes it the standard target in Bayesian and many ML regression settings.",
-          "hint": "Posterior mean; minimizes expected squared error."
-        },
-        {
-          "id": "detection-estimation-estimation-ml-004",
-          "type": "flashcard",
-          "front": "Define bias and variance of an estimator, and what 'unbiased' means.",
-          "back": "Bias = E[theta_hat] - theta, the systematic offset of the estimate from the truth. Variance = E[(theta_hat - E[theta_hat])^2], the spread of estimates across data realizations. Unbiased means bias = 0 (correct on average). Mean-square error = bias^2 + variance, so reducing one can raise the other (the bias-variance tradeoff).",
-          "hint": "Bias = average offset; variance = spread; MSE = bias^2 + variance."
-        },
-        {
-          "id": "detection-estimation-estimation-ml-005",
-          "type": "flashcard",
-          "front": "State the Cramer-Rao lower bound (CRLB) and what it bounds.",
-          "back": "For any unbiased estimator, Var(theta_hat) >= 1 / I(theta), where I(theta) is the Fisher information. The CRLB is the fundamental floor on the variance (hence accuracy) achievable by an unbiased estimator. An estimator meeting it with equality is called efficient.",
-          "hint": "Variance >= 1 / Fisher information."
-        },
-        {
-          "id": "detection-estimation-estimation-ml-006",
-          "type": "flashcard",
-          "front": "Define Fisher information I(theta) and explain intuitively what it measures.",
-          "back": "I(theta) = E[(d/dtheta ln p(x|theta))^2] = -E[d^2/dtheta^2 ln p(x|theta)]. It measures how sharply the log-likelihood peaks around theta: a sharply curved likelihood is very sensitive to theta, giving high information and thus a low CRLB (can estimate precisely). Flat likelihood = low information = poor precision.",
-          "hint": "Expected curvature of the log-likelihood; sharper peak = more info."
-        },
-        {
-          "id": "detection-estimation-estimation-ml-007",
-          "type": "flashcard",
-          "front": "How are MLE/MAP estimation and machine-learning training the same idea?",
-          "back": "Training a model minimizes a loss summed over data. Choosing parameters to minimize negative log-likelihood IS maximum likelihood estimation; the model's parameters are theta. Adding a regularizer (e.g. L2 weight penalty) corresponds to a prior, turning MLE into MAP. So fitting a classifier is parameter estimation done with gradient descent.",
-          "hint": "Minimizing NLL = MLE; regularizer = prior = MAP."
-        },
-        {
-          "id": "detection-estimation-estimation-ml-008",
-          "type": "flashcard",
-          "front": "Why are common ML loss functions (cross-entropy, MSE) interpretable as negative log-likelihoods?",
-          "back": "Cross-entropy loss equals the negative log-likelihood under a categorical/Bernoulli model, so minimizing it is MLE for classification. Mean-squared-error loss equals the negative log-likelihood under a Gaussian-noise model, so minimizing MSE is MLE for regression. Loss minimization is therefore likelihood maximization in disguise.",
-          "hint": "Cross-entropy = NLL of categorical; MSE = NLL of Gaussian."
-        },
-        {
-          "id": "detection-estimation-estimation-ml-009",
+          "id": "detection-estimation-estimation-crb-002",
           "type": "mcq",
-          "prompt": "The key difference between the MAP and ML estimators is that MAP:",
-          "choices": ["Ignores the data entirely", "Incorporates a prior distribution on the parameter", "Always has lower variance than the CRLB", "Cannot be computed for Gaussian noise"],
+          "prompt": "The MAP estimator differs from the MLE in that it:",
+          "choices": [
+            "Ignores the likelihood entirely",
+            "Maximizes the posterior $p(\\theta\\mid x) \\propto p(x\\mid\\theta)\\,p(\\theta)$, incorporating a prior",
+            "Always has zero variance",
+            "Minimizes the false-alarm rate"
+          ],
           "answerIndex": 1,
-          "explanation": "MAP maximizes p(x|theta)p(theta), adding the prior p(theta) to the likelihood. When the prior is flat, MAP collapses to MLE. The prior behaves like regularization, which is why MAP is more robust than MLE with limited data."
+          "explanation": "MAP maximizes the posterior, which weights the likelihood by a prior $p(\\theta)$. When the prior is uniform (flat), the $p(\\theta)$ factor is constant and MAP collapses to MLE. The prior acts as regularization, pulling estimates toward likely values."
         },
         {
-          "id": "detection-estimation-estimation-ml-010",
-          "type": "mcq",
-          "prompt": "The Cramer-Rao lower bound states that, for an unbiased estimator, the variance is:",
-          "choices": ["Equal to the bias squared", "At least 1 / Fisher information", "At most the Fisher information", "Always zero"],
-          "answerIndex": 1,
-          "explanation": "CRLB: Var(theta_hat) >= 1/I(theta). It is a floor on the variance of any unbiased estimator. More Fisher information (sharper likelihood) lowers the floor, allowing more precise estimation; an estimator achieving equality is efficient."
+          "id": "detection-estimation-estimation-crb-003",
+          "type": "flashcard",
+          "front": "What does the MMSE estimator minimize, and what is its closed form?",
+          "back": "The MMSE estimator minimizes the mean-square error $E[(\\hat\\theta-\\theta)^2]$. Its solution is the conditional mean of the posterior: $\\hat\\theta_{MMSE} = E[\\theta\\mid x]$. Unlike MAP (the posterior mode), MMSE is the posterior mean; for a symmetric unimodal posterior such as a Gaussian, the two coincide.",
+          "hint": "Posterior mean; minimizes squared error."
         },
         {
-          "id": "detection-estimation-estimation-ml-011",
+          "id": "detection-estimation-estimation-crb-004",
           "type": "mcq",
-          "prompt": "An estimator has zero bias but very large variance. Its mean-square error is therefore:",
-          "choices": ["Zero, because it is unbiased", "Dominated by the variance term", "Equal to the bias squared", "Always below the CRLB"],
+          "prompt": "The bias-variance decomposition of mean-square error is:",
+          "choices": [
+            "$\\text{MSE} = \\text{bias} + \\text{variance}$",
+            "$\\text{MSE} = \\text{bias}^2 + \\text{variance}$",
+            "$\\text{MSE} = \\text{bias}^2 - \\text{variance}$",
+            "$\\text{MSE} = \\text{variance} / \\text{bias}^2$"
+          ],
           "answerIndex": 1,
-          "explanation": "MSE = bias^2 + variance. With zero bias, MSE equals the variance, so a large variance makes the MSE large. Unbiasedness alone does not guarantee accuracy; the variance term still matters."
+          "explanation": "$\\text{MSE} = E[(\\hat\\theta-\\theta)^2] = \\text{bias}^2 + \\operatorname{Var}(\\hat\\theta)$. This is the exact trade-off behind regularization in ML: a little bias (e.g. from a prior / L2 penalty) can sharply reduce variance and lower total error."
         },
         {
-          "id": "detection-estimation-estimation-ml-012",
-          "type": "mcq",
-          "prompt": "The MMSE estimator of theta given observation x is:",
-          "choices": ["The mode of the likelihood", "The posterior mean E[theta | x]", "The maximum of the prior", "The value that sets Pfa = 0"],
-          "answerIndex": 1,
-          "explanation": "Minimizing expected squared error E[(theta_hat - theta)^2] yields the posterior mean E[theta|x] as the optimal estimate. MAP uses the posterior mode and MLE the likelihood mode; MMSE averages over the posterior."
+          "id": "detection-estimation-estimation-crb-005",
+          "type": "flashcard",
+          "front": "State the Cramer-Rao lower bound (CRB) and what it limits.",
+          "back": "For any unbiased estimator, $\\operatorname{Var}(\\hat\\theta) \\geq 1/I(\\theta)$, where $I(\\theta)$ is the Fisher information. It is a fundamental floor on achievable variance set by the data's statistics, independent of which estimator you use. An estimator that meets it is called efficient.",
+          "hint": "Variance >= 1 over Fisher information."
         },
         {
-          "id": "detection-estimation-estimation-ml-013",
+          "id": "detection-estimation-estimation-crb-006",
           "type": "mcq",
-          "prompt": "Training a classifier by minimizing cross-entropy loss is equivalent to:",
-          "choices": ["Minimizing the Cramer-Rao bound", "Maximum likelihood estimation of the model parameters", "Computing the matched filter output", "Setting a CFAR threshold"],
+          "prompt": "Fisher information $I(\\theta)$ can be computed as:",
+          "choices": [
+            "$E[\\ln p(x\\mid\\theta)]$",
+            "$-E\\left[\\dfrac{\\partial^2 \\ln p(x\\mid\\theta)}{\\partial\\theta^2}\\right]$",
+            "$\\operatorname{Var}(x)$",
+            "$P_d / P_{fa}$"
+          ],
           "answerIndex": 1,
-          "explanation": "Cross-entropy loss is the negative log-likelihood under a categorical model, so minimizing it maximizes the likelihood of the labels given the inputs. Training is parameter estimation (MLE), and adding a weight-decay regularizer turns it into MAP."
+          "explanation": "Fisher information is the expected curvature of the log-likelihood, $I(\\theta) = -E[\\partial^2 \\ln p / \\partial\\theta^2]$, equivalently the variance of the score $\\partial \\ln p/\\partial\\theta$. A sharply peaked log-likelihood (high curvature) carries more information, lowering the CRB."
         },
         {
-          "id": "detection-estimation-estimation-ml-014",
+          "id": "detection-estimation-estimation-crb-007",
           "type": "mcq",
-          "prompt": "How is binary classification in ML related to detection theory?",
-          "choices": ["It is unrelated to hypothesis testing", "It is a two-hypothesis decision (class 0 vs class 1) with a learned likelihood ratio and threshold", "It always uses the Cramer-Rao bound", "It requires AWGN to work"],
-          "answerIndex": 1,
-          "explanation": "A binary classifier decides between two classes from features, exactly the H0-vs-H1 structure. A logistic model learns (the log of) a likelihood ratio, and the decision threshold trades the two error types just as Pd vs Pfa do on an ROC, which is why ROC/AUC are standard ML metrics."
+          "prompt": "An estimator that achieves the Cramer-Rao bound is described as:",
+          "choices": [
+            "Biased",
+            "Inconsistent",
+            "Efficient",
+            "Sufficient"
+          ],
+          "answerIndex": 2,
+          "explanation": "An unbiased estimator whose variance equals the CRB is efficient: no other unbiased estimator does better. The MLE is asymptotically efficient (achieves the CRB as the number of samples grows), which is one reason it is so widely used."
         },
         {
-          "id": "detection-estimation-estimation-ml-015",
+          "id": "detection-estimation-estimation-crb-008",
+          "type": "flashcard",
+          "front": "Why does radar parameter accuracy improve with more SNR, bandwidth, or integration time?",
+          "back": "Each of these raises the Fisher information $I(\\theta)$ about the parameter (range, Doppler, angle), which lowers the CRB variance floor $1/I(\\theta)$. More SNR sharpens the likelihood peak, wider bandwidth sharpens range information, and longer integration sharpens Doppler. The estimator can then localize the parameter more precisely.",
+          "hint": "All of them increase Fisher information, lowering the variance floor."
+        },
+        {
+          "id": "detection-estimation-estimation-crb-009",
           "type": "mcq",
-          "prompt": "Adding an L2 weight penalty (weight decay) to a training loss corresponds, in estimation terms, to:",
-          "choices": ["Increasing the Fisher information", "Imposing a Gaussian prior on the parameters, turning MLE into MAP", "Lowering the false-alarm rate", "Removing the likelihood term"],
+          "prompt": "Training a neural-network classifier by minimizing cross-entropy loss is mathematically equivalent to:",
+          "choices": [
+            "Maximizing the false-alarm rate",
+            "Maximum likelihood estimation of the model parameters",
+            "Computing the Cramer-Rao bound",
+            "Applying a CFAR threshold"
+          ],
           "answerIndex": 1,
-          "explanation": "An L2 penalty on parameters is the negative log of a zero-mean Gaussian prior. Adding it to the negative log-likelihood gives the negative log-posterior, so minimizing the regularized loss is MAP estimation rather than plain MLE."
+          "explanation": "Cross-entropy loss is the negative log-likelihood of the labels under the model, so minimizing it is exactly MLE of the network weights. Adding an L2 weight penalty corresponds to a Gaussian prior, turning the procedure into MAP estimation, the same MLE/MAP machinery used in radar estimation."
+        },
+        {
+          "id": "detection-estimation-estimation-crb-010",
+          "type": "flashcard",
+          "front": "How does adding L2 regularization to a loss function relate to MAP estimation?",
+          "back": "Minimizing (negative log-likelihood + $\\lambda\\lVert\\theta\\rVert^2$) is equivalent to maximizing the posterior under a zero-mean Gaussian prior on $\\theta$ with variance set by $1/\\lambda$. The data-fit term is the likelihood and the L2 penalty is the log-prior, so regularized training is MAP estimation; weight decay is a Gaussian prior in disguise.",
+          "hint": "L2 penalty = Gaussian prior, so MLE becomes MAP."
         }
       ]
     }

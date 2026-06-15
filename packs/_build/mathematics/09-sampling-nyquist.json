@@ -4,322 +4,285 @@
   "order": 9,
   "lessons": [
     {
-      "id": "fundamentals",
-      "title": "Sampling Fundamentals & the Nyquist Theorem",
+      "id": "sampling-nyquist-1",
+      "title": "Sampling & the Nyquist Theorem",
       "order": 1,
-      "difficulty": 1,
+      "content": "Sampling is the bridge from the continuous analog world your radar front-end lives in to the discrete numbers a CPU or FPGA can process. Model **ideal sampling** as multiplying a continuous signal $x(t)$ by an impulse train (a Dirac comb) of period $T_s = 1/f_s$. Multiplication by a comb in time becomes **convolution with a comb** in frequency, so the spectrum $X(f)$ gets copied (replicated) at every multiple of the sample rate:\n\n$$X_s(f) = f_s \\sum_{k=-\\infty}^{\\infty} X(f - k f_s)$$\n\nThis spectral replication is the whole game. If the original signal is bandlimited to $B$ Hz, each replica is a triangle (schematically) sitting at $0, \\pm f_s, \\pm 2f_s, \\dots$. As long as the replicas do **not overlap**, the baseband copy is a perfect, undistorted image of the original and you can recover $x(t)$ exactly.\n\nThe **Nyquist-Shannon sampling theorem** states the no-overlap condition: a signal bandlimited to $B$ can be perfectly reconstructed if\n\n$$f_s > 2B.$$\n\nThe minimum rate $2B$ is the **Nyquist rate**; half the sample rate, $f_s/2$, is the **Nyquist frequency** (the folding frequency). Keep these straight - the Nyquist rate is a property of the *signal* (twice its bandwidth), while the Nyquist frequency is a property of your *sampler* (half its clock). A classic rust-knocker: you need to beat twice the *bandwidth*, not twice the highest frequency - that distinction is exactly what makes bandpass sampling possible later.",
       "items": [
         {
-          "id": "sampling-nyquist-fundamentals-001",
+          "id": "sampling-nyquist-1-001",
           "type": "flashcard",
-          "front": "What is sampling, in one sentence?",
-          "back": "Sampling is the process of converting a continuous-time signal x(t) into a discrete-time sequence x[n] by recording its amplitude at uniformly spaced instants n*Ts, where Ts is the sampling period and fs = 1/Ts is the sampling rate.",
-          "hint": "Continuous time -> discrete time at regular intervals."
+          "front": "Model ideal sampling as a mathematical operation in the time domain.",
+          "back": "Multiplication of $x(t)$ by an impulse train (Dirac comb) of period $T_s = 1/f_s$: $x_s(t) = x(t)\\sum_n \\delta(t - nT_s)$.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/mathematics/images/sampling-nyquist-1.svg"
         },
         {
-          "id": "sampling-nyquist-fundamentals-002",
+          "id": "sampling-nyquist-1-002",
           "type": "flashcard",
-          "front": "Mathematically, ideal (impulse) sampling is modeled as what operation on x(t)?",
-          "back": "Multiplication of x(t) by a Dirac impulse train (Dirac comb) s(t) = sum over n of delta(t - n*Ts). The sampled signal is xs(t) = x(t) * s(t) = sum of x(n*Ts)*delta(t - n*Ts). This idealization captures the sample instants while ignoring real-world aperture/hold effects.",
-          "hint": "Think of a comb of delta functions spaced Ts apart."
+          "front": "What does multiplication by an impulse train in time do to the spectrum?",
+          "back": "It convolves $X(f)$ with a frequency-domain comb, replicating (copying) the spectrum at every multiple of $f_s$: $X_s(f) = f_s\\sum_k X(f - k f_s)$."
         },
         {
-          "id": "sampling-nyquist-fundamentals-003",
+          "id": "sampling-nyquist-1-003",
           "type": "flashcard",
-          "front": "What does multiplication by an impulse train in the time domain do to the signal's spectrum?",
-          "back": "It convolves the spectrum X(f) with an impulse train in frequency (spaced at fs). The result is periodic spectral replication: copies of X(f) appear centered at every integer multiple of fs (..., -fs, 0, +fs, +2*fs, ...), each scaled by 1/Ts.",
-          "hint": "Time-domain multiplication = frequency-domain convolution; the comb spacing is fs."
+          "front": "State the Nyquist-Shannon sampling theorem condition for perfect reconstruction.",
+          "back": "A signal bandlimited to $B$ Hz can be perfectly reconstructed if $f_s > 2B$ (replicas do not overlap)."
         },
         {
-          "id": "sampling-nyquist-fundamentals-004",
+          "id": "sampling-nyquist-1-004",
           "type": "flashcard",
-          "front": "State the Nyquist-Shannon sampling theorem.",
-          "back": "A baseband signal containing no frequency components above B Hz is completely determined by, and can be exactly reconstructed from, samples taken at a rate fs > 2*B. Equivalently, sampling at strictly more than twice the highest frequency preserves all information.",
-          "hint": "Strictly greater than twice the highest frequency."
+          "front": "Distinguish 'Nyquist rate' from 'Nyquist frequency'.",
+          "back": "Nyquist rate $= 2B$ is the minimum sample rate (a signal property). Nyquist frequency $= f_s/2$ is the folding frequency (a sampler property)."
         },
         {
-          "id": "sampling-nyquist-fundamentals-005",
+          "id": "sampling-nyquist-1-005",
           "type": "flashcard",
-          "front": "Distinguish the Nyquist RATE from the Nyquist FREQUENCY.",
-          "back": "Nyquist RATE = 2*B: the minimum SAMPLING rate needed to capture a signal of bandwidth/highest-frequency B (a property of the SIGNAL). Nyquist FREQUENCY = fs/2: the highest signal frequency that a given sample rate fs can represent without aliasing (a property of the SAMPLER). They are easy to confuse because both involve a factor of 2.",
-          "hint": "Rate is 2*B (about the signal); frequency is fs/2 (about the sampler)."
+          "front": "Why is sampling above twice the bandwidth, not twice the highest frequency, the precise statement?",
+          "back": "The theorem constrains the spectral support (bandwidth $B$). For baseband signals the highest frequency equals $B$, but for bandpass signals the bandwidth can be far below the carrier - enabling undersampling."
         },
         {
-          "id": "sampling-nyquist-fundamentals-006",
+          "id": "sampling-nyquist-1-006",
           "type": "mcq",
-          "prompt": "An audio signal has energy up to 20 kHz. What is the Nyquist rate?",
-          "choices": ["10 kHz", "20 kHz", "40 kHz", "80 kHz"],
-          "answerIndex": 2,
-          "explanation": "The Nyquist rate is 2*B = 2 * 20 kHz = 40 kHz. This is why CD audio uses 44.1 kHz, leaving a small guard band above 40 kHz for the anti-alias filter to roll off."
-        },
-        {
-          "id": "sampling-nyquist-fundamentals-007",
-          "type": "mcq",
-          "prompt": "A baseband signal is sampled at fs = 100 MHz. What is the Nyquist frequency?",
-          "choices": ["25 MHz", "50 MHz", "100 MHz", "200 MHz"],
-          "answerIndex": 1,
-          "explanation": "The Nyquist frequency is fs/2 = 100/2 = 50 MHz. Any baseband signal content above 50 MHz will alias unless removed by an anti-alias filter before the ADC."
-        },
-        {
-          "id": "sampling-nyquist-fundamentals-008",
-          "type": "mcq",
-          "prompt": "Why does the sampling theorem require fs STRICTLY greater than 2*B rather than fs equal to 2*B?",
           "choices": [
-            "At exactly 2*B, adjacent spectral replicas just touch at fs/2, leaving no room for a realizable filter and risking ambiguity for components exactly at B (e.g., a sine at B can be missed if sampled at its zero crossings)",
-            "Sampling hardware physically cannot run at exactly 2*B",
-            "Quantization noise doubles at exactly 2*B",
-            "The DFT is undefined when fs equals 2*B"
+            "2 kHz",
+            "4 kHz",
+            "8 kHz",
+            "16 kHz"
           ],
-          "answerIndex": 0,
-          "explanation": "At fs = 2*B the replicas meet edge-to-edge with zero guard band, so an ideal brick-wall filter would be required, and a tone exactly at B can be sampled at its zero crossings and lost. Real systems sample at fs > 2*B (oversample) to leave a transition band."
+          "explanation": "Nyquist rate $= 2B = 2 \\times 4\\text{ kHz} = 8$ kHz.",
+          "prompt": "A baseband signal is bandlimited to $B = 4$ kHz. What is the minimum (Nyquist) sample rate for perfect reconstruction?",
+          "answerIndex": 2
         },
         {
-          "id": "sampling-nyquist-fundamentals-009",
-          "type": "flashcard",
-          "front": "In an ADC/embedded data acquisition chain, where does sampling actually occur and what is fs set by?",
-          "back": "Sampling occurs in the sample-and-hold (track-and-hold) circuit at the ADC front end; fs is set by the ADC conversion clock (e.g., a timer-triggered conversion or a dedicated sample clock). The chosen fs together with the analog input bandwidth determines whether aliasing happens.",
-          "hint": "Sample-and-hold + conversion clock."
-        },
-        {
-          "id": "sampling-nyquist-fundamentals-010",
+          "id": "sampling-nyquist-1-007",
           "type": "mcq",
-          "prompt": "After ideal sampling at rate fs, what does the spectrum of the sampled signal look like?",
           "choices": [
-            "A single copy of X(f) centered at 0",
-            "The baseband X(f) plus identical scaled replicas centered at every multiple of fs",
-            "A flat (white) spectrum",
-            "X(f) shifted up by fs/2 only"
+            "12 kHz",
+            "24 kHz",
+            "48 kHz",
+            "96 kHz"
           ],
-          "answerIndex": 1,
-          "explanation": "Sampling replicates the baseband spectrum periodically at intervals of fs (images at +/-fs, +/-2*fs, ...). Reconstruction works by isolating just the baseband copy with a lowpass filter; aliasing occurs when these replicas overlap."
+          "explanation": "Nyquist frequency $= f_s/2 = 24$ kHz.",
+          "prompt": "If you sample at $f_s = 48$ kHz, what is the Nyquist (folding) frequency?",
+          "answerIndex": 1
+        },
+        {
+          "id": "sampling-nyquist-1-008",
+          "type": "mcq",
+          "choices": [
+            "Multiplying the spectrum by a constant",
+            "Convolving the spectrum with a comb (spectral replication)",
+            "Differentiating the spectrum",
+            "Shifting the spectrum by a single fixed amount"
+          ],
+          "explanation": "Multiplication in time is convolution in frequency; convolving with a comb copies the spectrum at every multiple of $f_s$.",
+          "prompt": "Multiplying a signal by an impulse train in the time domain corresponds in the frequency domain to:",
+          "answerIndex": 1
+        },
+        {
+          "id": "sampling-nyquist-1-009",
+          "type": "mcq",
+          "choices": [
+            "$f_s < B$",
+            "$f_s = B$",
+            "$f_s > 2B$",
+            "$f_s < 2B$"
+          ],
+          "explanation": "No overlap requires $f_s > 2B$; this is exactly the Nyquist criterion for perfect reconstruction.",
+          "prompt": "Replicas in the sampled spectrum will NOT overlap when:",
+          "answerIndex": 2
         }
-      ]
+      ],
+      "difficulty": 1
     },
     {
-      "id": "aliasing",
+      "id": "sampling-nyquist-2",
       "title": "Aliasing, Anti-Alias Filtering & Reconstruction",
       "order": 2,
-      "difficulty": 2,
+      "content": "When $f_s \\le 2B$ the replicas overlap and high-frequency energy masquerades as low-frequency content. This is **aliasing**, and it is irreversible once it happens. The apparent (aliased) frequency of a tone at $f_{in}$ folds about the Nyquist frequency. A handy formula: the observed frequency is\n\n$$f_{alias} = \\left| f_{in} - f_s \\cdot \\operatorname{round}\\!\\left(\\frac{f_{in}}{f_s}\\right) \\right|,$$\n\nwhich produces the familiar triangular **fold** as $f_{in}$ sweeps up: it rises to $f_s/2$, then mirrors back down. Example: sampling a 7 kHz tone at $f_s = 10$ kHz gives $|7 - 10| = 3$ kHz - the 7 kHz tone *aliases* to 3 kHz and is indistinguishable from a real 3 kHz tone.\n\nThe defense is an **anti-alias filter (AAF)**: an analog low-pass filter placed *before* the ADC that attenuates everything above $f_s/2$ so it cannot fold into your band. Because real filters have finite roll-off, you usually oversample a bit to give the transition band room.\n\n**Reconstruction** is the reverse trip. Perfect reconstruction multiplies the spectrum by an ideal brick-wall low-pass, which in time is convolution with a $\\operatorname{sinc}$ - the **Whittaker-Shannon interpolation formula**:\n\n$$x(t) = \\sum_n x[n]\\,\\operatorname{sinc}\\!\\left(\\frac{t - nT_s}{T_s}\\right).$$\n\nReal DACs cannot do an ideal sinc. A **zero-order hold (ZOH)** holds each sample for $T_s$, which imposes a $\\operatorname{sinc}$-shaped amplitude droop $H(f) = \\operatorname{sinc}(f/f_s)$ that a reconstruction (anti-imaging) filter then corrects.",
       "items": [
         {
-          "id": "sampling-nyquist-aliasing-001",
+          "id": "sampling-nyquist-2-001",
           "type": "flashcard",
-          "front": "What is aliasing?",
-          "back": "Aliasing is the irreversible corruption that occurs when a signal contains energy above the Nyquist frequency (fs/2). The spectral replicas overlap, so high-frequency content 'folds' down and masquerades as a lower frequency that is indistinguishable from a genuine low-frequency component.",
-          "hint": "High frequencies impersonating low ones because replicas overlap."
+          "front": "What is aliasing, and is it reversible?",
+          "back": "When $f_s \\le 2B$, spectral replicas overlap and high frequencies fold into the band, masquerading as lower frequencies. It is irreversible once sampled.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/mathematics/images/sampling-nyquist-2.svg"
         },
         {
-          "id": "sampling-nyquist-aliasing-002",
+          "id": "sampling-nyquist-2-002",
           "type": "flashcard",
-          "front": "Give the folding formula for the apparent (alias) frequency of a tone f sampled at fs.",
-          "back": "Compute f mod fs to bring it into [0, fs). If the result is <= fs/2, that is the alias. If it is > fs/2, the alias is fs - (f mod fs). The spectrum 'folds' about each multiple of fs/2, so apparent frequency bounces between 0 and fs/2.",
-          "hint": "Reduce mod fs, then reflect about fs/2 if needed."
+          "front": "Give the folding formula for the apparent (aliased) frequency of a tone $f_{in}$ sampled at $f_s$.",
+          "back": "$f_{alias} = \\left| f_{in} - f_s\\,\\operatorname{round}(f_{in}/f_s) \\right|$ - energy folds (mirrors) about the Nyquist frequency $f_s/2$."
         },
         {
-          "id": "sampling-nyquist-aliasing-003",
+          "id": "sampling-nyquist-2-003",
+          "type": "flashcard",
+          "front": "What is an anti-alias filter and where is it placed?",
+          "back": "An analog low-pass filter placed BEFORE the ADC that attenuates energy above $f_s/2$ so it cannot fold into the band of interest."
+        },
+        {
+          "id": "sampling-nyquist-2-004",
+          "type": "flashcard",
+          "front": "State the ideal (Whittaker-Shannon) reconstruction formula.",
+          "back": "$x(t) = \\sum_n x[n]\\,\\operatorname{sinc}\\!\\left(\\frac{t - nT_s}{T_s}\\right)$ - ideal sinc interpolation, i.e. a brick-wall low-pass in frequency."
+        },
+        {
+          "id": "sampling-nyquist-2-005",
+          "type": "flashcard",
+          "front": "What spectral distortion does a zero-order-hold DAC introduce, and how is it fixed?",
+          "back": "A $\\operatorname{sinc}$ amplitude droop $H(f) = \\operatorname{sinc}(f/f_s)$. A reconstruction (anti-imaging) filter, often with sinc-compensation, corrects it."
+        },
+        {
+          "id": "sampling-nyquist-2-006",
           "type": "mcq",
-          "prompt": "A 30 kHz tone is sampled at fs = 50 kHz. What apparent (alias) frequency appears in the digitized signal?",
-          "choices": ["10 kHz", "20 kHz", "30 kHz", "5 kHz"],
-          "answerIndex": 1,
-          "explanation": "fs/2 = 25 kHz, and 30 kHz > 25 kHz so it aliases. 30 mod 50 = 30, which exceeds 25, so the alias = 50 - 30 = 20 kHz. The 30 kHz tone is indistinguishable from a real 20 kHz tone."
-        },
-        {
-          "id": "sampling-nyquist-aliasing-004",
-          "type": "mcq",
-          "prompt": "A 70 kHz tone is sampled at fs = 50 kHz. What is the alias frequency?",
-          "choices": ["20 kHz", "30 kHz", "10 kHz", "25 kHz"],
-          "answerIndex": 0,
-          "explanation": "70 mod 50 = 20 kHz, which is below fs/2 = 25 kHz, so the alias is 20 kHz directly (no further reflection needed). A tone one full fs above 20 kHz lands back at 20 kHz."
-        },
-        {
-          "id": "sampling-nyquist-aliasing-005",
-          "type": "flashcard",
-          "front": "What is an anti-aliasing filter and where does it go?",
-          "back": "An anti-aliasing filter is an analog lowpass filter placed BEFORE the ADC (sample-and-hold). It attenuates all energy above fs/2 (ideally above the band of interest) so that out-of-band signals and noise cannot fold into the passband. It must be analog because once sampled, aliasing is irreversible.",
-          "hint": "Analog LPF before the sampler; must act before digitization."
-        },
-        {
-          "id": "sampling-nyquist-aliasing-006",
-          "type": "flashcard",
-          "front": "Why does oversampling relax the anti-aliasing filter requirements?",
-          "back": "Sampling well above 2*B widens the gap between the signal band edge (B) and the Nyquist frequency (fs/2). The filter's transition band can be much gentler (lower order, cheaper, less phase distortion) because anything that aliases must lie between B and fs - B, which is now far away. Oversampling trades data rate for analog filter simplicity.",
-          "hint": "Bigger guard band = gentler filter roll-off."
-        },
-        {
-          "id": "sampling-nyquist-aliasing-007",
-          "type": "mcq",
-          "prompt": "A radar receiver digitizes a video/IF band of 0 to 5 MHz with an ADC at fs = 12 MHz. A strong out-of-band interferer at 8 MHz leaks past a weak anti-alias filter. Where does it appear?",
           "choices": [
-            "It is harmless because it is above the 5 MHz band",
-            "At 4 MHz, landing inside the 0 to 5 MHz band of interest",
-            "At 8 MHz, still out of band",
-            "At 12 MHz, removed by the next stage"
+            "3 kHz",
+            "7 kHz",
+            "10 kHz",
+            "17 kHz"
           ],
-          "answerIndex": 1,
-          "explanation": "fs/2 = 6 MHz; 8 MHz > 6 MHz so it aliases. 8 mod 12 = 8 > 6, so alias = 12 - 8 = 4 MHz, which falls inside the 0-5 MHz band and corrupts the data. This is exactly why anti-alias filtering matters in receiver design."
+          "explanation": "$|7 - 10| = 3$ kHz. The 7 kHz tone folds about $f_s/2 = 5$ kHz to 3 kHz.",
+          "prompt": "A 7 kHz sinusoid is sampled at $f_s = 10$ kHz. What apparent frequency appears in the digitized data?",
+          "answerIndex": 0
         },
         {
-          "id": "sampling-nyquist-aliasing-008",
-          "type": "flashcard",
-          "front": "What is ideal reconstruction (sinc interpolation)?",
-          "back": "Perfect reconstruction passes the sampled signal through an ideal lowpass (brick-wall) filter with cutoff fs/2. In the time domain this convolves each sample with a sinc pulse: x(t) = sum of x[n] * sinc((t - n*Ts)/Ts). The sincs sum to exactly reproduce the band-limited original. It is ideal but non-causal/infinite, so not realizable exactly.",
-          "hint": "Brick-wall LPF in frequency = sinc interpolation in time."
-        },
-        {
-          "id": "sampling-nyquist-aliasing-009",
+          "id": "sampling-nyquist-2-007",
           "type": "mcq",
-          "prompt": "A practical DAC outputs a zero-order hold (ZOH): each sample value is held constant for one period Ts. What spectral effect does ZOH introduce?",
           "choices": [
-            "A flat (no) frequency response",
-            "A sinc-shaped (sin(pi*f/fs)/(pi*f/fs)) amplitude droop across the band plus residual images, usually corrected by a sinc/x-compensation filter",
-            "Perfect brick-wall reconstruction",
-            "It removes all images automatically with no droop"
+            "To reduce quantization levels",
+            "To give the anti-alias filter a realistic finite transition band",
+            "To increase aliasing on purpose",
+            "To lower the DAC sinc droop to zero"
           ],
-          "answerIndex": 1,
-          "explanation": "ZOH convolves with a rectangular pulse of width Ts, whose transform is a sinc. This causes passband amplitude droop (about -3.9 dB at fs/2) and only partially suppresses images, so DAC chains use a sinc-compensation (inverse-sinc) filter plus an analog reconstruction lowpass."
+          "explanation": "Real anti-alias filters cannot roll off instantly; oversampling widens the transition region so out-of-band energy is adequately attenuated by $f_s/2$.",
+          "prompt": "Why do designers oversample beyond the strict Nyquist minimum before an ADC?",
+          "answerIndex": 1
         },
         {
-          "id": "sampling-nyquist-aliasing-010",
+          "id": "sampling-nyquist-2-008",
           "type": "mcq",
-          "prompt": "Which statement best explains why aliasing cannot be undone in software after the ADC?",
           "choices": [
-            "Software is too slow",
-            "Once overlapping replicas are summed during sampling, the aliased and genuine components occupy the same bins and are mathematically inseparable",
-            "ADCs discard the sign bit",
-            "Digital filters only work on real signals"
+            "A rectangular pulse",
+            "A Gaussian",
+            "A sinc function",
+            "A unit step"
           ],
-          "answerIndex": 1,
-          "explanation": "Aliasing adds the folded high-frequency energy directly onto legitimate in-band content. After summation there is no information left to separate them, so prevention (analog anti-alias filtering or adequate fs) is the only cure."
+          "explanation": "An ideal brick-wall low-pass in frequency is a $\\operatorname{sinc}$ in time, giving Whittaker-Shannon sinc interpolation.",
+          "prompt": "Ideal reconstruction of a sampled signal corresponds in the time domain to interpolation with which function?",
+          "answerIndex": 2
+        },
+        {
+          "id": "sampling-nyquist-2-009",
+          "type": "mcq",
+          "choices": [
+            "2 kHz",
+            "4 kHz",
+            "6 kHz",
+            "12 kHz"
+          ],
+          "explanation": "$|12 - 8 \\cdot \\operatorname{round}(12/8)| = |12 - 16| = 4$ kHz; equivalently it folds to 4 kHz.",
+          "prompt": "A tone at 12 kHz is sampled at $f_s = 8$ kHz. What is its aliased frequency?",
+          "answerIndex": 1
         }
-      ]
+      ],
+      "difficulty": 2
     },
     {
-      "id": "quantization-iq",
-      "title": "Quantization, SNR, Bandpass Sampling & I/Q",
+      "id": "sampling-nyquist-3",
+      "title": "Bandpass Sampling, Quantization SNR & I/Q",
       "order": 3,
-      "difficulty": 3,
+      "content": "Modern SDR and radar receivers exploit a loophole in Nyquist: a **bandpass signal** of bandwidth $B$ centered at a high carrier need not be sampled at twice the carrier - only fast enough to keep its *replicas* from colliding. **Bandpass sampling (undersampling)** deliberately folds an RF band down to baseband. A sufficient condition is\n\n$$\\frac{2 f_H}{n} \\le f_s \\le \\frac{2 f_L}{n-1},$$\n\nwhere $f_L, f_H$ are the band edges and $n$ is an integer with $1 \\le n \\le \\lfloor f_H/B \\rfloor$. This is how a digital-IF receiver samples, say, a 70 MHz IF with a far lower clock.\n\n**Quantization** maps each sample to one of $2^N$ levels for an $N$-bit ADC. The rounding error is modeled as uniform noise of variance $\\Delta^2/12$ (with step $\\Delta$). For a full-scale sinusoid this yields the canonical signal-to-quantization-noise ratio:\n\n$$\\text{SNR}_{dB} = 6.02\\,N + 1.76\\ \\text{dB}.$$\n\nThat is the famous **~6 dB per bit** rule: each added bit buys roughly 6 dB of dynamic range. **Dither** (adding small noise before quantizing) decorrelates the error and trades spurious tones for a smoother noise floor.\n\nFinally, **I/Q (complex baseband)** represents a signal as in-phase and quadrature components $x(t) = I(t) + jQ(t)$. Sampling I and Q lets you capture a full bandwidth $B$ at a complex rate of just $B$ (vs. $2B$ real), preserving the sign of frequency - essential for Doppler, direction, and efficient decimation/interpolation in multirate chains.",
       "items": [
         {
-          "id": "sampling-nyquist-quantization-iq-001",
+          "id": "sampling-nyquist-3-001",
           "type": "flashcard",
-          "front": "What is quantization, and how many levels does an N-bit ADC provide?",
-          "back": "Quantization maps the continuous sampled amplitude to the nearest of a finite set of discrete codes. An N-bit ADC has 2^N levels with step size (LSB) q = full-scale-range / 2^N. The rounding error introduced is quantization error, bounded by +/- q/2.",
-          "hint": "2^N levels; step q = FSR / 2^N."
+          "front": "What is bandpass sampling (undersampling) and why is it allowed?",
+          "back": "Sampling a bandpass signal below twice its carrier, deliberately folding the RF band to baseband. Allowed because Nyquist only requires non-overlapping replicas (driven by bandwidth $B$), not $f_s > 2f_{carrier}$."
         },
         {
-          "id": "sampling-nyquist-quantization-iq-002",
+          "id": "sampling-nyquist-3-002",
           "type": "flashcard",
-          "front": "What is quantization noise and what is its typical model?",
-          "back": "Quantization noise is the error signal between the true and quantized values. For a busy signal spanning many codes it is modeled as additive noise uniformly distributed on [-q/2, +q/2], approximately white, with variance q^2/12 (RMS = q/sqrt(12)). This model underpins the SNR-vs-bits formula.",
-          "hint": "Uniform on +/- q/2; variance q^2/12."
+          "front": "Give a valid sample-rate range for bandpass sampling with band edges $f_L, f_H$.",
+          "back": "$\\frac{2 f_H}{n} \\le f_s \\le \\frac{2 f_L}{n-1}$ for integer $n$ with $1 \\le n \\le \\lfloor f_H/B \\rfloor$."
         },
         {
-          "id": "sampling-nyquist-quantization-iq-003",
+          "id": "sampling-nyquist-3-003",
           "type": "flashcard",
-          "front": "State the ideal ADC SNR formula and the '6 dB per bit' rule of thumb.",
-          "back": "For a full-scale sine into an ideal N-bit ADC: SNR = 6.02*N + 1.76 dB. So each added bit improves SNR by about 6.02 dB. The 1.76 dB term comes from the sine's crest factor relative to the uniform-noise model.",
-          "hint": "6.02*N + 1.76 dB; ~6 dB/bit."
+          "front": "State the quantization SNR rule for a full-scale sinusoid into an N-bit ADC.",
+          "back": "$\\text{SNR}_{dB} = 6.02 N + 1.76$ dB - roughly 6 dB of dynamic range per bit."
         },
         {
-          "id": "sampling-nyquist-quantization-iq-004",
+          "id": "sampling-nyquist-3-004",
+          "type": "flashcard",
+          "front": "What is the variance of uniform quantization noise with step size $\\Delta$?",
+          "back": "$\\sigma_q^2 = \\Delta^2 / 12$, assuming the error is uniformly distributed over one step."
+        },
+        {
+          "id": "sampling-nyquist-3-005",
+          "type": "flashcard",
+          "front": "What does dither do in a quantizer?",
+          "back": "Adds small noise before quantizing to decorrelate the quantization error, converting harmonic spurs into a smoother (more white) noise floor."
+        },
+        {
+          "id": "sampling-nyquist-3-006",
+          "type": "flashcard",
+          "front": "What is I/Q (complex baseband) representation and a key advantage?",
+          "back": "$x(t) = I(t) + jQ(t)$ with in-phase and quadrature components. It preserves the sign of frequency (positive vs. negative) and captures bandwidth $B$ at a complex sample rate of $B$ rather than $2B$ real."
+        },
+        {
+          "id": "sampling-nyquist-3-007",
           "type": "mcq",
-          "prompt": "Using SNR = 6.02*N + 1.76 dB, what is the ideal SNR of a 12-bit ADC for a full-scale sine?",
-          "choices": ["72.2 dB", "74.0 dB", "62.0 dB", "98.1 dB"],
-          "answerIndex": 1,
-          "explanation": "6.02 * 12 + 1.76 = 72.24 + 1.76 = 74.0 dB. Each bit adds about 6 dB, so a 16-bit ADC would reach about 98.1 dB."
-        },
-        {
-          "id": "sampling-nyquist-quantization-iq-005",
-          "type": "mcq",
-          "prompt": "A radar receiver must capture a 78 dB instantaneous dynamic range. Ignoring processing gain and oversampling, what is the minimum ADC bit depth from the 6.02*N + 1.76 dB rule?",
-          "choices": ["10 bits", "12 bits", "13 bits", "16 bits"],
-          "answerIndex": 2,
-          "explanation": "Solve 6.02*N + 1.76 >= 78 -> N >= 76.24/6.02 = 12.66, so N = 13 bits gives 6.02*13 + 1.76 = 80.0 dB. 12 bits (74 dB) is insufficient; this is the core 'justify bit depth from SNR' calculation."
-        },
-        {
-          "id": "sampling-nyquist-quantization-iq-006",
-          "type": "flashcard",
-          "front": "What is dither and why deliberately add noise before an ADC?",
-          "back": "Dither is a small amount of noise added before quantization to decorrelate the quantization error from the signal. It breaks up harmonic/pattern distortion (turning it into a smoother noise floor) and, combined with averaging/oversampling, can recover sub-LSB resolution. Useful for low-level signals near the LSB.",
-          "hint": "Add noise to randomize quantization error and kill spurs."
-        },
-        {
-          "id": "sampling-nyquist-quantization-iq-007",
-          "type": "mcq",
-          "prompt": "Processing gain: oversampling by a factor OSR and then digitally filtering to bandwidth B spreads quantization noise over fs/2 but keeps signal in B. Doubling fs (OSR x2) over the same band improves SNR by approximately how much?",
-          "choices": ["0 dB", "3 dB", "6 dB", "12 dB"],
-          "answerIndex": 1,
-          "explanation": "Quantization noise is spread roughly white over 0 to fs/2; only the fraction B/(fs/2) remains after decimation/filtering. Each 2x in fs halves the in-band noise power = +3 dB SNR (equivalent to about 0.5 extra bit, more with noise-shaping sigma-delta)."
-        },
-        {
-          "id": "sampling-nyquist-quantization-iq-008",
-          "type": "flashcard",
-          "front": "What is bandpass (under)sampling and why is it used in SDR/radar?",
-          "back": "Bandpass sampling deliberately samples an RF signal of bandwidth B centered at high carrier fc at a rate fs much less than 2*fc (but still > 2*B). The signal lies in a higher Nyquist zone; aliasing is used ON PURPOSE to fold the RF band down to baseband/low-IF. This eliminates an analog downconversion stage in SDR/radar receivers.",
-          "hint": "Sample faster than 2*B but slower than 2*fc; use aliasing intentionally."
-        },
-        {
-          "id": "sampling-nyquist-quantization-iq-009",
-          "type": "mcq",
-          "prompt": "For bandpass sampling, the key constraint (besides fs > 2*B) that must hold to avoid the band straddling a multiple of fs/2 is:",
           "choices": [
-            "fs must equal fc exactly",
-            "The entire band must fit within a single Nyquist zone, i.e., a valid fs satisfies 2*fc_high/n <= fs <= 2*fc_low/(n-1) for some integer n with n <= fc_high/B",
-            "fs must be greater than 2*fc",
-            "B must be a power of two"
+            "44 dB",
+            "60 dB",
+            "74 dB",
+            "98 dB"
           ],
-          "answerIndex": 1,
-          "explanation": "The band must land entirely inside one Nyquist zone (no fold across a k*fs/2 boundary). Valid rates fall in bands given by 2*fc_high/n <= fs <= 2*fc_low/(n-1), where the zone index n is bounded by floor(fc_high/B). Picking fs from a valid band folds the RF cleanly to baseband."
+          "explanation": "$6.02 \\times 12 + 1.76 = 72.24 + 1.76 \\approx 74$ dB.",
+          "prompt": "Using the 6 dB/bit rule, what is the approximate full-scale-sinusoid SNR of a 12-bit ADC?",
+          "answerIndex": 2
         },
         {
-          "id": "sampling-nyquist-quantization-iq-010",
+          "id": "sampling-nyquist-3-008",
           "type": "mcq",
-          "prompt": "A signal occupies 200 to 220 MHz (B = 20 MHz, fc = 210 MHz). A receiver bandpass-samples it at fs = 80 MHz. To which baseband frequency range does the 200-220 MHz band fold?",
           "choices": [
-            "0 to 20 MHz",
-            "20 to 40 MHz",
-            "It cannot be sampled below 2*fc",
-            "60 to 80 MHz"
+            "6 bits",
+            "8 bits",
+            "10 bits",
+            "14 bits"
           ],
-          "answerIndex": 1,
-          "explanation": "Reduce edges mod fs=80: 200 mod 80 = 40, 220 mod 80 = 60. Both fall in the 2nd half of a Nyquist zone (40-80 with fs/2=40... here zone 3: 160-200 is up-going, 200-240 is down-going), so the band reflects to 80-60=20 and 80-40=40, i.e. 20 to 40 MHz (spectrum inverted). It fits cleanly in one zone since fs=80 > 2*B=40."
+          "explanation": "Solve $6.02N + 1.76 \\ge 60 \\Rightarrow N \\ge 9.67$, so 10 bits.",
+          "prompt": "You need at least 60 dB of quantization SNR. Roughly how many ADC bits are required?",
+          "answerIndex": 2
         },
         {
-          "id": "sampling-nyquist-quantization-iq-011",
-          "type": "flashcard",
-          "front": "What is I/Q sampling (complex baseband) and why is it used?",
-          "back": "I/Q sampling represents a signal as a complex stream I + jQ, where I (in-phase) and Q (quadrature) are the outputs of mixing with cos and sin of the carrier (90 degrees apart). Complex baseband captures both positive and negative frequencies independently, allows asymmetric spectra, doubles usable bandwidth per real sample rate, and is the native format of SDR/radar receivers.",
-          "hint": "Two channels 90 degrees apart -> complex stream that distinguishes +f from -f."
-        },
-        {
-          "id": "sampling-nyquist-quantization-iq-012",
+          "id": "sampling-nyquist-3-009",
           "type": "mcq",
-          "prompt": "For a COMPLEX (I/Q) baseband signal of one-sided bandwidth B (occupying -B/2 to +B/2), the minimum complex sample rate to avoid aliasing is:",
-          "choices": ["2*B complex samples/s", "B complex samples/s", "4*B complex samples/s", "B/2 complex samples/s"],
-          "answerIndex": 1,
-          "explanation": "A complex signal spanning total bandwidth B needs only fs = B complex samples/s (each complex sample is two real numbers, so the real-equivalent rate still meets Nyquist). This is why SDRs quote complex sample rate equal to the channel bandwidth, not twice it."
-        },
-        {
-          "id": "sampling-nyquist-quantization-iq-013",
-          "type": "flashcard",
-          "front": "Define decimation and interpolation in a multirate DSP chain.",
-          "back": "Decimation reduces the sample rate by integer M: first lowpass-filter to fs/(2*M) to prevent aliasing, then keep every Mth sample (downsample). Interpolation increases the rate by integer L: insert L-1 zeros between samples (upsample), then lowpass-filter to remove the resulting images. Together (L/M) they give rational rate conversion.",
-          "hint": "Decimate = filter then drop samples; interpolate = zero-stuff then filter."
-        },
-        {
-          "id": "sampling-nyquist-quantization-iq-014",
-          "type": "mcq",
-          "prompt": "When decimating by M, why must the lowpass (decimation) filter come BEFORE discarding samples?",
           "choices": [
-            "To save memory",
-            "Because dropping samples lowers the effective fs to fs/M, so any content above fs/(2*M) would alias unless removed first",
-            "Filters only work at high rates",
-            "It does not matter; order is arbitrary"
+            "It eliminates quantization noise",
+            "It lets a lower-rate ADC capture a high-carrier signal by folding it to baseband",
+            "It removes the need for any anti-alias filter",
+            "It doubles the carrier frequency"
           ],
-          "answerIndex": 1,
-          "explanation": "Downsampling by M reduces the Nyquist frequency from fs/2 to fs/(2*M). Energy between the new and old Nyquist edges must be filtered out first, otherwise it folds into the retained band. (Polyphase implementations fold the filter and the downsampler together efficiently, but logically the filtering still precedes the rate drop.)"
+          "explanation": "Bandpass sampling folds an RF/IF band down to baseband, so the ADC clock need only satisfy the bandwidth-based replica condition, not twice the carrier.",
+          "prompt": "What is the primary advantage of bandpass sampling in an SDR/radar receiver?",
+          "answerIndex": 1
+        },
+        {
+          "id": "sampling-nyquist-3-010",
+          "type": "mcq",
+          "choices": [
+            "Because complex samples carry I and Q per sample, resolving positive and negative frequencies",
+            "Because quantization noise is halved",
+            "Because the carrier is removed by the ADC",
+            "Because dither doubles the effective rate"
+          ],
+          "explanation": "Each complex sample carries two real numbers (I and Q), distinguishing positive from negative frequencies, so a one-sided bandwidth $B$ needs a complex rate of $B$.",
+          "prompt": "Why does I/Q (complex) sampling capture a bandwidth $B$ at a complex rate of only $B$ instead of $2B$?",
+          "answerIndex": 0
         }
-      ]
+      ],
+      "difficulty": 3
     }
   ]
 }
