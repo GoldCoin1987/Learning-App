@@ -1,0 +1,292 @@
+{
+  "id": "parasitics-grounding-layout",
+  "title": "Parasitics, Grounding & Layout",
+  "order": 14,
+  "lessons": [
+    {
+      "id": "l1",
+      "title": "Why Schematics Lie: Parasitics",
+      "order": 1,
+      "difficulty": 1,
+      "items": [
+        {
+          "id": "parasitics-grounding-layout-l1-001",
+          "type": "flashcard",
+          "front": "What does it mean to say a schematic is 'ideal' and why can a perfect schematic still fail on a board?",
+          "back": "A schematic shows only intended components and connections. The physical board adds unintended parasitics: trace resistance and inductance, parasitic capacitance between conductors, lead/package inductance, and finite ground impedance. These hidden elements alter timing, gain, stability, and noise, so a circuit that simulates and 'works on paper' can oscillate, ring, or fail EMC once laid out.",
+          "hint": "The copper, leads, and gaps between conductors are not in the schematic."
+        },
+        {
+          "id": "parasitics-grounding-layout-l1-002",
+          "type": "flashcard",
+          "front": "What are the three dominant parasitics of a real capacitor, and what does each cause?",
+          "back": "ESR (equivalent series resistance): causes I2R loss and limits how low impedance can go at resonance. ESL (equivalent series inductance, from leads/body): causes impedance to rise with frequency above self-resonance, so the cap stops acting like a cap. Together they create a series self-resonant frequency (SRF) where the cap impedance is minimum (= ESR). Above SRF the part is inductive.",
+          "hint": "One resistive term, one inductive term, and the frequency where they meet the C."
+        },
+        {
+          "id": "parasitics-grounding-layout-l1-003",
+          "type": "flashcard",
+          "front": "Why does a real inductor stop acting like an inductor at high frequency (self-resonance)?",
+          "back": "An inductor has parasitic capacitance between its windings (and to its core/leads). The inductance resonates with this winding capacitance at the self-resonant frequency (SRF). Below SRF impedance rises with frequency (inductive); at SRF impedance peaks; above SRF the part looks capacitive. Useful inductor operation is well below its SRF.",
+          "hint": "Winding-to-winding capacitance forms a parallel resonant tank with L."
+        },
+        {
+          "id": "parasitics-grounding-layout-l1-004",
+          "type": "flashcard",
+          "front": "Roughly how much inductance does a typical PCB trace or component lead have, and why does that matter for fast edges?",
+          "back": "On the order of ~10-20 nH per inch of trace or lead (a common rule of thumb is ~15-20 nH/in for a wire, less for a wide trace over a plane). It matters because V = L di/dt: with fast edges (large di/dt) even a few nH drops significant transient voltage, causing ringing, ground bounce, and spikes on supply rails. Short, wide, low-loop-area routing minimizes L.",
+          "hint": "Tens of nanohenries per inch; voltage scales with di/dt."
+        },
+        {
+          "id": "parasitics-grounding-layout-l1-005",
+          "type": "mcq",
+          "prompt": "Above its self-resonant frequency (SRF), a real bypass capacitor behaves like:",
+          "choices": [
+            "An inductor (impedance rises with frequency)",
+            "An ideal capacitor (impedance keeps falling)",
+            "A pure resistor equal to its capacitance",
+            "An open circuit at all frequencies"
+          ],
+          "answerIndex": 0,
+          "explanation": "Below SRF the capacitor's reactance dominates and impedance falls with frequency. At SRF the capacitive and inductive reactances cancel, leaving only ESR (minimum impedance). Above SRF the ESL dominates, so impedance rises with frequency and the part looks inductive. This is why one big cap cannot decouple all frequencies."
+        },
+        {
+          "id": "parasitics-grounding-layout-l1-006",
+          "type": "mcq",
+          "prompt": "A voltage spike appears on a supply pin only during fast logic transitions. The most likely cause is:",
+          "choices": [
+            "L di/dt voltage developed across lead/trace inductance in the supply path",
+            "Thermal drift of the regulator reference",
+            "Excess DC resistance of the trace",
+            "The capacitor's ESR being too low"
+          ],
+          "answerIndex": 0,
+          "explanation": "Spikes correlated with fast edges point to di/dt effects across parasitic inductance (V = L di/dt), not DC resistance (which only causes steady IR drop) or slow thermal drift. The fix is to reduce inductance: local decoupling close to the pin, wide short traces, and small loop area. Low ESR is helpful, not harmful, here."
+        },
+        {
+          "id": "parasitics-grounding-layout-l1-007",
+          "type": "mcq",
+          "prompt": "Why does a single 10 uF bulk capacitor often fail to decouple high-frequency switching noise by itself?",
+          "choices": [
+            "Its larger package ESL gives it a low SRF, so it looks inductive at high frequency",
+            "Large capacitors have negative capacitance at RF",
+            "Bulk capacitors have zero ESR and reflect all noise",
+            "High capacitance always means high impedance"
+          ],
+          "answerIndex": 0,
+          "explanation": "A large-value cap is physically bigger, has more ESL, and therefore a lower self-resonant frequency. Above that SRF it is inductive and cannot sink fast transient current. You pair it with small low-ESL ceramics (e.g., 100 nF / 1 nF) placed at the pin so the small caps cover high frequencies and the bulk cap handles low-frequency/bulk charge demand."
+        },
+        {
+          "id": "parasitics-grounding-layout-l1-008",
+          "type": "flashcard",
+          "front": "What is parasitic capacitance between traces/conductors and where does it bite you?",
+          "back": "Any two conductors separated by dielectric form a capacitor. On a PCB this appears between adjacent traces, between a trace and a plane, and at high-impedance nodes. It bites you as: coupling/crosstalk between signals, loading and bandwidth loss on high-Z nodes (e.g., op-amp inputs, photodiode front ends), and unintended feedback that can cause instability.",
+          "hint": "Two conductors + dielectric = a capacitor you did not draw."
+        }
+      ]
+    },
+    {
+      "id": "l2",
+      "title": "Grounding, Returns & Decoupling",
+      "order": 2,
+      "difficulty": 2,
+      "items": [
+        {
+          "id": "parasitics-grounding-layout-l2-001",
+          "type": "flashcard",
+          "front": "What is a ground loop, why is it a problem, and how do you fix it?",
+          "back": "A ground loop is a closed conductive path where 'ground' exists at more than one point, so current returns via multiple paths. Differences in ground potential (from IR drops or magnetic coupling into the loop area) inject noise/hum into signals referenced to that ground. Fixes: single-point (star) grounding to remove the loop, break the loop (isolation: transformers, opto, differential signaling), reduce loop area, or move return currents off the signal reference. Classic symptom: 50/60 Hz hum.",
+          "hint": "Two ground points + a loop = injected difference voltage; remove the loop or isolate."
+        },
+        {
+          "id": "parasitics-grounding-layout-l2-002",
+          "type": "flashcard",
+          "front": "Single-point (star) grounding vs multipoint grounding: when is each preferred?",
+          "back": "Single-point/star: all returns meet at one node; best at low frequency (audio, precision DC, sensor front ends) where it prevents shared-impedance coupling and ground loops. Multipoint: many short connections to a solid ground plane; best at high frequency (RF, fast digital) because the plane gives the lowest inductance return and the shortest return path. Hybrid schemes tie planes at one point at DC but couple at HF via caps.",
+          "hint": "Star at LF to avoid loops; plane at HF for lowest-inductance returns."
+        },
+        {
+          "id": "parasitics-grounding-layout-l2-003",
+          "type": "flashcard",
+          "front": "In a mixed-signal board, why separate analog and digital grounds, and where should they tie together?",
+          "back": "Digital switching dumps noisy return current into the ground; if analog references share that path, the IR/L drops corrupt low-level analog signals (shared-impedance coupling). Partition the layout so digital return currents stay under digital and analog under analog. Tie the grounds together at ONE point, typically directly under the ADC/DAC (the converter is the natural single bridge), so converter return currents do not flow across the analog reference.",
+          "hint": "Partition, then bridge at a single point under the converter."
+        },
+        {
+          "id": "parasitics-grounding-layout-l2-004",
+          "type": "flashcard",
+          "front": "What is ground bounce and what makes it worse?",
+          "back": "Ground bounce is a transient shift of the local ground reference when many outputs switch and push return current through ground-path inductance (V = L di/dt). It corrupts logic thresholds and can cause false switching. Worse with: high lead/trace inductance, many simultaneously switching outputs (SSO), fast edges, and inadequate/poorly placed decoupling. Mitigate with low-inductance ground (plane, multiple vias), local decoupling, and slower edges where acceptable.",
+          "hint": "L di/dt in the ground return when many outputs switch at once."
+        },
+        {
+          "id": "parasitics-grounding-layout-l2-005",
+          "type": "mcq",
+          "prompt": "For a fast digital signal over a ground plane, where does the high-frequency return current actually flow?",
+          "choices": [
+            "Directly under the signal trace in the plane, hugging its path",
+            "By the lowest-DC-resistance path regardless of the trace location",
+            "Uniformly spread across the entire ground plane",
+            "Back through the power plane only"
+          ],
+          "answerIndex": 0,
+          "explanation": "At high frequency return current follows the path of least inductance, which is the path of minimum loop area: directly beneath the signal trace. (At DC it spreads to follow least resistance.) This is why a gap or split in the plane under a high-speed trace forces the return to detour, enlarging the loop area, increasing inductance, and creating radiation and crosstalk."
+        },
+        {
+          "id": "parasitics-grounding-layout-l2-006",
+          "type": "mcq",
+          "prompt": "What happens if a high-speed trace crosses a slot/split in the reference plane beneath it?",
+          "choices": [
+            "The return current must detour around the slot, enlarging loop area and increasing EMI/crosstalk",
+            "Nothing, because return current ignores the plane",
+            "Signal speed increases due to lower capacitance",
+            "The slot acts as a perfect ground and improves integrity"
+          ],
+          "answerIndex": 0,
+          "explanation": "The HF return wants to flow directly under the trace. A slot blocks that path, forcing the return current to go around the gap. This greatly increases the signal loop area, raising loop inductance, degrading signal integrity, and turning the loop into an efficient antenna (radiated emissions) plus a crosstalk aggressor. Never route fast signals across plane splits."
+        },
+        {
+          "id": "parasitics-grounding-layout-l2-007",
+          "type": "mcq",
+          "prompt": "When placing a local decoupling capacitor, the single most important layout goal is to:",
+          "choices": [
+            "Minimize the loop area / inductance between the cap, the IC pin, and the ground/power plane",
+            "Maximize the capacitance value regardless of size",
+            "Place it as far as possible from the IC to avoid coupling",
+            "Use only through-hole parts with long leads"
+          ],
+          "answerIndex": 0,
+          "explanation": "Decoupling effectiveness at high frequency is limited by the total loop inductance (cap ESL plus trace/via inductance), not just the capacitance. Place the cap right at the pin, use short wide connections, and via straight down to the planes to minimize loop area. A bigger value with a long, high-inductance connection is useless for fast transients."
+        },
+        {
+          "id": "parasitics-grounding-layout-l2-008",
+          "type": "mcq",
+          "prompt": "An audio preamp picks up a steady 60 Hz hum that worsens when a second grounded cable is connected. The most likely cause is:",
+          "choices": [
+            "A ground loop creating a difference voltage between two ground points",
+            "Insufficient gain bandwidth product",
+            "Capacitor self-resonance at 60 Hz",
+            "Ground bounce from fast logic edges"
+          ],
+          "answerIndex": 0,
+          "explanation": "Steady mains-frequency hum that appears/worsens when adding a second ground connection is the textbook signature of a ground loop: two ground reference points at slightly different potentials drive current through the loop and inject hum. Fix by single-point grounding, breaking the loop with isolation (transformer/opto), or differential signaling. 60 Hz is far below any decoupling SRF or logic-edge effect."
+        },
+        {
+          "id": "parasitics-grounding-layout-l2-009",
+          "type": "flashcard",
+          "front": "Decoupling strategy: what is the role of bulk vs local capacitors, and how do you choose values?",
+          "back": "Bulk caps (e.g., 10-100 uF, electrolytic/tantalum) supply low-frequency/large charge demands and hold the rail steady between regulator responses; place near the supply entry/regulator. Local caps (e.g., 100 nF + small 1-10 nF ceramics) supply high-frequency transient current and must sit at each IC power pin. Use a few values to cover a broad frequency band (staggered SRFs), prioritizing low-ESL placement over sheer capacitance.",
+          "hint": "Bulk = slow/large charge near the source; local = fast/small at the pin."
+        }
+      ]
+    },
+    {
+      "id": "l3",
+      "title": "Crosstalk, EMI, Layout & When a Wire Stops Being a Wire",
+      "order": 3,
+      "difficulty": 3,
+      "items": [
+        {
+          "id": "parasitics-grounding-layout-l3-001",
+          "type": "flashcard",
+          "front": "Distinguish capacitive vs inductive crosstalk and give the primary mitigation for each.",
+          "back": "Capacitive (electric-field) coupling: driven by dV/dt through parasitic capacitance between conductors; worse for high-impedance, high-voltage-swing nodes. Mitigate with spacing, a grounded guard trace/shield, and lowering node impedance. Inductive (magnetic-field) coupling: driven by dI/dt through mutual inductance between loops; worse for high-current, low-impedance circuits. Mitigate by reducing loop area, increasing separation, orthogonal routing, and twisted/differential pairs. Both improve with a close return path (reference plane).",
+          "hint": "Capacitive ~ dV/dt and high-Z; inductive ~ dI/dt and loop area."
+        },
+        {
+          "id": "parasitics-grounding-layout-l3-002",
+          "type": "flashcard",
+          "front": "What is a guard ring/guard trace and when do you use it?",
+          "back": "A guard is a low-impedance conductor (usually at the same potential as the sensitive node, often driven, or tied to a clean reference) placed around a high-impedance node to intercept leakage and capacitively-coupled currents before they reach it. Used to protect high-Z inputs: electrometer/op-amp inputs, transimpedance front ends, integrators. By holding the surrounding copper at the node's potential, leakage current across the surface insulation is driven to near zero.",
+          "hint": "Surround a high-Z node with copper at the same potential to kill leakage/coupling."
+        },
+        {
+          "id": "parasitics-grounding-layout-l3-003",
+          "type": "flashcard",
+          "front": "What is a Kelvin (4-wire / force-sense) connection and why use it?",
+          "back": "A Kelvin connection uses separate force (current-carrying) and sense (measurement) conductors at a node so the voltage is measured exactly where it matters, excluding IR drops in the force path. Used for current-sense resistors, precision references, regulator remote sense, and low-value resistance measurement. The sense lines carry negligible current, so their parasitic resistance does not corrupt the reading.",
+          "hint": "Separate the current path from the measurement path to skip series IR drops."
+        },
+        {
+          "id": "parasitics-grounding-layout-l3-004",
+          "type": "flashcard",
+          "front": "What do ferrite beads and common-mode chokes do in EMI control, and how do they differ?",
+          "back": "A ferrite bead is a lossy (mostly resistive at HF) series element that dissipates high-frequency noise as heat; used on supply/signal lines to damp ringing and block HF, but it affects both differential and the line it is on. A common-mode choke passes wires through a shared core so differential (signal) current cancels flux and is unaffected, while common-mode (noise) current sees high impedance and is attenuated. Used on cables/power to suppress common-mode EMI without disturbing the signal.",
+          "hint": "Bead = lossy HF series resistor; CM choke = high-Z to common-mode only."
+        },
+        {
+          "id": "parasitics-grounding-layout-l3-005",
+          "type": "flashcard",
+          "front": "When does a wire/trace stop behaving like a simple wire and start being a transmission line?",
+          "back": "When the signal's rise time (not just frequency) is short compared to the round-trip propagation delay of the interconnect, the trace must be treated as a transmission line with characteristic impedance. A common rule of thumb: treat it as a transmission line when the electrical length exceeds about 1/6 to 1/10 of the rise-time distance (or trace length > ~tr * v / 6). Then reflections, impedance matching/termination, and controlled impedance matter.",
+          "hint": "Compare edge rate (rise time) to propagation delay, not just clock frequency."
+        },
+        {
+          "id": "parasitics-grounding-layout-l3-006",
+          "type": "mcq",
+          "prompt": "Two parallel high-impedance traces couple noise. Reducing the VICTIM node's impedance and adding a grounded guard trace between them primarily attacks which coupling mechanism?",
+          "choices": [
+            "Capacitive (electric-field) crosstalk",
+            "Inductive (magnetic-field) crosstalk",
+            "Conducted ground bounce",
+            "Thermal coupling"
+          ],
+          "answerIndex": 0,
+          "explanation": "Capacitive coupling injects current through the inter-trace capacitance; the induced victim voltage is that current times the victim impedance, and the coupling scales with dV/dt. Lowering the victim impedance reduces the developed voltage, and a grounded guard trace shunts the field to ground. Inductive coupling, by contrast, is reduced mainly by shrinking loop area and separation, not by lowering node impedance."
+        },
+        {
+          "id": "parasitics-grounding-layout-l3-007",
+          "type": "mcq",
+          "prompt": "For a switching power-supply layout, the most critical loop to keep physically tight is:",
+          "choices": [
+            "The high di/dt switching (hot) loop: input cap, switch, and diode/synchronous FET",
+            "The feedback resistor divider to the controller",
+            "The enable pin pull-up network",
+            "The output LED indicator trace"
+          ],
+          "answerIndex": 0,
+          "explanation": "The hot loop carries pulsed, high di/dt current. Its loop area sets the parasitic inductance that causes switch-node ringing, voltage spikes (V = L di/dt), and radiated EMI. Keeping that loop tiny (input cap right at the switch/diode) is the single most important SMPS layout rule. Feedback, enable, and indicator nets carry low/slow currents and are far less critical for EMI."
+        },
+        {
+          "id": "parasitics-grounding-layout-l3-008",
+          "type": "mcq",
+          "prompt": "An RF amplifier passes simulation but oscillates on the prototype board. The MOST likely physical cause is:",
+          "choices": [
+            "Parasitic feedback via layout coupling and inadequate decoupling/ground inductance not modeled in SPICE",
+            "The transistor model has the wrong part number",
+            "The DC supply voltage is set 0.1 V too high",
+            "Insufficient solder mask thickness"
+          ],
+          "answerIndex": 0,
+          "explanation": "SPICE typically omits board parasitics: trace/lead inductance, inter-stage capacitive coupling, and finite ground/supply impedance. These add unintended feedback paths and phase shift that can satisfy the oscillation criteria at HF. Fixes are physical: tighten layout, shorten/isolate input and output, improve decoupling, and lower ground inductance. The ideal-schematic simulation simply never saw these elements."
+        },
+        {
+          "id": "parasitics-grounding-layout-l3-009",
+          "type": "mcq",
+          "prompt": "Which thermal-layout technique most effectively moves heat from a power component's exposed pad into the board?",
+          "choices": [
+            "An array of thermal vias under the pad connecting to internal/bottom copper pours",
+            "A single thin trace to a distant connector",
+            "Removing all copper near the part to 'let it breathe'",
+            "Adding more solder mask over the pad"
+          ],
+          "answerIndex": 0,
+          "explanation": "A grid of thermal vias under the exposed pad conducts heat from the top pad into internal and bottom copper pours that act as heat spreaders, dramatically lowering thermal resistance to ambient. A single thin trace is a poor thermal conductor, removing copper eliminates the spreader, and solder mask is a thermal insulator. Large copper pours plus via arrays are the standard PCB heat-sinking approach."
+        },
+        {
+          "id": "parasitics-grounding-layout-l3-010",
+          "type": "mcq",
+          "prompt": "Reflections and ringing on a fast digital line are best predicted by considering:",
+          "choices": [
+            "The signal rise time relative to the interconnect propagation delay (transmission-line effects)",
+            "Only the clock's fundamental frequency",
+            "The DC resistance of the trace alone",
+            "The color of the solder mask"
+          ],
+          "answerIndex": 0,
+          "explanation": "Transmission-line behavior is driven by edge rate: when the rise time is short compared to the round-trip propagation delay, impedance mismatches cause reflections and ringing. A slow clock with very fast edges can still need termination. DC resistance governs steady IR drop, not reflections, and the fundamental frequency alone understates the bandwidth carried by sharp edges."
+        }
+      ]
+    }
+  ]
+}

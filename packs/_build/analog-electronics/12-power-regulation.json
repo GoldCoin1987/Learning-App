@@ -1,0 +1,369 @@
+{
+  "id": "power-regulation",
+  "title": "Power Supplies & Voltage Regulation",
+  "order": 12,
+  "lessons": [
+    {
+      "id": "unreg-linear",
+      "title": "Unregulated Chains & Linear Regulators",
+      "order": 1,
+      "difficulty": 1,
+      "items": [
+        {
+          "id": "power-regulation-unreg-linear-001",
+          "type": "flashcard",
+          "front": "Name the four stages of a classic unregulated DC supply, in order.",
+          "back": "Transformer (steps mains AC down) -> Rectifier (AC to pulsating DC, e.g. bridge) -> Filter capacitor (reduces ripple) -> Load. Output is unregulated: it sags with load and varies with line.",
+          "hint": "It starts at the wall and ends at a big electrolytic cap."
+        },
+        {
+          "id": "power-regulation-unreg-linear-002",
+          "type": "flashcard",
+          "front": "In a capacitor-input filter, what sets the peak-to-peak ripple voltage?",
+          "back": "Vripple ~= Iload / (f * C), where f is the ripple frequency (2x line for a full-wave/bridge rectifier) and C is the filter capacitance. More load current or smaller C -> more ripple.",
+          "hint": "Q = C*V, and the cap discharges into the load between charging peaks."
+        },
+        {
+          "id": "power-regulation-unreg-linear-003",
+          "type": "flashcard",
+          "front": "How does a series-pass linear regulator work conceptually?",
+          "back": "A pass transistor in series with the load acts as a variable resistor. An error amplifier compares a scaled output to a reference and drives the pass device so Vout stays constant. The voltage difference (Vin-Vout) is dropped across the pass device as heat.",
+          "hint": "Think of it as a controlled, lossy resistor in series."
+        },
+        {
+          "id": "power-regulation-unreg-linear-004",
+          "type": "flashcard",
+          "front": "Define dropout voltage for a linear regulator, and what makes an LDO 'low dropout'.",
+          "back": "Dropout voltage is the minimum Vin-Vout needed to keep the regulator in regulation. A standard regulator (e.g. 7805) needs ~2V; an LDO uses a different pass topology (often a PMOS or PNP) to operate with only ~100-300mV of headroom.",
+          "hint": "It is the headroom Vin must keep above Vout."
+        },
+        {
+          "id": "power-regulation-unreg-linear-005",
+          "type": "flashcard",
+          "front": "Distinguish line regulation from load regulation.",
+          "back": "Line regulation: change in Vout for a change in Vin (at fixed load). Load regulation: change in Vout for a change in load current (at fixed Vin). Both are ideally near zero; quoted as mV, %, or per-volt/per-amp.",
+          "hint": "One varies the input, the other varies the current drawn."
+        },
+        {
+          "id": "power-regulation-unreg-linear-006",
+          "type": "mcq",
+          "prompt": "A 7805 (standard, ~2V dropout) must output 5V at 1A. What is the minimum acceptable input voltage and the approximate worst-case power dissipated in the regulator if Vin is 12V?",
+          "choices": [
+            "Vin_min = 7V; P ~= (12-5)*1 = 7W",
+            "Vin_min = 5V; P ~= 5*1 = 5W",
+            "Vin_min = 7V; P ~= 12*1 = 12W",
+            "Vin_min = 3V; P ~= (12-5)*1 = 7W"
+          ],
+          "answerIndex": 0,
+          "explanation": "Min input = Vout + dropout = 5 + 2 = 7V. Pass-device dissipation = (Vin-Vout)*Iload = (12-5)*1 = 7W (the input-cap supplies Iload too, but quiescent current is negligible here)."
+        },
+        {
+          "id": "power-regulation-unreg-linear-007",
+          "type": "mcq",
+          "prompt": "PSRR (power-supply rejection ratio) of a regulator is specified as 70 dB at 1 kHz. If 100 mVpp of ripple at 1 kHz appears on the input, roughly how much appears on the output?",
+          "choices": [
+            "About 32 uVpp",
+            "About 70 mVpp",
+            "About 1.4 mVpp",
+            "About 100 mVpp"
+          ],
+          "answerIndex": 0,
+          "explanation": "70 dB is a voltage ratio of 10^(70/20) = ~3162. Output ripple ~= 100 mVpp / 3162 ~= 32 uVpp. PSRR is how strongly the regulator attenuates input disturbances; it falls off at higher frequencies."
+        },
+        {
+          "id": "power-regulation-unreg-linear-008",
+          "type": "mcq",
+          "prompt": "An LDO is rated for 1A but, at Vin=12V, Vout=3.3V, you only draw 0.5A and it still overheats and shuts down. Most likely cause?",
+          "choices": [
+            "Thermal limit: P=(12-3.3)*0.5=4.35W exceeds what the package/heatsink can dissipate within the junction temperature limit",
+            "The LDO is below its dropout voltage",
+            "PSRR is too low at DC",
+            "Load regulation is out of spec"
+          ],
+          "answerIndex": 0,
+          "explanation": "Linear regulators are current-AND-thermal limited. 4.35W into a small SMD package easily exceeds the allowable rise (Tj = Ta + P*ThetaJA). The current rating assumes adequate heatsinking and low dropout; large Vin-Vout makes thermal, not current, the binding constraint."
+        },
+        {
+          "id": "power-regulation-unreg-linear-009",
+          "type": "flashcard",
+          "front": "Why does an LDO's datasheet specify a minimum output capacitance and often an ESR range?",
+          "back": "The output cap is part of the regulator's control loop. Many older LDOs need a minimum ESR (a 'zero') for loop stability; too little ESR (e.g. a pure ceramic) can make them oscillate. Modern LDOs are designed to be stable with low-ESR ceramics, but you must follow the datasheet stability window.",
+          "hint": "The cap is not just for ripple; it sets loop phase margin."
+        }
+      ]
+    },
+    {
+      "id": "references",
+      "title": "Voltage References",
+      "order": 2,
+      "difficulty": 2,
+      "items": [
+        {
+          "id": "power-regulation-references-001",
+          "type": "flashcard",
+          "front": "What physical principle makes a bandgap reference temperature-stable?",
+          "back": "It sums a CTAT term (a forward Vbe, which decreases ~-2mV/C) with a PTAT term (proportional to absolute temperature, from the delta-Vbe of two junctions at different current densities) scaled so their tempcos cancel. The sum lands near the silicon bandgap voltage, ~1.25V.",
+          "hint": "Two opposing temperature coefficients are added to cancel."
+        },
+        {
+          "id": "power-regulation-references-002",
+          "type": "flashcard",
+          "front": "How does a buried (subsurface) Zener reference differ from a surface Zener, and why is it used in precision references?",
+          "back": "A buried Zener conducts below the silicon surface, away from surface defects and contamination. This gives much lower noise and better long-term stability than a surface Zener. Used in high-accuracy references (often Zener-based parts operate around 6.2-7V).",
+          "hint": "Moving the breakdown away from the surface cuts 1/f noise and drift."
+        },
+        {
+          "id": "power-regulation-references-003",
+          "type": "flashcard",
+          "front": "Name the three reference error specs that matter most and what each means.",
+          "back": "Initial accuracy (tolerance at 25C, in % or mV), temperature drift (tempco, in ppm/C), and noise (low-frequency 0.1-10Hz noise in uVpp plus broadband noise density). Long-term drift (ppm/1000h) also matters for precision work.",
+          "hint": "Where it starts, how it moves with temperature, and how quiet it is."
+        },
+        {
+          "id": "power-regulation-references-004",
+          "type": "mcq",
+          "prompt": "A reference has 25 ppm/C drift and a nominal output of 2.500V. Over a 50C temperature swing, what is the worst-case output change?",
+          "choices": [
+            "About 3.1 mV",
+            "About 31 mV",
+            "About 0.31 mV",
+            "About 25 mV"
+          ],
+          "answerIndex": 0,
+          "explanation": "Delta = 25e-6 * 50 * 2.500V = 25e-6 * 125 = 3.125 mV. ppm/C is a fractional change per degree, multiplied by the swing and the nominal voltage."
+        },
+        {
+          "id": "power-regulation-references-005",
+          "type": "mcq",
+          "prompt": "Why is a dedicated bandgap/Zener reference preferred over simply using a regulator's output as the reference for a 16-bit ADC?",
+          "choices": [
+            "References are trimmed and specified for tight initial accuracy, low tempco, and low noise; regulator outputs prioritize current capacity and tolerate far looser tolerance and drift",
+            "Regulators cannot supply enough current for an ADC reference",
+            "References are always higher voltage than regulators",
+            "Regulators have lower output impedance, which corrupts the ADC"
+          ],
+          "answerIndex": 0,
+          "explanation": "A 16-bit converter needs reference stability comparable to its LSB. Regulators may be +/-2-5% with poor tempco. A reference is purpose-built for accuracy/drift/noise, even though it sources little current."
+        },
+        {
+          "id": "power-regulation-references-006",
+          "type": "mcq",
+          "prompt": "A 'shunt' reference (two-terminal, like a precision Zener) is typically biased how?",
+          "choices": [
+            "Through a series resistor from a higher supply, so it sinks current and clamps the node to its reference voltage",
+            "Directly across the supply with no series element",
+            "From a current sink pulling its output low",
+            "Only by the load current with no external bias"
+          ],
+          "answerIndex": 0,
+          "explanation": "A shunt reference behaves like an ideal Zener: you feed it from a higher rail through a resistor sized so the reference current stays in its valid range across all load conditions. A series (three-terminal) reference instead works like a small regulator."
+        },
+        {
+          "id": "power-regulation-references-007",
+          "type": "flashcard",
+          "front": "Why might you add an RC filter or a low-noise buffer after a voltage reference feeding a sensitive converter?",
+          "back": "To attenuate the reference's broadband and 1/f noise before it reaches the ADC/DAC, since reference noise directly limits achievable resolution. A buffer also provides the dynamic current the converter draws during conversions without disturbing the reference.",
+          "hint": "Reference noise sets the converter's noise floor."
+        },
+        {
+          "id": "power-regulation-references-008",
+          "type": "flashcard",
+          "front": "What is 'thermal hysteresis' in a voltage reference?",
+          "back": "A small permanent (until re-cycled) shift in output after the part is cycled through a wide temperature range and returns to the original temperature, due to package mechanical stress. It limits repeatability and is specified separately from tempco in precision references.",
+          "hint": "Take it hot then back to 25C and it does not read exactly the same."
+        }
+      ]
+    },
+    {
+      "id": "smps",
+      "title": "Switch-Mode Power Supplies",
+      "order": 3,
+      "difficulty": 3,
+      "items": [
+        {
+          "id": "power-regulation-smps-001",
+          "type": "flashcard",
+          "front": "Write the ideal duty-cycle relationships for buck, boost, and buck-boost converters (CCM).",
+          "back": "Buck: Vout = D*Vin (steps down). Boost: Vout = Vin/(1-D) (steps up). Buck-boost: Vout = -D/(1-D)*Vin (steps up or down, inverting). D is the switch on-time fraction.",
+          "hint": "Buck multiplies by D; boost divides by (1-D)."
+        },
+        {
+          "id": "power-regulation-smps-002",
+          "type": "flashcard",
+          "front": "What distinguishes continuous (CCM) from discontinuous (DCM) conduction mode?",
+          "back": "In CCM the inductor current never reaches zero during a switching cycle. In DCM it falls to zero and stays there for part of the cycle (typically at light load). DCM changes the transfer function (it becomes load-dependent) and the control loop behavior.",
+          "hint": "Does the inductor current hit zero each cycle?"
+        },
+        {
+          "id": "power-regulation-smps-003",
+          "type": "flashcard",
+          "front": "How do you size a buck inductor from a peak-to-peak ripple-current spec?",
+          "back": "L = (Vin - Vout) * D / (f_sw * dIL), with D = Vout/Vin. Equivalently L = Vout*(Vin-Vout)/(Vin*f_sw*dIL). Higher f_sw or larger L reduces ripple current dIL; a common target is dIL ~= 30% of Iout.",
+          "hint": "Volt-seconds across L during the on-time set the current ramp."
+        },
+        {
+          "id": "power-regulation-smps-004",
+          "type": "flashcard",
+          "front": "For a given inductor ripple current, what sets the buck output-capacitor voltage ripple?",
+          "back": "Two terms: the capacitive term dV ~= dIL/(8*f_sw*Cout) and the ESR term dV ~= dIL*ESR. In real designs the ESR term often dominates, so a low-ESR cap (or several in parallel) matters as much as raw capacitance.",
+          "hint": "Capacitance handles charge; ESR adds an IR drop from the ripple current."
+        },
+        {
+          "id": "power-regulation-smps-005",
+          "type": "mcq",
+          "prompt": "Buck: Vin=12V, Vout=3.3V, Iout=2A, f_sw=500kHz, target ripple current dIL=30% of Iout (0.6A). Closest inductor value?",
+          "choices": [
+            "About 8 uH",
+            "About 0.8 uH",
+            "About 80 uH",
+            "About 27 uH"
+          ],
+          "answerIndex": 0,
+          "explanation": "L = Vout*(Vin-Vout)/(Vin*f_sw*dIL) = 3.3*(12-3.3)/(12*500e3*0.6) = 3.3*8.7/(3.6e6) = 28.71/3.6e6 = 7.97 uH ~= 8 uH."
+        },
+        {
+          "id": "power-regulation-smps-006",
+          "type": "mcq",
+          "prompt": "What does synchronous rectification replace, and why does it improve efficiency?",
+          "choices": [
+            "It replaces the catch/freewheel diode with an actively-driven MOSFET, cutting the conduction loss from a ~0.4-0.7V diode drop to a small I*Rds(on) drop",
+            "It replaces the inductor with a transformer to recover energy",
+            "It replaces the output cap with a synchronous filter to cancel ripple",
+            "It synchronizes the switching frequency to the AC line to reduce EMI"
+          ],
+          "answerIndex": 0,
+          "explanation": "A diode dissipates Vf*I; at low Vout a 0.5V drop is a large fraction of the output. A MOSFET with low Rds(on) gates on in place of the diode, dropping only I*Rds(on), which is much smaller, especially at low output voltages."
+        },
+        {
+          "id": "power-regulation-smps-007",
+          "type": "mcq",
+          "prompt": "Raising the switching frequency of a buck converter primarily lets you do what, at what cost?",
+          "choices": [
+            "Use smaller inductor and capacitor (less stored energy per cycle), at the cost of higher switching losses and more high-frequency EMI",
+            "Lower the output voltage ripple to zero, at the cost of dropout",
+            "Eliminate the need for an output capacitor, at the cost of accuracy",
+            "Increase the duty cycle range, at the cost of inductor saturation"
+          ],
+          "answerIndex": 0,
+          "explanation": "Component size scales inversely with f_sw, so higher frequency shrinks magnetics and caps. But switching (gate-drive and transition) losses scale with frequency, and faster edges radiate/conduct more EMI. It is a size-vs-efficiency-vs-EMI tradeoff."
+        },
+        {
+          "id": "power-regulation-smps-008",
+          "type": "mcq",
+          "prompt": "You measure 87% efficiency on a buck delivering 3.3V at 3A (9.9W out). About how much power is dissipated as loss in the converter?",
+          "choices": [
+            "About 1.48 W",
+            "About 0.13 W",
+            "About 8.6 W",
+            "About 11.4 W"
+          ],
+          "answerIndex": 0,
+          "explanation": "Pin = Pout/eff = 9.9/0.87 = 11.38W. Loss = Pin - Pout = 11.38 - 9.9 = 1.48W. This is the heat budget for the switches, inductor DCR, and diode/sync FET."
+        },
+        {
+          "id": "power-regulation-smps-009",
+          "type": "flashcard",
+          "front": "Why does a switching regulator generate EMI and ripple that a linear regulator does not?",
+          "back": "It chops current with fast edges at the switching frequency, creating high di/dt and dv/dt. These produce conducted and radiated emissions at f_sw and its harmonics, plus output ripple at f_sw. Layout (tight hot loops), spread-spectrum, input/output filtering, and shielding are used to manage it.",
+          "hint": "Fast switching edges and chopped currents are the source."
+        }
+      ]
+    },
+    {
+      "id": "topo-tradeoffs",
+      "title": "Topology Choice, Sequencing & Decoupling",
+      "order": 4,
+      "difficulty": 4,
+      "items": [
+        {
+          "id": "power-regulation-topo-tradeoffs-001",
+          "type": "flashcard",
+          "front": "Describe a flyback converter conceptually and one thing it provides that a buck cannot.",
+          "back": "A flyback uses a coupled inductor (transformer) where energy is stored when the primary switch is on and delivered to the secondary when it turns off. It provides galvanic isolation between input and output (and easy multiple/negative outputs), which buck/boost/buck-boost cannot.",
+          "hint": "It is the workhorse low-power isolated topology, common in AC adapters."
+        },
+        {
+          "id": "power-regulation-topo-tradeoffs-002",
+          "type": "flashcard",
+          "front": "Summarize the linear vs switching tradeoff in one breath.",
+          "back": "Linear: low noise, simple, cheap, fast transient response, but lossy and heat-limited (efficiency ~ Vout/Vin) and only steps down. Switching: high efficiency, can step up/down/invert/isolate, but noisier (EMI/ripple), more complex, and needs careful layout.",
+          "hint": "Noise and simplicity vs efficiency and flexibility."
+        },
+        {
+          "id": "power-regulation-topo-tradeoffs-003",
+          "type": "flashcard",
+          "front": "Why cascade a switcher into an LDO for a sensitive RF/analog rail, and what is the design rule?",
+          "back": "The switcher does the bulk step-down efficiently; the LDO post-regulates to strip the switching ripple/noise the analog/RF front-end cannot tolerate. Rule: keep enough headroom for the LDO's dropout, but minimize Vin-Vout to limit LDO heat; pick an LDO whose PSRR is high at the switcher's f_sw.",
+          "hint": "Efficiency from the switcher, cleanliness from the LDO."
+        },
+        {
+          "id": "power-regulation-topo-tradeoffs-004",
+          "type": "mcq",
+          "prompt": "A 0.5 dBm-sensitivity GPS/radar receiver front-end shows spurs at the system's 1.2 MHz switcher fundamental on its LNA supply. Best fix?",
+          "choices": [
+            "Post-regulate the LNA rail with a low-noise LDO chosen for high PSRR at 1.2 MHz, fed from the switcher with modest headroom",
+            "Increase the switcher output capacitance until the spurs disappear",
+            "Lower the switching frequency below the receiver band",
+            "Power the whole board from the LDO and remove the switcher"
+          ],
+          "answerIndex": 0,
+          "explanation": "Bulk capacitance alone rarely kills narrowband supply-coupled spurs, and shifting f_sw just moves them. A high-PSRR LDO post-regulator attenuates the ripple at the offending frequency while keeping system efficiency from the upstream switcher. This is the standard switcher->LDO pattern for sensitive RF."
+        },
+        {
+          "id": "power-regulation-topo-tradeoffs-005",
+          "type": "flashcard",
+          "front": "What is soft-start and why is it used?",
+          "back": "Soft-start ramps the regulator's reference (or duty cycle) up gradually at power-on so the output rises smoothly. It limits inrush current into the output capacitors and downstream loads, avoids overshoot, and prevents tripping overcurrent or browning out the input source.",
+          "hint": "Ramp the output up instead of slamming it on."
+        },
+        {
+          "id": "power-regulation-topo-tradeoffs-006",
+          "type": "flashcard",
+          "front": "Why does power sequencing matter, and give one common ordering rule.",
+          "back": "Many devices (FPGAs, SoCs, level-translated interfaces) require certain rails up/down in a defined order to avoid latch-up, excessive current through I/O clamp diodes, or undefined logic states. A common rule: bring the core rail up before (or with) I/O, and sequence down in reverse.",
+          "hint": "Multi-rail chips have ordering constraints between core and I/O."
+        },
+        {
+          "id": "power-regulation-topo-tradeoffs-007",
+          "type": "flashcard",
+          "front": "Define inrush current and two ways to limit it.",
+          "back": "Inrush is the large transient current at power-up as bulk/output caps charge from near-zero. Limit it with: (1) soft-start (ramp the regulator), (2) an inrush limiter such as an NTC thermistor or a current-limited hot-swap/load-switch MOSFET that controls dV/dt of the bulk caps.",
+          "hint": "Discharged caps look like a short at t=0."
+        },
+        {
+          "id": "power-regulation-topo-tradeoffs-008",
+          "type": "mcq",
+          "prompt": "Which set of protections corresponds to OVP / OCP / thermal shutdown?",
+          "choices": [
+            "Over-voltage protection (clamps or shuts down if output rises too high) / over-current protection (limits or folds back current) / thermal shutdown (disables when junction temp exceeds a limit)",
+            "Over-voltage protection / open-circuit protection / time-out shutdown",
+            "Output-voltage proportioning / oscillation control / thermistor bias",
+            "Over-voltage protection / over-charge protection / transient hold"
+          ],
+          "answerIndex": 0,
+          "explanation": "OVP guards against the output going too high (e.g. a shorted high-side FET), OCP limits or folds back excessive load/short current, and thermal shutdown protects the die when Tj exceeds the limit. Together they keep a fault from destroying the regulator or load."
+        },
+        {
+          "id": "power-regulation-topo-tradeoffs-009",
+          "type": "mcq",
+          "prompt": "Why use bulk capacitance plus small local ceramics for decoupling, rather than one large capacitor?",
+          "choices": [
+            "Bulk caps supply low-frequency/large transient charge but have higher ESL/ESR; small local ceramics have low ESL and supply the high-frequency transient current right at the pin where loop inductance matters",
+            "Two capacitor types are required by safety standards",
+            "Ceramics store more total energy than electrolytics of the same size",
+            "Bulk caps filter EMI while ceramics only set the DC voltage"
+          ],
+          "answerIndex": 0,
+          "explanation": "Decoupling is frequency-distributed. Bulk (electrolytic/tantalum/large ceramic) handles slow/large demand; small ceramics placed at the IC pins have low ESL/ESR and respond to fast di/dt before the bulk can, minimizing the inductance of the supply path that causes high-frequency droop."
+        },
+        {
+          "id": "power-regulation-topo-tradeoffs-010",
+          "type": "flashcard",
+          "front": "What do ESR and ESL of a decoupling capacitor represent, and why do they limit high-frequency performance?",
+          "back": "ESR is the cap's equivalent series resistance (causes IR drop and ripple heating); ESL is its equivalent series inductance (from leads, plates, vias). Above the self-resonant frequency (set by C and ESL) the part looks inductive, so it can no longer sink fast transients - which is why small, low-ESL packages placed close to the load are essential at high frequency.",
+          "hint": "Every real cap is C in series with R and L; the L wins at high frequency."
+        }
+      ]
+    }
+  ]
+}
