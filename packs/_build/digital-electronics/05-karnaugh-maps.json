@@ -7,7 +7,7 @@
       "id": "karnaugh-maps-lesson-1",
       "title": "The K-Map as a Geometry of Adjacency",
       "order": 1,
-      "difficulty": "easy",
+      "difficulty": 1,
       "content": "A Karnaugh map is just a truth table re-drawn so that **physically adjacent cells differ in exactly one input variable**. That single-variable-change property is the whole trick, and it comes from labelling the axes in **Gray code** ($00, 01, 11, 10$) instead of straight binary ($00, 01, 10, 11$). Walk left-to-right across a row and only one bit flips per step; the same holds top-to-bottom and, crucially, across the wrap-around edges (the map is a torus).\n\nWhy does this matter? Boolean algebra's **combining theorem** says\n\n$$X\\cdot Y + X\\cdot \\overline{Y} = X.$$\n\nTwo minterms that differ in one variable collapse, eliminating that variable. On the map those two minterms are *adjacent cells*, so \"draw a loop around adjacent 1s\" is the visual form of applying that theorem. A 2-variable map is a $2\\times 2$ grid (4 cells), a 3-variable map is $2\\times 4$ (8 cells), and a 4-variable map is $4\\times 4$ (16 cells), one cell per minterm.\n\nEach cell holds the function's output for that input combination. You fill it directly from the truth table or from the canonical SOP minterm list. As an ex-radar tech you already read state tables fluently; the K-map is the same data with the rows shuffled so that the *geometry encodes the algebra*. Get the Gray ordering and the cell-to-minterm mapping reflexive first — every later step (grouping, prime implicants, don't-cares) rides on top of this adjacency structure.",
       "items": [
         {
@@ -100,7 +100,7 @@
       "id": "karnaugh-maps-lesson-2",
       "title": "Grouping, Prime Implicants & SOP/POS Minimization",
       "order": 2,
-      "difficulty": "medium",
+      "difficulty": 2,
       "content": "Minimization is the art of covering every 1 with the **fewest, largest legal groups**. The rules: a group must be a rectangle of $2^k$ cells ($1, 2, 4, 8, 16$), may wrap around edges, and must contain only 1s (for SOP). A group of $2^k$ cells in an $n$-variable map eliminates $k$ variables, leaving an $(n-k)$-literal product term — so **bigger groups are cheaper**. Always grab the largest group each 1 can belong to.\n\nVocabulary that earns its keep when you read synthesis reports:\n\n- An **implicant** is any legal group (any product term that implies the function).\n- A **prime implicant (PI)** is a group that cannot be enlarged — no bigger legal rectangle contains it.\n- An **essential prime implicant (EPI)** is a PI that is the *only* PI covering some particular 1. EPIs must appear in any minimal cover.\n\nThe algorithm: list all PIs, select every EPI, then cover the remaining 1s with as few additional PIs as possible. See the diagram of a 4-cell group reducing to $B\\cdot D$.\n\n**SOP vs POS** is a duality. To get a minimal product-of-sums, group the **0s** instead of the 1s, read each group as a sum term using complemented logic, and combine with AND. Equivalently, by De Morgan,\n\n$$\\overline{F} = \\sum m(\\text{the 0 cells}), \\quad F = \\overline{\\overline{F}}.$$\n\nChoose whichever has fewer/larger groups: a function dense with 1s often yields a cheaper POS. The minimal SOP and minimal POS describe the *same* function but can differ in gate count, delay, and which hazards appear.",
       "items": [
         {
@@ -193,7 +193,7 @@
       "id": "karnaugh-maps-lesson-3",
       "title": "Don't-Cares, Quine-McCluskey & Hazard Removal",
       "order": 3,
-      "difficulty": "hard",
+      "difficulty": 3,
       "content": "**Don't-cares** ($d$ or $X$) are input combinations that never occur or whose output you don't care about (e.g., the invalid codes $1010$-$1111$ in a BCD digit). Treat each $X$ as a free $1$ *only when it enlarges a group*, and as $0$ otherwise. Never cover an $X$ that buys you nothing — it is never required on its own. Exploited well, don't-cares routinely halve literal counts (see the wrap-around corner group in the second diagram).\n\nK-maps run out of steam past 4-5 variables (a 5-var map is two stacked 4-var maps; 6-var is four). The **Quine-McCluskey** tabular method is the algorithmic generalization that gives the *same* prime implicants without geometry: list minterms grouped by bit-count, repeatedly combine terms differing in one bit (marking $-$ for the eliminated variable), and the uncombinable terms are the prime implicants. A **PI chart** then selects EPIs and a minimal cover. It is exact but exponential; real synthesizers use heuristic minimizers like **Espresso**, which trade guaranteed minimality for speed on hundreds of variables.\n\n**Hazard removal:** a minimal cover can still **glitch**. A static-1 hazard occurs when an input change moves between two adjacent 1-cells that lie in *different* groups — momentarily, neither product term holds and the output dips. The fix is to add a **redundant (consensus) product term** that covers the overlap, bridging the two groups. The consensus of $A\\cdot C$ and $\\overline{A}\\cdot B$ is $B\\cdot C$:\n\n$$A\\cdot C + \\overline{A}\\cdot B + B\\cdot C.$$\n\nThe extra term costs a gate but guarantees a glitch-free output — essential for asynchronous logic and any signal feeding an edge-sensitive input.",
       "items": [
         {

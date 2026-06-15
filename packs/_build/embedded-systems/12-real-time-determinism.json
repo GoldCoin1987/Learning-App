@@ -7,7 +7,7 @@
       "id": "real-time-determinism-lesson-1",
       "title": "What 'Real-Time' and 'Deterministic' Actually Mean",
       "order": 1,
-      "difficulty": "easy",
+      "difficulty": 1,
       "content": "As a radar tech you already lived this: a return that arrives *correct but late* is worthless. That intuition is the whole subject. **Real-time** is not \"fast\" — it is **bounded**. A system is real-time when its correctness depends on producing a result *within a deadline*, not merely on producing the right value eventually.\n\nThree flavors:\n\n- **Hard real-time:** missing a deadline is a system failure. Airbag deployment, motor commutation, a radar range gate. Late = wrong.\n- **Firm real-time:** a late result is useless and discarded, but an occasional miss is tolerable (it just degrades quality). A dropped video frame.\n- **Soft real-time:** late results still have *some* value that decays with lateness. A UI update, audio buffering with slack.\n\nThe load-bearing word is **deterministic**, and it does *not* mean \"always the same\" or \"fast on average.\" It means the **worst-case behavior is bounded and known**. A path that runs in 2 µs on average but occasionally takes 900 µs is *non-deterministic* for any deadline under 900 µs — even though it's blazing fast almost always.\n\nThis is the core mindset shift from application programming. On a desktop you optimize the **average case** and tolerate the rare hiccup; the OS, the GC, and the cache all trade worst-case for throughput. In hard real-time you do the opposite: you accept a slower average to *cap the maximum*. A predictable 10 µs beats a usually-1 µs-but-sometimes-1 ms path every time. \"Will this *ever* exceed the deadline?\" is the only question that matters.",
       "items": [
         {
@@ -42,7 +42,12 @@
           "id": "real-time-determinism-1-mcq-1",
           "type": "mcq",
           "prompt": "A system discards any sensor reading that arrives after its deadline, but an occasional dropped reading only slightly degrades output quality. What real-time class is this?",
-          "choices": ["Hard real-time", "Firm real-time", "Soft real-time", "Non-real-time"],
+          "choices": [
+            "Hard real-time",
+            "Firm real-time",
+            "Soft real-time",
+            "Non-real-time"
+          ],
           "answerIndex": 1,
           "explanation": "A late result being useless (discarded) but occasional misses being tolerable is the definition of firm real-time. Hard would treat any miss as failure; soft would still extract decaying value from the late result."
         },
@@ -50,7 +55,12 @@
           "id": "real-time-determinism-1-mcq-2",
           "type": "mcq",
           "prompt": "Which statement best captures 'deterministic' in a real-time context?",
-          "choices": ["The code executes in exactly the same number of cycles every single time", "The average execution time is very low", "The worst-case execution time is bounded and known", "The code never uses interrupts"],
+          "choices": [
+            "The code executes in exactly the same number of cycles every single time",
+            "The average execution time is very low",
+            "The worst-case execution time is bounded and known",
+            "The code never uses interrupts"
+          ],
           "answerIndex": 2,
           "explanation": "Determinism means a known, bounded worst case. Execution need not be byte-for-byte identical each run, nor merely fast on average; what matters is that the maximum is provably capped."
         },
@@ -58,7 +68,12 @@
           "id": "real-time-determinism-1-mcq-3",
           "type": "mcq",
           "prompt": "For a hard real-time deadline of 50 µs, which of these implementations is preferable?",
-          "choices": ["Usually 5 µs, but occasionally 200 µs under cache pressure", "Predictably 30 µs every time", "Usually 2 µs, worst case unmeasured", "Averages 8 µs with an unbounded tail"],
+          "choices": [
+            "Usually 5 µs, but occasionally 200 µs under cache pressure",
+            "Predictably 30 µs every time",
+            "Usually 2 µs, worst case unmeasured",
+            "Averages 8 µs with an unbounded tail"
+          ],
           "answerIndex": 1,
           "explanation": "A predictable 30 µs is fully inside the 50 µs budget with a known bound. The others either exceed the deadline in the worst case or have an unknown/unbounded worst case, which is unacceptable for hard real-time."
         },
@@ -66,7 +81,12 @@
           "id": "real-time-determinism-1-mcq-4",
           "type": "mcq",
           "prompt": "Why is average-case latency the wrong metric for a hard real-time path?",
-          "choices": ["Average latency is impossible to measure on an MCU", "A single rare deadline miss can constitute a system failure, so the maximum governs correctness", "Averages are always higher than worst case", "The CPU cannot compute averages in real time"],
+          "choices": [
+            "Average latency is impossible to measure on an MCU",
+            "A single rare deadline miss can constitute a system failure, so the maximum governs correctness",
+            "Averages are always higher than worst case",
+            "The CPU cannot compute averages in real time"
+          ],
           "answerIndex": 1,
           "explanation": "In hard real-time a single missed deadline is a failure, so correctness is governed by the worst-case latency. The average can look excellent while a rare tail event still violates the deadline."
         }
@@ -76,7 +96,7 @@
       "id": "real-time-determinism-lesson-2",
       "title": "Latency, Jitter, WCET, and the Enemies of Determinism",
       "order": 2,
-      "difficulty": "medium",
+      "difficulty": 2,
       "content": "To engineer determinism you need three distinct measurements, and confusing them is a classic mistake.\n\n- **Latency:** time from a triggering event (interrupt fires) to the response (handler completes / output asserted).\n- **Throughput:** events or bytes processed per unit time. High throughput does *not* imply low latency — a deep DMA pipeline maximizes throughput while *adding* latency.\n- **Jitter:** the *variation* in latency across many events — the spread of the distribution. For a hard deadline, jitter is often the real enemy: a fixed large latency can be designed around; a wandering one cannot.\n\n**WCET (worst-case execution time)** is the upper bound on how long a piece of code can take. You estimate it analytically and confirm it empirically — you never *assume* it. Its enemies are exactly the hardware features that make average case fast:\n\n- **Cache misses:** a hit is a few cycles, a miss is tens to hundreds. WCET must assume misses.\n- **Branch misprediction:** flushes the pipeline; variable cost.\n- **Variable-time instructions:** hardware **division** and some multiplies take data-dependent cycles; this bites in tight ISRs.\n- **DMA / bus contention:** a DMA burst stalls the CPU when both want the same bus matrix path — your code slows down through no fault of its own.\n- **Interrupt storms:** a flood of interrupts preempts your task repeatedly, inflating *observed* latency without your code changing.\n- **The heap:** `malloc`/`free` have data-dependent, fragmentation-dependent, effectively unbounded timing. This is why dynamic allocation is banned in real-time paths.\n\n**Measuring jitter** the right way: toggle a GPIO at ISR entry and exit (or at task start/end), capture thousands of events on a logic analyzer or scope, and build the **distribution**. Report the **maximum and the spread**, not the mean. The tail of that histogram — not its peak — is what decides whether you meet a hard deadline.",
       "items": [
         {
@@ -118,7 +138,12 @@
           "id": "real-time-determinism-2-mcq-1",
           "type": "mcq",
           "prompt": "Why is hardware integer division a hazard in a tight, deadline-critical ISR?",
-          "choices": ["It is always slower than software division", "It takes a data-dependent, variable number of cycles, inflating WCET unpredictably", "It disables interrupts automatically", "It cannot run in handler mode"],
+          "choices": [
+            "It is always slower than software division",
+            "It takes a data-dependent, variable number of cycles, inflating WCET unpredictably",
+            "It disables interrupts automatically",
+            "It cannot run in handler mode"
+          ],
           "answerIndex": 1,
           "explanation": "Division on many cores is a variable-time, data-dependent instruction. Variable timing is exactly what undermines a bounded WCET, so it is risky in tight real-time paths."
         },
@@ -126,7 +151,12 @@
           "id": "real-time-determinism-2-mcq-2",
           "type": "mcq",
           "prompt": "When estimating WCET analytically, how should you treat the cache?",
-          "choices": ["Assume every access is a cache hit, since that is most common", "Assume the worst case: cache misses on the critical accesses", "Ignore the cache because it averages out", "Disable the cache so it cannot affect timing in any way"],
+          "choices": [
+            "Assume every access is a cache hit, since that is most common",
+            "Assume the worst case: cache misses on the critical accesses",
+            "Ignore the cache because it averages out",
+            "Disable the cache so it cannot affect timing in any way"
+          ],
           "answerIndex": 1,
           "explanation": "WCET is an upper bound, so you must assume cache misses on the relevant accesses. Assuming hits gives a best case, not a worst case. (Disabling the cache is one mitigation but is a design choice, not how you *estimate* WCET.)"
         },
@@ -134,7 +164,12 @@
           "id": "real-time-determinism-2-mcq-3",
           "type": "mcq",
           "prompt": "You measure an ISR's latency over 100,000 events. Which figure most directly tells you whether a hard deadline is safe?",
-          "choices": ["The mean latency", "The median latency", "The maximum observed latency (and the tail of the distribution)", "The minimum latency"],
+          "choices": [
+            "The mean latency",
+            "The median latency",
+            "The maximum observed latency (and the tail of the distribution)",
+            "The minimum latency"
+          ],
           "answerIndex": 2,
           "explanation": "Hard deadlines are governed by the worst case, so the maximum and the tail of the distribution are decisive. Mean, median, and minimum can all look fine while a rare tail event violates the deadline."
         },
@@ -142,7 +177,12 @@
           "id": "real-time-determinism-2-mcq-4",
           "type": "mcq",
           "prompt": "Why is dynamic heap allocation (malloc/free) discouraged in real-time code?",
-          "choices": ["It uses too much flash", "Its execution time is data- and fragmentation-dependent and effectively unbounded", "It requires an MMU that MCUs lack", "It only works in privileged mode"],
+          "choices": [
+            "It uses too much flash",
+            "Its execution time is data- and fragmentation-dependent and effectively unbounded",
+            "It requires an MMU that MCUs lack",
+            "It only works in privileged mode"
+          ],
           "answerIndex": 1,
           "explanation": "Allocator timing depends on heap state and fragmentation and has no useful upper bound, which destroys WCET guarantees. Real-time designs prefer static allocation, pools, and ring buffers."
         },
@@ -150,7 +190,12 @@
           "id": "real-time-determinism-2-mcq-5",
           "type": "mcq",
           "prompt": "An ISR's code is unchanged, yet its measured response time suddenly spikes during heavy peripheral activity. The most likely cause is:",
-          "choices": ["The compiler re-optimized the ISR at runtime", "DMA/bus contention or an interrupt storm preempting/stalling the path", "The heap grew larger", "The CPU clock increased"],
+          "choices": [
+            "The compiler re-optimized the ISR at runtime",
+            "DMA/bus contention or an interrupt storm preempting/stalling the path",
+            "The heap grew larger",
+            "The CPU clock increased"
+          ],
           "answerIndex": 1,
           "explanation": "Bus contention from DMA bursts and preemption from interrupt storms inflate observed latency without any change to the ISR code itself — both are classic external enemies of determinism."
         },
@@ -168,7 +213,7 @@
       "id": "real-time-determinism-lesson-3",
       "title": "Designing for the Worst Case: Budgets, Scheduling, and Robustness",
       "order": 3,
-      "difficulty": "hard",
+      "difficulty": 3,
       "content": "Knowing your WCETs lets you *design* for the worst case instead of hoping.\n\n**CPU budgeting.** For each periodic task compute utilization **U = C / T** (worst-case execution time C over period T) and sum across tasks. If ΣU > 1 the system is overcommitted and *will* miss deadlines under load. Leave headroom — a 100%-loaded MCU has no margin for the tail events of Lesson 2.\n\n**Rate-monotonic (RM) intuition.** Under fixed-priority preemptive scheduling, assign priorities by *rate*: the more frequent task (shorter period) gets the higher priority. RM is provably optimal among fixed-priority schemes. The classic sufficient bound for *n* tasks is ΣU ≤ n(2^(1/n) − 1), which tends to **~0.69** as n grows — a useful rule of thumb that a fixed-priority set comfortably below ~69% utilization is schedulable, though specific task sets can go higher. **Deadline analysis** is the rigorous check: for each task verify that its worst-case response time (its own C plus all preemption from higher-priority tasks) is ≤ its deadline.\n\n**The dangerous patterns** — each silently destroys determinism:\n\n- **Disabling interrupts** for long stretches: every interrupt's latency now includes that critical-section duration. Keep critical sections *tiny and bounded*; never do real work with interrupts off.\n- **Busy-waiting / spin loops** in a critical path: burns CPU and, worse, can wait an unbounded time on an external condition.\n- **Unbounded loops:** a `while (!flag)` with no timeout, or a loop whose iteration count is data-dependent, has no WCET. Cap every loop.\n\n**Robustness backstops.** Even with budgets, things go wrong. The **watchdog timer** catches a hung or deadlocked system: if the code stops \"kicking\" it within a bounded window, it resets the MCU — turning a silent hang into a recoverable reboot. The **MPU** (memory protection unit) catches stack overflows and stray writes by faulting on illegal accesses, converting silent corruption into a diagnosable fault. Neither makes you faster; both make worst-case *failure* bounded and detectable — the same philosophy as the rest of this module.",
       "items": [
         {
@@ -217,7 +262,12 @@
           "id": "real-time-determinism-3-mcq-1",
           "type": "mcq",
           "prompt": "Three periodic tasks have utilizations 0.30, 0.30, and 0.35 (ΣU = 0.95). What does this imply under fixed-priority scheduling?",
-          "choices": ["Always schedulable, since ΣU < 1", "It exceeds the ~0.69 RM rule-of-thumb bound, so schedulability is not guaranteed and there is almost no margin for tail events", "It is unschedulable because ΣU > 0.5", "Utilization is irrelevant to schedulability"],
+          "choices": [
+            "Always schedulable, since ΣU < 1",
+            "It exceeds the ~0.69 RM rule-of-thumb bound, so schedulability is not guaranteed and there is almost no margin for tail events",
+            "It is unschedulable because ΣU > 0.5",
+            "Utilization is irrelevant to schedulability"
+          ],
           "answerIndex": 1,
           "explanation": "ΣU = 0.95 is below 1 but well above the ~0.69 RM sufficient bound, so the simple test does not guarantee schedulability (you'd need full response-time analysis), and 95% load leaves essentially no headroom for the worst-case tail events."
         },
@@ -225,7 +275,12 @@
           "id": "real-time-determinism-3-mcq-2",
           "type": "mcq",
           "prompt": "Under rate-monotonic scheduling, a 1 kHz task and a 100 Hz task share a CPU. Which gets higher priority?",
-          "choices": ["The 100 Hz task, because it is less frequent", "The 1 kHz task, because it has the shorter period / higher rate", "Whichever has the longer execution time", "They must have equal priority"],
+          "choices": [
+            "The 100 Hz task, because it is less frequent",
+            "The 1 kHz task, because it has the shorter period / higher rate",
+            "Whichever has the longer execution time",
+            "They must have equal priority"
+          ],
           "answerIndex": 1,
           "explanation": "RM assigns priority by rate: the shorter-period (1 kHz) task gets the higher priority. Period, not execution time, drives the RM assignment."
         },
@@ -233,7 +288,12 @@
           "id": "real-time-determinism-3-mcq-3",
           "type": "mcq",
           "prompt": "What does worst-case response-time deadline analysis for a task account for that simple utilization summing does not?",
-          "choices": ["The task's own execution time only", "The task's execution time plus all preemption it can suffer from higher-priority tasks, checked against its deadline", "Only the heap usage of the task", "The average-case latency of the whole system"],
+          "choices": [
+            "The task's own execution time only",
+            "The task's execution time plus all preemption it can suffer from higher-priority tasks, checked against its deadline",
+            "Only the heap usage of the task",
+            "The average-case latency of the whole system"
+          ],
           "answerIndex": 1,
           "explanation": "Response-time analysis sums a task's own C with the interference (preemption) from all higher-priority tasks and verifies the result is within the deadline — a sharper, per-task check than the aggregate utilization bound."
         },
@@ -241,7 +301,12 @@
           "id": "real-time-determinism-3-mcq-4",
           "type": "mcq",
           "prompt": "Why is an unbounded loop like `while (!flag) { }` (no timeout) a determinism hazard?",
-          "choices": ["It always uses too much flash", "Its iteration count is data/event dependent, so it has no WCET and can stall the path indefinitely", "It cannot be compiled with optimization", "It automatically disables the MPU"],
+          "choices": [
+            "It always uses too much flash",
+            "Its iteration count is data/event dependent, so it has no WCET and can stall the path indefinitely",
+            "It cannot be compiled with optimization",
+            "It automatically disables the MPU"
+          ],
           "answerIndex": 1,
           "explanation": "A loop waiting on an external condition with no bound has no worst-case execution time and can block indefinitely, destroying any timing guarantee. Critical-path loops must have a bounded iteration count or a timeout."
         },
@@ -249,7 +314,12 @@
           "id": "real-time-determinism-3-mcq-5",
           "type": "mcq",
           "prompt": "A watchdog and an MPU share what design philosophy with the rest of real-time engineering?",
-          "choices": ["They make the average case faster", "They bound and make detectable the worst-case failure, rather than improving speed", "They eliminate the need for WCET analysis", "They remove all jitter from the system"],
+          "choices": [
+            "They make the average case faster",
+            "They bound and make detectable the worst-case failure, rather than improving speed",
+            "They eliminate the need for WCET analysis",
+            "They remove all jitter from the system"
+          ],
           "answerIndex": 1,
           "explanation": "Neither speeds anything up; both bound worst-case failure — a hang becomes a timed reset, corruption becomes a fault — mirroring the module's theme of bounding the worst case rather than optimizing the average."
         }

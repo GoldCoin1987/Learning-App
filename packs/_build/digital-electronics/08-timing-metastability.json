@@ -7,7 +7,7 @@
       "id": "timing-metastability-l1",
       "title": "Delays & Flip-Flop Timing Parameters",
       "order": 1,
-      "difficulty": "easy",
+      "difficulty": 1,
       "content": "Every gate and wire takes time to respond. **Propagation delay** $t_{pd}$ is the *maximum* time from a stable input change to a stable output; **contamination delay** $t_{cd}$ is the *minimum* time before the output *starts* to change. So after an input edge the output is guaranteed stable only after $t_{pd}$, and guaranteed unchanged only up to $t_{cd}$. Note $t_{cd} \\le t_{pd}$ always.\n\nA flip-flop adds three timing parameters that define a window around its clock edge:\n\n- **Setup time** $t_{su}$ — the input $D$ must be stable for at least $t_{su}$ *before* the active clock edge.\n- **Hold time** $t_{h}$ — $D$ must remain stable for at least $t_{h}$ *after* the edge.\n- **Clock-to-Q delay** $t_{cq}$ — after the edge, $Q$ is valid after $t_{cq}$ (datasheets often give both $t_{cq,max}$ and a $t_{cq,min}$, akin to $t_{pd}$ vs $t_{cd}$ for combinational logic).\n\nViolate $t_{su}$ or $t_{h}$ and the flop may capture a wrong value or go *metastable* (Lesson 4). As a radar tech you measured rise/fall times on a scope; these are the same physics, now abstracted into datasheet numbers your timing tools consume.\n\nThink of a register-to-register path: the launching flop fires ($t_{cq}$), the signal crosses combinational logic ($t_{pd}$), and must arrive at the capturing flop's $D$ before its $t_{su}$. That chain is the seed of every timing constraint in the rest of this subtopic.",
       "items": [
         {
@@ -104,7 +104,7 @@
       "id": "timing-metastability-l2",
       "title": "The Setup & Hold Inequalities, f_max, and the Critical Path",
       "order": 2,
-      "difficulty": "medium",
+      "difficulty": 2,
       "content": "Consider two flip-flops separated by combinational logic, both on clock period $T_{clk}$. After a launch edge the data is valid at $D$ of the capturing flop at time $t_{cq}+t_{pd}$, and it must arrive at least $t_{su}$ before the *next* edge. That gives the **setup constraint**:\n\n$$t_{cq} + t_{pd,max} + t_{su} \\le T_{clk}$$\n\nSolving for the period sets the **maximum clock frequency**:\n\n$$f_{max} = \\frac{1}{t_{cq} + t_{pd,max} + t_{su}}$$\n\nThe slowest register-to-register path—the **critical path**—is the one that maximizes $t_{cq}+t_{pd,max}$ and therefore caps $f_{max}$. **Slack** is how much margin a path has: $\\text{slack} = T_{clk} - (t_{cq}+t_{pd,max}+t_{su})$; negative slack means a setup failure.\n\nThe **hold constraint** is different—it compares fastest data against the *same* edge:\n\n$$t_{cq,min} + t_{cd} \\ge t_{h}$$\n\nNotice $T_{clk}$ does **not** appear. Hold is **frequency-independent**: the data launched at an edge must not race through and corrupt the capturing flop's input *before* its hold window closes after that same edge. This is why **slowing the clock can fix setup violations but never hold violations**—a classic rust-knocker. Hold failures are fixed by adding delay (buffers) on short paths or fixing skew, not by lowering frequency.",
       "items": [
         {
@@ -200,7 +200,7 @@
       "id": "timing-metastability-l3",
       "title": "Clock Skew, Jitter, and Pipelining",
       "order": 3,
-      "difficulty": "medium",
+      "difficulty": 2,
       "content": "**Clock skew** is the difference in clock arrival time between the launching and capturing flops, $t_{skew} = t_{clk,capture} - t_{clk,launch}$. Skew shifts both constraints. With skew the setup constraint becomes\n\n$$t_{cq} + t_{pd,max} + t_{su} \\le T_{clk} + t_{skew}$$\n\nPositive skew (clock reaches the capture flop *later*) *relaxes* setup—it effectively lends time. But the same positive skew *tightens* hold:\n\n$$t_{cq,min} + t_{cd} \\ge t_{h} + t_{skew}$$\n\nSo skew is a double-edged sword; tools budget it carefully, and uncontrolled skew (e.g., from gating a clock) is dangerous.\n\n**Jitter** is cycle-to-cycle variation in the clock edge position—random (phase noise) and deterministic. Unlike static skew, jitter is uncertain, so it eats directly into your timing budget: subtract it from the period for setup. Your radar phase-noise intuition transfers exactly—jitter is phase noise in the time domain.\n\n**Pipelining** raises throughput by inserting registers to chop one long combinational path into shorter stages. If a path of delay $D$ is split into $k$ balanced stages, each stage is $\\approx D/k$, so $f_{max}$ rises (ideally by $\\approx k\\times$, minus the added $t_{cq}+t_{su}$ per stage). The cost is **latency**: results now take $k$ cycles to emerge, and you must add matching pipeline delays to side signals. Pipelining is the standard answer when a critical path won't meet timing—central to FPGA radar DSP, where deep MAC pipelines run at line rate.",
       "items": [
         {
@@ -296,7 +296,7 @@
       "id": "timing-metastability-l4",
       "title": "Metastability, Synchronizers, CDC & Reset",
       "order": 4,
-      "difficulty": "hard",
+      "difficulty": 3,
       "content": "When a flip-flop's setup/hold window is violated—inevitable when sampling a signal asynchronous to the clock—its output can hover between logic levels for an unbounded time before resolving randomly. This is **metastability**. It is a physical bistable-circuit phenomenon (a ball balanced on a hill), so it can never be fully eliminated, only made statistically rare.\n\nThe figure of merit is **mean time between failures**:\n\n$$\\text{MTBF} = \\frac{e^{\\,t_{r}/\\tau}}{f_{clk}\\, f_{data}\\, T_{0}}$$\n\nwhere $t_{r}$ is the resolution time allowed before the value is used, $\\tau$ and $T_0$ are device constants, and $f_{clk}$, $f_{data}$ are the clock and data-event rates. MTBF grows *exponentially* with the resolution time $t_{r}$—the lever we control.\n\nThe **two-flop synchronizer** buys one full clock of resolution time: FF1 samples the async input (and may go metastable), and FF2 resamples FF1's output one cycle later, by which time it has almost certainly resolved. That single-bit recipe is the foundation of **clock-domain crossing (CDC)**.\n\nMulti-bit buses can't use parallel two-flop synchronizers—bits would resolve on different cycles, producing illegal intermediate values. Instead: encode counters in **Gray code** (only one bit changes per step, so at most one bit is mid-transition), use a **handshake** (req/ack with the data held stable), or use an **asynchronous FIFO** (the standard for streaming data, combining Gray-coded pointers and dual-clock RAM).\n\nFinally, **reset strategy**: prefer **asynchronous assert, synchronous de-assert**. Assert reset immediately regardless of clock, but release it synchronized to the destination clock so flops don't exit reset near a clock edge and go metastable—the same synchronizer reasoning applied to the reset line itself.",
       "items": [
         {

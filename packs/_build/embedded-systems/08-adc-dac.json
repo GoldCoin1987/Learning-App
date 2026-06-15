@@ -7,7 +7,7 @@
       "id": "adc-dac-l1",
       "title": "ADC Fundamentals at the Register Level",
       "order": 1,
-      "difficulty": "easy",
+      "difficulty": 1,
       "content": "An ADC maps an analog input onto an $N$-bit integer code. The smallest distinguishable step, one LSB, is\n\n$$V_{LSB}=\\frac{V_{ref}}{2^N}$$\n\nso a 12-bit ADC with $V_{ref}=3.3\\,\\text{V}$ resolves $\\approx 0.806\\,\\text{mV}$. The output code is\n\n$$\\text{code}=\\left\\lfloor \\frac{V_{in}}{V_{ref}}\\cdot 2^N \\right\\rfloor$$\n\nclamped to $[0, 2^N-1]$. At the register level you typically configure a **resolution** field (e.g. 12/10/8/6 bits), select the **reference** (an external pin, VDDA, or an on-chip bandgap), and pick the **input channel** in a sequence register.\n\nThe front end is a **sample-and-hold (S/H)**: a switch charges a hold capacitor $C_H$ through the source resistance $R_S$ plus the internal switch resistance. The sampling capacitor must settle to within $\\tfrac{1}{2}$ LSB, which takes several RC time constants. As a rule of thumb you need\n\n$$t_{samp} \\ge (N+1)\\ln 2 \\cdot R_S C_H$$\n\nso a **high source impedance forces a longer sampling time** (set via the sample-time register) or an op-amp buffer. Skimp on it and you read a value pulled toward the previous channel. This is exactly the radar/instrumentation lesson: characterize your source impedance before trusting a code.",
       "items": [
         {
@@ -96,7 +96,7 @@
       "id": "adc-dac-l2",
       "title": "Conversion Modes, Triggering & Throughput",
       "order": 2,
-      "difficulty": "medium",
+      "difficulty": 2,
       "content": "Once the analog path is sound, you choose **how** conversions are launched. **Single (one-shot)** mode converts once per trigger. **Continuous** mode re-arms itself the instant a conversion finishes, free-running as fast as it can. **Scan/sequence** mode walks an ordered list of channels (regular sequence registers), optionally storing each result via DMA so you can sample, say, four sensors per sweep.\n\n**Triggering** is the crux. **Software trigger** (set the start bit) is convenient but the launch time jitters with whatever the CPU was doing. **Timer (hardware) triggering** ties each conversion to a timer event (e.g. TIM update -> TRGO -> ADC start), giving a hardware-precise, low-jitter sample clock at frequency $f_s$. This is the standard pattern for clean acquisition.\n\nTotal conversion time is the sampling window plus the SAR steps:\n\n$$t_{conv}=t_{samp}+t_{SAR}=t_{samp}+\\frac{N+\\delta}{f_{ADC}}$$\n\nand throughput is $f_{s,max}=1/t_{conv}$.\n\nDon't forget **Nyquist**: to represent a signal of bandwidth $B$ you must sample at $f_s>2B$. Because the ADC samples everything, any energy above $f_s/2$ folds (aliases) back into your band — so the **anti-alias filter is analog, ahead of the ADC**, and cannot be undone in software. A radar tech knows this viscerally: an unfiltered spur at $f_s+f$ lands right on top of your target return.",
       "items": [
         {
@@ -185,7 +185,7 @@
       "id": "adc-dac-l3",
       "title": "Timer+DMA Acquisition, Oversampling, Calibration & DAC/DDS",
       "order": 3,
-      "difficulty": "hard",
+      "difficulty": 3,
       "content": "The headline pattern: **timer -> ADC -> DMA -> circular buffer**. A timer's TRGO triggers each conversion; the ADC raises a request on end-of-conversion; the DMA copies the data register into RAM and auto-increments. With a **circular (ping-pong/double) buffer** plus **half-transfer (HT)** and **transfer-complete (TC)** interrupts, the CPU processes the half that just filled while the other half fills — an evenly-sampled block, captured with near-zero CPU babysitting, ready for an FFT.\n\n**Oversampling** trades speed for resolution. Averaging (or decimating) $M$ samples of a signal with sufficient noise dither raises the effective number of bits by\n\n$$\\Delta N=\\frac{1}{2}\\log_2 M$$\n\nso $M=256$ buys 4 extra bits. A hardware oversampler does this in the ADC and right-shifts automatically.\n\n**Calibration** corrects **offset** (zero error) and **gain** (full-scale slope) error; many MCUs run a startup self-calibration into a register. **Internal channels** (a die temperature sensor, the bandgap $V_{ref}$) let you measure VDDA and compensate.\n\nThe **DAC** is the inverse: code in, voltage out, $V_{out}=\\frac{\\text{code}}{2^N}V_{ref}$, with an optional output buffer. Drive it from a **timer + DMA** streaming a sine lookup table and you have **DDS**: output frequency $f_{out}=f_{update}/L$ for a table of length $L$. Finally, **SAR vs sigma-delta**: SAR is fast, low-latency, moderate resolution (great for radar/scan); sigma-delta oversamples a 1-bit modulator for very high resolution at low bandwidth (great for audio/precision DC).",
       "items": [
         {

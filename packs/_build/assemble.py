@@ -58,6 +58,9 @@ def main():
             for key in ("id", "title", "order", "difficulty", "items"):
                 if key not in lesson:
                     errors.append(f"{fname}/{lesson.get('id','?')}: missing lesson key '{key}'")
+            for nkey in ("order", "difficulty"):
+                if not isinstance(lesson.get(nkey), int) or isinstance(lesson.get(nkey), bool):
+                    errors.append(f"{fname}/{lesson.get('id','?')}: lesson {nkey} must be int -> {lesson.get(nkey)!r}")
             lid = f"{st['id']}-{lesson.get('id')}"
             lesson["id"] = lid
             if lid in lesson_ids:
@@ -81,7 +84,9 @@ def main():
                         errors.append(f"{iid}: mcq missing prompt")
                     if not isinstance(choices, list) or len(choices) < 2:
                         errors.append(f"{iid}: mcq needs >=2 choices")
-                    elif not isinstance(ai, int) or ai < 0 or ai >= len(choices):
+                    elif any(not isinstance(c, str) for c in choices):
+                        errors.append(f"{iid}: mcq choices must all be strings")
+                    elif not isinstance(ai, int) or isinstance(ai, bool) or ai < 0 or ai >= len(choices):
                         errors.append(f"{iid}: mcq answerIndex out of range")
                 else:
                     errors.append(f"{iid}: unknown type '{t}'")
