@@ -53,6 +53,7 @@ class PackRepository(
         )
         for (subtopic in pack.subtopics) {
             for (lesson in subtopic.lessons) {
+                db.lessonDao().upsert(lesson.toLessonEntity(pack.id, subtopic))
                 for (item in lesson.items) {
                     val fresh = item.toEntity(pack.id, subtopic, lesson, todayEpochDay)
                     val existing = db.itemDao().getItem(pack.id, item.id)
@@ -87,19 +88,26 @@ class StudyRepository(private val db: StudyDatabase) {
     suspend fun subtopics(packId: String, today: Long): List<SubtopicSummary> =
         db.itemDao().subtopicSummaries(packId, today)
 
+    suspend fun lessons(packId: String, subtopicId: String): List<LessonEntity> =
+        db.lessonDao().lessonsForSubtopic(packId, subtopicId)
+
+    suspend fun lesson(packId: String, lessonId: String): LessonEntity? =
+        db.lessonDao().getLesson(packId, lessonId)
+
     /**
      * Session = due reviews first (SM-2), then new items introduced in easy→hard order.
-     * [packId]/[subtopicId] null = study everything; set them to scope to a topic or sub-topic.
+     * Null scope = study everything; set packId/subtopicId/lessonId to narrow it.
      */
     suspend fun buildSession(
         today: Long,
         packId: String? = null,
         subtopicId: String? = null,
+        lessonId: String? = null,
         newLimit: Int = 20,
         reviewLimit: Int = 80,
     ): List<StudyCard> {
-        val due = db.itemDao().dueItemsScoped(today, packId, subtopicId, reviewLimit)
-        val fresh = db.itemDao().newItemsScoped(packId, subtopicId, newLimit)
+        val due = db.itemDao().dueItemsScoped(today, packId, subtopicId, lessonId, reviewLimit)
+        val fresh = db.itemDao().newItemsScoped(packId, subtopicId, lessonId, newLimit)
         return (due + fresh).map { it.toStudyCard() }
     }
 
@@ -108,6 +116,19 @@ class StudyRepository(private val db: StudyDatabase) {
         db.itemDao().update(Sm2.review(entity, grade, today))
     }
 }
+
+private fun Lesson.toLessonEntity(packId: String, subtopic: Subtopic): LessonEntity = LessonEntity(
+    packId = packId,
+    lessonId = id,
+    subtopicId = subtopic.id,
+    subtopicTitle = subtopic.title,
+    subtopicOrder = subtopic.order,
+    lessonTitle = title,
+    lessonOrder = order,
+    difficulty = difficulty,
+    seq = subtopic.order * 10000 + order * 100 + difficulty,
+    content = content,
+)
 
 private fun Item.toEntity(packId: String, subtopic: Subtopic, lesson: Lesson, todayEpochDay: Long): ItemEntity =
     ItemEntity(

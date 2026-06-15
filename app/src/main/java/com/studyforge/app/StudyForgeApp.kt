@@ -34,8 +34,7 @@ class StudyForgeApp : Application(), ImageLoaderFactory {
 class AppContainer(context: Context) {
     val db: StudyDatabase = Room
         .databaseBuilder(context, StudyDatabase::class.java, "studyforge.db")
-        // Schema v2 (hierarchical packs). Content is re-downloadable, so a destructive
-        // upgrade is acceptable here rather than hand-writing a migration.
+        // Content is re-downloadable; a destructive recreate on schema change is fine.
         .fallbackToDestructiveMigration()
         .build()
 

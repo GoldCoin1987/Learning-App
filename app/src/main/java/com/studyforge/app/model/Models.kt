@@ -51,6 +51,8 @@ data class Lesson(
     val title: String,
     val order: Int = 0,
     val difficulty: Int = 1,
+    /** Optional readable lesson (markdown + LaTeX + images) shown before the questions. */
+    val content: String? = null,
     val items: List<Item> = emptyList(),
 )
 

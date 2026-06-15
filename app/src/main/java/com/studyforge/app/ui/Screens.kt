@@ -40,6 +40,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import coil.compose.AsyncImage
 import com.studyforge.app.AppContainer
+import com.studyforge.app.data.LessonEntity
 import com.studyforge.app.data.StudyCard
 import com.studyforge.app.data.SubtopicSummary
 import com.studyforge.app.domain.Gating
@@ -61,17 +62,35 @@ fun AppNav(container: AppContainer) {
         composable("topic/{packId}") { entry ->
             SubtopicsScreen(container, entry.arguments?.getString("packId").orEmpty(), nav::navigate)
         }
+        composable("subtopic/{packId}/{subtopicId}") { entry ->
+            LessonsScreen(
+                container,
+                entry.arguments?.getString("packId").orEmpty(),
+                entry.arguments?.getString("subtopicId").orEmpty(),
+                nav::navigate,
+            )
+        }
+        composable("lesson/{packId}/{lessonId}") { entry ->
+            LessonReadingScreen(
+                container,
+                entry.arguments?.getString("packId").orEmpty(),
+                entry.arguments?.getString("lessonId").orEmpty(),
+                nav::navigate,
+            )
+        }
         composable(
-            route = "study?packId={packId}&subtopicId={subtopicId}",
+            route = "study?packId={packId}&subtopicId={subtopicId}&lessonId={lessonId}",
             arguments = listOf(
                 navArgument("packId") { type = NavType.StringType; nullable = true; defaultValue = null },
                 navArgument("subtopicId") { type = NavType.StringType; nullable = true; defaultValue = null },
+                navArgument("lessonId") { type = NavType.StringType; nullable = true; defaultValue = null },
             ),
         ) { entry ->
             StudyScreen(
                 container = container,
                 packId = entry.arguments?.getString("packId"),
                 subtopicId = entry.arguments?.getString("subtopicId"),
+                lessonId = entry.arguments?.getString("lessonId"),
                 onDone = { nav.popBackStack() },
             )
         }
@@ -150,12 +169,83 @@ private fun SubtopicsScreen(container: AppContainer, packId: String, navigate: (
                             Text(st.subtopicTitle, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                             Text("${st.total} cards · ${st.due} due · ${st.newCount} new", style = MaterialTheme.typography.labelMedium)
                             Spacer(Modifier.height(8.dp))
-                            Button(onClick = { navigate("study?packId=$packId&subtopicId=${st.subtopicId}") }) {
-                                Text("Study")
+                            Button(onClick = { navigate("subtopic/$packId/${st.subtopicId}") }) {
+                                Text("Open lessons")
                             }
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LessonsScreen(container: AppContainer, packId: String, subtopicId: String, navigate: (String) -> Unit) {
+    var lessons by remember { mutableStateOf<List<LessonEntity>?>(null) }
+    LaunchedEffect(packId, subtopicId) { lessons = container.studyRepo.lessons(packId, subtopicId) }
+
+    Column(Modifier.fillMaxSize().padding(16.dp)) {
+        Text("Lessons", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(12.dp))
+        Button(
+            onClick = { navigate("study?packId=$packId&subtopicId=$subtopicId") },
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text("Study whole sub-topic") }
+        Spacer(Modifier.height(12.dp))
+        when (val list = lessons) {
+            null -> CircularProgressIndicator()
+            else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                items(list) { lesson ->
+                    Card(Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(16.dp)) {
+                            Text(lesson.lessonTitle, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.height(8.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                if (!lesson.content.isNullOrBlank()) {
+                                    Button(onClick = { navigate("lesson/$packId/${lesson.lessonId}") }) { Text("Read") }
+                                }
+                                OutlinedButton(onClick = {
+                                    navigate("study?packId=$packId&subtopicId=$subtopicId&lessonId=${lesson.lessonId}")
+                                }) { Text("Questions") }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LessonReadingScreen(container: AppContainer, packId: String, lessonId: String, navigate: (String) -> Unit) {
+    var lesson by remember { mutableStateOf<LessonEntity?>(null) }
+    var loaded by remember { mutableStateOf(false) }
+    LaunchedEffect(packId, lessonId) {
+        lesson = container.studyRepo.lesson(packId, lessonId)
+        loaded = true
+    }
+
+    Column(Modifier.fillMaxSize().padding(16.dp)) {
+        val l = lesson
+        when {
+            !loaded -> CircularProgressIndicator()
+            l == null -> Text("Lesson not found.")
+            else -> {
+                Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                    Text(l.lessonTitle, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(12.dp))
+                    if (l.content.isNullOrBlank()) {
+                        Text("No reading for this lesson yet — jump straight to the questions.")
+                    } else {
+                        RichText(l.content, modifier = Modifier.fillMaxWidth(), textSizeSp = 16f)
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                Button(
+                    onClick = { navigate("study?packId=$packId&subtopicId=${l.subtopicId}&lessonId=$lessonId") },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Start questions") }
             }
         }
     }
@@ -220,13 +310,13 @@ private fun CatalogScreen(container: AppContainer) {
 }
 
 @Composable
-private fun StudyScreen(container: AppContainer, packId: String?, subtopicId: String?, onDone: () -> Unit) {
+private fun StudyScreen(container: AppContainer, packId: String?, subtopicId: String?, lessonId: String?, onDone: () -> Unit) {
     val scope = rememberCoroutineScope()
     var session by remember { mutableStateOf<List<StudyCard>?>(null) }
     var index by remember { mutableStateOf(0) }
 
-    LaunchedEffect(packId, subtopicId) {
-        session = container.studyRepo.buildSession(today(), packId, subtopicId)
+    LaunchedEffect(packId, subtopicId, lessonId) {
+        session = container.studyRepo.buildSession(today(), packId, subtopicId, lessonId)
     }
 
     val cards = session

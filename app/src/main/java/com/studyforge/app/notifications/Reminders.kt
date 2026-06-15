@@ -40,7 +40,7 @@ class ReminderWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
     override suspend fun doWork(): Result {
         val app = applicationContext as StudyForgeApp
         val today = LocalDate.now().toEpochDay()
-        val due = app.container.db.itemDao().dueItemsScoped(today, null, null, 1000).size
+        val due = app.container.db.itemDao().dueItemsScoped(today, null, null, null, 1000).size
         if (due > 0) showReminder(applicationContext, due)
         ReminderScheduler.scheduleNext(applicationContext)
         return Result.success()

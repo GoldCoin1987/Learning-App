@@ -21,10 +21,24 @@ data class PackEntity(
     val installedAt: Long,
 )
 
+/** Lesson-level metadata + readable content (the "read before questions" text). */
+@Entity(tableName = "lessons", primaryKeys = ["packId", "lessonId"])
+data class LessonEntity(
+    val packId: String,
+    val lessonId: String,
+    val subtopicId: String,
+    val subtopicTitle: String,
+    val subtopicOrder: Int,
+    val lessonTitle: String,
+    val lessonOrder: Int,
+    val difficulty: Int,
+    val seq: Int,
+    val content: String?,
+)
+
 /**
  * One study item, denormalized with its sub-topic/lesson context and embedded SM-2 state.
- * Keyed on (packId, itemId) so re-importing a pack IGNOREs existing rows and preserves progress.
- * [seq] = subtopicOrder*10000 + lessonOrder*100 + difficulty — the easy→hard progression order.
+ * Keyed on (packId, itemId). [seq] = subtopicOrder*10000 + lessonOrder*100 + difficulty.
  */
 @Entity(tableName = "items", primaryKeys = ["packId", "itemId"])
 data class ItemEntity(
@@ -40,7 +54,6 @@ data class ItemEntity(
     val seq: Int,
     val type: String,
     val payloadJson: String,
-    // SRS state
     val ef: Double,
     val intervalDays: Int,
     val reps: Int,
@@ -75,6 +88,18 @@ interface PackDao {
 }
 
 @Dao
+interface LessonDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(lesson: LessonEntity)
+
+    @Query("SELECT * FROM lessons WHERE packId = :packId AND subtopicId = :subtopicId ORDER BY seq")
+    suspend fun lessonsForSubtopic(packId: String, subtopicId: String): List<LessonEntity>
+
+    @Query("SELECT * FROM lessons WHERE packId = :packId AND lessonId = :lessonId")
+    suspend fun getLesson(packId: String, lessonId: String): LessonEntity?
+}
+
+@Dao
 interface ItemDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAll(items: List<ItemEntity>)
@@ -95,15 +120,16 @@ interface ItemDao {
     @Query("SELECT COUNT(*) FROM items WHERE introduced = 1 AND dueEpochDay <= :today")
     fun observeDueCount(today: Long): Flow<Int>
 
-    /** Due reviews in scope (null packId/subtopicId = unrestricted). */
+    /** Due reviews in scope (null packId/subtopicId/lessonId = unrestricted). */
     @Query(
         "SELECT * FROM items " +
             "WHERE introduced = 1 AND dueEpochDay <= :today " +
             "AND (:packId IS NULL OR packId = :packId) " +
             "AND (:subtopicId IS NULL OR subtopicId = :subtopicId) " +
+            "AND (:lessonId IS NULL OR lessonId = :lessonId) " +
             "ORDER BY seq, dueEpochDay LIMIT :limit"
     )
-    suspend fun dueItemsScoped(today: Long, packId: String?, subtopicId: String?, limit: Int): List<ItemEntity>
+    suspend fun dueItemsScoped(today: Long, packId: String?, subtopicId: String?, lessonId: String?, limit: Int): List<ItemEntity>
 
     /** New (never-introduced) items in scope, in easy→hard progression order. */
     @Query(
@@ -111,9 +137,10 @@ interface ItemDao {
             "WHERE introduced = 0 " +
             "AND (:packId IS NULL OR packId = :packId) " +
             "AND (:subtopicId IS NULL OR subtopicId = :subtopicId) " +
+            "AND (:lessonId IS NULL OR lessonId = :lessonId) " +
             "ORDER BY seq, itemId LIMIT :limit"
     )
-    suspend fun newItemsScoped(packId: String?, subtopicId: String?, limit: Int): List<ItemEntity>
+    suspend fun newItemsScoped(packId: String?, subtopicId: String?, lessonId: String?, limit: Int): List<ItemEntity>
 
     @Query(
         "SELECT subtopicId, subtopicTitle, subtopicOrder, " +
@@ -126,8 +153,9 @@ interface ItemDao {
     suspend fun subtopicSummaries(packId: String, today: Long): List<SubtopicSummary>
 }
 
-@Database(entities = [PackEntity::class, ItemEntity::class], version = 2, exportSchema = false)
+@Database(entities = [PackEntity::class, LessonEntity::class, ItemEntity::class], version = 3, exportSchema = false)
 abstract class StudyDatabase : RoomDatabase() {
     abstract fun packDao(): PackDao
+    abstract fun lessonDao(): LessonDao
     abstract fun itemDao(): ItemDao
 }

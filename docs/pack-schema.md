@@ -45,7 +45,11 @@ by a per-session new-item cap. Between packs, `requires` enforces topic prerequi
 | `title` | string | yes | |
 | `order` | int | yes | Sequence within the sub-topic (1-based). |
 | `difficulty` | int | yes | Tier; `1` = easiest. |
+| `content` | string | no | Readable lesson (markdown + LaTeX + images) shown in a "Read" view before the questions. Omit for question-only lessons. |
 | `items` | Item[] | yes | |
+
+A lesson with `content` gets a **Read** button (renders the lesson, then a "Start questions" button
+runs that lesson's items). Lessons without `content` go straight to questions.
 
 ## Item
 
