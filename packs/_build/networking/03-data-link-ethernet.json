@@ -1,0 +1,359 @@
+{
+  "id": "data-link-ethernet",
+  "title": "Data Link: Ethernet, Framing, MAC & Switching",
+  "order": 3,
+  "lessons": [
+    {
+      "id": "data-link-ethernet-l1-mac-llc-addresses",
+      "title": "The Data Link Layer: MAC, LLC & the 48-bit Address",
+      "order": 1,
+      "difficulty": 1,
+      "content": "The **data link layer** (OSI layer 2) takes the raw bit-pipe the physical layer offers and turns it into something useful: addressed, delimited **frames** delivered across a single link or LAN segment. IEEE 802 splits it into two sublayers. The lower **MAC (Media Access Control)** sublayer owns the hardware address, the frame format, and the rules for who may transmit on a shared medium. The upper **LLC (Logical Link Control, IEEE 802.2)** sublayer was meant to multiplex upper-layer protocols and offer optional reliability. In practice, modern Ethernet (Ethernet II / DIX) skips LLC entirely and identifies the upper protocol with the EtherType field, so you will rarely meet 802.2 LLC outside legacy or 802.11 contexts.\n\nThe **MAC address** is a 48-bit (6-byte) identifier written as six hex octets, e.g. `00:1B:44:11:3A:B7`. It is structured, not random. The top three bytes are the **OUI (Organizationally Unique Identifier)**, assigned by the IEEE to a vendor; the lower three bytes are assigned by that vendor per-NIC. Two bits in the very first byte carry meaning. The least-significant bit of the first octet is the **I/G (individual/group) bit**: 0 means unicast, 1 means multicast (group). The next bit is the **U/L (universal/local) bit**: 0 means a globally-unique burned-in address, 1 means a **locally-administered address (LAA)** set by software. The all-ones address `FF:FF:FF:FF:FF:FF` is the L2 **broadcast**. As an ex-radar tech you can read this exactly like a structured tag field: a vendor prefix plus a per-unit serial, with two flag bits riding in the header.",
+      "items": [
+        {
+          "id": "data-link-ethernet-l1-001",
+          "type": "flashcard",
+          "front": "What are the two sublayers of the IEEE 802 data link layer, and what does each do?",
+          "back": "MAC (Media Access Control): hardware addressing, frame format, and medium-access rules. LLC (Logical Link Control, 802.2): multiplexes upper-layer protocols and offers optional flow/error control. Modern Ethernet II uses the EtherType field instead of LLC.",
+          "hint": "Lower handles the wire and the address; upper handles protocol multiplexing."
+        },
+        {
+          "id": "data-link-ethernet-l1-002",
+          "type": "flashcard",
+          "front": "How many bits is a MAC address, and how is it split structurally?",
+          "back": "48 bits / 6 octets. The upper 3 bytes are the OUI (vendor prefix assigned by IEEE); the lower 3 bytes are assigned by the vendor per device.",
+          "hint": "Vendor prefix + per-unit serial."
+        },
+        {
+          "id": "data-link-ethernet-l1-003",
+          "type": "flashcard",
+          "front": "In a MAC address, what do the I/G bit and the U/L bit indicate, and where are they?",
+          "back": "Both live in the first octet. The least-significant bit is I/G: 0 = unicast (individual), 1 = multicast (group). The next bit is U/L: 0 = universal/globally-unique (burned-in), 1 = locally administered (software-set).",
+          "hint": "Two lowest-order bits of the very first byte."
+        },
+        {
+          "id": "data-link-ethernet-l1-004",
+          "type": "flashcard",
+          "front": "What is the Ethernet broadcast MAC address?",
+          "back": "FF:FF:FF:FF:FF:FF (all 48 bits set). A frame to this address is delivered to every host in the broadcast domain.",
+          "hint": "Every bit is 1."
+        },
+        {
+          "id": "data-link-ethernet-l1-005",
+          "type": "mcq",
+          "prompt": "You see a frame destined for MAC address 01:00:5E:7F:00:01. Looking only at the address, what kind of frame is it?",
+          "choices": [
+            "A unicast frame (the I/G bit is 0)",
+            "A multicast frame (the I/G bit is 1)",
+            "A broadcast frame (all bits set)",
+            "A locally-administered unicast frame"
+          ],
+          "answerIndex": 1,
+          "explanation": "The first octet is 0x01 = 0000 0001 in binary. The least-significant bit (I/G) is 1, so it is multicast. (01:00:5E is in fact the IANA OUI used for mapping IPv4 multicast groups onto Ethernet.) It is not broadcast because not all bits are set."
+        },
+        {
+          "id": "data-link-ethernet-l1-006",
+          "type": "mcq",
+          "prompt": "A virtual machine's NIC has the MAC 02:42:AC:11:00:02. What does the first octet tell you?",
+          "choices": [
+            "It is a multicast address",
+            "It is the burned-in address from a hardware vendor's OUI",
+            "It is a unicast, locally-administered address",
+            "It is an invalid MAC address"
+          ],
+          "answerIndex": 2,
+          "explanation": "0x02 = 0000 0010. The I/G bit (lowest) is 0 -> unicast. The U/L bit (next) is 1 -> locally administered, i.e. set by software rather than a vendor OUI. Hypervisors and containers (e.g. Docker's 02:42 prefix) commonly use LAAs."
+        },
+        {
+          "id": "data-link-ethernet-l1-007",
+          "type": "mcq",
+          "prompt": "Why does modern Ethernet II rarely use the 802.2 LLC sublayer?",
+          "choices": [
+            "LLC is illegal under current IEEE standards",
+            "The EtherType field already identifies the upper-layer protocol, making LLC's multiplexing redundant",
+            "LLC only works on fiber, not copper",
+            "Switches strip the LLC header before forwarding"
+          ],
+          "answerIndex": 1,
+          "explanation": "Ethernet II carries a 2-byte EtherType that names the upper protocol directly (e.g. 0x0800 = IPv4). That makes the LLC/SNAP multiplexing machinery unnecessary, so LLC survives mainly in legacy 802.3 and in 802.11."
+        },
+        {
+          "id": "data-link-ethernet-l1-008",
+          "type": "flashcard",
+          "front": "What is a locally-administered address (LAA) and where do you commonly see them?",
+          "back": "A MAC with the U/L bit set to 1, meaning it was assigned by software rather than burned in from a vendor OUI. Common on VMs, containers (Docker uses 02:42:...), and bonded/failover interfaces.",
+          "hint": "U/L bit = 1; think hypervisors and containers."
+        }
+      ]
+    },
+    {
+      "id": "data-link-ethernet-l2-frame-format",
+      "title": "The Ethernet II Frame, Byte by Byte",
+      "order": 2,
+      "difficulty": 2,
+      "content": "Lay an Ethernet II frame out left to right and every byte has a job. First on the wire come **7 bytes of preamble** (alternating `10101010`) followed by a **1-byte SFD (Start Frame Delimiter, `10101011`)**. These eight bytes let the receiver's clock-recovery circuit lock onto the bit timing and find the frame boundary; they are a physical-layer artifact and are **not** counted as part of the frame and **not** covered by the FCS.\n\nThe frame proper begins with the **6-byte destination MAC**, then the **6-byte source MAC**, then a **2-byte EtherType** identifying the payload protocol (0x0800 IPv4, 0x86DD IPv6, 0x0806 ARP, 0x8100 a VLAN tag). Next is the **payload**, **46 to 1500 bytes**. The 1500-byte ceiling is the standard **MTU**; if the upper layer has fewer than 46 bytes it is **padded** up to 46. Finally a **4-byte FCS (Frame Check Sequence)** holds a **CRC-32** over the destination, source, type, and payload fields.\n\nDo the arithmetic: 6 + 6 + 2 + 46 + 4 = **64 bytes minimum**, and 6 + 6 + 2 + 1500 + 4 = **1518 bytes maximum** (1522 with a VLAN tag). **Jumbo frames** raise the payload to roughly 9000 bytes to cut per-frame overhead on storage and data-center links; they are non-standard, so every device in the path must agree or the frames are dropped. The CRC-32 is a powerful **error-detection** code — it catches essentially all real-world bit errors — but it is purely a checksum: Ethernet **detects and discards** corrupt frames, it never corrects them. Recovery is left to a higher layer (TCP) or simply dropped (UDP).",
+      "items": [
+        {
+          "id": "data-link-ethernet-l2-001",
+          "type": "flashcard",
+          "front": "Study this diagram.",
+          "back": "Review the diagram above.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/data-link-ethernet-1.svg"
+        },
+        {
+          "id": "data-link-ethernet-l2-002",
+          "type": "flashcard",
+          "front": "List the fields of an Ethernet II frame in order, with their sizes.",
+          "back": "Preamble (7 B) + SFD (1 B) [PHY sync, not part of frame] | Destination MAC (6 B) | Source MAC (6 B) | EtherType (2 B) | Payload (46-1500 B) | FCS/CRC-32 (4 B).",
+          "hint": "Sync, then dst, src, type, data, check."
+        },
+        {
+          "id": "data-link-ethernet-l2-003",
+          "type": "flashcard",
+          "front": "What is the minimum and maximum size of a standard (untagged) Ethernet frame, and why?",
+          "back": "Minimum 64 bytes (6+6+2+46+4), maximum 1518 bytes (6+6+2+1500+4). The 1500-byte payload is the standard MTU; payloads under 46 bytes are padded. Preamble/SFD are not counted.",
+          "hint": "Sum the header/trailer plus the 46-1500 payload range."
+        },
+        {
+          "id": "data-link-ethernet-l2-004",
+          "type": "flashcard",
+          "front": "What does the EtherType field do, and give three common values.",
+          "back": "It identifies the upper-layer protocol carried in the payload. 0x0800 = IPv4, 0x86DD = IPv6, 0x0806 = ARP, 0x8100 = 802.1Q VLAN tag. Values >= 0x0600 are EtherTypes (smaller values were 802.3 length).",
+          "hint": "Two bytes after the source MAC; >= 0x0600."
+        },
+        {
+          "id": "data-link-ethernet-l2-005",
+          "type": "flashcard",
+          "front": "What is a jumbo frame and what is the catch?",
+          "back": "A frame with a payload up to ~9000 bytes (vs the standard 1500), used to reduce per-frame overhead on data-center/storage links. It is non-standard, so every NIC, switch, and router along the path must be configured for the same large MTU or the frames are dropped/fragmented.",
+          "hint": "~9000-byte payload; end-to-end agreement required."
+        },
+        {
+          "id": "data-link-ethernet-l2-006",
+          "type": "mcq",
+          "prompt": "An IP packet hands only 20 bytes of payload to Ethernet. What happens?",
+          "choices": [
+            "The frame is sent with a 20-byte payload",
+            "The frame is rejected as too small",
+            "The payload is padded with zeros up to 46 bytes",
+            "The preamble is shortened to compensate"
+          ],
+          "answerIndex": 2,
+          "explanation": "The minimum payload is 46 bytes, so a short payload is padded to 46. This keeps the total frame at least 64 bytes, a requirement that dates back to collision-detection timing on shared media."
+        },
+        {
+          "id": "data-link-ethernet-l2-007",
+          "type": "mcq",
+          "prompt": "A frame arrives and its computed CRC-32 does not match the FCS field. What does the Ethernet hardware do?",
+          "choices": [
+            "Corrects the error using the CRC and forwards the frame",
+            "Discards the frame; any recovery is left to upper layers",
+            "Requests a retransmission from the sender at layer 2",
+            "Strips the FCS and forwards the frame anyway"
+          ],
+          "answerIndex": 1,
+          "explanation": "CRC-32 is error-DETECTION only. A mismatch means corruption, so the frame is silently dropped (and counted as an error). Ethernet has no L2 retransmission for this; recovery, if any, is TCP's job, while UDP/real-time traffic just loses the data."
+        },
+        {
+          "id": "data-link-ethernet-l2-008",
+          "type": "mcq",
+          "prompt": "Which of these is NOT counted in the Ethernet frame size or covered by the FCS?",
+          "choices": [
+            "The destination MAC address",
+            "The EtherType field",
+            "The preamble and SFD",
+            "The payload"
+          ],
+          "answerIndex": 2,
+          "explanation": "The 7-byte preamble and 1-byte SFD are physical-layer synchronization bytes. They precede the frame on the wire, are not part of the 64-1518 byte frame size, and are not included in the CRC-32 computation."
+        },
+        {
+          "id": "data-link-ethernet-l2-009",
+          "type": "flashcard",
+          "front": "What does the FCS contain and what does it protect?",
+          "back": "A 4-byte CRC-32 computed over the destination MAC, source MAC, EtherType, and payload. It detects (not corrects) bit errors in those fields. Preamble/SFD are excluded.",
+          "hint": "Cyclic redundancy check over the frame body, trailer position."
+        }
+      ]
+    },
+    {
+      "id": "data-link-ethernet-l3-csma-switching",
+      "title": "From CSMA/CD to Switches: How L2 Forwarding Works",
+      "order": 3,
+      "difficulty": 3,
+      "content": "Original Ethernet was a **shared bus**: every host saw every frame and only one could transmit at a time. **CSMA/CD (Carrier Sense Multiple Access with Collision Detection)** governed it — listen before sending, and if two stations transmit at once, detect the collision, jam, back off a random interval, and retry. This is the **reason the minimum frame is 64 bytes**: a sender must still be transmitting when the most distant collision signal returns, or it would finish and never notice the collision. The 64-byte floor, the maximum cable length, and the 10 Mbps rate are bound together by this round-trip timing. On a modern **full-duplex switched link** there is no contention, so CSMA/CD is disabled and effectively irrelevant — but it still explains the legacy 64-byte minimum you compute today.\n\nThe device that killed CSMA/CD is the **switch**. A **hub** is a dumb multiport repeater: one collision domain, every port sees every bit. A **bridge** was the two-port ancestor of the switch; a switch is a fast, many-port bridge implemented in hardware. A switch **learns** by recording the *source* MAC of every incoming frame against the port it arrived on, building a **MAC/CAM forwarding table**. To forward, it looks up the *destination* MAC: \n\n- **Known unicast** -> forward out the single learned port. \n- **Unknown unicast** (not yet in the table) -> **flood** out all ports except the ingress. \n- **Broadcast** (FF:FF:FF:FF:FF:FF) -> flood everywhere. \n- **Multicast** -> flood by default, or send only to subscribed ports if IGMP snooping is enabled. \n\nCrucially, each switch port is its **own collision domain** (so collisions essentially vanish), but the whole switch is **one broadcast domain** until you introduce VLANs or a router.",
+      "items": [
+        {
+          "id": "data-link-ethernet-l3-001",
+          "type": "flashcard",
+          "front": "What does CSMA/CD stand for and what problem does it solve?",
+          "back": "Carrier Sense Multiple Access with Collision Detection. On a shared half-duplex medium it arbitrates access: listen before sending, detect collisions, jam, back off randomly, and retry. Obsolete on full-duplex switched links.",
+          "hint": "Listen, send, detect collision, back off."
+        },
+        {
+          "id": "data-link-ethernet-l3-002",
+          "type": "flashcard",
+          "front": "Why is the minimum Ethernet frame 64 bytes, in terms of CSMA/CD?",
+          "back": "A transmitting station must still be sending when the worst-case collision signal travels to the far end of the segment and back. 64 bytes at 10 Mbps over the maximum cable length guarantees the sender is still on the wire to detect the collision (the 'slot time').",
+          "hint": "Round-trip propagation time vs transmit time."
+        },
+        {
+          "id": "data-link-ethernet-l3-003",
+          "type": "flashcard",
+          "front": "How does a switch learn where hosts are?",
+          "back": "It reads the SOURCE MAC of each incoming frame and records (source MAC -> ingress port, with an aging timer) in its MAC/CAM forwarding table. Forwarding decisions then use the DESTINATION MAC lookup.",
+          "hint": "Learn from source, forward by destination."
+        },
+        {
+          "id": "data-link-ethernet-l3-004",
+          "type": "mcq",
+          "prompt": "Trace the switch behavior for each frame type. A switch receives frames on port 3. Which row is correct?",
+          "choices": [
+            "Unknown unicast -> drop; Known unicast -> flood; Broadcast -> single port; Multicast -> drop",
+            "Unknown unicast -> flood all but port 3; Known unicast -> forward only to the learned port; Broadcast -> flood all but port 3; Multicast -> flood (or subscribed ports with IGMP snooping)",
+            "Unknown unicast -> forward to learned port; Known unicast -> flood; Broadcast -> drop; Multicast -> flood",
+            "All four types -> flood out every port including port 3"
+          ],
+          "answerIndex": 1,
+          "explanation": "This is the canonical L2 forwarding behavior. Unknown unicast (dst not in CAM) is flooded out all ports except ingress; known unicast goes only to the learned port; broadcast (FF:FF:FF:FF:FF:FF) floods to all but ingress; multicast floods by default unless IGMP snooping restricts it to subscribers. A switch never forwards a frame back out the port it came in on."
+        },
+        {
+          "id": "data-link-ethernet-l3-005",
+          "type": "mcq",
+          "prompt": "What is the key difference between a hub and a switch regarding collision domains?",
+          "choices": [
+            "A hub gives each port its own collision domain; a switch shares one",
+            "Both put all ports in one collision domain",
+            "A hub is one big collision domain; a switch makes each port its own collision domain",
+            "Neither has collision domains because Ethernet is full-duplex"
+          ],
+          "answerIndex": 2,
+          "explanation": "A hub is a dumb repeater: every port shares a single collision domain, so traffic from any host can collide with any other. A switch isolates each port into its own collision domain (and runs full-duplex), which is why collisions essentially disappear on switched networks."
+        },
+        {
+          "id": "data-link-ethernet-l3-006",
+          "type": "mcq",
+          "prompt": "A switch with no VLANs configured forms how many broadcast domains and how many collision domains for its 24 ports?",
+          "choices": [
+            "24 broadcast domains, 1 collision domain",
+            "1 broadcast domain, 24 collision domains",
+            "1 broadcast domain, 1 collision domain",
+            "24 broadcast domains, 24 collision domains"
+          ],
+          "answerIndex": 1,
+          "explanation": "Each switch port is its own collision domain (24 of them). But absent VLANs or a router, the entire switch is a single broadcast domain: a broadcast frame floods out all ports. Segmenting the broadcast domain requires VLANs (L2) or routing (L3)."
+        },
+        {
+          "id": "data-link-ethernet-l3-007",
+          "type": "flashcard",
+          "front": "Hub vs bridge vs switch: one line each.",
+          "back": "Hub = dumb multiport repeater, one collision domain, no addressing. Bridge = early 2-port device that learns MACs and separates segments (software). Switch = a fast, many-port hardware bridge that learns MACs and forwards per-port.",
+          "hint": "Repeater, ancestor, modern hardware version."
+        },
+        {
+          "id": "data-link-ethernet-l3-008",
+          "type": "flashcard",
+          "front": "Why is CSMA/CD irrelevant on a modern switched link, yet still worth knowing?",
+          "back": "Full-duplex switched links have separate Tx/Rx paths and no shared medium, so collisions cannot occur and CSMA/CD is disabled. It still matters because it explains the legacy 64-byte minimum frame size and the historical cable-length/rate constraints.",
+          "hint": "Full duplex = no contention; but it explains the 64-byte floor."
+        }
+      ]
+    },
+    {
+      "id": "data-link-ethernet-l4-vlans-stp-lacp",
+      "title": "VLANs, 802.1Q, Spanning Tree, LACP & Flow Control",
+      "order": 4,
+      "difficulty": 4,
+      "content": "A single broadcast domain does not scale, so we segment one physical switch into many logical LANs with **VLANs (Virtual LANs)**. Hosts in different VLANs cannot reach each other at L2; traffic must cross a **router or L3 switch**, which is also where you enforce policy and security. To carry multiple VLANs over one **trunk** link, **IEEE 802.1Q** inserts a **4-byte tag** between the source MAC and EtherType. It holds a 2-byte TPID (0x8100, which appears as the EtherType), a **3-bit PCP (Priority Code Point)** for class-of-service, a 1-bit DEI, and a **12-bit VLAN ID** (4094 usable VLANs). A tagged frame's max size grows to 1522 bytes.\n\nRedundant links create **loops**, and an Ethernet frame has **no TTL** — nothing decrements and discards a circulating frame the way IP's TTL does. A broadcast caught in a loop is re-flooded forever, a **broadcast storm** that saturates links and melts the network in seconds, with MAC tables thrashing as the same source appears on multiple ports. **Spanning Tree Protocol (STP, 802.1D)** prevents this by electing a root bridge and logically **blocking** redundant ports to leave one loop-free active tree, re-converging if a link fails. Classic STP takes ~30-50 s; **RSTP (802.1w)** converges in well under a second and is the modern default.\n\nWhen you *want* to use parallel links for bandwidth and redundancy without a loop, bundle them with **LACP (802.3ad Link Aggregation)** into one logical link; the bundle load-balances flows and survives individual link failures. Finally, **802.3x flow control** lets a congested receiver send a **PAUSE** frame asking the sender to stop briefly - a blunt, link-local backpressure mechanism, largely superseded by higher-layer congestion control but still seen in lossless data-center fabrics.",
+      "items": [
+        {
+          "id": "data-link-ethernet-l4-001",
+          "type": "flashcard",
+          "front": "What is a VLAN, and how do hosts in different VLANs communicate?",
+          "back": "A VLAN is a logical broadcast domain layered onto a physical switch, isolating groups of ports at L2. Hosts in different VLANs cannot talk directly; their traffic must be routed by a router or L3 switch (inter-VLAN routing).",
+          "hint": "Logical LAN segmentation; crossing them needs L3."
+        },
+        {
+          "id": "data-link-ethernet-l4-002",
+          "type": "flashcard",
+          "front": "Describe the 802.1Q tag: where it sits and its fields.",
+          "back": "A 4-byte tag inserted between source MAC and EtherType. Fields: 16-bit TPID (0x8100), 3-bit PCP (priority/CoS), 1-bit DEI, 12-bit VLAN ID (4094 usable). Tagged frames can be up to 1522 bytes.",
+          "hint": "TPID + PCP + DEI + 12-bit VID, after src MAC."
+        },
+        {
+          "id": "data-link-ethernet-l4-003",
+          "type": "mcq",
+          "prompt": "Why is a Layer 2 loop catastrophic in a way that a Layer 3 routing loop is not?",
+          "choices": [
+            "L2 frames are larger than L3 packets so they congest faster",
+            "Ethernet frames have no TTL field, so a looping frame (especially a broadcast) circulates forever, causing a broadcast storm",
+            "Routers cannot detect loops at all",
+            "L2 loops corrupt the FCS, which L3 loops do not"
+          ],
+          "answerIndex": 1,
+          "explanation": "IP packets carry a TTL that is decremented at each hop and dropped at zero, bounding routing loops. Ethernet frames have no such field, so a looping frame is never discarded. A broadcast or unknown-unicast frame gets re-flooded endlessly, a broadcast storm that saturates links and thrashes MAC tables within seconds."
+        },
+        {
+          "id": "data-link-ethernet-l4-004",
+          "type": "mcq",
+          "prompt": "What does Spanning Tree Protocol do to prevent loops?",
+          "choices": [
+            "It adds a TTL to Ethernet frames",
+            "It elects a root bridge and logically blocks redundant ports, leaving a single loop-free active tree",
+            "It encrypts broadcast frames so they cannot loop",
+            "It routes frames using IP addresses"
+          ],
+          "answerIndex": 1,
+          "explanation": "STP (802.1D) builds a loop-free topology by electing a root bridge and putting redundant ports into a blocking state, so exactly one active path exists between any two points. If a link fails it re-converges to restore connectivity. RSTP (802.1w) does the same far faster."
+        },
+        {
+          "id": "data-link-ethernet-l4-005",
+          "type": "mcq",
+          "prompt": "What is the main improvement of RSTP (802.1w) over classic STP (802.1D)?",
+          "choices": [
+            "It supports more VLANs",
+            "It encrypts BPDUs",
+            "It converges in well under a second instead of ~30-50 seconds",
+            "It eliminates the need for a root bridge"
+          ],
+          "answerIndex": 2,
+          "explanation": "RSTP's headline benefit is dramatically faster convergence (sub-second vs the ~30-50 s of classic STP), achieved with proposal/agreement handshakes and edge/point-to-point port roles. It still elects a root bridge."
+        },
+        {
+          "id": "data-link-ethernet-l4-006",
+          "type": "flashcard",
+          "front": "What is LACP (802.3ad) and what does it provide?",
+          "back": "Link Aggregation Control Protocol bundles multiple physical links into one logical link. It increases aggregate bandwidth, load-balances flows across members, and provides redundancy (the bundle survives loss of individual links) - all without creating an STP-blocked loop.",
+          "hint": "Bond parallel links into one; bandwidth + redundancy."
+        },
+        {
+          "id": "data-link-ethernet-l4-007",
+          "type": "flashcard",
+          "front": "What does an 802.3x PAUSE frame do?",
+          "back": "It is link-local flow control: a congested receiver sends a PAUSE frame telling the directly-connected sender to stop transmitting for a specified time, applying backpressure. It is blunt and largely superseded by higher-layer congestion control, but still used in lossless data-center fabrics.",
+          "hint": "Receiver tells the sender 'stop for a moment'."
+        },
+        {
+          "id": "data-link-ethernet-l4-008",
+          "type": "mcq",
+          "prompt": "How large is the VLAN ID field in an 802.1Q tag, and how many usable VLANs does that allow?",
+          "choices": [
+            "8 bits, 256 VLANs",
+            "10 bits, 1024 VLANs",
+            "12 bits, 4094 usable VLANs (0 and 4095 reserved)",
+            "16 bits, 65536 VLANs"
+          ],
+          "answerIndex": 2,
+          "explanation": "The VLAN ID is 12 bits, giving 4096 values; VLAN 0 (priority-only) and 4095 (reserved) are not usable as normal VLANs, leaving 4094. This 4094 ceiling is a key motivation for VXLAN overlays in large multi-tenant data centers."
+        },
+        {
+          "id": "data-link-ethernet-l4-009",
+          "type": "flashcard",
+          "front": "How does a trunk link differ from an access port?",
+          "back": "An access port belongs to a single VLAN and carries untagged frames to/from an end host. A trunk port carries traffic for multiple VLANs between switches (or to a router), using 802.1Q tags to keep the VLANs distinguished.",
+          "hint": "Access = one VLAN, untagged; trunk = many VLANs, tagged."
+        }
+      ]
+    }
+  ]
+}

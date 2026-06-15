@@ -1,0 +1,375 @@
+{
+  "id": "tls-security",
+  "title": "TLS & Security Fundamentals",
+  "order": 11,
+  "lessons": [
+    {
+      "id": "tls-security-crypto-primitives",
+      "title": "CIA Triad & Crypto Primitives",
+      "order": 1,
+      "difficulty": 1,
+      "content": "Network security rests on the **CIA triad**: **Confidentiality** (only intended parties read the data), **Integrity** (data is not altered undetected), and **Availability** (the service stays reachable). TLS gives you confidentiality and integrity; availability is a separate fight against DoS. Authentication (proving who you're talking to) is the fourth pillar that PKI provides.\n\nThe toolkit has three families. **Symmetric ciphers** use one shared key for encrypt and decrypt — fast, but you must somehow agree on the key first (think AES). **Asymmetric (public-key) crypto** uses a keypair: anyone can encrypt with the public key or verify a signature, only the private key holder can decrypt or sign (RSA, elliptic-curve). It's slow, so it's used to bootstrap a symmetric session key, not to bulk-encrypt. **Hash functions** (SHA-256) are one-way fingerprints — fixed-size, collision-resistant, used for integrity.\n\nA bare hash proves nothing about *who* sent the data, so we add a key: an **HMAC** (hash-based message authentication code) mixes a secret key into the hash, proving integrity *and* authenticity to anyone holding the key. Modern protocols go further with **AEAD** (Authenticated Encryption with Associated Data) ciphers that encrypt and authenticate in one pass: **AES-GCM** (hardware-accelerated on most CPUs) and **ChaCha20-Poly1305** (fast in software, used on mobile). TLS 1.3 mandates AEAD and drops everything else.\n\n```bash\n# fingerprint a file (integrity)\nsha256sum firmware.bin\n# keyed MAC over a message\nopenssl dgst -sha256 -hmac \"secretkey\" message.txt\n```\n\nAs a radar tech: think of HMAC like a keyed checksum on a data frame, and AEAD as doing scrambling and the integrity check in a single coherent pass.",
+      "items": [
+        {
+          "id": "tls-security-crypto-primitives-001",
+          "type": "flashcard",
+          "front": "Name the three properties of the CIA triad and what each means.",
+          "back": "Confidentiality (only intended parties can read the data), Integrity (data cannot be altered undetected), and Availability (the service remains reachable when needed). TLS delivers confidentiality and integrity; availability is defended separately.",
+          "hint": "Read, alter, reach."
+        },
+        {
+          "id": "tls-security-crypto-primitives-002",
+          "type": "flashcard",
+          "front": "Why is asymmetric crypto used only to set up a session, not to encrypt all traffic?",
+          "back": "Public-key operations are far slower than symmetric ones. So asymmetric crypto authenticates the peer and securely establishes a shared symmetric key; the fast symmetric cipher then does the bulk data encryption.",
+          "hint": "Slow to bootstrap the fast cipher."
+        },
+        {
+          "id": "tls-security-crypto-primitives-003",
+          "type": "flashcard",
+          "front": "What does an HMAC give you that a plain hash does not?",
+          "back": "A plain hash proves only that data is unchanged by anyone who can recompute it. An HMAC mixes in a secret key, so it proves both integrity AND authenticity: only a holder of the key could have produced or verified it.",
+          "hint": "A keyed hash."
+        },
+        {
+          "id": "tls-security-crypto-primitives-004",
+          "type": "flashcard",
+          "front": "What is an AEAD cipher, and name the two TLS 1.3 examples.",
+          "back": "Authenticated Encryption with Associated Data: it encrypts and authenticates in one operation, producing ciphertext plus an authentication tag. TLS 1.3 examples: AES-GCM (hardware-accelerated) and ChaCha20-Poly1305 (fast in software, common on mobile).",
+          "hint": "Encrypt + authenticate together."
+        },
+        {
+          "id": "tls-security-crypto-primitives-005",
+          "type": "flashcard",
+          "front": "Contrast symmetric vs asymmetric keys in one sentence each.",
+          "back": "Symmetric: a single shared secret key encrypts and decrypts (fast, e.g. AES). Asymmetric: a public/private keypair where the public key encrypts or verifies and only the private key decrypts or signs (slow, e.g. RSA/ECC).",
+          "hint": "One key vs a pair."
+        },
+        {
+          "id": "tls-security-crypto-primitives-006",
+          "type": "flashcard",
+          "front": "What three properties make a cryptographic hash useful for integrity?",
+          "back": "Deterministic fixed-size output, pre-image resistance (can't recover input from the digest), and collision resistance (can't find two inputs with the same digest). SHA-256 is the standard workhorse.",
+          "hint": "One-way, fixed-size, collision-resistant."
+        },
+        {
+          "id": "tls-security-crypto-primitives-007",
+          "type": "mcq",
+          "prompt": "A protocol encrypts a message with AES but appends only an unkeyed SHA-256 of the plaintext. What security property is still missing?",
+          "choices": [
+            "Authenticity/integrity against an active attacker who can recompute the hash",
+            "Confidentiality of the message body",
+            "Availability of the endpoint",
+            "Compression of the payload"
+          ],
+          "answerIndex": 0,
+          "explanation": "An unkeyed hash can be recomputed by anyone, so an attacker who alters the ciphertext and re-hashes their forged plaintext defeats it. You need a keyed MAC (HMAC) or, better, an AEAD cipher that authenticates the ciphertext."
+        },
+        {
+          "id": "tls-security-crypto-primitives-008",
+          "type": "mcq",
+          "prompt": "Which cipher would you prefer on a phone CPU that lacks AES hardware acceleration?",
+          "choices": [
+            "ChaCha20-Poly1305",
+            "AES-256-GCM",
+            "Triple-DES",
+            "RC4"
+          ],
+          "answerIndex": 0,
+          "explanation": "ChaCha20-Poly1305 is an AEAD cipher designed to be fast and constant-time in pure software, so it outperforms AES-GCM on devices without AES-NI hardware. 3DES and RC4 are obsolete and insecure."
+        },
+        {
+          "id": "tls-security-crypto-primitives-009",
+          "type": "mcq",
+          "prompt": "Which goal of the CIA triad does a DDoS attack primarily target?",
+          "choices": [
+            "Availability",
+            "Confidentiality",
+            "Integrity",
+            "Authenticity"
+          ],
+          "answerIndex": 0,
+          "explanation": "A distributed denial-of-service floods a target to exhaust its resources, denying legitimate users access. It does not read or alter data; it attacks availability."
+        }
+      ]
+    },
+    {
+      "id": "tls-security-tls13-handshake",
+      "title": "The TLS 1.3 Handshake",
+      "order": 2,
+      "difficulty": 2,
+      "content": "TLS sits between TCP and the application, turning a raw byte stream into an authenticated, encrypted channel. **TLS 1.3 (RFC 8446)** is a clean break from 1.2: legacy ciphers (RC4, 3DES, static-RSA key exchange, CBC MACs) are gone, and the handshake is **1-RTT** instead of two round trips.\n\nThe flow: the client sends **ClientHello** carrying its supported groups and a **key_share** — its ephemeral Diffie-Hellman public value — guessing the group the server will pick. The server replies with **ServerHello** containing its own ephemeral key_share. After this single exchange both sides can derive the shared secret, so *everything after ServerHello is encrypted*, including the server's **Certificate**, **CertificateVerify** (a signature proving it owns the private key), and **Finished**. The client sends its own **Finished** and can immediately send application data. One round trip to first byte.\n\nBecause the DH keys are **ephemeral** (fresh per connection, never reused), recording the traffic and later stealing the server's long-term private key still does *not* let you decrypt past sessions — that's **forward secrecy**, and TLS 1.3 makes it mandatory. In TLS 1.2, static-RSA key exchange lacked this; one stolen key decrypted years of captures.\n\n**0-RTT resumption** lets a returning client send data in its very first flight using a pre-shared key, saving the round trip — but that early data can be **replayed** by an attacker, so it must only carry idempotent requests.\n\n```bash\n# negotiate TLS 1.3 and watch the handshake\nopenssl s_client -connect example.com:443 -tls1_3\n```",
+      "items": [
+        {
+          "id": "tls-security-tls13-handshake-001",
+          "type": "flashcard",
+          "front": "Walk through the TLS 1.3 1-RTT handshake message flow.",
+          "back": "ClientHello (with supported groups + ephemeral DH key_share + SNI) -> ServerHello (with its ephemeral DH key_share + chosen cipher). Both derive the shared secret; the server then sends ENCRYPTED EncryptedExtensions, Certificate, CertificateVerify, Finished. Client sends Finished and can send application data immediately. One round trip to first byte.",
+          "hint": "Hello, Hello, derive, encrypted server flight, client Finished.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-1.svg"
+        },
+        {
+          "id": "tls-security-tls13-handshake-002",
+          "type": "flashcard",
+          "front": "What is forward secrecy and how does TLS 1.3 guarantee it?",
+          "back": "Forward secrecy means a compromise of the server's long-term private key cannot decrypt previously recorded sessions. TLS 1.3 uses ephemeral Diffie-Hellman keys (fresh per connection, discarded after), so each session's secret is independent and is never recoverable from the static key.",
+          "hint": "Ephemeral DH, per-session keys."
+        },
+        {
+          "id": "tls-security-tls13-handshake-003",
+          "type": "flashcard",
+          "front": "Why does the client put a key_share in the very first ClientHello?",
+          "back": "To achieve 1-RTT, the client optimistically sends its ephemeral DH public value for the group it expects the server to choose. The server can then complete the key exchange in its single ServerHello reply, so keys are ready after one round trip.",
+          "hint": "Guess the group, send DH pub early."
+        },
+        {
+          "id": "tls-security-tls13-handshake-004",
+          "type": "flashcard",
+          "front": "What is the replay caveat of TLS 1.3 0-RTT (early data)?",
+          "back": "0-RTT data is sent before the handshake completes using a pre-shared key, so an on-path attacker can capture and resend it. The server has no anti-replay guarantee for that early data, so only idempotent requests (e.g. a safe GET) should ever be sent as 0-RTT.",
+          "hint": "Early data can be re-sent."
+        },
+        {
+          "id": "tls-security-tls13-handshake-005",
+          "type": "flashcard",
+          "front": "Name three things TLS 1.3 removed that TLS 1.2 still allowed.",
+          "back": "Static-RSA key exchange (no forward secrecy), legacy/weak ciphers like RC4 and 3DES, and CBC-mode MAC-then-encrypt constructions. TLS 1.3 also dropped renegotiation and compression. Only AEAD ciphers with (EC)DHE key exchange remain.",
+          "hint": "Static RSA, weak ciphers, CBC."
+        },
+        {
+          "id": "tls-security-tls13-handshake-006",
+          "type": "flashcard",
+          "front": "In TLS 1.3, is the server's certificate sent in the clear? Compare to 1.2.",
+          "back": "No. After ServerHello the keys are established, so the Certificate, CertificateVerify, and Finished are all encrypted. In TLS 1.2 the certificate was sent in plaintext, exposing the server identity to passive observers.",
+          "hint": "Encrypted after ServerHello."
+        },
+        {
+          "id": "tls-security-tls13-handshake-007",
+          "type": "mcq",
+          "prompt": "How many round trips does a full (non-resumed) TLS 1.3 handshake add before the client can send application data?",
+          "choices": [
+            "1 RTT",
+            "2 RTT",
+            "0 RTT always",
+            "3 RTT"
+          ],
+          "answerIndex": 0,
+          "explanation": "A full TLS 1.3 handshake is 1-RTT: ClientHello out, ServerHello plus the encrypted server flight back, then the client sends Finished and application data. TLS 1.2 needed 2 RTT. 0-RTT applies only to resumption with a pre-shared key."
+        },
+        {
+          "id": "tls-security-tls13-handshake-008",
+          "type": "mcq",
+          "prompt": "An attacker records a TLS 1.3 session today and steals the server's RSA private key next year. What can they decrypt?",
+          "choices": [
+            "Nothing from that recorded session",
+            "The entire recorded session",
+            "Only the ClientHello",
+            "Only the certificate"
+          ],
+          "answerIndex": 0,
+          "explanation": "TLS 1.3's mandatory ephemeral Diffie-Hellman provides forward secrecy: the per-session secret was derived from ephemeral keys that were discarded, and the long-term key only signed the handshake, never encrypted the session key. The recording stays opaque."
+        },
+        {
+          "id": "tls-security-tls13-handshake-009",
+          "type": "mcq",
+          "prompt": "What does the server's CertificateVerify message prove?",
+          "choices": [
+            "That the server holds the private key matching the certificate it sent",
+            "That the certificate has not expired",
+            "That DNS resolved correctly",
+            "That the client trusts the CA"
+          ],
+          "answerIndex": 0,
+          "explanation": "CertificateVerify is a signature over the handshake transcript made with the server's private key. It proves the server actually possesses the private key paired with the public key in its certificate, defeating an attacker who merely copied someone else's certificate."
+        }
+      ]
+    },
+    {
+      "id": "tls-security-certs-pki",
+      "title": "Certificates, PKI & Validation",
+      "order": 3,
+      "difficulty": 3,
+      "content": "A handshake proves the peer holds a private key, but who says that key belongs to `example.com`? That's the job of **PKI** (Public Key Infrastructure). A server presents an **X.509 certificate**: a structured document binding a public key to a subject name (domain), with validity dates, allowed uses, and a **digital signature from a Certificate Authority (CA)**.\n\nTrust is delegated through a **chain**. The leaf (server) cert is signed by an intermediate CA, whose cert is signed by a **root CA**. Roots are self-signed and pre-installed in the OS/browser **root store** — that's the anchor you implicitly trust. Validation walks the chain leaf->intermediate->root, checking each signature, until it reaches a trusted root.\n\nA client validates a cert by checking: (1) **name match** — the requested hostname is in the Subject Alternative Name; (2) **validity period** — not expired, not yet valid; (3) **chain to a trusted root**; (4) **revocation** — was it cancelled early? Revocation uses **CRLs** (bulk revocation lists, clunky), **OCSP** (an online query per cert, but it leaks browsing to the CA and adds latency), or **OCSP stapling** where the server fetches and attaches a fresh signed OCSP response itself — faster and private.\n\n```bash\n# fetch and inspect the full chain to the root\nopenssl s_client -connect example.com:443 -showcerts </dev/null\n# decode a leaf certificate's fields\nopenssl x509 -in cert.pem -noout -text\n```\n\nMost real-world cert errors are mundane: expired certs, a missing intermediate the server forgot to send, or a name mismatch (cert for `www.` but you hit the apex).",
+      "items": [
+        {
+          "id": "tls-security-certs-pki-001",
+          "type": "flashcard",
+          "front": "What does an X.509 certificate bind together, and who vouches for it?",
+          "back": "It binds a public key to a subject identity (domain name), along with validity dates and allowed key usages. A Certificate Authority (CA) signs it with its own private key, vouching that the key really belongs to that subject.",
+          "hint": "Key + name, signed by a CA."
+        },
+        {
+          "id": "tls-security-certs-pki-002",
+          "type": "flashcard",
+          "front": "Describe the chain of trust from a server cert up to a root.",
+          "back": "The leaf (server) certificate is signed by an intermediate CA; the intermediate is signed by a root CA. The root is self-signed and pre-installed in the OS/browser root store. Validation verifies each signature up the chain until it reaches a trusted root anchor.",
+          "hint": "Leaf -> intermediate -> root store."
+        },
+        {
+          "id": "tls-security-certs-pki-003",
+          "type": "flashcard",
+          "front": "List the four checks a client performs to validate a certificate.",
+          "back": "1) Name match: the hostname is in the Subject Alternative Name. 2) Validity period: current time is within not-before/not-after. 3) Chain: it links to a trusted root. 4) Revocation: it hasn't been revoked (via CRL, OCSP, or OCSP stapling).",
+          "hint": "Name, expiry, chain, revocation."
+        },
+        {
+          "id": "tls-security-certs-pki-004",
+          "type": "flashcard",
+          "front": "What is the root store and why is it the trust anchor?",
+          "back": "The root store is the set of self-signed root CA certificates pre-installed in your OS or browser. The whole PKI rests on trusting these roots implicitly; any cert that chains to one is accepted. Adding a malicious root is therefore a complete compromise of trust.",
+          "hint": "Pre-installed self-signed roots."
+        },
+        {
+          "id": "tls-security-certs-pki-005",
+          "type": "flashcard",
+          "front": "Contrast CRL, OCSP, and OCSP stapling for revocation.",
+          "back": "CRL: the CA publishes a bulk list of revoked serials the client downloads (large, stale). OCSP: the client queries the CA per certificate (fresh, but adds latency and leaks browsing to the CA). OCSP stapling: the server itself fetches a fresh signed OCSP response and attaches it to the handshake (fast and private).",
+          "hint": "List vs query vs server-attached."
+        },
+        {
+          "id": "tls-security-certs-pki-006",
+          "type": "flashcard",
+          "front": "Why is OCSP stapling preferred over plain OCSP?",
+          "back": "Plain OCSP makes the client contact the CA for every certificate, adding latency and leaking which sites the user visits to the CA. With stapling the server pre-fetches a time-stamped, CA-signed OCSP response and includes it in the handshake, so the client gets revocation status with no extra round trip and no privacy leak.",
+          "hint": "Server pre-fetches; no client-to-CA call."
+        },
+        {
+          "id": "tls-security-certs-pki-007",
+          "type": "mcq",
+          "prompt": "A browser shows NET::ERR_CERT_AUTHORITY_INVALID even though the cert is unexpired and the name matches. Most likely cause?",
+          "choices": [
+            "The chain does not reach a trusted root (e.g. a missing or untrusted intermediate)",
+            "The page used HTTP/2",
+            "The TCP handshake failed",
+            "DNS returned the wrong A record"
+          ],
+          "answerIndex": 0,
+          "explanation": "AUTHORITY_INVALID means validation could not build a chain to a root in the trust store. Commonly the server failed to send the intermediate CA cert, or the issuer is a private/untrusted CA. Name and expiry checks already passed."
+        },
+        {
+          "id": "tls-security-certs-pki-008",
+          "type": "mcq",
+          "prompt": "What is verified when validating the signature on a leaf certificate?",
+          "choices": [
+            "That the issuing CA's public key correctly verifies the CA's signature over the leaf",
+            "That the server still holds the matching private key",
+            "That the domain currently resolves in DNS",
+            "That TLS 1.3 was negotiated"
+          ],
+          "answerIndex": 0,
+          "explanation": "The leaf carries the CA's signature; you verify it using the CA (intermediate) certificate's public key. Proof of private-key possession is separate (CertificateVerify in the handshake). DNS and TLS version are unrelated to the signature check."
+        },
+        {
+          "id": "tls-security-certs-pki-009",
+          "type": "mcq",
+          "prompt": "Which OpenSSL command shows you every certificate the server sends, so you can walk the chain to a root?",
+          "choices": [
+            "openssl s_client -connect host:443 -showcerts",
+            "openssl rand -hex 16",
+            "openssl genrsa 2048",
+            "openssl dgst -sha256 file"
+          ],
+          "answerIndex": 0,
+          "explanation": "s_client opens a TLS connection and -showcerts prints the full certificate chain the server presents (leaf plus intermediates), which you can then verify links up to a trusted root."
+        }
+      ]
+    },
+    {
+      "id": "tls-security-attacks-defenses",
+      "title": "Attacks, Tunnels & Defenses",
+      "order": 4,
+      "difficulty": 4,
+      "content": "Encryption is necessary but not sufficient — and it doesn't hide everything. TLS protects the *content* of a connection, but **metadata leaks**: packet sizes and timing, the destination IP and port, and (pre-ECH) the **SNI** in the ClientHello, which names the host in plaintext. The DNS lookup that preceded the connection is also visible unless you use DoH/DoT. **Encrypted Client Hello (ECH)** is the modern fix: it encrypts the ClientHello (including SNI) under a public key published in DNS, closing the last big plaintext leak.\n\nKnow the **attack taxonomy**: **spoofing** (forging a source address/identity), **MITM** (relaying and reading/altering traffic between two parties — defeated by certificate authentication), **replay** (re-sending captured valid messages), **DoS/DDoS** (exhausting resources), **amplification/reflection** (sending a small spoofed query to a service like DNS or NTP that replies with a huge response aimed at the victim), and **TCP RST injection** (an on-path attacker forging a reset to tear down a connection).\n\n**Defenses** layer up. **Firewalls** filter traffic: a **stateless** firewall judges each packet in isolation by header fields; a **stateful** firewall tracks connection state (the conntrack table) so it can allow return traffic for connections it saw initiate. **Network segmentation** (VLANs, subnets) limits blast radius. **Zero-trust** discards the idea of a trusted interior: every request is authenticated and authorized regardless of network location. And **TLS everywhere** plus authenticated tunnels — **SSH** for admin sessions, **IPsec** for traditional site VPNs, and **WireGuard** (a minimal, fast, modern VPN using fixed modern crypto and a tiny codebase) — encrypt links end to end.\n\n```bash\n# stateful rule: allow established/related return traffic\nnft add rule inet filter input ct state established,related accept\n```",
+      "items": [
+        {
+          "id": "tls-security-attacks-defenses-001",
+          "type": "flashcard",
+          "front": "What can an attacker see, and NOT see, on a TLS-encrypted link?",
+          "back": "CANNOT see: the application payload (request bodies, responses, credentials) and cannot undetectably alter it. CAN see: source/destination IPs and ports, packet sizes and timing (traffic analysis), the preceding DNS query (unless DoH/DoT), and pre-ECH the SNI hostname in the ClientHello. TLS protects content, not metadata.",
+          "hint": "Content hidden; metadata + SNI leak."
+        },
+        {
+          "id": "tls-security-attacks-defenses-002",
+          "type": "flashcard",
+          "front": "What is SNI, why is it a privacy leak, and how does ECH fix it?",
+          "back": "Server Name Indication tells the server which hostname the client wants, so one IP can host many TLS sites. Historically it was sent in plaintext in the ClientHello, revealing the destination host to observers. Encrypted Client Hello (ECH) encrypts the ClientHello including SNI under a public key published in DNS, hiding it.",
+          "hint": "Plaintext hostname; ECH encrypts the ClientHello."
+        },
+        {
+          "id": "tls-security-attacks-defenses-003",
+          "type": "flashcard",
+          "front": "Define a reflection/amplification attack and name typical abused services.",
+          "back": "The attacker sends small requests with a spoofed source address (the victim's) to servers that reply with much larger responses, flooding the victim with amplified traffic. Commonly abused: DNS, NTP (monlist), and memcached, which can amplify by 50x or more.",
+          "hint": "Small spoofed query, huge reply at the victim."
+        },
+        {
+          "id": "tls-security-attacks-defenses-004",
+          "type": "flashcard",
+          "front": "How does TLS certificate authentication defeat a man-in-the-middle?",
+          "back": "A MITM relays traffic, but to impersonate the server it must present a certificate for that hostname signed by a trusted CA, and prove possession of the matching private key (CertificateVerify). Without the genuine key it cannot, so the client's validation fails and the connection aborts.",
+          "hint": "Attacker can't forge a CA-signed cert it owns the key for."
+        },
+        {
+          "id": "tls-security-attacks-defenses-005",
+          "type": "flashcard",
+          "front": "Contrast a stateless vs a stateful firewall.",
+          "back": "A stateless firewall evaluates each packet independently using header fields (IPs, ports, flags) against static rules. A stateful firewall tracks connection state in a conntrack table, so it can automatically permit return packets of connections it saw start, enabling rules like 'allow established,related'.",
+          "hint": "Per-packet vs connection-aware."
+        },
+        {
+          "id": "tls-security-attacks-defenses-006",
+          "type": "flashcard",
+          "front": "What is zero-trust networking and how does it differ from the old perimeter model?",
+          "back": "Zero-trust assumes no implicit trust based on network location: every request is authenticated and authorized individually, whether it comes from inside or outside. The old castle-and-moat model trusted anything inside the perimeter, so one breached host gave an attacker free interior movement.",
+          "hint": "Never trust the interior; authenticate every request."
+        },
+        {
+          "id": "tls-security-attacks-defenses-007",
+          "type": "flashcard",
+          "front": "What makes WireGuard different from traditional IPsec VPNs?",
+          "back": "WireGuard is a minimal, modern VPN: a tiny codebase (easy to audit), a fixed set of modern crypto primitives (no negotiation/cipher agility), runs in the kernel, and uses simple public-key peer config. It is faster and far simpler to configure than the sprawling, negotiation-heavy IPsec suite.",
+          "hint": "Small, fixed crypto, fast, simple."
+        },
+        {
+          "id": "tls-security-attacks-defenses-008",
+          "type": "mcq",
+          "prompt": "An on-path attacker forges a TCP segment with the RST flag to a client. What is the effect, and is TLS a defense?",
+          "choices": [
+            "The connection is torn down; TLS does not prevent it because RST acts at the transport layer below TLS",
+            "The attacker reads the plaintext; TLS prevents it",
+            "Nothing happens; RST is ignored on TLS connections",
+            "The certificate is revoked automatically"
+          ],
+          "answerIndex": 0,
+          "explanation": "RST injection operates on the TCP layer beneath TLS. A correctly guessed RST tears down the connection (a denial-of-service / censorship tool). TLS protects payload confidentiality and integrity but cannot stop a forged transport-layer reset; that's an availability attack."
+        },
+        {
+          "id": "tls-security-attacks-defenses-009",
+          "type": "mcq",
+          "prompt": "Even with TLS 1.3 and ECH deployed, what does a passive on-path observer still reliably learn?",
+          "choices": [
+            "The destination IP address, ports, and packet size/timing patterns",
+            "The full HTTP request body",
+            "The user's login password",
+            "The server's private key"
+          ],
+          "answerIndex": 0,
+          "explanation": "ECH hides the SNI and TLS hides the payload, but the IP header is unavoidably visible: destination IP and port plus traffic-analysis signals (sizes, timing). Content and secrets remain protected; raw routing metadata cannot be hidden by TLS alone."
+        },
+        {
+          "id": "tls-security-attacks-defenses-010",
+          "type": "mcq",
+          "prompt": "Which nftables match lets a stateful firewall accept return traffic without an explicit inbound rule per service?",
+          "choices": [
+            "ct state established,related",
+            "tcp flags syn",
+            "ip saddr 0.0.0.0/0",
+            "meta l4proto icmp"
+          ],
+          "answerIndex": 0,
+          "explanation": "Connection tracking (ct state established,related) lets the firewall recognize packets belonging to a connection it already saw initiate, so replies are permitted automatically. This is the defining capability of a stateful firewall."
+        }
+      ]
+    }
+  ]
+}

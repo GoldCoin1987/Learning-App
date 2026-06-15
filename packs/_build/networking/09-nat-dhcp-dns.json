@@ -1,0 +1,283 @@
+{
+  "id": "nat-dhcp-dns",
+  "title": "NAT, DHCP & DNS",
+  "order": 9,
+  "lessons": [
+    {
+      "id": "nat-dhcp-dns-lesson-nat",
+      "title": "NAT: SNAT, DNAT, PAT and the cost of address translation",
+      "order": 1,
+      "difficulty": 1,
+      "content": "Network Address Translation rewrites IP headers (and often ports) as packets cross a boundary, letting many private hosts share scarce public addresses. **SNAT** (source NAT) rewrites the source address on the way out; **DNAT** (destination NAT) rewrites the destination on the way in — that is exactly what a port-forward is. What your home router actually does is **PAT**, also called *NAT overload* or *masquerade*: it maps many internal `(IP:port)` pairs onto one public IP by also rewriting the source port, then remembers each mapping in a **connection-tracking (conntrack) table**. Return packets are matched against that table and translated back. Entries are keyed by the 5-tuple and time out, which is why long-idle TCP connections sometimes die behind NAT.\n\nThe cost is that NAT **breaks the end-to-end principle**: an outside host can't initiate a connection to an inside host because no conntrack entry exists yet and the address is unroutable. This breaks peer-to-peer, VoIP, and gaming. The workaround is **hole punching**: **STUN** lets a host discover its public mapping; **TURN** relays traffic when direct punching fails; **ICE** is the framework that tries candidate paths and picks one. **Carrier-Grade NAT (CGNAT)** stacks a second NAT layer at the ISP, sharing one public IP across many customers — multiplying these problems. IPv6's vast address space is meant to *kill* NAT and restore true end-to-end reachability (with firewalls, not translation, providing security).",
+      "items": [
+        {
+          "id": "nat-dhcp-dns-fc-snat-dnat",
+          "type": "flashcard",
+          "front": "Difference between SNAT and DNAT?",
+          "back": "SNAT rewrites the SOURCE address/port on egress (e.g. private hosts sharing a public IP). DNAT rewrites the DESTINATION on ingress (e.g. a port-forward steering inbound traffic to an internal host).",
+          "hint": "Which header field, which direction?"
+        },
+        {
+          "id": "nat-dhcp-dns-fc-pat",
+          "type": "flashcard",
+          "front": "What is PAT (NAT overload / masquerade) and why is it needed?",
+          "back": "PAT maps many internal (IP:port) pairs onto a single public IP by also rewriting the source port. It lets a whole LAN share one public address — what every home router does.",
+          "hint": "It also touches the port, not just the IP."
+        },
+        {
+          "id": "nat-dhcp-dns-fc-conntrack",
+          "type": "flashcard",
+          "front": "What is the conntrack table's role in NAT?",
+          "back": "It stores each translation mapping keyed by the connection 5-tuple so return packets can be reverse-translated. Entries time out, which is why idle connections behind NAT can drop.",
+          "hint": "How does the router know where to send the reply?"
+        },
+        {
+          "id": "nat-dhcp-dns-fc-e2e",
+          "type": "flashcard",
+          "front": "How does NAT break the end-to-end principle?",
+          "back": "An external host cannot initiate a connection inward: the internal address is unroutable and no conntrack mapping exists until the inside host sends first. This breaks P2P, VoIP and inbound services.",
+          "hint": "Who has to speak first?"
+        },
+        {
+          "id": "nat-dhcp-dns-fc-stun-turn-ice",
+          "type": "flashcard",
+          "front": "STUN vs TURN vs ICE?",
+          "back": "STUN discovers your public IP:port mapping for hole punching. TURN relays traffic through a server when direct punching fails. ICE is the framework that gathers candidates, tests paths, and selects the best.",
+          "hint": "Discover, relay, orchestrate."
+        },
+        {
+          "id": "nat-dhcp-dns-mcq-overload",
+          "type": "mcq",
+          "prompt": "A home router gives 200 devices internet access through one public IPv4 address. Which mechanism makes this possible?",
+          "choices": [
+            "DNAT with a static one-to-one map per device",
+            "PAT (NAT overload) rewriting source ports into a conntrack table",
+            "Proxy ARP advertising each host's MAC",
+            "DHCP assigning each device a public address"
+          ],
+          "answerIndex": 1,
+          "explanation": "Many-to-one sharing requires rewriting source ports so replies can be demultiplexed back to the right host; mappings live in the conntrack table. That is PAT / NAT overload."
+        },
+        {
+          "id": "nat-dhcp-dns-mcq-cgnat",
+          "type": "mcq",
+          "prompt": "What is Carrier-Grade NAT (CGNAT)?",
+          "choices": [
+            "NAT performed only on IPv6 traffic",
+            "A second NAT layer at the ISP sharing one public IP across many subscribers",
+            "A NAT that never times out conntrack entries",
+            "Hardware NAT built into the customer's router"
+          ],
+          "answerIndex": 1,
+          "explanation": "CGNAT stacks ISP-side NAT on top of the customer's NAT, sharing scarce public IPv4 across many subscribers and compounding inbound-reachability problems."
+        },
+        {
+          "id": "nat-dhcp-dns-mcq-ipv6",
+          "type": "mcq",
+          "prompt": "Why does IPv6 aim to eliminate NAT?",
+          "choices": [
+            "IPv6 has too few addresses to translate",
+            "Its huge address space lets every host be globally addressable, restoring end-to-end reachability",
+            "IPv6 routers cannot perform port rewriting",
+            "NAT is illegal under the IPv6 standard"
+          ],
+          "answerIndex": 1,
+          "explanation": "IPv6's address space removes the scarcity that forced NAT, so hosts can be globally addressable again; firewalls (not translation) provide security."
+        }
+      ]
+    },
+    {
+      "id": "nat-dhcp-dns-lesson-dhcp",
+      "title": "DHCP: the DORA lease, relays, and renewal",
+      "order": 2,
+      "difficulty": 2,
+      "content": "DHCP automates host configuration through the **DORA** exchange. **Discover:** a booting client with no address broadcasts a DHCPDISCOVER (source `0.0.0.0`, destination `255.255.255.255`, UDP 67/68) asking any server to identify itself. **Offer:** each server replies with a DHCPOFFER proposing an IP plus options. **Request:** the client broadcasts a DHCPREQUEST naming the chosen server (so the others withdraw their offers). **Acknowledge:** that server sends DHCPACK confirming the lease and full configuration. Because the client has no IP yet, the early steps must be **broadcast** at layer 2.\n\nAn offer carries an address, subnet mask, and **options**: default gateway (router), DNS servers, NTP, domain name, lease time, and boot/PXE info for network boot. The lease is time-bounded. At **T1** (≈50% of the lease) the client tries to **renew** by unicasting REQUEST directly to its server; if that fails, at **T2** (≈87.5%) it **rebinds** by broadcasting to any server. If the lease expires it must start DORA over.\n\nTo serve clients on subnets without a local server, a **DHCP relay agent** (often the router) forwards the broadcast as unicast to the server and stamps the **giaddr** (gateway IP address) field so the server knows which subnet's pool to draw from and where to send replies. **DHCPv6** differs: it uses multicast (`ff02::1:2`) instead of broadcast, a Solicit/Advertise/Request/Reply flow, and DUIDs to identify clients — and it often coexists with IPv6 SLAAC router advertisements rather than replacing them.",
+      "items": [
+        {
+          "id": "nat-dhcp-dns-fc-dora-recall",
+          "type": "flashcard",
+          "front": "Recall the full DHCP DORA exchange from memory, naming who broadcasts and what each step does.",
+          "back": "Discover: client broadcasts DHCPDISCOVER (0.0.0.0 -> 255.255.255.255) seeking servers. Offer: server(s) reply with a proposed IP + options. Request: client BROADCASTS DHCPREQUEST naming the chosen server (others withdraw). Acknowledge: chosen server sends DHCPACK confirming the lease.",
+          "hint": "Discover, Offer, Request, Acknowledge."
+        },
+        {
+          "id": "nat-dhcp-dns-fc-broadcast",
+          "type": "flashcard",
+          "front": "Why are the early DHCP messages broadcast rather than unicast?",
+          "back": "The client has no IP address yet and doesn't know any server's address, so it cannot unicast. It broadcasts to 255.255.255.255 so any reachable server can respond.",
+          "hint": "What does the client lack at boot?"
+        },
+        {
+          "id": "nat-dhcp-dns-fc-t1-t2",
+          "type": "flashcard",
+          "front": "What happens at T1 and T2 during a DHCP lease?",
+          "back": "T1 (~50% of lease): client RENEWS by unicasting REQUEST to its own server. T2 (~87.5%): if renewal failed, client REBINDS by broadcasting to any server. On expiry, restart DORA.",
+          "hint": "Renew unicast, then rebind broadcast."
+        },
+        {
+          "id": "nat-dhcp-dns-fc-giaddr",
+          "type": "flashcard",
+          "front": "What does a DHCP relay agent do, and what is giaddr for?",
+          "back": "The relay forwards broadcast DHCP requests as unicast to a server on another subnet. It sets giaddr (gateway IP address) so the server picks the correct subnet's address pool and knows where to send replies.",
+          "hint": "How does a server help clients it can't hear directly?"
+        },
+        {
+          "id": "nat-dhcp-dns-fc-options",
+          "type": "flashcard",
+          "front": "Name several configuration parameters DHCP delivers via options.",
+          "back": "Default gateway (router), DNS server list, subnet mask, lease time, domain name, NTP servers, and PXE/boot-file info for network booting.",
+          "hint": "Everything beyond the IP itself."
+        },
+        {
+          "id": "nat-dhcp-dns-mcq-request-broadcast",
+          "type": "mcq",
+          "prompt": "Why is the DHCPREQUEST (third message) typically broadcast rather than unicast to the chosen server?",
+          "choices": [
+            "The client still has no usable IP and other servers must learn their offers were declined",
+            "Servers cannot receive unicast on UDP 67",
+            "Broadcast is encrypted while unicast is not",
+            "It carries the giaddr field which requires broadcast"
+          ],
+          "answerIndex": 0,
+          "explanation": "The client hasn't committed an address yet, and broadcasting the REQUEST lets the non-selected servers see the client picked someone else so they release their reserved offers."
+        },
+        {
+          "id": "nat-dhcp-dns-mcq-dhcpv6",
+          "type": "mcq",
+          "prompt": "Which is a real difference between DHCPv6 and DHCPv4?",
+          "choices": [
+            "DHCPv6 uses TCP instead of UDP",
+            "DHCPv6 uses multicast and DUIDs, and often coexists with SLAAC",
+            "DHCPv6 eliminates the concept of leases",
+            "DHCPv6 assigns MAC addresses instead of IPs"
+          ],
+          "answerIndex": 1,
+          "explanation": "DHCPv6 replaces broadcast with multicast (ff02::1:2), identifies clients with DUIDs via a Solicit/Advertise/Request/Reply flow, and frequently works alongside SLAAC router advertisements."
+        },
+        {
+          "id": "nat-dhcp-dns-mcq-relay-pool",
+          "type": "mcq",
+          "prompt": "A central DHCP server serves clients on many subnets. How does it choose which pool to assign from for a given request?",
+          "choices": [
+            "From the client's MAC vendor prefix",
+            "From the giaddr stamped by the relay agent",
+            "From the TTL of the DISCOVER packet",
+            "It assigns randomly and the client corrects it"
+          ],
+          "answerIndex": 1,
+          "explanation": "The relay agent fills giaddr with the gateway/subnet address it received the broadcast on; the server matches that to the correct address pool and routes replies back through the relay."
+        },
+        {
+          "id": "nat-dhcp-dns-img-dora",
+          "type": "flashcard",
+          "front": "Study this diagram.",
+          "back": "Review the diagram above.",
+          "image": "https://raw.githubusercontent.com/studyforge/packs/main/networking/images/nat-dhcp-dns-1.svg"
+        }
+      ]
+    },
+    {
+      "id": "nat-dhcp-dns-lesson-dns",
+      "title": "DNS: hierarchy, resolution, records, and the modern stack",
+      "order": 3,
+      "difficulty": 3,
+      "content": "DNS maps names to data through a delegated **hierarchy**: the **root** (`.`) delegates to **TLD** servers (`.com`, `.org`), which delegate to the **authoritative** servers for a domain. Your host runs a **stub resolver** that asks a **recursive resolver**; the resolver does the legwork **iteratively** — querying root, then TLD, then authoritative, following *referrals* at each step — then returns the answer and **caches** it for the record's **TTL**. *Recursive* means \"do all the work and bring me the answer\"; *iterative* means \"give me your best referral and I'll chase it myself.\"\n\nKey **record types**: **A** (IPv4), **AAAA** (IPv6), **CNAME** (alias to another name), **MX** (mail exchanger), **NS** (delegates a zone), **SOA** (zone authority/serial/timers), **TXT** (arbitrary text, e.g. SPF/DKIM), **SRV** (service host+port), and **PTR** (reverse: IP→name). TTLs govern caching; **negative caching** (NXDOMAIN) is governed by the SOA. DNS rides **UDP/53**, falling back to **TCP/53** when responses exceed the limit (large answers, zone transfers, DNSSEC); **EDNS** advertises larger UDP buffers.\n\nModern DNS hardens privacy and trust: **DoH** (DNS over HTTPS) and **DoT** (DNS over TLS) encrypt queries so they can't be read or tampered with on the wire, while **DNSSEC** signs records so resolvers can verify *authenticity* (it provides integrity, not confidentiality). Classic **failure modes** are why \"it's always DNS\": **stale cache** serving old records after a change, **split-horizon** returning different answers inside vs outside a network, and over-long **negative caching** pinning an NXDOMAIN.",
+      "items": [
+        {
+          "id": "nat-dhcp-dns-fc-resolution-walk",
+          "type": "flashcard",
+          "front": "Narrate the full resolution of www.example.com from a cold cache, end to end.",
+          "back": "Stub resolver sends a recursive query to the recursive resolver. Resolver (iteratively): asks a ROOT server -> referral to .com TLD servers; asks a TLD server -> referral to example.com authoritative NS; asks the AUTHORITATIVE server -> returns the A/AAAA record. Resolver caches each result per its TTL and returns the answer to the stub.",
+          "hint": "Stub -> recursive; recursive iterates root -> TLD -> authoritative -> cache."
+        },
+        {
+          "id": "nat-dhcp-dns-fc-recursive-iterative",
+          "type": "flashcard",
+          "front": "Recursive vs iterative resolution?",
+          "back": "Recursive: the resolver does all the work and returns the final answer (stub -> recursive resolver). Iterative: a server returns its best referral and the asker chases it (recursive resolver -> root/TLD/authoritative).",
+          "hint": "Who chases the referrals?"
+        },
+        {
+          "id": "nat-dhcp-dns-fc-records",
+          "type": "flashcard",
+          "front": "What do A, AAAA, CNAME, MX, NS, SOA, TXT, SRV, and PTR records hold?",
+          "back": "A=IPv4, AAAA=IPv6, CNAME=alias to another name, MX=mail exchanger, NS=delegates a zone, SOA=zone authority/serial/timers, TXT=arbitrary text (SPF/DKIM), SRV=service host+port, PTR=reverse lookup (IP->name).",
+          "hint": "Address, alias, mail, delegation, authority, text, service, reverse."
+        },
+        {
+          "id": "nat-dhcp-dns-fc-doh-dot-dnssec",
+          "type": "flashcard",
+          "front": "DoH/DoT vs DNSSEC — what does each protect?",
+          "back": "DoH (over HTTPS) and DoT (over TLS) encrypt queries for CONFIDENTIALITY/privacy on the wire. DNSSEC signs records for AUTHENTICITY/integrity (it does NOT encrypt). They solve different problems and can be combined.",
+          "hint": "Privacy of transport vs proof of the data."
+        },
+        {
+          "id": "nat-dhcp-dns-fc-udp-tcp",
+          "type": "flashcard",
+          "front": "Why does DNS use UDP/53 but sometimes TCP/53?",
+          "back": "UDP/53 is fast and cheap for typical small queries. DNS falls back to TCP/53 for responses too large for a single datagram (large answers, DNSSEC, zone transfers); EDNS lets clients advertise bigger UDP buffers to delay that fallback.",
+          "hint": "Small/fast by default, fall back when the answer is too big."
+        },
+        {
+          "id": "nat-dhcp-dns-mcq-cname",
+          "type": "mcq",
+          "prompt": "What is a CNAME record used for?",
+          "choices": [
+            "Mapping a name directly to an IPv4 address",
+            "Aliasing one name to another canonical name, which is then resolved",
+            "Delegating a subdomain to other name servers",
+            "Reverse-resolving an IP address to a hostname"
+          ],
+          "answerIndex": 1,
+          "explanation": "A CNAME makes a name an alias of another (canonical) name; the resolver then looks up that target. A maps to an IP, NS delegates, PTR does reverse."
+        },
+        {
+          "id": "nat-dhcp-dns-mcq-stale",
+          "type": "mcq",
+          "prompt": "You change a site's A record but some users still hit the old server for a while. Most likely cause?",
+          "choices": [
+            "DNSSEC validation failure",
+            "Cached records still alive within their TTL (stale cache)",
+            "The TLD lost its NS delegation",
+            "UDP was blocked forcing TCP"
+          ],
+          "answerIndex": 1,
+          "explanation": "Resolvers cache records for the TTL, so until cached copies expire some users get the old answer. Lowering the TTL before a change reduces this window."
+        },
+        {
+          "id": "nat-dhcp-dns-mcq-iterative-target",
+          "type": "mcq",
+          "prompt": "During iterative resolution of a .com name, what does a root server typically return?",
+          "choices": [
+            "The final A record for the host",
+            "A referral pointing to the .com TLD name servers",
+            "An NXDOMAIN for the whole query",
+            "The authoritative SOA of the target domain"
+          ],
+          "answerIndex": 1,
+          "explanation": "Root servers don't know the final answer; they refer the resolver downward to the appropriate TLD name servers, which then refer to the authoritative servers."
+        },
+        {
+          "id": "nat-dhcp-dns-mcq-negcache",
+          "type": "mcq",
+          "prompt": "Which record controls how long a negative answer (NXDOMAIN) is cached?",
+          "choices": [
+            "The TXT record",
+            "The SOA record's negative-caching TTL",
+            "The MX record priority",
+            "The PTR record"
+          ],
+          "answerIndex": 1,
+          "explanation": "Negative caching duration is governed by the zone's SOA (its minimum/negative-TTL field), which is why a misconfigured SOA can pin a stale NXDOMAIN."
+        },
+        {
+          "id": "nat-dhcp-dns-img-resolution",
+          "type": "flashcard",
+          "front": "Study this diagram.",
+          "back": "Review the diagram above.",
+          "image": "https://raw.githubusercontent.com/studyforge/packs/main/networking/images/nat-dhcp-dns-2.svg"
+        }
+      ]
+    }
+  ]
+}

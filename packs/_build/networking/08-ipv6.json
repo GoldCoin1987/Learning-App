@@ -1,0 +1,279 @@
+{
+  "id": "ipv6",
+  "title": "IPv6: Addressing, Autoconfig & Transition",
+  "order": 8,
+  "lessons": [
+    {
+      "id": "ipv6-why-and-notation",
+      "title": "Why IPv6 & How to Read an Address",
+      "order": 1,
+      "difficulty": 1,
+      "content": "IPv4's 32-bit space (~4.3 billion addresses) ran dry, and NAT was the duct tape that papered over it at the cost of breaking the end-to-end principle. **IPv6 uses 128-bit addresses** — about $3.4\\times10^{38}$ of them — enough to give every device a globally routable address and retire NAT-as-necessity. It also brings a **cleaner, fixed-size 40-byte header** (versus IPv4's variable header) that routers process faster, plus first-class autoconfiguration.\n\nAn address is written as **eight groups of four hex digits** separated by colons, e.g. `2001:0db8:0000:0000:0000:ff00:0042:8329`. Two compression rules make this livable:\n\n1. **Drop leading zeros** in each group: `0db8` -> `db8`, `0000` -> `0`, `0042` -> `42`.\n2. **`::` collapses one run of all-zero groups** to nothing — but you may use it **only once** per address (otherwise the length is ambiguous).\n\nSo the address above canonicalizes to `2001:db8::ff00:42:8329`. Conversely, to expand `::1` you restore the zeros: `0000:0000:0000:0000:0000:0000:0000:0001` — that is the **loopback** (IPv4's `127.0.0.1`). The unspecified address is `::` (all zeros).\n\nRFC 5952 also fixes a **canonical form** for tooling: lowercase hex, leading zeros suppressed, and `::` applied to the **longest** zero run (leftmost on ties). Getting compression reflexive is the IPv6 equivalent of fast subnetting — it shows up in every config, log, and packet capture you read.",
+      "items": [
+        {
+          "id": "ipv6-why-001",
+          "type": "flashcard",
+          "front": "How many bits is an IPv6 address, and roughly how many addresses does that give?",
+          "back": "128 bits, giving about $3.4\\times10^{38}$ addresses (2^128). That is the whole point: enough to globally address every device and end the need for NAT.",
+          "hint": "Four times the IPv4 bit count."
+        },
+        {
+          "id": "ipv6-why-002",
+          "type": "flashcard",
+          "front": "State the two IPv6 text-compression rules.",
+          "back": "(1) Drop leading zeros within each 16-bit group (0db8 -> db8, 0000 -> 0). (2) Replace one contiguous run of all-zero groups with `::`. The `::` may appear at most once per address.",
+          "hint": "Leading zeros, then one zero-run collapse."
+        },
+        {
+          "id": "ipv6-why-003",
+          "type": "flashcard",
+          "front": "Why can `::` only be used once in an address?",
+          "back": "`::` means 'as many zero groups as needed to total eight'. Two of them would be ambiguous — the reader could not tell how many zero groups belong to each. So a parser would not know the address length.",
+          "hint": "Ambiguity of how many zero groups."
+        },
+        {
+          "id": "ipv6-why-004",
+          "type": "flashcard",
+          "front": "What are the IPv6 loopback and unspecified addresses?",
+          "back": "Loopback is `::1` (all zeros except the last bit) — the equivalent of IPv4 127.0.0.1. The unspecified address is `::` (all 128 bits zero), used as a source while a host has no address yet.",
+          "hint": "One has a trailing 1, one is all zeros."
+        },
+        {
+          "id": "ipv6-why-005",
+          "type": "flashcard",
+          "front": "Per RFC 5952 canonical form, where must `::` be applied when there are multiple zero runs?",
+          "back": "Apply `::` to the longest run of zero groups; if two runs tie in length, use it on the leftmost (first) one. Hex must be lowercase and leading zeros suppressed. A single zero group is not shortened to `::`.",
+          "hint": "Longest run, leftmost on a tie."
+        },
+        {
+          "id": "ipv6-why-006",
+          "type": "mcq",
+          "prompt": "Canonicalize the address `2001:0DB8:0000:0000:0008:0800:200C:417A`.",
+          "choices": [
+            "2001:db8::8:800:200c:417a",
+            "2001:db8:0:0:8:8:2c:417a",
+            "2001:db8::8:800:200c:417a::",
+            "21:db8::8:8:2c:417a"
+          ],
+          "answerIndex": 0,
+          "explanation": "Lowercase the hex, drop leading zeros in each group (0008->8, 0800->800, 200C->200c), and collapse the single run of two zero groups with one `::`. Result: 2001:db8::8:800:200c:417a. You may not place a trailing `::` as well."
+        },
+        {
+          "id": "ipv6-why-007",
+          "type": "mcq",
+          "prompt": "Which is the correct fully-expanded form of `fe80::1`?",
+          "choices": [
+            "fe80:0000:0000:0000:0000:0000:0000:0001",
+            "fe80:0000:0000:0000:0000:0000:0000:1000",
+            "0000:0000:0000:0000:0000:0000:fe80:0001",
+            "fe80:1111:1111:1111:1111:1111:1111:0001"
+          ],
+          "answerIndex": 0,
+          "explanation": "The `::` stands in for the six all-zero groups between fe80 and the final group, which is 0001. The 1 stays in the low-order (rightmost) position, giving fe80:0000:0000:0000:0000:0000:0000:0001."
+        },
+        {
+          "id": "ipv6-why-008",
+          "type": "mcq",
+          "prompt": "Why is IPv6's fixed 40-byte header an advantage over IPv4's variable header?",
+          "choices": [
+            "Routers can parse it at a known offset with no options-length math, speeding forwarding",
+            "It makes IPv6 packets smaller than IPv4 packets",
+            "It lets routers fragment packets more easily",
+            "It allows the address field to be optional"
+          ],
+          "answerIndex": 0,
+          "explanation": "A fixed-length base header means every field sits at a known offset, so routers skip the IHL/options arithmetic IPv4 requires. Rarely-used options move to chained extension headers, keeping the fast path simple."
+        },
+        {
+          "id": "ipv6-why-009",
+          "type": "flashcard",
+          "front": "What problem did NAT solve in IPv4, and why does IPv6 aim to retire it?",
+          "back": "NAT let many hosts share one public IPv4 address, stretching the exhausted address space — but it breaks end-to-end addressing, complicates inbound connections, and needs hole-punching for P2P/VoIP. IPv6's vast space gives every host a globally routable address, so NAT is no longer required.",
+          "hint": "Address conservation vs. end-to-end reachability."
+        }
+      ]
+    },
+    {
+      "id": "ipv6-address-types-and-prefixes",
+      "title": "Address Types, Interface IDs & Prefixes",
+      "order": 2,
+      "difficulty": 2,
+      "content": "IPv6 replaces IPv4's address classes with a small set of **types** distinguished by their high-order bits:\n\n- **Global unicast** (currently `2000::/3`): globally routable, the public Internet.\n- **Link-local** `fe80::/10`: **always present** on every IPv6 interface, auto-generated, valid only on that link (not routed). Used by NDP and as a next-hop for routing.\n- **Unique local (ULA)** `fc00::/7` (in practice `fd00::/8` with a random 40-bit global ID): the private-network analog of RFC 1918, not routed on the Internet.\n- **Multicast** `ff00::/8`: one-to-many. Crucially, **IPv6 has no broadcast** — its jobs are done by well-known multicast groups (e.g. all-nodes `ff02::1`, all-routers `ff02::2`).\n- **Anycast**: a unicast address shared by several nodes; the routing system delivers to the nearest one. Anycast has no special bit pattern — it is just a unicast address advertised from multiple places.\n\nThe low 64 bits are the **interface identifier (IID)**. Historically it was derived from the 48-bit MAC via **EUI-64**: split the OUI and NIC halves, insert `fffe` in the middle, and flip the 7th bit (the universal/local bit). That made the IID a permanent device fingerprint, so **privacy extensions (RFC 4941)** now generate random, periodically-rotating IIDs for outbound connections — the modern default on phones and laptops.\n\nPrefixes are clean: **`/64` is the standard subnet** (and SLAAC effectively requires it), while a site is typically allocated a **`/48`**, leaving 16 bits of subnet ID — that is 65,536 `/64` subnets per site, all carved on **nibble (4-bit) boundaries** so every hex digit maps to exactly 4 bits.",
+      "items": [
+        {
+          "id": "ipv6-types-001",
+          "type": "flashcard",
+          "front": "Match each prefix to its address type: fe80::/10, fc00::/7, ff00::/8, 2000::/3.",
+          "back": "fe80::/10 = link-local (always present, not routed). fc00::/7 = unique local (ULA, private). ff00::/8 = multicast. 2000::/3 = global unicast (public Internet).",
+          "hint": "Link-local, ULA, multicast, global."
+        },
+        {
+          "id": "ipv6-types-002",
+          "type": "flashcard",
+          "front": "Why does IPv6 have no broadcast address, and what replaces it?",
+          "back": "Broadcast forces every host to process irrelevant frames. IPv6 drops it entirely and uses scoped multicast groups instead — e.g. all-nodes ff02::1 and all-routers ff02::2 — and solicited-node multicast for neighbor discovery, so only interested nodes are woken.",
+          "hint": "Targeted multicast groups, not flooding everyone."
+        },
+        {
+          "id": "ipv6-types-003",
+          "type": "flashcard",
+          "front": "What is an anycast address and how is it delivered?",
+          "back": "An anycast address is a unicast address assigned to multiple nodes; routing delivers a packet to the topologically nearest one. It has no distinguishing bit pattern — it looks like a normal unicast address. Common for DNS roots and CDNs.",
+          "hint": "Same address, many locations, nearest wins."
+        },
+        {
+          "id": "ipv6-types-004",
+          "type": "flashcard",
+          "front": "Describe EUI-64 IID generation and the privacy concern it raised.",
+          "back": "Split the 48-bit MAC, insert fffe in the middle to make 64 bits, and flip the 7th bit (universal/local). The IID becomes a stable device fingerprint that tracks you across networks. RFC 4941 privacy extensions fix this with random, rotating IIDs.",
+          "hint": "Insert fffe, flip U/L bit; then randomize for privacy."
+        },
+        {
+          "id": "ipv6-types-005",
+          "type": "flashcard",
+          "front": "What are the standard IPv6 subnet and site prefix lengths, and what do they imply?",
+          "back": "/64 is the standard subnet (SLAAC requires the host bits to be the low 64). A site is typically allocated /48, leaving 16 subnet bits = 65,536 /64 subnets. Subnetting is done on nibble (4-bit) boundaries.",
+          "hint": "Subnet /64, site /48, 16 bits between them."
+        },
+        {
+          "id": "ipv6-types-006",
+          "type": "mcq",
+          "prompt": "You are given the site prefix 2001:db8:acad::/48. How many /64 subnets does it contain, and what is the third subnet's prefix?",
+          "choices": [
+            "65,536 subnets; 2001:db8:acad:2::/64",
+            "256 subnets; 2001:db8:acad:3::/64",
+            "65,536 subnets; 2001:db8:acad:3::/64",
+            "1,024 subnets; 2001:db8:acad:0003::/64"
+          ],
+          "answerIndex": 0,
+          "explanation": "From /48 to /64 is 16 subnet bits, so 2^16 = 65,536 subnets. Numbering from zero, subnet 0 is :0::/64, subnet 1 is :1::/64, subnet 2 is :2::/64 — so the third subnet (index 2) is 2001:db8:acad:2::/64.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/ipv6-1.svg"
+        },
+        {
+          "id": "ipv6-types-007",
+          "type": "mcq",
+          "prompt": "An interface shows both fe80::1a2b:3c4d and 2001:db8:1::1a2b:3c4d. What is true?",
+          "choices": [
+            "fe80:: is the link-local (auto, not routed); 2001:db8:: is the routable global unicast",
+            "fe80:: is the global address and 2001:db8:: is private",
+            "Both are link-local; an interface cannot have a global address",
+            "fe80:: is a multicast group the host joined"
+          ],
+          "answerIndex": 0,
+          "explanation": "fe80::/10 is always-present link-local scope, used by NDP and only valid on that link. The 2001:db8::/32 documentation block is global unicast scope and is routable. A single interface routinely holds multiple addresses of different scopes."
+        },
+        {
+          "id": "ipv6-types-008",
+          "type": "mcq",
+          "prompt": "Which prefix is the IPv6 counterpart to RFC 1918 private addressing?",
+          "choices": [
+            "fc00::/7 (unique local addresses)",
+            "fe80::/10 (link-local)",
+            "ff00::/8 (multicast)",
+            "::/0 (default route)"
+          ],
+          "answerIndex": 0,
+          "explanation": "Unique local addresses (fc00::/7, used as fd00::/8 with a random global ID) are non-Internet-routable private addressing, analogous to 10/8 and 192.168/16. Link-local is narrower (single link only) and not a general private range."
+        },
+        {
+          "id": "ipv6-types-009",
+          "type": "flashcard",
+          "front": "What does the all-routers multicast group ff02::2 do, and what is ff02::1?",
+          "back": "ff02::2 is the link-scoped all-routers group; hosts send Router Solicitations to it. ff02::1 is the all-nodes group (the closest thing to broadcast). The ff02 scope means link-local — these never leave the link.",
+          "hint": "::1 = all nodes, ::2 = all routers, scope ff02 = link-local."
+        }
+      ]
+    },
+    {
+      "id": "ipv6-autoconfig-ndp-transition",
+      "title": "SLAAC, NDP, Header & Transition",
+      "order": 3,
+      "difficulty": 3,
+      "content": "IPv6 hosts can configure themselves with no server. **SLAAC (stateless address autoconfiguration)** works like this: the host forms a link-local address, sends a **Router Solicitation (RS)**, and the router replies with a **Router Advertisement (RA)** carrying the `/64` prefix. The host appends its own interface ID (EUI-64 or random) to that prefix to build a global address — no central record is kept. **DHCPv6** is the stateful alternative: a server hands out specific addresses and tracks leases, giving central control and extra options (it also has a *stateless* mode that supplies only DNS while SLAAC sets the address). RA flags choose the mix: **M** (managed) says 'use DHCPv6 for addresses'; **O** (other) says 'use DHCPv6 only for other config like DNS'. **SLAAC vs DHCPv6**: SLAAC is zero-infrastructure and self-healing but gives the admin little control over which address a host gets; DHCPv6 gives control and auditing at the cost of running a server. Many networks run both.\n\n**NDP (Neighbor Discovery Protocol)** replaces ARP and runs over **ICMPv6**: Neighbor Solicitation/Advertisement do address resolution and duplicate-address detection; Router Solicitation/Advertisement do router/prefix discovery; Redirect steers to a better next hop. This is why **ICMPv6 is mandatory** — block it wholesale and NDP, SLAAC, and Path MTU Discovery all break.\n\nThe header is leaner: rare options live in **extension headers** chained via Next Header, and **routers never fragment** — only the source may, guided by Path MTU Discovery. Coexistence with IPv4 uses **dual-stack** (run both), **6in4** tunneling (encapsulate IPv6 in IPv4), and **NAT64/DNS64** (let IPv6-only clients reach IPv4 servers). **Happy Eyeballs** races IPv6 and IPv4 connections in parallel and uses whichever answers first, hiding broken paths from users.",
+      "items": [
+        {
+          "id": "ipv6-auto-001",
+          "type": "flashcard",
+          "front": "Walk through SLAAC step by step.",
+          "back": "1) Host self-assigns a link-local address and runs DAD. 2) Sends a Router Solicitation to ff02::2. 3) Router replies with a Router Advertisement containing the /64 prefix. 4) Host appends its interface ID to that prefix to form a global address. No server tracks the assignment — it is stateless.",
+          "hint": "Link-local -> RS -> RA prefix -> append IID."
+        },
+        {
+          "id": "ipv6-auto-002",
+          "type": "flashcard",
+          "front": "Compare SLAAC and DHCPv6: when would you choose each?",
+          "back": "SLAAC is stateless, server-free, and self-healing but gives little control over which address a host gets and historically lacked DNS delivery. DHCPv6 is stateful: a server assigns specific addresses, tracks leases, and supplies options (DNS, NTP) — choose it when you need central control and auditing. Many networks run both, using SLAAC for the address and stateless DHCPv6 for DNS.",
+          "hint": "Stateless/no control vs. stateful/central control."
+        },
+        {
+          "id": "ipv6-auto-003",
+          "type": "flashcard",
+          "front": "What do the M and O flags in a Router Advertisement tell a host?",
+          "back": "M (Managed) = obtain addresses via DHCPv6 (stateful). O (Other) = use SLAAC for the address but get other config (e.g. DNS) from DHCPv6 (stateless DHCPv6). Both clear = pure SLAAC with prefixes from the RA.",
+          "hint": "Managed = DHCP addresses; Other = DHCP for extras only."
+        },
+        {
+          "id": "ipv6-auto-004",
+          "type": "flashcard",
+          "front": "Which NDP/ICMPv6 messages replace ARP, and what else does NDP do?",
+          "back": "Neighbor Solicitation/Advertisement replace ARP request/reply (address resolution) and perform Duplicate Address Detection. Router Solicitation/Advertisement do router and prefix discovery. Redirect indicates a better next hop. All ride on ICMPv6.",
+          "hint": "NS/NA for neighbors, RS/RA for routers, plus Redirect."
+        },
+        {
+          "id": "ipv6-auto-005",
+          "type": "flashcard",
+          "front": "Why is in-network fragmentation removed in IPv6, and who fragments instead?",
+          "back": "Routers never fragment IPv6 packets — that work is pushed to the source, which discovers the path MTU via ICMPv6 'Packet Too Big' messages and sizes packets accordingly. This keeps the router fast path simple and avoids reassembly attacks/overhead in the network.",
+          "hint": "Source-only, driven by Path MTU Discovery."
+        },
+        {
+          "id": "ipv6-auto-006",
+          "type": "mcq",
+          "prompt": "A firewall admin blocks ALL ICMPv6 'to be safe'. What is the most likely result on an IPv6 network?",
+          "choices": [
+            "NDP, SLAAC, and Path MTU Discovery break, so connectivity fails or large transfers hang",
+            "Nothing changes; ICMPv6 is purely diagnostic like ICMPv4",
+            "Only ping stops working; all other traffic is unaffected",
+            "Routing tables silently switch to IPv4"
+          ],
+          "answerIndex": 0,
+          "explanation": "ICMPv6 is mandatory infrastructure: NDP (NS/NA, RS/RA) and Path MTU Discovery all ride on it. Blocking it wholesale breaks neighbor resolution, autoconfiguration, and large-packet delivery. You filter ICMPv6 selectively, never entirely."
+        },
+        {
+          "id": "ipv6-auto-007",
+          "type": "mcq",
+          "prompt": "An IPv6-only mobile client needs to reach a legacy IPv4-only web server. Which transition mechanism makes this work?",
+          "choices": [
+            "NAT64 with DNS64 synthesizing AAAA records",
+            "6in4 tunneling of IPv6 inside IPv4",
+            "Dual-stack on the client only",
+            "Happy Eyeballs alone"
+          ],
+          "answerIndex": 0,
+          "explanation": "DNS64 synthesizes an AAAA record pointing at a NAT64 prefix when only an A record exists; NAT64 then translates the IPv6 packets to IPv4 toward the legacy server. 6in4 carries IPv6 over IPv4 networks (the reverse problem), and Happy Eyeballs only chooses between existing paths.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/ipv6-1.svg"
+        },
+        {
+          "id": "ipv6-auto-008",
+          "type": "mcq",
+          "prompt": "What does Happy Eyeballs (RFC 8305) do?",
+          "choices": [
+            "Attempts IPv6 and IPv4 connections in parallel and uses whichever completes first",
+            "Forces all traffic onto IPv6 and disables IPv4",
+            "Fragments packets at the source to avoid black holes",
+            "Encrypts DNS so AAAA lookups cannot be tampered with"
+          ],
+          "answerIndex": 0,
+          "explanation": "Happy Eyeballs races the IPv6 and IPv4 connection attempts (with a slight IPv6 head start) and uses the first to succeed, so a broken IPv6 path falls back to IPv4 fast enough that the user never notices."
+        },
+        {
+          "id": "ipv6-auto-009",
+          "type": "flashcard",
+          "front": "What is dual-stack operation, and why is it the baseline transition strategy?",
+          "back": "Dual-stack means a host or network runs IPv4 and IPv6 simultaneously, each with its own addresses and routing. Applications use whichever the destination supports (often chosen by Happy Eyeballs). It is the baseline because it preserves full IPv4 reachability while IPv6 is rolled out incrementally, with no flag day.",
+          "hint": "Both protocols live side by side, no flag day."
+        }
+      ]
+    }
+  ]
+}

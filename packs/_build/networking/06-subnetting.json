@@ -1,0 +1,509 @@
+{
+  "id": "subnetting",
+  "title": "IPv4 Addressing & Subnetting",
+  "order": 6,
+  "lessons": [
+    {
+      "id": "subnetting-foundations",
+      "title": "Dotted-Decimal, Binary, and the Classful-to-CIDR Story",
+      "order": 1,
+      "difficulty": 1,
+      "content": "An IPv4 address is just **32 bits**. Dotted-decimal (`192.168.10.20`) is a human convenience: split the 32 bits into four 8-bit octets and write each octet 0–255. As an ex-radar tech you already think in bits, so internalize the one fact that makes all of subnetting mechanical: `192.168.10.20` is\n\n$$11000000\\,.\\,10101000\\,.\\,00001010\\,.\\,00010100$$\n\n**Classful history.** The 1981 scheme split the space by the leading bits: Class A (`0…`, /8, 16.7M hosts), Class B (`10…`, /16, 65k hosts), Class C (`110…`, /24, 254 hosts), plus D (multicast) and E (reserved). The class *was* the mask — you couldn't choose. This was wasteful: an org needing 500 hosts had to take a whole Class B (65k) because a Class C (254) was too small. That waste is a big reason we exhausted IPv4.\n\n**CIDR (Classless Inter-Domain Routing, RFC 1519, 1993)** threw away classes. Now the **prefix length** `/n` is explicit and arbitrary: the first `n` bits are the *network*, the remaining `32-n` are the *host* portion. `10.0.0.0/8`, `10.0.0.0/12`, `10.0.0.0/30` are all legal. This also enabled **route aggregation** — advertising one `/16` instead of 256 `/24`s — which kept the global routing table from exploding.\n\nThe whole modern game is: *where is the boundary between network bits and host bits, and what do the host bits range over?* Everything else (network address, broadcast, host count) falls straight out of that boundary.",
+      "items": [
+        {
+          "id": "subnetting-foundations-fc-1",
+          "type": "flashcard",
+          "front": "How many bits is an IPv4 address, and how is dotted-decimal derived from it?",
+          "back": "32 bits, split into four 8-bit octets; each octet is written in decimal (0–255) separated by dots. It is purely a human-readable rendering of the 32-bit value.",
+          "hint": "4 octets."
+        },
+        {
+          "id": "subnetting-foundations-fc-2",
+          "type": "flashcard",
+          "front": "In CIDR notation /n, what do the first n bits and the remaining 32−n bits represent?",
+          "back": "The first n bits are the network (prefix) portion, fixed for every address in the block; the remaining 32−n bits are the host portion, which varies across the addresses in that block.",
+          "hint": "Network on the left, hosts on the right."
+        },
+        {
+          "id": "subnetting-foundations-fc-3",
+          "type": "flashcard",
+          "front": "What were the classful default masks for Class A, B, and C, and by what bits were the classes distinguished?",
+          "back": "Class A = /8 (leading bit 0), Class B = /16 (leading bits 10), Class C = /24 (leading bits 110). The leading bits of the first octet determined the class and therefore the fixed mask.",
+          "hint": "0… / 10… / 110… ; 8/16/24."
+        },
+        {
+          "id": "subnetting-foundations-fc-4",
+          "type": "flashcard",
+          "front": "Name two problems with classful addressing that CIDR solved.",
+          "back": "(1) Coarse, wasteful allocation — you got 254, 65k, or 16M hosts with nothing in between, stranding huge ranges. (2) Routing-table bloat — no way to aggregate. CIDR allows arbitrary prefix lengths and route aggregation (summarizing many prefixes into one).",
+          "hint": "Waste and table size."
+        },
+        {
+          "id": "subnetting-foundations-fc-5",
+          "type": "flashcard",
+          "front": "Convert the octet 172 to 8-bit binary.",
+          "back": "172 = 128 + 32 + 8 + 4 = 10101100. (Place values 128 64 32 16 8 4 2 1.)",
+          "hint": "128 + 44, and 44 = 32+8+4."
+        },
+        {
+          "id": "subnetting-foundations-mcq-1",
+          "type": "mcq",
+          "prompt": "Which of the following is NOT a valid IPv4 dotted-decimal address?",
+          "choices": [
+            "10.0.255.1",
+            "192.168.1.256",
+            "172.31.0.0",
+            "8.8.4.4"
+          ],
+          "answerIndex": 1,
+          "explanation": "Each octet is 8 bits, so the legal range is 0–255. 256 overflows a single octet and is invalid. The others all have every octet within 0–255."
+        },
+        {
+          "id": "subnetting-foundations-mcq-2",
+          "type": "mcq",
+          "prompt": "Under the original classful scheme, what class is 172.20.5.9 and what was its default mask?",
+          "choices": [
+            "Class A, /8",
+            "Class B, /16",
+            "Class C, /24",
+            "Class D, /32"
+          ],
+          "answerIndex": 1,
+          "explanation": "First octet 172 is in 128–191, whose leading bits are 10…, marking Class B with a default /16 mask. (128–191 = B; 1–126 = A; 192–223 = C.)"
+        },
+        {
+          "id": "subnetting-foundations-mcq-3",
+          "type": "mcq",
+          "prompt": "What is the decimal value of the binary octet 11000000?",
+          "choices": [
+            "192",
+            "224",
+            "128",
+            "240"
+          ],
+          "answerIndex": 0,
+          "explanation": "11000000 = 128 + 64 = 192. This pattern (two leading 1s) is also the /26 third-borrowed-bit mask octet and the start of Class C, worth memorizing."
+        },
+        {
+          "id": "subnetting-foundations-mcq-4",
+          "type": "mcq",
+          "prompt": "Why did CIDR's introduction of route aggregation matter for the Internet's core routers?",
+          "choices": [
+            "It encrypted routing updates between autonomous systems",
+            "It let many contiguous prefixes be advertised as one shorter prefix, slowing growth of the global routing table",
+            "It increased the IPv4 address space from 32 to 64 bits",
+            "It removed the need for routers entirely on classless networks"
+          ],
+          "answerIndex": 1,
+          "explanation": "Aggregation (supernetting) summarizes contiguous blocks into a single shorter prefix, so an ISP can advertise one route instead of hundreds. This containment of routing-table growth was a primary motivation for CIDR."
+        },
+        {
+          "id": "subnetting-foundations-mcq-5",
+          "type": "mcq",
+          "prompt": "An address begins 110 in its first three bits. Before CIDR, what did that guarantee about its network size?",
+          "choices": [
+            "It was a Class C with a fixed /24 mask (254 usable hosts)",
+            "It was a Class A with a fixed /8 mask",
+            "Nothing — the mask was always chosen by the admin",
+            "It was a multicast group address"
+          ],
+          "answerIndex": 0,
+          "explanation": "Leading bits 110 identify Class C, which carried a fixed /24 default mask and thus 2^8 − 2 = 254 usable hosts. The whole point of classful addressing was that the leading bits dictated the mask."
+        }
+      ]
+    },
+    {
+      "id": "subnetting-masks-anatomy",
+      "title": "Masks, Wildcards, and the Anatomy of a Block",
+      "order": 2,
+      "difficulty": 2,
+      "content": "A **subnet mask** is the prefix written as 32 bits: `n` ones followed by `32-n` zeros. `/24` = `11111111.11111111.11111111.00000000` = `255.255.255.0`. The mask answers \"which bits are network?\" Bitwise-AND an address with its mask and you get the **network address** (host bits forced to 0). OR the address with the *inverted* mask and you get the **broadcast address** (host bits forced to 1).\n\nThe **wildcard mask** (used in Cisco ACLs and OSPF) is the bit-inverse of the netmask: `/24` → mask `255.255.255.0`, wildcard `0.0.0.255`. Wildcard + netmask octets always sum to 255 each. A 1 in the wildcard means \"don't care\" (host bit); a 0 means \"must match.\"\n\nFor any `/n` block the four key quantities are:\n\n- **Network address:** first address, all host bits 0.\n- **Broadcast address:** last address, all host bits 1.\n- **Usable host range:** everything strictly between them.\n- **Host count:** $2^{32-n} - 2$.\n\nThe $-2$ removes the network and broadcast addresses, which can't be assigned to interfaces. So a `/24` has $2^{8}-2 = 254$ hosts; a `/30` has $2^{2}-2 = 2$ (the classic point-to-point link); a `/31` is a special case (RFC 3021) that uses **both** addresses for 2-host p2p links, no $-2$. A `/32` is a single host route.\n\nThe **block size** trick: in the \"interesting\" octet (where the mask isn't 0 or 255), block size $= 256 - \\text{mask octet}$. Network addresses in that octet are multiples of the block size. This is the engine of fast mental subnetting.",
+      "items": [
+        {
+          "id": "subnetting-masks-fc-1",
+          "type": "flashcard",
+          "front": "How do you compute the network address from an IP and its mask, and the broadcast from there?",
+          "back": "Network = IP AND mask (host bits cleared to 0). Broadcast = IP OR (NOT mask), i.e. host bits set to 1. Equivalently, broadcast = network + block_size − 1 in the interesting octet.",
+          "hint": "AND with mask, OR with inverted mask."
+        },
+        {
+          "id": "subnetting-masks-fc-2",
+          "type": "flashcard",
+          "front": "What is a wildcard mask and how does it relate to the subnet mask?",
+          "back": "The wildcard mask is the bitwise inverse of the subnet mask (used in Cisco ACLs/OSPF). Each octet pair sums to 255: e.g. mask 255.255.255.0 ↔ wildcard 0.0.0.255. 0 = must match, 1 = don't care.",
+          "hint": "Inverse; octets sum to 255."
+        },
+        {
+          "id": "subnetting-masks-fc-3",
+          "type": "flashcard",
+          "front": "State the host-count formula for an IPv4 /n block and explain the −2.",
+          "back": "Usable hosts = $2^{32-n} - 2$. Subtract 2 because the all-zeros host portion is the network address and the all-ones host portion is the broadcast address; neither is assignable to an interface.",
+          "hint": "All-zeros and all-ones host portions are reserved."
+        },
+        {
+          "id": "subnetting-masks-fc-4",
+          "type": "flashcard",
+          "front": "What is the 'block size' trick and where does it apply?",
+          "back": "In the interesting octet (mask octet not 0 or 255), block size = 256 − mask_octet. Subnet/network boundaries in that octet fall on multiples of the block size, so you can step through subnets quickly without binary.",
+          "hint": "256 minus the mask octet."
+        },
+        {
+          "id": "subnetting-masks-fc-5",
+          "type": "flashcard",
+          "front": "Why are /31 and /32 exceptions to the −2 rule?",
+          "back": "/32 is a single-host route (one address, no network/broadcast concept). /31 (RFC 3021) is for point-to-point links and uses BOTH addresses as host endpoints — no broadcast needed on a 2-node link — so it gives 2 usable hosts instead of 2^1−2 = 0.",
+          "hint": "Point-to-point and single host."
+        },
+        {
+          "id": "subnetting-masks-mcq-1",
+          "type": "mcq",
+          "prompt": "What dotted-decimal subnet mask corresponds to /26?",
+          "choices": [
+            "255.255.255.0",
+            "255.255.255.192",
+            "255.255.255.224",
+            "255.255.192.0"
+          ],
+          "answerIndex": 1,
+          "explanation": "/26 = 24 ones + 2 ones in the 4th octet = 11000000 = 192. So 255.255.255.192. (224 would be /27; .0 is /24.)"
+        },
+        {
+          "id": "subnetting-masks-mcq-2",
+          "type": "mcq",
+          "prompt": "The wildcard mask for /27 is:",
+          "choices": [
+            "0.0.0.31",
+            "0.0.0.32",
+            "0.0.0.15",
+            "0.0.0.224"
+          ],
+          "answerIndex": 0,
+          "explanation": "/27 mask 4th octet = 224. Wildcard = 255 − 224 = 31, so 0.0.0.31. (Block size 32, addresses 0–31 in the first subnet — the wildcard spans exactly one block minus one.)"
+        },
+        {
+          "id": "subnetting-masks-mcq-3",
+          "type": "mcq",
+          "prompt": "How many usable hosts does a /30 provide, and what is its classic use?",
+          "choices": [
+            "4 hosts; small office LANs",
+            "2 hosts; point-to-point router links",
+            "6 hosts; a printer VLAN",
+            "0 hosts; loopback only"
+          ],
+          "answerIndex": 1,
+          "explanation": "2^(32−30) − 2 = 4 − 2 = 2 usable hosts. With exactly two endpoints it is the traditional mask for point-to-point WAN/router links (a /31 also works under RFC 3021)."
+        },
+        {
+          "id": "subnetting-masks-mcq-4",
+          "type": "mcq",
+          "prompt": "Given mask 255.255.255.240, what is the block size in the 4th octet and how many usable hosts per subnet?",
+          "choices": [
+            "Block size 16, 14 hosts",
+            "Block size 240, 240 hosts",
+            "Block size 8, 6 hosts",
+            "Block size 16, 16 hosts"
+          ],
+          "answerIndex": 0,
+          "explanation": "240 = /28. Block size = 256 − 240 = 16. Hosts = 2^(32−28) − 2 = 16 − 2 = 14. Subnets start at .0, .16, .32, …"
+        },
+        {
+          "id": "subnetting-masks-mcq-5",
+          "type": "mcq",
+          "prompt": "For 10.4.8.130/25, what are the network and broadcast addresses?",
+          "choices": [
+            "Network 10.4.8.128, broadcast 10.4.8.255",
+            "Network 10.4.8.0, broadcast 10.4.8.127",
+            "Network 10.4.8.128, broadcast 10.4.8.191",
+            "Network 10.4.8.0, broadcast 10.4.8.255"
+          ],
+          "answerIndex": 0,
+          "explanation": "/25 → mask .128, block size 128. The two blocks in the 4th octet are 0–127 and 128–255. .130 falls in 128–255, so network = 10.4.8.128, broadcast = 10.4.8.255."
+        },
+        {
+          "id": "subnetting-masks-mcq-6",
+          "type": "mcq",
+          "prompt": "Which statement about the relationship between netmask and wildcard mask is correct?",
+          "choices": [
+            "They are identical",
+            "Each corresponding octet of the two sums to 255",
+            "The wildcard is always 0.0.0.0",
+            "The wildcard equals the network address"
+          ],
+          "answerIndex": 1,
+          "explanation": "The wildcard is the bitwise NOT of the netmask, so corresponding octets sum to 255 (e.g. 255 + 0, 192 + 63). A 1 in the wildcard marks a 'don't care' (host) bit."
+        }
+      ]
+    },
+    {
+      "id": "subnetting-carving-blocks",
+      "title": "Carving Blocks: Equal Subnets and Worked Examples",
+      "order": 3,
+      "difficulty": 3,
+      "content": "To split a block into equal subnets you **borrow** host bits. Borrowing $k$ bits creates $2^{k}$ subnets, each with $2^{(32-n-k)} - 2$ usable hosts. Borrowing trades host bits for subnet bits — the 32-bit budget is conserved.\n\n**Worked example: 192.168.10.0/24 into 4 equal subnets.** Need 4 subnets → borrow $k=2$ bits ($2^2=4$) → new prefix /26, mask 255.255.255.192. Block size $= 256 - 192 = 64$. Step the 4th octet by 64:\n\n| Subnet | Network | Broadcast | Usable range | Hosts |\n|---|---|---|---|---|\n| 1 | .0/26 | .63 | .1 – .62 | 62 |\n| 2 | .64/26 | .127 | .65 – .126 | 62 |\n| 3 | .128/26 | .191 | .129 – .190 | 62 |\n| 4 | .192/26 | .255 | .193 – .254 | 62 |\n\nNotice every network address is a multiple of the block size (0, 64, 128, 192), and each broadcast is the next network minus one.\n\n**The fast algorithm for \"given IP/prefix, find everything\":**\n1. Find the interesting octet (where the mask is partial) and its block size $= 256 - \\text{mask octet}$.\n2. Round the address's value in that octet **down** to the nearest multiple of the block size → network address.\n3. Broadcast = network + block size $- 1$ in that octet.\n4. First host = network $+ 1$; last host = broadcast $- 1$.\n5. Host count $= 2^{32-n} - 2$.\n\nThis works in any octet — for `/18` the interesting octet is the *third*: block size $256-192=64$, networks at .0, .64, .128, .192 in octet 3. Drill until it's reflexive.",
+      "items": [
+        {
+          "id": "subnetting-carving-fc-1",
+          "type": "flashcard",
+          "front": "If you borrow k host bits, how many subnets do you create and how many hosts does each have?",
+          "back": "Subnets = $2^{k}$. Hosts per subnet = $2^{(32-n-k)} - 2$, where n was the original prefix. Borrowing bits moves the network/host boundary right.",
+          "hint": "2^k subnets; the rest are host bits."
+        },
+        {
+          "id": "subnetting-carving-fc-2",
+          "type": "flashcard",
+          "front": "List the 5-step algorithm to derive network, broadcast, host range, and count from any IP/prefix.",
+          "back": "1) Block size = 256 − mask octet (in the interesting octet). 2) Round that octet down to a multiple of block size → network. 3) Broadcast = network + block size − 1. 4) First host = net+1, last host = bcast−1. 5) Hosts = 2^(32−n) − 2.",
+          "hint": "Block size → round down → +size−1 → trim ends → count."
+        },
+        {
+          "id": "subnetting-carving-fc-3",
+          "type": "flashcard",
+          "front": "To split a /24 into subnets that each hold at least 50 hosts, what prefix do you use and why?",
+          "back": "/26. Need ≥50 usable hosts → 2^(32−n) − 2 ≥ 50 → host bits ≥ 6 (2^6−2 = 62 ≥ 50; 2^5−2 = 30 < 50). 6 host bits → /26, giving four 62-host subnets.",
+          "hint": "Smallest power of two minus 2 that is ≥ 50."
+        },
+        {
+          "id": "subnetting-carving-fc-4",
+          "type": "flashcard",
+          "front": "When the interesting octet is the third octet (e.g. a /18), how do you find the network address?",
+          "back": "Same method, applied to octet 3: block size = 256 − third-octet mask value; round the address's third octet down to a multiple of that block size; the 4th octet of the network address is 0.",
+          "hint": "The trick is octet-agnostic."
+        },
+        {
+          "id": "subnetting-carving-mcq-1",
+          "type": "mcq",
+          "prompt": "For host 192.168.10.100/26, give network, broadcast, and first/last usable host.",
+          "choices": [
+            "Net .64, bcast .127, hosts .65–.126",
+            "Net .96, bcast .127, hosts .97–.126",
+            "Net .64, bcast .128, hosts .65–.127",
+            "Net .100, bcast .163, hosts .101–.162"
+          ],
+          "answerIndex": 0,
+          "explanation": "/26 block size 64; multiples are 0, 64, 128, 192. 100 rounds down to 64 → network .64; broadcast = 64+64−1 = .127; usable .65–.126.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-1.svg"
+        },
+        {
+          "id": "subnetting-carving-mcq-2",
+          "type": "mcq",
+          "prompt": "How many equal subnets and how many hosts each result from subnetting 172.16.0.0/16 into /20s?",
+          "choices": [
+            "8 subnets, 4094 hosts each",
+            "16 subnets, 4094 hosts each",
+            "16 subnets, 4096 hosts each",
+            "4 subnets, 8190 hosts each"
+          ],
+          "answerIndex": 1,
+          "explanation": "Borrowed bits = 20 − 16 = 4 → 2^4 = 16 subnets. Host bits = 32 − 20 = 12 → 2^12 − 2 = 4094 hosts each."
+        },
+        {
+          "id": "subnetting-carving-mcq-3",
+          "type": "mcq",
+          "prompt": "What is the network address of 10.45.200.37/19?",
+          "choices": [
+            "10.45.192.0",
+            "10.45.200.0",
+            "10.45.224.0",
+            "10.45.160.0"
+          ],
+          "answerIndex": 0,
+          "explanation": "/19 → third octet mask = 224, block size 32. Round 200 down to a multiple of 32: 192 (192, 224 bracket it). Network = 10.45.192.0; 4th octet 0."
+        },
+        {
+          "id": "subnetting-carving-mcq-4",
+          "type": "mcq",
+          "prompt": "For 192.168.1.0/24 carved into eight equal subnets, what is the prefix and the network address of the FIFTH subnet?",
+          "choices": [
+            "/27, fifth network 192.168.1.128",
+            "/27, fifth network 192.168.1.96",
+            "/28, fifth network 192.168.1.64",
+            "/27, fifth network 192.168.1.160"
+          ],
+          "answerIndex": 0,
+          "explanation": "8 subnets → borrow 3 bits → /27, block size 32. Networks: .0, .32, .64, .96, .128, … The fifth is .128 → 192.168.1.128."
+        },
+        {
+          "id": "subnetting-carving-mcq-5",
+          "type": "mcq",
+          "prompt": "Which address is the broadcast address of the subnet containing 10.0.0.70/28?",
+          "choices": [
+            "10.0.0.79",
+            "10.0.0.71",
+            "10.0.0.95",
+            "10.0.0.63"
+          ],
+          "answerIndex": 0,
+          "explanation": "/28 block size 16; multiples 0,16,32,48,64,80. 70 rounds down to 64 → network .64, broadcast = 64+16−1 = .79."
+        },
+        {
+          "id": "subnetting-carving-mcq-6",
+          "type": "mcq",
+          "prompt": "Is 192.168.5.64 a valid host address inside the subnet 192.168.5.0/26?",
+          "choices": [
+            "Yes, it is a usable host in that subnet",
+            "No — it is the network address of the NEXT /26 subnet",
+            "No — it is the broadcast of 192.168.5.0/26",
+            "Yes, but only as the default gateway"
+          ],
+          "answerIndex": 1,
+          "explanation": "192.168.5.0/26 spans .0–.63 (broadcast .63). .64 is the network address of the next /26 (.64–.127), not a host in the .0 subnet — a classic boundary off-by-one."
+        },
+        {
+          "id": "subnetting-carving-mcq-7",
+          "type": "mcq",
+          "prompt": "You need at least 1000 hosts per subnet. What is the largest prefix (longest mask) you can use?",
+          "choices": [
+            "/22",
+            "/21",
+            "/23",
+            "/20"
+          ],
+          "answerIndex": 0,
+          "explanation": "Need 2^(32−n) − 2 ≥ 1000 → host bits ≥ 10 (2^10−2 = 1022 ≥ 1000; 2^9−2 = 510 < 1000). 10 host bits → /22. Longer prefixes (e.g. /23) give too few hosts."
+        }
+      ]
+    },
+    {
+      "id": "subnetting-vlsm-aggregation-special",
+      "title": "VLSM, Supernetting, Special Ranges, and Plan Design",
+      "order": 4,
+      "difficulty": 4,
+      "content": "**VLSM (Variable-Length Subnet Masking)** drops the equal-size rule: carve a block into subnets of *different* sizes so each fits its host requirement, wasting no addresses. Method: **sort requirements largest-first**, allocate each from the next free address using the smallest prefix that fits, and keep them block-aligned.\n\n**Worked VLSM on 192.168.1.0/24:** Sales 100, Eng 50, Ops 25, plus a router p2p link (2).\n- Sales (100 ≤ 126): /25 → .0–.127 (network .0, bcast .127).\n- Eng (50 ≤ 62): /26 → .128–.191.\n- Ops (25 ≤ 30): /27 → .192–.223.\n- p2p (2): /30 → .224–.227. Plenty of room left (.228–.255).\n\nThe golden rule: **largest first**, or you fragment the space and can't fit the big blocks.\n\n**Supernetting / aggregation** is the inverse — combine contiguous blocks into one shorter prefix. Four contiguous /24s `192.168.4.0`, `.5.0`, `.6.0`, `.7.0` aggregate to `192.168.4.0/22` (they share the top 22 bits; the third octet 4–7 = `000001` + 2 varying bits). Aggregation only works on a power-of-two count of blocks aligned on the right boundary.\n\n**Special ranges to know cold:**\n- **RFC 1918 private:** `10.0.0.0/8`, `172.16.0.0/12` (172.16–172.31), `192.168.0.0/16`. Not routed on the public Internet; NAT bridges them out.\n- **Loopback:** `127.0.0.0/8` (usually 127.0.0.1).\n- **Link-local / APIPA:** `169.254.0.0/16` (self-assigned when DHCP fails — a diagnostic signal).\n- **Multicast:** `224.0.0.0/4` (Class D).\n- **Documentation/TEST-NET, broadcast 255.255.255.255**, etc.\n\nA good addressing plan reserves room for growth, aligns blocks for aggregation, groups by function/VLAN, and documents masks — not just IPs.",
+      "items": [
+        {
+          "id": "subnetting-vlsm-fc-1",
+          "type": "flashcard",
+          "front": "What is VLSM and what is the cardinal rule when allocating with it?",
+          "back": "Variable-Length Subnet Masking: subnetting a block into subnets of different sizes, each sized to its host requirement. Cardinal rule: allocate largest requirement first (then descending), block-aligned, to avoid fragmenting the space.",
+          "hint": "Different-size subnets; biggest first."
+        },
+        {
+          "id": "subnetting-vlsm-fc-2",
+          "type": "flashcard",
+          "front": "State the three RFC 1918 private address ranges with prefixes.",
+          "back": "10.0.0.0/8, 172.16.0.0/12 (covers 172.16.0.0–172.31.255.255), and 192.168.0.0/16. These are non-routable on the public Internet and reached via NAT.",
+          "hint": "10/8, 172.16/12, 192.168/16."
+        },
+        {
+          "id": "subnetting-vlsm-fc-3",
+          "type": "flashcard",
+          "front": "What is supernetting/route aggregation, and what must be true to aggregate blocks?",
+          "back": "Combining contiguous subnets into one shorter prefix (e.g. four /24s → one /22). Requires a power-of-two count of contiguous blocks aligned on the correct boundary so they share a common shorter prefix.",
+          "hint": "Inverse of subnetting; power-of-two & aligned."
+        },
+        {
+          "id": "subnetting-vlsm-fc-4",
+          "type": "flashcard",
+          "front": "What does an interface address in 169.254.0.0/16 usually indicate?",
+          "back": "Link-local / APIPA self-assignment: the host failed to obtain an address from DHCP and auto-configured one. It's a diagnostic clue that DHCP (or L2 connectivity to the DHCP server) is broken.",
+          "hint": "DHCP failed."
+        },
+        {
+          "id": "subnetting-vlsm-fc-5",
+          "type": "flashcard",
+          "front": "Give the loopback and multicast IPv4 ranges.",
+          "back": "Loopback = 127.0.0.0/8 (commonly 127.0.0.1). Multicast (old Class D) = 224.0.0.0/4 (224.0.0.0–239.255.255.255).",
+          "hint": "127/8 and 224/4."
+        },
+        {
+          "id": "subnetting-vlsm-fc-6",
+          "type": "flashcard",
+          "front": "Name three properties of a well-designed IPv4 addressing plan.",
+          "back": "Reserve room for growth; align blocks on boundaries that permit future aggregation; group addresses by function/VLAN/site; and document prefixes/masks (not just bare IPs) so the structure is recoverable.",
+          "hint": "Growth, alignment, grouping, documentation."
+        },
+        {
+          "id": "subnetting-vlsm-mcq-1",
+          "type": "mcq",
+          "prompt": "Doing VLSM on 192.168.1.0/24 for needs of 100, 50, 25, and 2 hosts (largest first), what prefix and block does the 50-host subnet get?",
+          "choices": [
+            "/26, 192.168.1.128–.191",
+            "/25, 192.168.1.0–.127",
+            "/26, 192.168.1.64–.127",
+            "/27, 192.168.1.128–.159"
+          ],
+          "answerIndex": 0,
+          "explanation": "100 → /25 takes .0–.127 first. Next, 50 ≤ 62 → /26, allocated from .128 → .128–.191. Largest-first keeps everything aligned."
+        },
+        {
+          "id": "subnetting-vlsm-mcq-2",
+          "type": "mcq",
+          "prompt": "Which single prefix aggregates 10.8.0.0/24, 10.8.1.0/24, 10.8.2.0/24, and 10.8.3.0/24?",
+          "choices": [
+            "10.8.0.0/22",
+            "10.8.0.0/23",
+            "10.8.0.0/21",
+            "10.8.0.0/24"
+          ],
+          "answerIndex": 0,
+          "explanation": "Four contiguous /24s aligned at .0 share the top 22 bits (third octet 0–3 = 000000xx). They aggregate to 10.8.0.0/22 (2 borrowed bits cover 4 blocks)."
+        },
+        {
+          "id": "subnetting-vlsm-mcq-3",
+          "type": "mcq",
+          "prompt": "Is 172.20.300.5 a valid RFC 1918 private address?",
+          "choices": [
+            "No — 300 is not a valid octet value at all",
+            "Yes — it falls in 172.16.0.0/12",
+            "No — 172.20 is public",
+            "Yes — it is in 192.168.0.0/16"
+          ],
+          "answerIndex": 0,
+          "explanation": "An octet cannot exceed 255, so 172.20.300.5 is malformed regardless of range. (Note: 172.20.x.x WOULD be private — 172.16/12 spans 172.16–172.31 — but the address is invalid.)"
+        },
+        {
+          "id": "subnetting-vlsm-mcq-4",
+          "type": "mcq",
+          "prompt": "Why must VLSM allocations be done largest-requirement-first?",
+          "choices": [
+            "Routers reject small subnets defined before large ones",
+            "Allocating small blocks first fragments the space so a large contiguous block may no longer fit",
+            "It changes the host-count formula",
+            "Small subnets cannot be aggregated otherwise"
+          ],
+          "answerIndex": 1,
+          "explanation": "If small blocks are scattered through the range first, no aligned contiguous span large enough for a big subnet may remain. Descending order keeps large blocks placeable and the layout aggregatable."
+        },
+        {
+          "id": "subnetting-vlsm-mcq-5",
+          "type": "mcq",
+          "prompt": "A laptop shows IP 169.254.13.7/16 with no default gateway. What is the most likely cause?",
+          "choices": [
+            "It received a valid public IP and is online",
+            "DHCP failed, so the host self-assigned an APIPA link-local address",
+            "It is on the loopback interface",
+            "It joined a multicast group"
+          ],
+          "answerIndex": 1,
+          "explanation": "169.254.0.0/16 is the APIPA/link-local range used when DHCP fails. No gateway and a 169.254 address is the textbook signature of a broken DHCP path."
+        },
+        {
+          "id": "subnetting-vlsm-mcq-6",
+          "type": "mcq",
+          "prompt": "From a /22 you must serve departments of 500, 200, 100, and 60 hosts via VLSM. What prefix fits the 200-host department, and is the total feasible?",
+          "choices": [
+            "/24 for 200; not feasible — exceeds the /22",
+            "/24 for 200; feasible — /23 + /24 + /25 + /26 fit inside a /22",
+            "/25 for 200; feasible",
+            "/23 for 200; not feasible"
+          ],
+          "answerIndex": 1,
+          "explanation": "500 → /23 (510 hosts), 200 → /24 (254), 100 → /25 (126), 60 → /26 (62). Sizes 512+256+128+64 = 960 ≤ 1024 addresses in a /22, and they pack contiguously — feasible."
+        },
+        {
+          "id": "subnetting-vlsm-mcq-7",
+          "type": "mcq",
+          "prompt": "Which range is multicast (former Class D)?",
+          "choices": [
+            "240.0.0.0/4",
+            "224.0.0.0/4",
+            "192.0.2.0/24",
+            "169.254.0.0/16"
+          ],
+          "answerIndex": 1,
+          "explanation": "224.0.0.0/4 (224.0.0.0–239.255.255.255) is multicast. 240.0.0.0/4 is reserved (former Class E); 192.0.2.0/24 is TEST-NET documentation; 169.254/16 is link-local."
+        }
+      ]
+    }
+  ]
+}

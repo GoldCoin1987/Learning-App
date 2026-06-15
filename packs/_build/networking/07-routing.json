@@ -1,0 +1,296 @@
+{
+  "id": "routing",
+  "title": "Routing: Static & Dynamic Protocols",
+  "order": 7,
+  "lessons": [
+    {
+      "id": "routing-table-and-static",
+      "title": "The Routing Table, Connected & Static Routes",
+      "order": 1,
+      "difficulty": 1,
+      "content": "A router's only job at the network layer is, per packet, to answer one question: *given this destination IP, which next hop and out-interface do I use?* The answer lives in the **routing table** (the RIB, Routing Information Base, which is distilled into the FIB the data plane actually consults). Each entry carries five things worth memorizing: the **destination prefix** (e.g. `10.1.2.0/24`), the **next-hop** address (the neighbor to hand the packet to), the **outgoing interface**, a **metric** (cost within a given routing source), and the **administrative distance** (AD, how much the router trusts the *source* of the route).\n\nRoutes arrive from three origins. **Connected** routes appear automatically when you assign an IP to an interface — the router knows that subnet is directly attached (AD 0). **Static** routes are entered by hand (`ip route add 10.2.0.0/16 via 192.0.2.1`, AD 1); they never change unless you change them. **Dynamic** routes are learned from a protocol (OSPF, BGP, ...) that adapts to topology automatically.\n\nThe **default route**, `0.0.0.0/0` (`::/0` in IPv6), matches *everything* — it is the \"if nothing more specific matched, send it here\" catch-all, typically pointing at your upstream gateway.\n\nThe selection rule is **longest-prefix match**: among all entries that match the destination, the one with the most specific (longest) mask wins — *independent of metric or AD*. A `/32` host route beats a `/24`, which beats the `/0` default. AD and metric only break ties between routes of equal prefix length, choosing first the most-trusted source, then the lowest metric within it.",
+      "items": [
+        {
+          "id": "routing-fc-table-fields",
+          "type": "flashcard",
+          "front": "Name the five fields of a routing-table entry.",
+          "back": "Destination prefix, next-hop address, outgoing interface, metric (cost within a routing source), and administrative distance (trust in the route's source).",
+          "hint": "Where to, via whom, out what, how far, how trusted."
+        },
+        {
+          "id": "routing-fc-longest-prefix",
+          "type": "flashcard",
+          "front": "When multiple routes match a destination, which one is used?",
+          "back": "The one with the longest (most specific) prefix mask — longest-prefix match. This is decided before metric or administrative distance ever enter the picture.",
+          "hint": "More specific beats more general.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/routing-1.svg"
+        },
+        {
+          "id": "routing-fc-admin-distance",
+          "type": "flashcard",
+          "front": "What is administrative distance (AD), and when does it matter?",
+          "back": "AD ranks how much a router trusts the SOURCE of a route (connected 0 < static 1 < eBGP 20 < OSPF 110 < RIP 120). It only decides between routes to the same prefix learned from different sources — it never overrides longest-prefix match.",
+          "hint": "Trust between protocols, not a path cost."
+        },
+        {
+          "id": "routing-fc-default-route",
+          "type": "flashcard",
+          "front": "What does the default route 0.0.0.0/0 do?",
+          "back": "It matches every destination with prefix length 0, so it is chosen only when no more-specific route matches. It is the catch-all 'gateway of last resort,' usually pointing at the upstream router.",
+          "hint": "/0 matches all, but is the shortest prefix."
+        },
+        {
+          "id": "routing-fc-rib-fib",
+          "type": "flashcard",
+          "front": "Distinguish a connected route from a static route.",
+          "back": "A connected route is installed automatically when an interface gets an IP/subnet (the router is directly attached, AD 0). A static route is configured manually by an operator for a remote prefix (AD 1) and persists unchanged until edited.",
+          "hint": "Auto from the interface vs typed by hand."
+        },
+        {
+          "id": "routing-mcq-lpm-pick",
+          "type": "mcq",
+          "prompt": "A router has routes 0.0.0.0/0, 10.0.0.0/8, 10.1.0.0/16, and 10.1.2.0/24. A packet is destined for 10.1.2.130. Which route is used?",
+          "choices": [
+            "0.0.0.0/0, because the default route is always preferred",
+            "10.0.0.0/8, because it has the lowest metric",
+            "10.1.2.0/24, because it is the longest matching prefix",
+            "10.1.0.0/16, because /16 is the most common LAN size"
+          ],
+          "answerIndex": 2,
+          "explanation": "All four entries match 10.1.2.130, but forwarding uses longest-prefix match, so the most specific /24 wins regardless of metric or default status."
+        },
+        {
+          "id": "routing-mcq-static-when",
+          "type": "mcq",
+          "prompt": "For which network is static routing typically the BEST choice?",
+          "choices": [
+            "A large carrier backbone with thousands of changing prefixes",
+            "A small stub network with a single uplink and a stable topology",
+            "A multi-homed network that must steer traffic by policy",
+            "A datacenter fabric needing sub-second reconvergence"
+          ],
+          "answerIndex": 1,
+          "explanation": "Static routes shine when topology is small, stable, and predictable (a stub with one exit). Large, dynamic, or multi-homed environments need a dynamic protocol to scale and adapt."
+        },
+        {
+          "id": "routing-mcq-ad-vs-metric",
+          "type": "mcq",
+          "prompt": "Two routes to 10.5.0.0/16 exist: one via OSPF (AD 110, metric 20) and one static (AD 1, metric 0). Which is installed?",
+          "choices": [
+            "The OSPF route, because OSPF computes optimal paths",
+            "The static route, because it has the lower administrative distance",
+            "Both, load-balanced equally",
+            "Neither; the conflict invalidates both routes"
+          ],
+          "answerIndex": 1,
+          "explanation": "Same prefix length, so AD decides: static (1) is more trusted than OSPF (110). Metric only compares routes from the same source, so it is irrelevant across different ADs."
+        },
+        {
+          "id": "routing-mcq-connected-ad",
+          "type": "mcq",
+          "prompt": "Why does a directly-connected route normally win over any learned route to the same subnet?",
+          "choices": [
+            "It has the highest metric",
+            "It has administrative distance 0, the most trusted source",
+            "Connected routes use a longer prefix by definition",
+            "Dynamic protocols never advertise local subnets"
+          ],
+          "answerIndex": 1,
+          "explanation": "Connected routes have AD 0 — nothing is more trustworthy than 'this subnet is physically on my interface,' so they outrank static and dynamic routes to the same prefix."
+        }
+      ]
+    },
+    {
+      "id": "routing-dynamic-igp",
+      "title": "Dynamic Routing & Interior Gateway Protocols",
+      "order": 2,
+      "difficulty": 2,
+      "content": "Static routes do not scale or self-heal, so larger networks run **dynamic routing protocols** that discover topology and recompute paths automatically. There are three algorithmic families.\n\n**Distance-vector** protocols advertise only *distance and direction* (\"I can reach X at cost N, via me\") to direct neighbors — routing by rumor. **RIP** is the classic example: metric is raw **hop count**, max 15 (16 = unreachable). Its great weakness is **count-to-infinity**: when a network goes down, routers can bounce inflated metrics back and forth, converging only by slowly counting up to 16. Split horizon, route poisoning, and hold-down timers patch this, but RIP is essentially **historical** today.\n\n**Link-state** protocols are smarter. Each router floods a description of its own links — **LSAs** (Link-State Advertisements) — so every router builds an identical map of the whole area, then runs **Dijkstra's SPF** algorithm locally to compute shortest paths. **OSPF** is the dominant **IGP** (interior gateway protocol): it uses **areas** (a backbone area 0 plus others) to bound LSA flooding and scale, with cost based on link bandwidth. **IS-IS** is the other major link-state IGP — algorithmically very similar to OSPF but riding directly on L2 rather than IP, favored by **large carriers** for its scalability and protocol-agnostic design.\n\n**EIGRP** is Cisco's advanced distance-vector (\"hybrid\") protocol: it keeps DV's neighbor-based advertisement but adds the **DUAL** algorithm with precomputed feasible successors for near-instant, loop-free failover, plus a composite bandwidth/delay metric.\n\nKey distinction: an **IGP** (OSPF, IS-IS, EIGRP, RIP) optimizes paths *inside one administrative domain*, where the goal is genuinely shortest/lowest-cost path. That goal changes completely at the edge between organizations — which is BGP's world (next lesson).",
+      "items": [
+        {
+          "id": "routing-fc-three-families",
+          "type": "flashcard",
+          "front": "Name the three dynamic-routing algorithm families and one protocol of each.",
+          "back": "Distance-vector (RIP, EIGRP), link-state (OSPF, IS-IS), and path-vector (BGP). DV advertises distance+direction to neighbors; link-state floods a full topology map; path-vector advertises the full AS path.",
+          "hint": "Rumor, map, and full route history."
+        },
+        {
+          "id": "routing-fc-count-to-infinity",
+          "type": "flashcard",
+          "front": "What is the count-to-infinity problem, and where does it occur?",
+          "back": "In distance-vector protocols like RIP, a lost route's metric can be re-learned and incremented in a loop between neighbors, climbing slowly toward 'infinity' (16 hops in RIP) before converging. Split horizon, poison reverse, and hold-down timers mitigate it.",
+          "hint": "Routing by rumor counting upward."
+        },
+        {
+          "id": "routing-fc-ospf-mechanics",
+          "type": "flashcard",
+          "front": "How does OSPF compute routes?",
+          "back": "Each router floods Link-State Advertisements (LSAs) describing its links; every router assembles an identical link-state database (a topology map) for its area, then runs Dijkstra's SPF algorithm locally to find shortest paths by cumulative link cost.",
+          "hint": "Flood links, build map, run Dijkstra."
+        },
+        {
+          "id": "routing-fc-ospf-areas",
+          "type": "flashcard",
+          "front": "Why does OSPF use areas?",
+          "back": "Areas bound the scope of LSA flooding and SPF computation so the topology database stays small as the network grows. All areas attach to the backbone area 0; inter-area routes pass through it, improving scalability and stability.",
+          "hint": "Divide the domain; backbone is area 0."
+        },
+        {
+          "id": "routing-fc-isis-eigrp",
+          "type": "flashcard",
+          "front": "What distinguishes IS-IS and EIGRP from OSPF?",
+          "back": "IS-IS is a link-state IGP like OSPF but runs directly over L2 (not IP) and scales well, so large carriers favor it. EIGRP is Cisco's advanced distance-vector protocol using the DUAL algorithm and feasible successors for fast, loop-free convergence.",
+          "hint": "Carrier link-state vs Cisco hybrid DV."
+        },
+        {
+          "id": "routing-mcq-igp-goal",
+          "type": "mcq",
+          "prompt": "What is the primary design goal of an interior gateway protocol (IGP) such as OSPF or IS-IS?",
+          "choices": [
+            "Enforce business policy between competing companies",
+            "Find the lowest-cost (shortest) path within a single administrative domain",
+            "Translate private addresses to public ones",
+            "Assign IP addresses to hosts automatically"
+          ],
+          "answerIndex": 1,
+          "explanation": "An IGP runs inside one organization where everyone shares the goal of optimal forwarding, so it legitimately optimizes for shortest/lowest-cost path. Inter-organization policy is BGP's job."
+        },
+        {
+          "id": "routing-mcq-ls-vs-dv",
+          "type": "mcq",
+          "prompt": "Which statement best contrasts link-state with distance-vector protocols?",
+          "choices": [
+            "Distance-vector routers each build a full topology map; link-state routers do not",
+            "Link-state routers flood link info and each runs SPF on a full map; distance-vector routers learn only neighbors' distances",
+            "Link-state protocols cannot be used as IGPs",
+            "Distance-vector protocols converge faster because they hold the whole topology"
+          ],
+          "answerIndex": 1,
+          "explanation": "Link-state floods LSAs so every router has the same complete map and runs Dijkstra locally; distance-vector only hears neighbors' advertised distances ('routing by rumor'), which is what makes it prone to count-to-infinity."
+        },
+        {
+          "id": "routing-mcq-rip-limit",
+          "type": "mcq",
+          "prompt": "RIP is considered largely historical primarily because:",
+          "choices": [
+            "Its 15-hop diameter limit and slow count-to-infinity convergence don't suit modern networks",
+            "It cannot route IPv4 traffic at all",
+            "It requires a centralized controller",
+            "It uses Dijkstra's algorithm, which is too slow"
+          ],
+          "answerIndex": 0,
+          "explanation": "RIP caps usable paths at 15 hops and converges slowly via count-to-infinity. Modern networks use link-state (OSPF/IS-IS) or EIGRP for scale and fast convergence. RIP does not use Dijkstra; that's link-state."
+        },
+        {
+          "id": "routing-mcq-eigrp-dual",
+          "type": "mcq",
+          "prompt": "EIGRP achieves fast, loop-free failover mainly through:",
+          "choices": [
+            "Flooding LSAs to every router and rerunning Dijkstra",
+            "The DUAL algorithm with precomputed feasible successors (backup next hops)",
+            "Counting hop count up to infinity",
+            "Centralizing the control plane in a controller"
+          ],
+          "answerIndex": 1,
+          "explanation": "EIGRP's DUAL maintains feasible successors — already-validated loop-free backup routes — so when the primary fails it can switch instantly without recomputation or risk of loops."
+        }
+      ]
+    },
+    {
+      "id": "routing-bgp-control-plane",
+      "title": "BGP, Policy, and the Control/Data Plane",
+      "order": 3,
+      "difficulty": 3,
+      "content": "The Internet is not one network but ~tens of thousands of **autonomous systems (AS)** — independently operated networks (ISPs, clouds, enterprises), each with an **AS number**. **BGP** (Border Gateway Protocol) is the single **path-vector** protocol that stitches them together; it is, functionally, the routing protocol that *is* the Internet.\n\nA path-vector advertisement carries the full **AS-PATH** — the ordered list of ASes a prefix traversed. Receivers reject any path that already contains their own AS, which is how BGP prevents loops without a global map. **eBGP** runs *between* different ASes (the actual inter-domain glue); **iBGP** carries those externally-learned routes *across* the interior of a single AS so all border routers agree.\n\nThe crucial idea: **BGP is policy routing, not shortest-path routing.** It would be wrong for BGP to simply pick the fewest-AS-hop path, because routing between organizations is about *money and contracts*, not distance. An ISP prefers to send traffic over a customer link (it gets paid) before a peer (free) before a transit provider (it pays), regardless of AS-PATH length. BGP path attributes — LOCAL_PREF, AS_PATH length, MED, communities — encode exactly this business policy. That is the deep answer to *why the Internet needs policy, not just shortest path*: the metric an operator cares about is economic and contractual, which no IGP cost can express.\n\nBecause BGP is built on trust and accepts what neighbors announce, a single fat-fingered config can be catastrophic. A **route leak** or **hijack** — announcing prefixes you don't own, or a more-specific prefix that wins longest-prefix match globally — can blackhole or reroute large swaths of the Internet, the cause of several famous **global outages**.\n\nUnderpinning all of this is the **control plane vs data plane** split: the control plane (BGP, OSPF, etc.) *builds* the table; the data plane *forwards* packets per-table at line rate. **Convergence** is how long after a change all routers agree; **route flapping** (a link bouncing up/down) churns the control plane, so **dampening** suppresses unstable routes. Finally, **ECMP** (equal-cost multipath) lets the data plane hash flows across several equal-cost next hops for load sharing.",
+      "items": [
+        {
+          "id": "routing-fc-bgp-pathvector",
+          "type": "flashcard",
+          "front": "What kind of protocol is BGP, and what does its key attribute carry?",
+          "back": "BGP is a path-vector protocol. Each advertisement carries the AS-PATH — the full ordered list of autonomous systems the prefix passed through. A router rejects any path containing its own AS number, which prevents routing loops.",
+          "hint": "It advertises the whole route's history, by AS."
+        },
+        {
+          "id": "routing-fc-ebgp-ibgp",
+          "type": "flashcard",
+          "front": "Distinguish eBGP from iBGP.",
+          "back": "eBGP runs between routers in DIFFERENT autonomous systems — the actual inter-domain glue of the Internet. iBGP runs between routers WITHIN the same AS to distribute externally-learned routes so all the AS's border routers share a consistent view.",
+          "hint": "Between ASes vs inside one AS."
+        },
+        {
+          "id": "routing-fc-policy-not-shortest",
+          "type": "flashcard",
+          "front": "Why does the Internet need policy routing instead of just shortest-path routing?",
+          "back": "Routing between organizations is governed by money and contracts, not distance. An ISP prefers customer links (paid) over peers (free) over transit (costs money) even if the AS-PATH is longer. Economic/contractual preference can't be expressed as an IGP cost, so BGP uses policy attributes (LOCAL_PREF, MED, communities).",
+          "hint": "Business relationships beat hop count."
+        },
+        {
+          "id": "routing-fc-control-data-plane",
+          "type": "flashcard",
+          "front": "Differentiate the control plane from the data plane.",
+          "back": "The control plane runs routing protocols (BGP, OSPF) to BUILD the forwarding table. The data plane uses that table to FORWARD each packet at line rate. Routing = building the map; forwarding = following it per-packet.",
+          "hint": "Build the table vs follow the table."
+        },
+        {
+          "id": "routing-fc-flap-dampen-ecmp",
+          "type": "flashcard",
+          "front": "Define convergence, route flapping/dampening, and ECMP.",
+          "back": "Convergence is the time for all routers to agree after a topology change. Flapping is a route repeatedly going up/down; dampening suppresses such unstable routes to protect the control plane. ECMP (equal-cost multipath) load-shares traffic across multiple equal-cost next hops.",
+          "hint": "Settle, suppress instability, and split load."
+        },
+        {
+          "id": "routing-mcq-bgp-loop-prevent",
+          "type": "mcq",
+          "prompt": "How does BGP prevent routing loops between autonomous systems?",
+          "choices": [
+            "It uses a TTL that decrements at each AS",
+            "It runs Dijkstra's SPF on a global topology map",
+            "A router rejects any advertised path whose AS-PATH already contains its own AS number",
+            "It limits the metric to a maximum of 15 hops"
+          ],
+          "answerIndex": 2,
+          "explanation": "As a path-vector protocol, BGP attaches the full AS-PATH. If a router sees its own AS already in the path, the route would loop, so it discards it. No global map (link-state) or hop cap (RIP) is involved."
+        },
+        {
+          "id": "routing-mcq-bgp-outage",
+          "type": "mcq",
+          "prompt": "Why can a single BGP misconfiguration cause a global Internet outage?",
+          "choices": [
+            "BGP encrypts all traffic, so one bad key breaks everything",
+            "BGP largely trusts what neighbors announce, so a bad/more-specific or leaked prefix can be accepted and propagated worldwide, blackholing or rerouting traffic",
+            "BGP recomputes every router's table from scratch each second",
+            "BGP has no way to aggregate routes, so tables overflow instantly"
+          ],
+          "answerIndex": 1,
+          "explanation": "BGP accepts announcements on trust. A hijack or leak — especially a more-specific prefix that wins longest-prefix match — can be propagated globally, sending huge volumes of traffic to the wrong AS or a black hole. This has caused several real worldwide incidents."
+        },
+        {
+          "id": "routing-mcq-igp-vs-bgp",
+          "type": "mcq",
+          "prompt": "What is the fundamental difference between an IGP and BGP?",
+          "choices": [
+            "An IGP works only on IPv6; BGP works only on IPv4",
+            "An IGP optimizes shortest path within one administrative domain; BGP enforces policy between independently-operated autonomous systems",
+            "BGP is a link-state protocol; an IGP is always path-vector",
+            "An IGP needs a central controller; BGP is fully distributed"
+          ],
+          "answerIndex": 1,
+          "explanation": "IGPs (OSPF, IS-IS, EIGRP, RIP) run inside one org and genuinely seek the lowest-cost path. BGP runs between autonomous systems where decisions are driven by contracts and policy, not raw distance — the core IGP-vs-BGP distinction."
+        },
+        {
+          "id": "routing-mcq-ecmp",
+          "type": "mcq",
+          "prompt": "What does ECMP (equal-cost multipath) accomplish in the data plane?",
+          "choices": [
+            "It dampens flapping routes to protect the control plane",
+            "It distributes flows across multiple next hops that have equal cost, sharing load while keeping each flow's packets in order",
+            "It guarantees a single deterministic path for every packet",
+            "It converts iBGP routes into eBGP routes"
+          ],
+          "answerIndex": 1,
+          "explanation": "When several next hops tie on cost, ECMP hashes traffic across them (typically per-flow, to preserve packet ordering) for load sharing and resilience — a data-plane behavior, distinct from control-plane dampening."
+        }
+      ]
+    }
+  ]
+}

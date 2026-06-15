@@ -1,0 +1,323 @@
+{
+  "id": "troubleshooting",
+  "title": "Troubleshooting & Observability",
+  "order": 13,
+  "lessons": [
+    {
+      "id": "troubleshooting-l1",
+      "title": "The Layered Methodology & the First-Pass Toolkit",
+      "order": 1,
+      "difficulty": 1,
+      "content": "The difference between an engineer who is *trusted* and one who is merely *busy* is methodology. When you get the dreaded \"the website is slow/down\" report, do not start guessing. Walk the stack, bottom-up, asking one yes/no question per layer and *only* assuming the layer below passed:\n\n1. **Is the link up?** `ip link show` (look for `state UP`), `ethtool eth0` for speed/duplex.\n2. **Do I have an IP and a gateway?** `ip addr`, `ip route` (is there a `default via`?).\n3. **Can I reach the gateway?** `ping <gw>`, and `ip neigh` to confirm ARP resolved the gateway MAC.\n4. **Does DNS resolve?** `dig example.com` — separate name failure from reachability failure.\n5. **Can I open a TCP connection?** `nc -vz example.com 443`.\n6. **Does the application respond?** `curl -v https://example.com`.\n\nThe first step that *fails* localizes the fault to one layer. That is the whole game: you have turned an open-ended \"it's broken\" into \"DNS resolves but TCP won't open on 443\" — a sentence you can act on. Top-down works too (start at `curl`, descend on failure); pick whichever gets you to the layer fastest.\n\n```bash\nping -c4 1.1.1.1          # reachability + RTT + loss\nip route get 93.184.216.34 # which gateway/iface will be used\ndig +short example.com    # does the name resolve?\nnc -vz example.com 443    # can TCP open the port?\n```\n\nFor someone with a radar/RF background this is the same instinct as isolating a fault to a stage in a signal chain: inject a known good signal, check each stage's output, find the first one that's wrong. Methodology beats tool-trivia every time.",
+      "items": [
+        {
+          "id": "troubleshooting-l1-fc1",
+          "type": "flashcard",
+          "front": "List the bottom-up layered diagnostic questions for a 'site is down' report.",
+          "back": "Link up? IP/gateway present? Can I reach the gateway? Does DNS resolve? Can TCP open the port? Does the app respond? The first failing step localizes the fault.",
+          "hint": "Six yes/no questions, link to app.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-1.svg"
+        },
+        {
+          "id": "troubleshooting-l1-fc2",
+          "type": "flashcard",
+          "front": "Which command confirms you have a default route, and what do you look for?",
+          "back": "`ip route` (or `ip route show`). Look for a `default via <gateway> dev <iface>` line; its absence explains why off-subnet destinations are unreachable."
+        },
+        {
+          "id": "troubleshooting-l1-fc3",
+          "type": "flashcard",
+          "front": "How do you test 'can I open a TCP connection to port 443?' without an application?",
+          "back": "`nc -vz host 443` (netcat). It performs just the TCP handshake and reports open/refused/timeout — isolating transport reachability from app behavior."
+        },
+        {
+          "id": "troubleshooting-l1-fc4",
+          "type": "flashcard",
+          "front": "Produce a layered checklist for a slow/down site (commands per layer).",
+          "back": "L2 link: `ip link` / `ethtool`. L3 addr+route: `ip addr`, `ip route`. Gateway: `ping gw`, `ip neigh`. DNS: `dig name`. Path: `mtr host`. TCP: `nc -vz host 443`. App: `curl -v https://host`. Stop at the first failure; that is your layer.",
+          "hint": "One tool per rung, link to app."
+        },
+        {
+          "id": "troubleshooting-l1-fc5",
+          "type": "flashcard",
+          "front": "What does ping's output give you beyond a yes/no answer?",
+          "back": "Round-trip time (latency), jitter (variation in RTT), and packet loss percentage from the summary line — three distinct signals of link/path health."
+        },
+        {
+          "id": "troubleshooting-l1-mc1",
+          "type": "mcq",
+          "prompt": "`ping <gateway>` succeeds but `ping 1.1.1.1` (an external IP) times out. Which layer is implicated?",
+          "choices": [
+            "Local link (cable/NIC) is down",
+            "DNS resolution is broken",
+            "Routing/gateway forwarding or upstream connectivity beyond the gateway",
+            "The application on the remote server is crashed"
+          ],
+          "answerIndex": 2,
+          "explanation": "You reached the gateway (link, local IP, and ARP are fine), so the fault is past it: the gateway's route/forwarding or the upstream path. DNS is not involved because you pinged an IP."
+        },
+        {
+          "id": "troubleshooting-l1-mc2",
+          "type": "mcq",
+          "prompt": "`dig example.com` returns the correct A record, but `curl https://example.com` hangs. The NEXT best single check is:",
+          "choices": [
+            "Re-run dig against a different resolver",
+            "`nc -vz example.com 443` to test whether TCP even opens",
+            "Reboot the local machine",
+            "Check the link with ethtool"
+          ],
+          "answerIndex": 1,
+          "explanation": "DNS already resolved, so the name layer is good. Before blaming the app/TLS, confirm TCP connectivity to the port; nc isolates transport from application behavior."
+        },
+        {
+          "id": "troubleshooting-l1-mc3",
+          "type": "mcq",
+          "prompt": "Why does the methodology say to assume only the layer BELOW the current one has passed?",
+          "choices": [
+            "To make the checklist longer",
+            "Because each layer depends on the one beneath it, so the first failure pinpoints the fault without false leads",
+            "Because higher layers are always the real problem",
+            "Because tools cannot test more than one layer"
+          ],
+          "answerIndex": 1,
+          "explanation": "Layers are dependent: TCP can't open if IP can't route, which can't work if the link is down. Walking up and stopping at the first failure localizes the fault precisely."
+        },
+        {
+          "id": "troubleshooting-l1-mc4",
+          "type": "mcq",
+          "prompt": "Which command both resolves the name AND lets you query a SPECIFIC DNS server to bypass a suspect resolver?",
+          "choices": [
+            "`ping example.com`",
+            "`dig @8.8.8.8 example.com`",
+            "`nc -vz example.com 53`",
+            "`ip neigh`"
+          ],
+          "answerIndex": 1,
+          "explanation": "`dig @<server> <name>` forces the query to a chosen resolver, isolating 'is DNS broken' from 'is THIS resolver broken'. ping would itself fail if your default resolver is broken."
+        }
+      ]
+    },
+    {
+      "id": "troubleshooting-l2",
+      "title": "Path, Sockets & Packet Capture (tcpdump + Wireshark)",
+      "order": 2,
+      "difficulty": 2,
+      "content": "Once you've localized the layer, you need tools that *see* what's happening. **Path tools:** `traceroute`/`tracert` map per-hop routers; `mtr` is the one to reach for — it combines traceroute and ping, showing per-hop latency *and* loss continuously, so you can spot the exact hop where loss begins.\n\n**Socket state:** `ss -tlnp` lists listening TCP sockets with owning process (`-t` TCP, `-l` listening, `-n` numeric, `-p` process); `ss -tan` shows all connections and their states (`SYN-SENT` stuck = no SYN-ACK coming back; many `TIME-WAIT` = lots of short connections). `ss` has largely replaced the older `netstat`.\n\n**Packet capture** is ground truth. `tcpdump` uses **BPF filter syntax** — a compact expression language compiled to a kernel filter so you capture only what matters:\n\n```bash\ntcpdump -i eth0 host 10.0.0.5\ntcpdump -i eth0 tcp port 443\ntcpdump -i eth0 'tcp[tcpflags] & tcp-syn != 0'   # SYNs only\ntcpdump -i eth0 'udp port 53'                     # DNS\ntcpdump -i eth0 -w cap.pcap 'host 10.0.0.5 and port 443'\n```\n\nFilters combine with `and`/`or`/`not`, support `host`/`net`/`port`/`portrange`, direction (`src`/`dst`), and byte-offset matches like `ip[8]<5` (low TTL). Write to a `.pcap` with `-w`, then open it in **Wireshark** for analysis: **display filters** (a different syntax, e.g. `tcp.port==443 && tcp.flags.reset==1`), **Follow Stream** to reassemble a conversation as text, **Expert Info** to auto-flag retransmissions/resets/duplicate ACKs, and the **IO/TCP graphs** and **Statistics** menus to visualize throughput and round-trips. Capture filters limit what you record; display filters limit what you view. Learn both.",
+      "items": [
+        {
+          "id": "troubleshooting-l2-fc1",
+          "type": "flashcard",
+          "front": "Why prefer `mtr` over a single `traceroute` for intermittent problems?",
+          "back": "mtr runs continuously, combining traceroute + ping to show per-hop latency AND loss over time, so you can see exactly which hop starts dropping packets rather than a one-shot snapshot."
+        },
+        {
+          "id": "troubleshooting-l2-fc2",
+          "type": "flashcard",
+          "front": "What does `ss -tlnp` show, flag by flag?",
+          "back": "-t TCP, -l listening sockets only, -n numeric (no name resolution), -p owning process/PID. Together: which processes are listening on which TCP ports."
+        },
+        {
+          "id": "troubleshooting-l2-fc3",
+          "type": "flashcard",
+          "front": "Write a tcpdump BPF filter that captures only DNS traffic on eth0.",
+          "back": "`tcpdump -i eth0 udp port 53` (add `or tcp port 53` to catch large/zone-transfer DNS over TCP).",
+          "hint": "DNS is UDP/53 normally."
+        },
+        {
+          "id": "troubleshooting-l2-fc4",
+          "type": "flashcard",
+          "front": "Write a tcpdump BPF filter that captures only TCP SYN packets.",
+          "back": "`tcpdump -i eth0 'tcp[tcpflags] & tcp-syn != 0'`. This masks the flags byte and matches any packet with the SYN bit set (SYN and SYN-ACK)."
+        },
+        {
+          "id": "troubleshooting-l2-fc5",
+          "type": "flashcard",
+          "front": "Write a tcpdump BPF filter for traffic to/from host 10.0.0.5 on port 443, saved to a pcap.",
+          "back": "`tcpdump -i eth0 -w cap.pcap 'host 10.0.0.5 and port 443'`. `-w` writes raw packets to a file for later Wireshark analysis."
+        },
+        {
+          "id": "troubleshooting-l2-fc6",
+          "type": "flashcard",
+          "front": "Distinguish a tcpdump CAPTURE filter from a Wireshark DISPLAY filter.",
+          "back": "Capture filter (BPF, e.g. `tcp port 443`) decides what is recorded by the kernel and cannot be undone. Display filter (Wireshark syntax, e.g. `tcp.port==443`) only changes what is shown from an already-captured set. Different syntaxes.",
+          "hint": "One limits recording, one limits viewing."
+        },
+        {
+          "id": "troubleshooting-l2-mc1",
+          "type": "mcq",
+          "prompt": "Which BPF expression captures only packets WITHOUT the SYN flag to port 80?",
+          "choices": [
+            "`tcp port 80 and tcp[tcpflags] & tcp-syn != 0`",
+            "`tcp port 80 and tcp[tcpflags] & tcp-syn == 0`",
+            "`udp port 80 and not syn`",
+            "`port 80 or tcp-syn`"
+          ],
+          "answerIndex": 1,
+          "explanation": "Masking the flags byte with tcp-syn and testing == 0 matches packets where the SYN bit is clear, restricted to TCP/80."
+        },
+        {
+          "id": "troubleshooting-l2-mc2",
+          "type": "mcq",
+          "prompt": "A connection shows state SYN-SENT in `ss -tan` and never advances. What does this most directly indicate?",
+          "choices": [
+            "The TLS handshake failed after connecting",
+            "No SYN-ACK is coming back: a firewall drop, wrong port, or unreachable host at the transport layer",
+            "DNS returned the wrong record",
+            "The application returned HTTP 500"
+          ],
+          "answerIndex": 1,
+          "explanation": "SYN-SENT means your host sent SYN and is waiting for SYN-ACK. Stuck there = no response to the SYN, typically a silent firewall drop or dead/listening-less port."
+        },
+        {
+          "id": "troubleshooting-l2-mc3",
+          "type": "mcq",
+          "prompt": "In Wireshark, which feature reassembles a full TCP conversation into readable application bytes?",
+          "choices": [
+            "Expert Info",
+            "IO Graph",
+            "Follow Stream",
+            "Capture Filter"
+          ],
+          "answerIndex": 2,
+          "explanation": "Follow > TCP Stream reassembles the bidirectional byte stream of a single conversation into a readable view (e.g. an HTTP request/response). Expert Info flags anomalies; IO Graph plots rates."
+        },
+        {
+          "id": "troubleshooting-l2-mc4",
+          "type": "mcq",
+          "prompt": "Which Wireshark display filter shows only TCP resets?",
+          "choices": [
+            "`tcp.flags.syn==1`",
+            "`tcp.flags.reset==1`",
+            "`tcp.analysis.retransmission`",
+            "`tcp port 443`"
+          ],
+          "answerIndex": 1,
+          "explanation": "`tcp.flags.reset==1` matches RST packets. Note `tcp port 443` is BPF capture-filter syntax, not a Wireshark display filter (which would be `tcp.port==443`)."
+        },
+        {
+          "id": "troubleshooting-l2-mc5",
+          "type": "mcq",
+          "prompt": "`ss` is generally preferred over `netstat` because it:",
+          "choices": [
+            "Captures packets to a file",
+            "Reads kernel socket state more efficiently and is the actively maintained successor",
+            "Resolves DNS names automatically",
+            "Replaces tcpdump for analysis"
+          ],
+          "answerIndex": 1,
+          "explanation": "ss queries the kernel via netlink, is faster on busy hosts, and is the maintained modern tool; netstat is legacy. Neither captures packets."
+        }
+      ]
+    },
+    {
+      "id": "troubleshooting-l3",
+      "title": "Reading Captures & Modern Observability",
+      "order": 3,
+      "difficulty": 3,
+      "content": "Capturing is easy; *reading* is the skill. Train your eye for these signatures:\n\n- **Retransmissions / duplicate ACKs:** the sender re-sends because ACKs are missing — points to loss or congestion on the path (cross-check with `mtr`).\n- **RST (reset):** an abrupt teardown. A RST right after SYN usually means the port is closed or a firewall is actively rejecting; a mid-stream RST means a peer or middlebox killed the connection.\n- **DNS failures:** `SERVFAIL`/`NXDOMAIN` in the response, or a query with no answer (resolver unreachable).\n- **TLS alerts:** in the handshake, a `fatal` alert (e.g. `handshake_failure`, `bad_certificate`, `unknown_ca`) tells you the negotiation broke and why — read the ClientHello/ServerHello.\n- **MTU/PMTUD issues:** the handshake completes but bulk transfer stalls; you see large packets disappear and `ICMP fragmentation needed` being dropped. Classic on tunnels/VPNs.\n\nThe **modern** shift is away from device-centric SNMP polling toward continuous, fine-grained telemetry. Know the categories: **flow telemetry** — NetFlow/IPFIX (per-flow records: who talked to whom, how much) and **sFlow** (packet sampling) for traffic visibility. **Streaming telemetry** — **gNMI** pushes structured (YANG-modeled) device state continuously instead of you polling SNMP OIDs. **Metrics** — **Prometheus exporters** (e.g. node_exporter, SNMP exporter, blackbox_exporter) scrape interface counters and probe results; Grafana graphs them. **Distributed tracing** — **OpenTelemetry** captures a request's journey across services, the application-layer view of network latency. **Kernel-level eBPF** — **Cilium/Hubble** gives identity-aware flow visibility in Kubernetes, and **bpftrace** lets you trace kernel network events ad hoc.\n\n```bash\n# bpftrace: count TCP retransmits live by PID\nbpftrace -e 'tracepoint:tcp:tcp_retransmit_skb { @[pid] = count(); }'\n```\n\n`nmap` (port/host discovery) and aggressive scans are **lab/authorized only** — never point them at networks you don't own. The throughline: methodology localizes, capture proves, and telemetry tells you the fault was coming before the pager went off.",
+      "items": [
+        {
+          "id": "troubleshooting-l3-fc1",
+          "type": "flashcard",
+          "front": "In a capture, what does a burst of TCP retransmissions and duplicate ACKs indicate?",
+          "back": "Packet loss or congestion on the path: the receiver's ACKs/segments aren't arriving, so the sender retransmits. Correlate the loss to a hop with mtr."
+        },
+        {
+          "id": "troubleshooting-l3-fc2",
+          "type": "flashcard",
+          "front": "Differentiate a RST seen right after SYN from a RST seen mid-stream.",
+          "back": "RST after SYN = port closed / firewall actively rejecting the connection. Mid-stream RST = a peer or middlebox abruptly tore down an established connection (crash, timeout, policy)."
+        },
+        {
+          "id": "troubleshooting-l3-fc3",
+          "type": "flashcard",
+          "front": "A TLS handshake fails. What field in the capture tells you why?",
+          "back": "A TLS Alert record marked 'fatal' with a description such as handshake_failure, bad_certificate, or unknown_ca — read it alongside the ClientHello/ServerHello to see what was rejected."
+        },
+        {
+          "id": "troubleshooting-l3-fc4",
+          "type": "flashcard",
+          "front": "What capture signature points to an MTU / PMTUD problem?",
+          "back": "Small packets and the handshake succeed, but large data packets vanish and bulk transfer stalls, often with 'ICMP fragmentation needed' messages being dropped (common on VPNs/tunnels)."
+        },
+        {
+          "id": "troubleshooting-l3-fc5",
+          "type": "flashcard",
+          "front": "Contrast NetFlow/IPFIX with sFlow.",
+          "back": "NetFlow/IPFIX exports per-flow records (5-tuple, byte/packet counts) summarizing every conversation. sFlow exports statistically SAMPLED packets/counters. Flow = complete accounting; sFlow = scalable sampling for high-rate links."
+        },
+        {
+          "id": "troubleshooting-l3-fc6",
+          "type": "flashcard",
+          "front": "What problem do gNMI streaming telemetry and Prometheus exporters solve vs SNMP polling?",
+          "back": "They replace slow, device-centric SNMP polling with continuous push (gNMI, YANG-modeled) or frequent scrapes (Prometheus exporters) of fine-grained metrics, giving higher resolution and faster anomaly detection."
+        },
+        {
+          "id": "troubleshooting-l3-mc1",
+          "type": "mcq",
+          "prompt": "A site loads its login page but every large download stalls and dies. The capture shows the TLS handshake completing, then big packets disappearing. Most likely cause?",
+          "choices": [
+            "DNS is returning NXDOMAIN",
+            "An MTU / Path MTU Discovery problem (large packets dropped, ICMP 'frag needed' filtered)",
+            "The TCP port is closed",
+            "A fatal TLS unknown_ca alert"
+          ],
+          "answerIndex": 1,
+          "explanation": "Small packets and the handshake succeed but large ones fail — the textbook MTU/PMTUD black hole, usually a tunnel/VPN dropping ICMP 'fragmentation needed'."
+        },
+        {
+          "id": "troubleshooting-l3-mc2",
+          "type": "mcq",
+          "prompt": "Which tool gives identity-aware network flow visibility inside a Kubernetes cluster using eBPF?",
+          "choices": [
+            "nmap",
+            "Cilium/Hubble",
+            "traceroute",
+            "netstat"
+          ],
+          "answerIndex": 1,
+          "explanation": "Cilium uses eBPF for datapath and policy; Hubble provides flow-level, identity-aware observability of pod-to-pod traffic. The others are host/path tools with no cluster identity awareness."
+        },
+        {
+          "id": "troubleshooting-l3-mc3",
+          "type": "mcq",
+          "prompt": "OpenTelemetry distributed tracing is best described as:",
+          "choices": [
+            "A packet capture format replacing pcap",
+            "A flow-export protocol like IPFIX",
+            "Application-layer observability that follows one request's path and latency across services",
+            "A kernel BPF program loader"
+          ],
+          "answerIndex": 2,
+          "explanation": "OpenTelemetry traces a request as spans across services, exposing where latency accrues at the application layer — complementary to packet/flow tools lower in the stack."
+        },
+        {
+          "id": "troubleshooting-l3-mc4",
+          "type": "mcq",
+          "prompt": "Why is `nmap` flagged as 'lab/authorized only' in this module?",
+          "choices": [
+            "It only runs on Linux",
+            "Active port/host scanning of networks you don't own is intrusive and often illegal/against policy",
+            "It cannot detect open ports",
+            "It is slower than nc"
+          ],
+          "answerIndex": 1,
+          "explanation": "nmap actively probes hosts; scanning networks without authorization can violate law and policy and trip security alerts. Use it only on systems you own or are explicitly authorized to test."
+        },
+        {
+          "id": "troubleshooting-l3-mc5",
+          "type": "mcq",
+          "prompt": "A `dig` query returns SERVFAIL. What does this most directly mean?",
+          "choices": [
+            "The name does not exist",
+            "The resolver tried to answer but failed (e.g. upstream/DNSSEC validation failure), distinct from NXDOMAIN",
+            "TCP port 53 is closed",
+            "The TLS certificate is invalid"
+          ],
+          "answerIndex": 1,
+          "explanation": "SERVFAIL is a server-side failure (broken upstream, DNSSEC validation failure, misconfiguration), whereas NXDOMAIN means the name authoritatively does not exist. Reading the rcode tells you which."
+        }
+      ]
+    }
+  ]
+}

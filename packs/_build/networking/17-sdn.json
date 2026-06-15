@@ -1,0 +1,372 @@
+{
+  "id": "sdn",
+  "title": "Software-Defined Networking & Programmability",
+  "order": 17,
+  "lessons": [
+    {
+      "id": "sdn-l1",
+      "title": "The SDN Idea: Centralize the Brain, Dumb Down the Pipes",
+      "order": 1,
+      "difficulty": 1,
+      "content": "**Take the control/data plane split to its conclusion.** In a classic router each box runs its own routing protocols (the *control plane*, deciding paths) and its own forwarding ASIC (the *data plane*, moving packets). Software-defined networking (SDN) asks: what if you rip the control plane out of every box and put it in one place?\n\nThe result is a **logically centralized controller** that holds a global view of the topology and programs every switch's forwarding table. The switches become *dumb, fast forwarders*: they no longer think, they just match packets and apply actions the controller pushed down. This is the same separation you already know from OSPF/BGP (control) versus the FIB lookup (data) in Module 7 — SDN just relocates the control plane off the device.\n\nWhy bother? Centralization buys you a single point to express *intent* (\"tenant A's traffic never touches tenant B\"), instant global reconfiguration, and the ability to write network policy as software instead of logging into 200 boxes. The trade-off is a new dependency: the controller (and its southbound channel) becomes critical infrastructure, so real deployments run controller clusters and let switches keep a cached \"fail-standalone\" mode.\n\n```bash\n# Conceptually: the data plane is now a table the controller writes\n# match: in_port=3, dst_ip=10.0.0.5  -> action: output port 7\n```\n\nMentally file SDN as *\"BGP's brain, but extracted and centralized, driving plumbing it can reprogram in milliseconds.\"* Everything else in this module — OpenFlow, overlays, eBPF, intent-based networking — is an elaboration of this one move.",
+      "items": [
+        {
+          "id": "sdn-l1-fc1",
+          "type": "flashcard",
+          "front": "In one sentence, what is the core move of SDN?",
+          "back": "Extract the control plane out of every device into a logically centralized controller, leaving devices as dumb, fast forwarders the controller programs.",
+          "hint": "It's a relocation, not a new function."
+        },
+        {
+          "id": "sdn-l1-fc2",
+          "type": "flashcard",
+          "front": "Define the control plane vs. the data plane.",
+          "back": "Control plane = decides paths/policy (routing protocols, the brain). Data plane (forwarding plane) = actually moves packets via fast table lookups (the muscle).",
+          "hint": "Brain vs. muscle."
+        },
+        {
+          "id": "sdn-l1-fc3",
+          "type": "flashcard",
+          "front": "How does SDN's split differ from the control/data split already inside a normal router?",
+          "back": "A normal router has both planes on the same box. SDN moves the control plane OFF the device into a central controller that programs many devices at once.",
+          "hint": "Location, not concept."
+        },
+        {
+          "id": "sdn-l1-fc4",
+          "type": "flashcard",
+          "front": "Name two concrete benefits of centralizing the control plane.",
+          "back": "A single place to express network-wide intent/policy, and near-instant global reconfiguration via software instead of per-box CLI.",
+          "hint": "Policy + speed of change."
+        },
+        {
+          "id": "sdn-l1-fc5",
+          "type": "flashcard",
+          "front": "What is the main risk introduced by a centralized controller, and how is it mitigated?",
+          "back": "The controller and its southbound channel become critical infrastructure / a failure point. Mitigated with controller clusters and switch 'fail-standalone' modes.",
+          "hint": "Single brain = single point of failure."
+        },
+        {
+          "id": "sdn-l1-fc6",
+          "type": "flashcard",
+          "front": "Map SDN onto something you already know from Module 7.",
+          "back": "OSPF/BGP = control plane; the FIB lookup that forwards a packet = data plane. SDN just relocates that control plane off the device into a controller.",
+          "hint": "Routing protocol vs. FIB."
+        },
+        {
+          "id": "sdn-l1-mc1",
+          "type": "mcq",
+          "prompt": "In a pure SDN switch, what does the switch itself decide?",
+          "choices": [
+            "The full routing topology of the network",
+            "Almost nothing about paths; it matches packets and applies controller-installed actions",
+            "Which BGP routes to advertise to peers",
+            "The encryption keys for each flow"
+          ],
+          "answerIndex": 1,
+          "explanation": "The whole point is that the switch becomes a dumb fast forwarder: path/policy decisions live in the controller, and the switch just executes match/action rules it was given."
+        },
+        {
+          "id": "sdn-l1-mc2",
+          "type": "mcq",
+          "prompt": "Which phrase best captures 'logically centralized' control?",
+          "choices": [
+            "Exactly one physical server makes all decisions",
+            "A single decision-making view that may run as a resilient cluster under the hood",
+            "Each switch keeps its own independent control plane",
+            "Control is centralized in the data plane ASIC"
+          ],
+          "answerIndex": 1,
+          "explanation": "'Logically centralized' means one coherent control view/API; physically it is usually a clustered controller for availability, not a single fragile box."
+        },
+        {
+          "id": "sdn-l1-mc3",
+          "type": "mcq",
+          "prompt": "A failure of the SDN controller's southbound channel is dangerous because:",
+          "choices": [
+            "Packets can no longer be encrypted",
+            "Switches lose the brain that programs their forwarding tables",
+            "Routing protocols stop converging on the switches",
+            "The data plane ASICs physically power off"
+          ],
+          "answerIndex": 1,
+          "explanation": "With the control plane centralized, the southbound channel is how the brain reaches the muscle; losing it means switches can't be (re)programmed, which is why fail-standalone modes and controller clusters exist."
+        },
+        {
+          "id": "sdn-l1-mc4",
+          "type": "mcq",
+          "prompt": "For a software developer entering today's market, why is SDN/cloud networking emphasized over configuring physical routers?",
+          "choices": [
+            "Physical routers no longer exist",
+            "Modern cloud, Kubernetes, and data-center networks are software-defined, so that's where the relevant work is",
+            "SDN is easier than subnetting",
+            "Routers cannot be automated"
+          ],
+          "answerIndex": 1,
+          "explanation": "Per the module's framing, modern infrastructure is software-defined; container/cloud networking is more immediately relevant to a developer than hand-configuring physical boxes."
+        }
+      ]
+    },
+    {
+      "id": "sdn-l2",
+      "title": "OpenFlow, Flow Tables & Open vSwitch",
+      "order": 2,
+      "difficulty": 2,
+      "content": "**OpenFlow** was the first widely deployed southbound protocol that made the SDN split concrete. It defines exactly how a controller programs a switch's **flow tables**. Each flow-table entry is a *match/action* rule: match on header fields (in-port, MAC, VLAN, IP, TCP/UDP ports) and apply actions (output to port, drop, rewrite a field, push/pop a tag, send to controller). A packet walks the tables, hits the highest-priority matching entry, and the switch executes its actions — pure data-plane mechanics with no local decision-making.\n\nWhen a packet matches nothing, the switch does a **packet-in** to the controller, which decides and installs a new flow rule (**flow-mod**) so future packets are handled in hardware at line rate. That's the SDN loop: rare slow-path consultation, fast-path forwarding everywhere else.\n\n```bash\n# Open vSwitch (OVS) speaks OpenFlow; inspect and add flows by hand\novs-ofctl dump-flows br0\novs-ofctl add-flow br0 \"priority=100,ip,nw_dst=10.0.0.5,actions=output:7\"\novs-ofctl add-flow br0 \"priority=10,actions=drop\"\n```\n\n**Open vSwitch** is the workhorse software switch: a programmable, OpenFlow-capable bridge that runs on every hypervisor and is the data plane underneath much of cloud networking. **Controllers** (ONOS, OpenDaylight, Faucet, or cloud-proprietary ones) provide the northbound API where you express intent and the southbound drivers that push flows down.\n\nIn practice raw OpenFlow is now often hidden beneath higher abstractions, but the model — *centralized controller writes match/action tables into programmable switches* — is the mental skeleton for everything that follows, including how overlays and Kubernetes networking are wired up.",
+      "items": [
+        {
+          "id": "sdn-l2-fc1",
+          "type": "flashcard",
+          "front": "What is an OpenFlow flow-table entry made of?",
+          "back": "A match (on header fields like in-port, MAC, VLAN, IP, L4 ports) plus actions (output, drop, rewrite, push/pop tag, send-to-controller), with a priority.",
+          "hint": "match + action + priority."
+        },
+        {
+          "id": "sdn-l2-fc2",
+          "type": "flashcard",
+          "front": "What happens on an OpenFlow 'table miss' (no matching flow)?",
+          "back": "The switch sends a packet-in to the controller; the controller decides and installs a flow-mod so subsequent packets are forwarded in hardware at line rate.",
+          "hint": "Slow path once, fast path forever after."
+        },
+        {
+          "id": "sdn-l2-fc3",
+          "type": "flashcard",
+          "front": "What role does OpenFlow play in SDN?",
+          "back": "It is a southbound protocol: the concrete way a controller programs a switch's forwarding (flow) tables.",
+          "hint": "Controller-to-switch wire protocol."
+        },
+        {
+          "id": "sdn-l2-fc4",
+          "type": "flashcard",
+          "front": "What is Open vSwitch (OVS)?",
+          "back": "A programmable, OpenFlow-capable software switch/bridge that runs on hypervisors and hosts; it's the data plane under much of cloud and container networking.",
+          "hint": "The software switch on every host."
+        },
+        {
+          "id": "sdn-l2-fc5",
+          "type": "flashcard",
+          "front": "What is a controller's northbound vs. southbound interface?",
+          "back": "Northbound = the API where operators/apps express intent and policy. Southbound (e.g. OpenFlow) = the channel that pushes resulting rules down to switches.",
+          "hint": "Up to apps, down to switches.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-1.svg"
+        },
+        {
+          "id": "sdn-l2-fc6",
+          "type": "flashcard",
+          "front": "Why is the OpenFlow model worth learning even though raw OpenFlow is often hidden today?",
+          "back": "It is the mental skeleton — centralized controller writes match/action tables into programmable forwarders — that overlays, OVS, and Kubernetes networking are all built on.",
+          "hint": "Abstraction hides it, but it's still underneath."
+        },
+        {
+          "id": "sdn-l2-mc1",
+          "type": "mcq",
+          "prompt": "A packet hits an OVS switch and matches no flow entry. What is the typical sequence?",
+          "choices": [
+            "The packet is silently dropped with no record",
+            "packet-in to controller -> controller installs flow-mod -> future packets forwarded in hardware",
+            "The switch floods it out every port forever",
+            "The switch runs OSPF to compute a route locally"
+          ],
+          "answerIndex": 1,
+          "explanation": "A table miss triggers a packet-in to the controller, which installs a flow rule (flow-mod); after that, matching packets are handled on the fast path without consulting the controller."
+        },
+        {
+          "id": "sdn-l2-mc2",
+          "type": "mcq",
+          "prompt": "In OpenFlow, when two flow entries both match a packet, which wins?",
+          "choices": [
+            "The oldest installed entry",
+            "The one with the higher priority value",
+            "The entry with the broadest match",
+            "Both actions are applied in sequence"
+          ],
+          "answerIndex": 1,
+          "explanation": "Flow entries carry a priority; the highest-priority matching entry's actions are executed. That's why a low-priority 'drop everything' rule can coexist with specific high-priority allow rules."
+        },
+        {
+          "id": "sdn-l2-mc3",
+          "type": "mcq",
+          "prompt": "Which command adds a flow that forwards IP traffic destined to 10.0.0.5 out port 7 on bridge br0?",
+          "choices": [
+            "ovs-ofctl del-flows br0",
+            "ovs-ofctl add-flow br0 \\\"priority=100,ip,nw_dst=10.0.0.5,actions=output:7\\\"",
+            "ip route add 10.0.0.5 dev br0",
+            "iptables -A FORWARD -d 10.0.0.5 -j ACCEPT"
+          ],
+          "answerIndex": 1,
+          "explanation": "ovs-ofctl add-flow installs an OpenFlow rule on the OVS bridge with a match (ip, nw_dst) and an action (output:7); the other commands are unrelated (route table or netfilter, not the OVS flow table)."
+        },
+        {
+          "id": "sdn-l2-mc4",
+          "type": "mcq",
+          "prompt": "Why does the SDN fast path matter for performance?",
+          "choices": [
+            "Because the controller forwards every packet itself",
+            "Because once a flow is installed, packets are matched/forwarded in the switch data plane at line rate without per-packet controller involvement",
+            "Because OpenFlow encrypts every packet",
+            "Because flow tables replace the need for any addressing"
+          ],
+          "answerIndex": 1,
+          "explanation": "Consulting the controller is the slow path and happens rarely (on misses); the value is that installed flows let the dumb-but-fast data plane handle the bulk of traffic at line rate."
+        }
+      ]
+    },
+    {
+      "id": "sdn-l3",
+      "title": "Overlays, Container Networking & eBPF/XDP",
+      "order": 3,
+      "difficulty": 3,
+      "content": "**Now wire real cloud/container networks from these parts.** Start in Linux (Module 05). A **network namespace** (`netns`) is an isolated network stack — its own interfaces, routes, and firewall. A **veth pair** is a virtual cable: two linked interfaces, one end in a namespace, the other on the host, plugged into a **Linux bridge** or **Open vSwitch**. Do this a few times and you've hand-built a container network: that's literally the Container Network Model and what Docker/Kubernetes automate.\n\n```bash\nip netns add c1\nip link add veth0 type veth peer name veth0-c\nip link set veth0-c netns c1\nip link set veth0 master br0   # attach host end to a bridge\n```\n\n**How do two containers on different hosts talk?** Their host-local bridges aren't connected, and you can't assume a flat L2 between hosts. The answer is an **overlay**: a **VXLAN** tunnel. The source host's VTEP takes the container's entire L2 frame and encapsulates it inside UDP/IP addressed host-to-host (L2-over-L3). A 24-bit **VNI** identifies the tenant, giving thousands of isolated virtual segments — multi-tenant networking. The far VTEP decapsulates and delivers the original frame. This is **encapsulation come full circle** from Module 1: a frame inside a packet inside a frame. (**GRE** does the same generically without the multi-tenant VNI.)\n\n**Kubernetes** standardizes this via **CNI** plugins. **Calico** can route pod traffic (often BGP) or use overlays; **Cilium** uses **eBPF/XDP** to run programmable packet-processing code *inside the kernel*, replacing iptables/kube-proxy with efficient in-kernel maps and even dropping/redirecting packets at the NIC driver (XDP) before the stack — this is why eBPF is reshaping kernel networking. **Service meshes** (Envoy/Istio) add L7 SDN: identity, mTLS, and routing for HTTP/gRPC. Finally, **IaC** closes the loop: NETCONF/YANG and gNMI model device config; Ansible/Terraform apply it; **intent-based networking** lets you declare desired state and let the system reconcile.",
+      "items": [
+        {
+          "id": "sdn-l3-fc1",
+          "type": "flashcard",
+          "front": "What is a Linux network namespace, and why does it matter for containers?",
+          "back": "An isolated network stack with its own interfaces, routes, and firewall. It's the primitive that gives each container its own private networking — the basis of the Container Network Model.",
+          "hint": "Per-container private network stack."
+        },
+        {
+          "id": "sdn-l3-fc2",
+          "type": "flashcard",
+          "front": "What is a veth pair?",
+          "back": "A virtual cable: two linked interfaces. One end sits in a namespace (the container), the other on the host, usually plugged into a Linux bridge or OVS.",
+          "hint": "A patch cable with two ends."
+        },
+        {
+          "id": "sdn-l3-fc3",
+          "type": "flashcard",
+          "front": "How do two containers on DIFFERENT hosts communicate?",
+          "back": "Via an overlay: the source host's VTEP encapsulates the container's entire L2 frame inside a UDP/IP packet addressed host-to-host (VXLAN, L2-over-L3); the far VTEP decapsulates and delivers it. A VNI tags the tenant.",
+          "hint": "Encapsulate the frame, ship it host-to-host, decapsulate.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-1.svg"
+        },
+        {
+          "id": "sdn-l3-fc4",
+          "type": "flashcard",
+          "front": "What does the 24-bit VXLAN VNI provide?",
+          "back": "A tenant/segment identifier giving up to ~16 million isolated virtual L2 networks over a shared L3 underlay — multi-tenant network virtualization.",
+          "hint": "Which virtual network this frame belongs to."
+        },
+        {
+          "id": "sdn-l3-fc5",
+          "type": "flashcard",
+          "front": "Why is eBPF changing kernel networking?",
+          "back": "eBPF lets you safely run sandboxed programmable code inside the kernel (and at the NIC driver via XDP) to filter, redirect, or drop packets at high speed, replacing slower iptables chains with efficient in-kernel maps — programmable fast packet processing without kernel patches.",
+          "hint": "Programmable, sandboxed code inside the kernel / at the driver."
+        },
+        {
+          "id": "sdn-l3-fc6",
+          "type": "flashcard",
+          "front": "What is CNI in Kubernetes, and name two implementations.",
+          "back": "CNI (Container Network Interface) is the plugin standard Kubernetes uses to wire pod networking. Examples: Calico (routing, often BGP, or overlay) and Cilium (eBPF-based).",
+          "hint": "The pluggable networking layer for pods."
+        },
+        {
+          "id": "sdn-l3-fc7",
+          "type": "flashcard",
+          "front": "How does VXLAN bring encapsulation 'full circle' from Module 1?",
+          "back": "You get a frame inside a packet inside a frame: the inner tenant Ethernet frame is wrapped in outer UDP/IP, which is wrapped in an outer Ethernet frame on the wire — encapsulation nesting taken literally.",
+          "hint": "Frame-in-packet-in-frame."
+        },
+        {
+          "id": "sdn-l3-fc8",
+          "type": "flashcard",
+          "front": "What is a service mesh (Envoy/Istio) in SDN terms?",
+          "back": "L7 SDN: sidecar/data-plane proxies provide identity, mTLS, and HTTP/gRPC routing and policy, with a control plane programming them — the SDN model applied at the application layer.",
+          "hint": "SDN moved up to L7."
+        },
+        {
+          "id": "sdn-l3-fc9",
+          "type": "flashcard",
+          "front": "What do NETCONF/YANG and gNMI provide for network IaC?",
+          "back": "A structured, model-driven way to read and write device configuration/state (YANG models over NETCONF or gNMI), so tools like Ansible/Terraform can manage networks as code.",
+          "hint": "Model-driven config APIs."
+        },
+        {
+          "id": "sdn-l3-fc10",
+          "type": "flashcard",
+          "front": "What is intent-based networking?",
+          "back": "You declare the desired end state (intent); the system continuously reconciles the actual network to match it, rather than you issuing imperative box-by-box commands.",
+          "hint": "Declare desired state; let it reconcile."
+        },
+        {
+          "id": "sdn-l3-mc1",
+          "type": "mcq",
+          "prompt": "A VXLAN frame on the wire, outermost to innermost, looks like:",
+          "choices": [
+            "Inner Ethernet | Inner IP | payload only",
+            "Outer Ethernet | Outer IP | UDP | VXLAN(VNI) | inner Ethernet frame",
+            "Outer IP | TCP | inner IP | payload",
+            "GRE | inner Ethernet only, no IP"
+          ],
+          "answerIndex": 1,
+          "explanation": "VXLAN encapsulates the entire inner L2 frame inside UDP (dport 4789) with a VXLAN header carrying the VNI, all inside an outer IP and outer Ethernet for transport across the L3 underlay."
+        },
+        {
+          "id": "sdn-l3-mc2",
+          "type": "mcq",
+          "prompt": "What is the role of a VTEP in a VXLAN overlay?",
+          "choices": [
+            "It assigns IP addresses via DHCP",
+            "It encapsulates outgoing frames and decapsulates incoming ones at the tunnel endpoints",
+            "It runs BGP between containers",
+            "It encrypts all tenant traffic by default"
+          ],
+          "answerIndex": 1,
+          "explanation": "The VXLAN Tunnel Endpoint (VTEP) is where encapsulation/decapsulation happens; it wraps the tenant frame for transit and unwraps it on arrival. VXLAN itself provides no encryption."
+        },
+        {
+          "id": "sdn-l3-mc3",
+          "type": "mcq",
+          "prompt": "Cilium replaces much of kube-proxy/iptables by:",
+          "choices": [
+            "Adding more iptables chains",
+            "Running eBPF programs in the kernel (and XDP at the NIC driver) with in-kernel maps for fast packet processing",
+            "Tunneling everything through a userspace proxy",
+            "Disabling the Linux network stack entirely"
+          ],
+          "answerIndex": 1,
+          "explanation": "Cilium leverages eBPF/XDP to do programmable, efficient in-kernel packet handling and service load-balancing via maps, avoiding the scaling pain of long iptables rule chains."
+        },
+        {
+          "id": "sdn-l3-mc4",
+          "type": "mcq",
+          "prompt": "You connect a container to the host using a veth pair. Where do the two ends go?",
+          "choices": [
+            "Both ends inside the container namespace",
+            "One end in the container's netns, the other on the host attached to a bridge/OVS",
+            "Both ends on the physical NIC",
+            "One end in the kernel, one in the controller"
+          ],
+          "answerIndex": 1,
+          "explanation": "A veth pair is a virtual cable: one end lives in the container's network namespace, the other stays on the host and is typically attached to a Linux bridge or Open vSwitch to reach other endpoints."
+        },
+        {
+          "id": "sdn-l3-mc5",
+          "type": "mcq",
+          "prompt": "What primarily distinguishes GRE from VXLAN as overlay tunnels?",
+          "choices": [
+            "GRE encrypts, VXLAN does not",
+            "VXLAN carries a 24-bit VNI for multi-tenant L2 segmentation; GRE is a generic encapsulation without that tenant identifier",
+            "GRE works only inside one host",
+            "VXLAN runs over TCP, GRE over UDP"
+          ],
+          "answerIndex": 1,
+          "explanation": "Both encapsulate traffic for transport over L3, but VXLAN adds a 24-bit VNI giving many isolated tenant segments; plain GRE is a generic tunnel without that multi-tenant identifier (and runs directly over IP, protocol 47, not UDP)."
+        },
+        {
+          "id": "sdn-l3-mc6",
+          "type": "mcq",
+          "prompt": "Why is XDP (eXpress Data Path) significant for performance?",
+          "choices": [
+            "It runs packet-processing code at the NIC driver, before the kernel network stack, allowing very fast drop/redirect",
+            "It moves all processing to userspace",
+            "It compresses every packet",
+            "It replaces the need for IP addressing"
+          ],
+          "answerIndex": 0,
+          "explanation": "XDP attaches eBPF programs at the earliest point in the driver, so packets can be dropped or redirected before incurring full stack processing — ideal for DDoS mitigation and high-speed load balancing."
+        }
+      ]
+    }
+  ]
+}

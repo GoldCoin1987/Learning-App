@@ -1,0 +1,364 @@
+{
+  "id": "application-protocols",
+  "title": "Application Protocols: HTTP & Messaging",
+  "order": 12,
+  "lessons": [
+    {
+      "id": "application-protocols-http-basics-lesson-1",
+      "title": "HTTP: Request/Response, Methods, Status, and State",
+      "order": 1,
+      "difficulty": 1,
+      "content": "HTTP is a **stateless, text-framed request/response** protocol that rides on top of a reliable transport (TCP, or QUIC for HTTP/3). The client sends a request; the server sends exactly one response. Nothing on the server inherently remembers you between requests — that is what *stateless* means, and it is the property that lets any server in a load-balanced pool answer any request.\n\nA request is a **request-line**, then **headers**, a blank line, then an optional **body**:\n\n```http\nGET /api/sensors/42 HTTP/1.1\nHost: example.com\nAccept: application/json\nUser-Agent: curl/8.4\n\n```\n\nA response mirrors it with a **status-line**, headers, blank line, body:\n\n```http\nHTTP/1.1 200 OK\nContent-Type: application/json\nContent-Length: 27\n\n{\"id\":42,\"temp_c\":21.4}\n```\n\n**Methods** carry intent: `GET` (read, safe/idempotent), `POST` (create/submit, not idempotent), `PUT` (replace, idempotent), `PATCH` (partial update), `DELETE`, plus `HEAD` and `OPTIONS`. **Status codes** group by first digit: 1xx informational, 2xx success, 3xx redirect, 4xx client error (400 bad request, 401 unauthorized, 404 not found), 5xx server error (500, 502 bad gateway, 503 unavailable).\n\nSince HTTP itself is stateless, applications layer state on top with **cookies**: the server sends `Set-Cookie: session=abc123`, and the browser echoes `Cookie: session=abc123` on every later request. The server maps that opaque token to a server-side session (or signs the state into the cookie itself, as with JWTs). This is the radar-tech analogy of a transponder code: the packet is anonymous on the wire; the tag is what re-associates it with a track.",
+      "items": [
+        {
+          "id": "application-protocols-1-fc-1",
+          "type": "flashcard",
+          "front": "What does it mean that HTTP is 'stateless', and why is that property useful?",
+          "back": "Each request/response is independent; the server keeps no inherent memory of prior requests from a client. This lets any server in a load-balanced pool handle any request, simplifying scaling and failover.",
+          "hint": "Think about a load balancer fanning requests across many identical servers."
+        },
+        {
+          "id": "application-protocols-1-fc-2",
+          "type": "flashcard",
+          "front": "List the three parts of an HTTP request message in order.",
+          "back": "1) Request-line (method, target, version, e.g. 'GET /path HTTP/1.1'); 2) Headers (one per line); 3) a blank line, then an optional body.",
+          "hint": "Line, lines, blank, payload."
+        },
+        {
+          "id": "application-protocols-1-fc-3",
+          "type": "flashcard",
+          "front": "Which common HTTP methods are idempotent, and what does idempotent mean here?",
+          "back": "GET, PUT, DELETE, HEAD, OPTIONS are idempotent — issuing the same request N times leaves the server in the same state as issuing it once. POST is NOT idempotent (it typically creates a new resource each time).",
+          "hint": "POST is the odd one out among create/replace/delete."
+        },
+        {
+          "id": "application-protocols-1-fc-4",
+          "type": "flashcard",
+          "front": "How do cookies add state on top of stateless HTTP?",
+          "back": "The server sends 'Set-Cookie: name=value'; the browser stores it and returns 'Cookie: name=value' on subsequent requests. The server maps that token to server-side session data (or verifies signed state in the cookie itself).",
+          "hint": "Set-Cookie out, Cookie back in."
+        },
+        {
+          "id": "application-protocols-1-mcq-1",
+          "type": "mcq",
+          "prompt": "A client receives '502 Bad Gateway'. What does this most directly indicate?",
+          "choices": [
+            "The client sent a malformed request",
+            "A server acting as a gateway/proxy got an invalid response from an upstream server",
+            "The requested resource does not exist",
+            "The client is not authenticated"
+          ],
+          "answerIndex": 1,
+          "explanation": "502 is a 5xx server-side error meaning a gateway/reverse proxy received an invalid response from the upstream it relied on. 400 is a malformed request, 404 is not found, 401 is unauthenticated."
+        },
+        {
+          "id": "application-protocols-1-mcq-2",
+          "type": "mcq",
+          "prompt": "Which status-code class indicates the client should look at its own request for the problem?",
+          "choices": [
+            "2xx",
+            "3xx",
+            "4xx",
+            "5xx"
+          ],
+          "answerIndex": 2,
+          "explanation": "4xx codes (400, 401, 403, 404, ...) signal client errors — the request was bad, unauthorized, forbidden, or for a missing resource. 5xx are server-side faults; 2xx success; 3xx redirection."
+        },
+        {
+          "id": "application-protocols-1-mcq-3",
+          "type": "mcq",
+          "prompt": "You want to fetch a resource's headers (e.g., size, last-modified) WITHOUT downloading its body. Which method fits?",
+          "choices": [
+            "GET",
+            "HEAD",
+            "OPTIONS",
+            "TRACE"
+          ],
+          "answerIndex": 1,
+          "explanation": "HEAD returns the same headers a GET would but with no body — ideal for checking Content-Length or caching metadata cheaply. OPTIONS reports allowed methods; GET would also transfer the body."
+        },
+        {
+          "id": "application-protocols-1-mcq-4",
+          "type": "mcq",
+          "prompt": "Why can't the server simply remember which TCP connection a logged-in user is on to track their session?",
+          "choices": [
+            "TCP connections never close, so it would leak memory",
+            "Connections are short-lived/reused and a user's requests may land on different servers, so connection identity is not durable session identity",
+            "TCP has no source port to identify clients",
+            "HTTP forbids reading the connection's IP address"
+          ],
+          "answerIndex": 1,
+          "explanation": "Connections open and close, get pooled, and are spread across a server fleet by load balancers. A cookie/token carried IN the request is the durable, server-independent way to identify a session."
+        }
+      ]
+    },
+    {
+      "id": "application-protocols-http-evolution-lesson-2",
+      "title": "HTTP/1.0 → 1.1 → 2 → 3: Connections, Multiplexing, and HOL Blocking",
+      "order": 2,
+      "difficulty": 2,
+      "content": "The evolution of HTTP is the cleanest case study of how a *lower-layer* limitation drives *application* design.\n\n**HTTP/1.0** opened a fresh TCP connection per request and closed it after the response — paying a 3-way handshake (and TLS handshake) every time. **HTTP/1.1** added **persistent connections** (`Connection: keep-alive`) so many requests reuse one TCP connection. It also specified **pipelining** — sending several requests without waiting for each response — but pipelining *failed in practice*: responses had to return in request order, so one slow response blocked all the ones queued behind it (**application-layer head-of-line blocking**), and buggy proxies mishandled it. Browsers disabled it and instead opened ~6 parallel connections per origin.\n\n**HTTP/2** (RFC 7540) replaced the text protocol with a **binary framing layer**. Requests/responses become **streams**, each chopped into frames that are **multiplexed** over a *single* TCP connection and interleaved freely — so a slow response no longer blocks others at the application layer. It adds **HPACK** header compression (headers are hugely repetitive) and server push (now deprecated). Crucially, HTTP/2 fixed *application* HOL blocking but **not** *transport* HOL blocking: because all streams share one TCP byte-stream, a single lost TCP segment stalls *every* stream until retransmission, since TCP must deliver bytes in order.\n\n```http\nGET /a HTTP/2\nGET /b HTTP/2   ; both in flight, frames interleaved on one connection\n```\n\n**HTTP/3** (RFC 9114) solves transport HOL by abandoning TCP. It runs over **QUIC**, a reliable transport built on **UDP** with TLS 1.3 baked in. QUIC carries independent streams: a lost packet only stalls the stream(s) whose bytes it held — the others keep flowing. QUIC also folds transport + crypto setup into 1-RTT (0-RTT on resumption) and supports connection migration across IP changes (great for mobile). The diagram contrasts HTTP/1.1's sequential responses with HTTP/2's interleaved frames.",
+      "items": [
+        {
+          "id": "application-protocols-2-fc-1",
+          "type": "flashcard",
+          "front": "What did HTTP/1.1 add over 1.0, and why did its pipelining feature fail?",
+          "back": "1.1 added persistent (keep-alive) connections so many requests reuse one TCP connection. Pipelining (sending requests without waiting) failed because responses had to come back in order — one slow response blocked the rest (application HOL) — and proxies mishandled it. Browsers used ~6 parallel connections instead.",
+          "hint": "Responses had to return in the order requests were sent.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-1.svg"
+        },
+        {
+          "id": "application-protocols-2-fc-2",
+          "type": "flashcard",
+          "front": "What is HPACK and why does HTTP/2 need it?",
+          "back": "HPACK is HTTP/2's header-compression scheme. HTTP headers are large and highly repetitive across requests on a connection; HPACK uses static + dynamic indexed tables and Huffman coding to avoid resending identical headers, cutting overhead substantially.",
+          "hint": "Compresses the very repetitive part of every request."
+        },
+        {
+          "id": "application-protocols-2-fc-3",
+          "type": "flashcard",
+          "front": "Why does QUIC use UDP rather than TCP as its base?",
+          "back": "TCP's in-order byte-stream causes transport HOL blocking and its handshake/congestion logic is fixed in the kernel. UDP is a thin datagram layer, so QUIC can implement its own reliable, multiplexed, per-stream delivery plus integrated TLS 1.3 in user space — evolving without kernel/middlebox changes.",
+          "hint": "It needs to control streams and crypto itself, in user space."
+        },
+        {
+          "id": "application-protocols-2-fc-4",
+          "type": "flashcard",
+          "front": "What is connection migration in QUIC and why does it matter for mobile?",
+          "back": "QUIC identifies a connection by a Connection ID, not the 4-tuple of IPs/ports. When a phone switches WiFi↔cellular (changing its IP), the connection survives without a new handshake — the same QUIC connection continues.",
+          "hint": "A phone walking out the door changes IP."
+        },
+        {
+          "id": "application-protocols-2-mcq-1",
+          "type": "mcq",
+          "prompt": "HTTP/2 multiplexes many streams over ONE TCP connection. A single TCP segment is lost. What happens?",
+          "choices": [
+            "Only the stream whose data was in that segment stalls; others continue",
+            "Nothing — HTTP/2 has its own retransmission that bypasses TCP",
+            "ALL streams stall until TCP retransmits, because TCP must deliver bytes in order (transport HOL blocking)",
+            "The connection is reset and all streams restart"
+          ],
+          "answerIndex": 2,
+          "explanation": "This is the key point: HTTP/2 fixed APPLICATION-level HOL blocking via multiplexing, but because every stream shares one TCP byte-stream, a single lost segment forces TCP to hold ALL subsequent bytes (all streams) until retransmission. That transport-level HOL is exactly what HTTP/3 over QUIC eliminates."
+        },
+        {
+          "id": "application-protocols-2-mcq-2",
+          "type": "mcq",
+          "prompt": "Which statement best captures what HTTP/3 changes versus HTTP/2?",
+          "choices": [
+            "It re-introduces a separate TCP connection per request",
+            "It runs the same multiplexed streams over QUIC/UDP so a lost packet stalls only its own stream(s), eliminating transport HOL blocking",
+            "It removes header compression to simplify the protocol",
+            "It drops encryption to reduce handshake latency"
+          ],
+          "answerIndex": 1,
+          "explanation": "HTTP/3 keeps the stream-multiplexing idea but moves it onto QUIC over UDP, where streams are independently reliable — a lost packet only affects its own stream. It still encrypts (TLS 1.3 is integral) and still compresses headers (QPACK)."
+        },
+        {
+          "id": "application-protocols-2-mcq-3",
+          "type": "mcq",
+          "prompt": "Before HTTP/2, why did browsers open roughly 6 parallel TCP connections per origin?",
+          "choices": [
+            "To exhaust the server's file descriptors",
+            "To work around 1.1's lack of usable multiplexing and pipelining — parallel connections approximated concurrency",
+            "Because TLS requires a separate connection per certificate",
+            "To split DNS load across resolvers"
+          ],
+          "answerIndex": 1,
+          "explanation": "With pipelining unusable and only one request in flight per 1.1 connection, parallel connections were the only way to fetch many assets concurrently. HTTP/2's single-connection multiplexing made this hack unnecessary (and removed its per-connection congestion-control unfairness)."
+        },
+        {
+          "id": "application-protocols-2-mcq-4",
+          "type": "mcq",
+          "prompt": "What is the fundamental framing change from HTTP/1.1 to HTTP/2?",
+          "choices": [
+            "From binary to human-readable text",
+            "From human-readable text messages to a binary framing layer of streams and frames",
+            "From UDP datagrams to TCP segments",
+            "From compressed to uncompressed bodies"
+          ],
+          "answerIndex": 1,
+          "explanation": "HTTP/1.x messages are ASCII text parsed line by line. HTTP/2 introduces a binary framing layer: each message is a stream split into typed binary frames that can be interleaved over one connection, enabling multiplexing and HPACK."
+        }
+      ]
+    },
+    {
+      "id": "application-protocols-apis-realtime-lesson-3",
+      "title": "APIs and Real-Time: REST/JSON, gRPC, WebSockets, SSE, Caching & Proxies",
+      "order": 3,
+      "difficulty": 3,
+      "content": "On top of HTTP sit several application patterns a developer chooses between.\n\n**REST** treats your domain as **resources** addressed by URLs and manipulated with HTTP methods, typically exchanging **JSON**. It is human-readable, cache-friendly, and ubiquitous, but verbose and schema-loose. **gRPC** is an RPC framework over HTTP/2: you define services and messages in **Protobuf** (a compact binary schema), get generated client/server stubs in many languages, and gain streaming (client/server/bidirectional) and strong typing. The tradeoff: binary payloads aren't human-readable and browser support needs gRPC-Web. Rough instinct: REST/JSON for public, browser-facing, evolving APIs; gRPC/Protobuf for internal, high-throughput, low-latency service-to-service calls.\n\nFor *pushing* data the request/response model is awkward. **Server-Sent Events (SSE)** is a one-way server→client stream over a single long-lived HTTP response (`Content-Type: text/event-stream`); it auto-reconnects and is dead simple for live feeds. **WebSockets** upgrade an HTTP connection (`Upgrade: websocket`) into a **full-duplex** byte channel — both sides send anytime — ideal for chat, games, and trading. SSE is simpler and HTTP-native; WebSockets are bidirectional but bypass HTTP semantics after the upgrade.\n\n```http\nGET /stream HTTP/1.1\nUpgrade: websocket\nConnection: Upgrade\nSec-WebSocket-Key: dGhlIHNhbXBsZQ==\n```\n\n**Caching, CDNs, and proxies** shape performance. HTTP caching uses `Cache-Control` (max-age, no-store), `ETag`/`If-None-Match` (304 Not Modified), and `Last-Modified`. A **CDN** is a geographically distributed cache that serves content from an edge near the user. A **forward proxy** acts on behalf of clients; a **reverse proxy / load balancer** sits in front of servers. Load balancers operate at two layers: an **L4** balancer forwards by IP/port (fast, protocol-agnostic, no payload inspection), while an **L7** balancer understands HTTP — routing by path/host, terminating TLS, and applying caching — at higher CPU cost.",
+      "items": [
+        {
+          "id": "application-protocols-3-fc-1",
+          "type": "flashcard",
+          "front": "What does gRPC use for its message format and transport, and what's the main tradeoff vs REST/JSON?",
+          "back": "gRPC uses Protobuf (compact binary, schema-defined) over HTTP/2, with generated stubs and streaming. Tradeoff: payloads aren't human-readable and browsers need gRPC-Web. REST/JSON is readable and ubiquitous but verbose and loosely typed.",
+          "hint": "Binary schema + HTTP/2 streams vs text resources."
+        },
+        {
+          "id": "application-protocols-3-fc-2",
+          "type": "flashcard",
+          "front": "SSE vs WebSockets: how do they differ in direction and complexity?",
+          "back": "SSE is one-way (server→client) over a long-lived HTTP response, auto-reconnecting and HTTP-native — simple. WebSockets are full-duplex (both sides send anytime) via an HTTP Upgrade, then a raw bidirectional channel — more capable but bypasses HTTP semantics.",
+          "hint": "One direction and simple vs both directions and an upgrade."
+        },
+        {
+          "id": "application-protocols-3-fc-3",
+          "type": "flashcard",
+          "front": "How do ETag and If-None-Match produce a 304 Not Modified?",
+          "back": "The server sends an ETag (a content version tag) with a resource. On revalidation the client sends 'If-None-Match: <etag>'. If unchanged, the server replies '304 Not Modified' with no body, letting the client reuse its cached copy — saving bandwidth.",
+          "hint": "A version tag echoed back to ask 'still current?'"
+        },
+        {
+          "id": "application-protocols-3-fc-4",
+          "type": "flashcard",
+          "front": "Contrast an L4 vs an L7 load balancer.",
+          "back": "L4 balances by IP/port (transport layer): fast, protocol-agnostic, no payload inspection. L7 understands HTTP (application layer): can route by host/path, terminate TLS, and cache — more flexible but more CPU per request.",
+          "hint": "Transport-tuple routing vs HTTP-aware routing."
+        },
+        {
+          "id": "application-protocols-3-mcq-1",
+          "type": "mcq",
+          "prompt": "You need a browser dashboard that receives live server updates but never sends data back over that channel. Lowest-complexity fit?",
+          "choices": [
+            "WebSockets",
+            "Server-Sent Events (SSE)",
+            "gRPC bidirectional streaming",
+            "Long-polling with POST"
+          ],
+          "answerIndex": 1,
+          "explanation": "SSE is purpose-built for one-way server→client streaming over plain HTTP, with automatic reconnection and minimal code. WebSockets add full-duplex you don't need; gRPC bidi streaming isn't natively browser-friendly."
+        },
+        {
+          "id": "application-protocols-3-mcq-2",
+          "type": "mcq",
+          "prompt": "An internal microservice handles 50k RPC/s between services in your cluster, needs low latency, strong typing, and streaming. Best choice?",
+          "choices": [
+            "REST/JSON over HTTP/1.1",
+            "gRPC with Protobuf over HTTP/2",
+            "SOAP/XML",
+            "WebSockets carrying JSON"
+          ],
+          "answerIndex": 1,
+          "explanation": "gRPC/Protobuf over HTTP/2 gives compact binary encoding, multiplexed streams, generated typed stubs, and built-in streaming — ideal for high-throughput internal service-to-service calls. REST/JSON is fine for public APIs but heavier on the wire and loosely typed."
+        },
+        {
+          "id": "application-protocols-3-mcq-3",
+          "type": "mcq",
+          "prompt": "What is the primary benefit a CDN provides?",
+          "choices": [
+            "It encrypts traffic that was otherwise plaintext",
+            "It serves cached content from an edge location geographically close to the user, cutting latency and origin load",
+            "It compresses Protobuf into JSON",
+            "It replaces DNS resolution"
+          ],
+          "answerIndex": 1,
+          "explanation": "A CDN is a distributed cache near users; edge nodes answer requests with reduced round-trip latency and offload the origin. It doesn't inherently add encryption (though it often terminates TLS) and doesn't replace DNS — it's steered BY DNS/anycast."
+        },
+        {
+          "id": "application-protocols-3-mcq-4",
+          "type": "mcq",
+          "prompt": "Which task REQUIRES an L7 (application-aware) load balancer rather than an L4 one?",
+          "choices": [
+            "Spreading raw TCP connections evenly across backends",
+            "Routing requests for /api to one pool and /images to another based on the URL path",
+            "Forwarding UDP datagrams by destination port",
+            "Balancing connections by source IP hash"
+          ],
+          "answerIndex": 1,
+          "explanation": "Path-based routing requires parsing the HTTP request, which only an L7 balancer does. L4 balancers see just IP/port and cannot inspect the URL, headers, or host to make application-level routing decisions."
+        }
+      ]
+    },
+    {
+      "id": "application-protocols-messaging-iot-lesson-4",
+      "title": "Messaging & IoT: MQTT, CoAP, AMQP/Kafka, NTP/PTP, SNMP, SMTP/IMAP",
+      "order": 4,
+      "difficulty": 3,
+      "content": "Beyond request/response, much of the modern stack is **messaging** — decoupling senders from receivers — and it is the bridge to embedded/IoT.\n\n**MQTT** is the dominant IoT protocol: a lightweight **publish/subscribe** scheme over TCP. Clients don't talk to each other; they connect to a central **broker** and publish to hierarchical **topics** (`sensors/floor3/temp`); subscribers register topic filters (with `+` single-level and `#` multi-level wildcards) and the broker fans out matching messages. Two features matter operationally: a **retained** message is stored by the broker as the last-known value on a topic so new subscribers get it immediately, and a **last-will (LWT)** is a message the broker publishes automatically if a client drops uncleanly — instant disconnect detection. This is exactly your topic-04 voice-translator pub/sub instinct.\n\nMQTT's three **QoS** levels trade reliability for chatter. **QoS 0** ('at most once') is fire-and-forget: one PUBLISH, no ack. **QoS 1** ('at least once') is a *2-packet* handshake — PUBLISH then PUBACK; if the PUBACK is lost the sender re-sends, so the receiver may see **duplicates**. **QoS 2** ('exactly once') is a *4-packet* handshake — PUBLISH → PUBREC → PUBREL → PUBCOMP — that deduplicates so the message is delivered once and only once, at the cost of two round-trips.\n\n**CoAP** is REST for constrained devices: GET/POST/PUT/DELETE and URIs like HTTP, but over **UDP** (with **DTLS** for security) and a tiny binary header — ideal where TCP+HTTP is too heavy. **AMQP** (broker-based, rich routing/queues, e.g. RabbitMQ) and **Kafka** (a partitioned, replayable distributed log for high-throughput event streams) cover backend messaging. For time: **NTP** syncs clocks to ~ms over the Internet; **PTP** (IEEE 1588) reaches sub-microsecond with hardware timestamping — the precision instrumentation/radar world relies on it. **SNMP** polls/traps device management data via MIBs/OIDs. **SMTP** sends mail between servers; **IMAP** (and older POP3) let clients retrieve it.",
+      "items": [
+        {
+          "id": "application-protocols-4-fc-1",
+          "type": "flashcard",
+          "front": "Describe MQTT's architecture: who talks to whom, and how is addressing done?",
+          "back": "Publish/subscribe via a central broker over TCP. Publishers send to hierarchical topics (e.g. sensors/floor3/temp); subscribers register topic filters using wildcards (+ single-level, # multi-level). The broker fans out matching messages — clients never address each other directly.",
+          "hint": "A broker in the middle; topics, not addresses."
+        },
+        {
+          "id": "application-protocols-4-fc-2",
+          "type": "flashcard",
+          "front": "What are MQTT retained messages and the last-will (LWT), and what problem does each solve?",
+          "back": "Retained: the broker stores the last message on a topic so a new subscriber immediately gets the current value instead of waiting for the next publish. LWT: a message the broker publishes automatically if a client disconnects uncleanly — giving fast, automatic dead-client detection.",
+          "hint": "One is 'latest value on connect'; one is 'announce my death'."
+        },
+        {
+          "id": "application-protocols-4-fc-3",
+          "type": "flashcard",
+          "front": "What is CoAP and how does it differ from HTTP?",
+          "back": "CoAP is a RESTful protocol (GET/POST/PUT/DELETE, URIs) for constrained devices, but runs over UDP with a tiny binary header (and DTLS for security) instead of TCP+text HTTP. It suits low-power, lossy, memory-limited nodes where full HTTP is too heavy.",
+          "hint": "REST semantics, but over UDP with a binary header."
+        },
+        {
+          "id": "application-protocols-4-fc-4",
+          "type": "flashcard",
+          "front": "Why does PTP (IEEE 1588) achieve far better accuracy than NTP, and why does that matter for radar/instrumentation?",
+          "back": "PTP uses hardware timestamping at the NIC/PHY (removing OS/software jitter) and a master/boundary/transparent-clock hierarchy, reaching sub-microsecond sync; NTP is software-timestamped at ~millisecond. Phased-array radar, sensor fusion, and distributed measurement need tightly aligned clocks for coherent timing.",
+          "hint": "Where the timestamp is taken: in hardware vs in the OS."
+        },
+        {
+          "id": "application-protocols-4-mcq-1",
+          "type": "mcq",
+          "prompt": "On the wire, how do MQTT QoS 1 and QoS 2 differ?",
+          "choices": [
+            "QoS 1 sends no acknowledgement; QoS 2 sends one PUBACK",
+            "QoS 1 is a 2-packet exchange (PUBLISH, PUBACK) and may deliver duplicates; QoS 2 is a 4-packet exchange (PUBLISH, PUBREC, PUBREL, PUBCOMP) guaranteeing exactly-once",
+            "QoS 1 uses UDP and QoS 2 uses TCP",
+            "They are identical except QoS 2 compresses the payload"
+          ],
+          "answerIndex": 1,
+          "explanation": "QoS 1 ('at least once') = PUBLISH + PUBACK; a lost PUBACK triggers re-send, so the receiver can see duplicates. QoS 2 ('exactly once') adds a second round-trip — PUBLISH, PUBREC, PUBREL, PUBCOMP — to deduplicate and deliver once and only once. Both run over the same TCP connection."
+        },
+        {
+          "id": "application-protocols-4-mcq-2",
+          "type": "mcq",
+          "prompt": "A sensor publishes telemetry where losing an occasional reading is fine and minimizing battery/bandwidth is critical. Which MQTT QoS fits best?",
+          "choices": [
+            "QoS 0 (at most once)",
+            "QoS 1 (at least once)",
+            "QoS 2 (exactly once)",
+            "QoS 3 (ordered)"
+          ],
+          "answerIndex": 0,
+          "explanation": "QoS 0 is fire-and-forget: a single PUBLISH with no acknowledgement — lowest overhead and power, acceptable when occasional loss doesn't matter. QoS 1/2 add round-trips and state. (There is no QoS 3.)"
+        },
+        {
+          "id": "application-protocols-4-mcq-3",
+          "type": "mcq",
+          "prompt": "Which backend messaging system is best described as a partitioned, replayable distributed commit log for high-throughput event streams?",
+          "choices": [
+            "MQTT",
+            "CoAP",
+            "Apache Kafka",
+            "SNMP"
+          ],
+          "answerIndex": 2,
+          "explanation": "Kafka stores ordered records in partitioned topics on disk; consumers track their own offset and can replay history — the distributed-log model for event streaming. MQTT/CoAP are lightweight IoT messaging; SNMP is device management."
+        },
+        {
+          "id": "application-protocols-4-mcq-4",
+          "type": "mcq",
+          "prompt": "Match the protocol to its job: retrieving mail to a client from a mailbox server.",
+          "choices": [
+            "SMTP",
+            "IMAP",
+            "SNMP",
+            "NTP"
+          ],
+          "answerIndex": 1,
+          "explanation": "IMAP (and older POP3) retrieves mail from the server to a client and, for IMAP, keeps it synchronized on the server. SMTP sends/relays mail between servers; SNMP manages network devices; NTP synchronizes clocks."
+        }
+      ]
+    }
+  ]
+}

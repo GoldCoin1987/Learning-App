@@ -1,0 +1,302 @@
+{
+  "id": "embedded-networking",
+  "title": "Embedded Networking & the Modern Edge",
+  "order": 16,
+  "lessons": [
+    {
+      "id": "embedded-networking-l1",
+      "title": "Lightweight TCP/IP Stacks & MCU Networking Hardware",
+      "order": 1,
+      "difficulty": 1,
+      "content": "On a desktop the kernel hides the network stack from you. On a microcontroller with tens of kilobytes of RAM, the stack *is* your problem, and **lwIP** (lightweight IP) is the canonical answer. lwIP is built so you can pick your trade-off. Its **raw / callback API** is the fastest and smallest: you register callbacks the stack invokes when data arrives, with no threads and no copies. The **sequential (netconn) API** wraps that in a thread-friendly message-passing interface, and the **socket API** emulates Berkeley sockets so ported code compiles unchanged — each step up costs RAM and copies. Memory is managed with fixed **pools** (deterministic, no fragmentation) rather than a general heap, and packets live in **pbufs**: chained buffers designed for **zero-copy**, so a payload can sit in DMA-filled memory and never be copied as headers are prepended. Other stacks make different bets: **uIP/Contiki** is even smaller (a single packet buffer, great for sensor motes), **FreeRTOS+TCP** integrates with that RTOS, and **Zephyr**'s net stack is a modern, modular option.\n\nUnderneath, an MCU Ethernet port splits into a **MAC** (on-chip, does framing and DMA) and an external **PHY** (the analog/line-coding chip on the magnetics). They connect over **MII** (wide, more pins) or the reduced **RMII** (fewer pins, 50 MHz reference clock) — the same MAC/PHY split you would have probed on radar line cards. The MAC moves frames via **DMA descriptor** rings so the CPU is not copying bytes per packet, and **offload engines** can compute IP/TCP **checksums** in hardware. When a board has no Ethernet MAC at all, you tunnel IP over a serial line with **SLIP** (trivial framing) or **PPP** (adds negotiation and auth).",
+      "items": [
+        {
+          "id": "embedded-networking-l1-fc1",
+          "type": "flashcard",
+          "front": "Name lwIP's three API styles from smallest/fastest to most portable.",
+          "back": "Raw/callback API (no threads, no copies, smallest) → sequential/netconn API (thread-friendly message passing) → socket API (Berkeley-sockets emulation for porting). Each step up costs more RAM and copies."
+        },
+        {
+          "id": "embedded-networking-l1-fc2",
+          "type": "flashcard",
+          "front": "What is a pbuf and why is it designed for zero-copy?",
+          "back": "A pbuf is lwIP's packet buffer, a chainable structure. By chaining buffers and reserving header room, a payload sitting in DMA memory can have headers prepended without copying the data — critical on RAM-starved MCUs.",
+          "hint": "p = packet; chains let headers attach without moving data."
+        },
+        {
+          "id": "embedded-networking-l1-fc3",
+          "type": "flashcard",
+          "front": "Why do embedded stacks use fixed memory pools instead of a general heap?",
+          "back": "Pools give deterministic, bounded allocation with no fragmentation — essential when a long-running device cannot tolerate heap fragmentation or unpredictable malloc latency."
+        },
+        {
+          "id": "embedded-networking-l1-fc4",
+          "type": "flashcard",
+          "front": "On an MCU Ethernet port, what is the split between MAC and PHY?",
+          "back": "The MAC is on-chip and handles framing, FCS, and DMA to memory; the external PHY does line coding and the analog interface to the magnetics/cable. They connect over MII or RMII."
+        },
+        {
+          "id": "embedded-networking-l1-fc5",
+          "type": "flashcard",
+          "front": "What do DMA descriptor rings and checksum offload save the CPU from doing?",
+          "back": "Descriptor rings let the MAC move frames to/from RAM without the CPU copying bytes per packet; checksum/TCP offload computes IP/TCP checksums in hardware instead of the CPU walking every byte."
+        },
+        {
+          "id": "embedded-networking-l1-fc6",
+          "type": "flashcard",
+          "front": "When an MCU has no Ethernet MAC, how do you still run IP? SLIP vs PPP?",
+          "back": "Tunnel IP over a serial UART. SLIP is minimal framing (just byte stuffing, no negotiation). PPP adds link negotiation (LCP), authentication, and multi-protocol support."
+        },
+        {
+          "id": "embedded-networking-l1-mc1",
+          "type": "mcq",
+          "prompt": "A team ports a Linux socket application to an STM32 running lwIP with minimal code changes. Which lwIP API did they most likely use, and what is the cost?",
+          "choices": [
+            "Raw/callback API; it copies every packet twice",
+            "Socket API; it costs more RAM and data copies than the raw API",
+            "DMA API; it bypasses the stack entirely",
+            "PPP API; it requires a second MCU"
+          ],
+          "answerIndex": 1,
+          "explanation": "The socket API emulates Berkeley sockets so existing code compiles, but the abstraction and threading cost more RAM and copies than the raw/callback path."
+        },
+        {
+          "id": "embedded-networking-l1-mc2",
+          "type": "mcq",
+          "prompt": "RMII is chosen over MII on a pin-constrained MCU primarily because RMII:",
+          "choices": [
+            "Encrypts the MAC-to-PHY link",
+            "Uses fewer signal pins by running a shared 50 MHz reference clock",
+            "Eliminates the need for an external PHY",
+            "Doubles the line rate to 200 Mbps"
+          ],
+          "answerIndex": 1,
+          "explanation": "RMII (Reduced MII) cuts the pin count of the MAC–PHY interface by using a single 50 MHz reference clock and narrower data buses; it does not remove the PHY or change the wire rate."
+        },
+        {
+          "id": "embedded-networking-l1-mc3",
+          "type": "mcq",
+          "prompt": "Which stack is the best match for an extremely RAM-limited sensor mote that handles one packet at a time?",
+          "choices": [
+            "lwIP socket API with full TCP",
+            "FreeRTOS+TCP with multiple sockets",
+            "uIP/Contiki with a single shared packet buffer",
+            "A desktop Linux kernel stack"
+          ],
+          "answerIndex": 2,
+          "explanation": "uIP/Contiki is designed for the smallest devices, using a single global packet buffer and processing one packet at a time to fit in kilobytes of RAM."
+        },
+        {
+          "id": "embedded-networking-l1-mc4",
+          "type": "mcq",
+          "prompt": "Why are fixed pbuf pools preferable to malloc/free on a device meant to run for months unattended?",
+          "choices": [
+            "malloc is illegal in C on microcontrollers",
+            "Pools guarantee bounded, fragmentation-free allocation and predictable latency",
+            "Pools automatically encrypt packet contents",
+            "malloc cannot allocate buffers larger than 64 bytes"
+          ],
+          "answerIndex": 1,
+          "explanation": "Long-running embedded systems cannot tolerate heap fragmentation or unpredictable allocation latency; fixed pools give deterministic, bounded behavior."
+        }
+      ]
+    },
+    {
+      "id": "embedded-networking-l2",
+      "title": "Constrained Protocols: MQTT-SN, CoAP/DTLS, 6LoWPAN & Thread/Matter",
+      "order": 2,
+      "difficulty": 2,
+      "content": "Once IP reaches a tiny device, the *application* protocols also have to shrink. Plain MQTT runs over TCP, which is heavy for the smallest radios, so **MQTT-SN** (for Sensor Networks) maps the same publish/subscribe model onto **UDP** (or even non-IP links), shortens topic names to two-byte IDs, and adds gateways and sleep-aware semantics. **CoAP** takes a different route: a compact, binary, RESTful protocol (GET/POST/PUT/DELETE with response codes that mirror HTTP) running over **UDP**, secured by **DTLS** (TLS adapted for datagrams). The reason **pub/sub and UDP fit lossy, constrained links** is structural: UDP has no handshake, no connection state to keep alive, and no head-of-line blocking, so a device can wake, send one datagram, and sleep — while the broker decouples senders from receivers so a sleeping node misses nothing it subscribes to. Reliability, when needed, is added lightly (CoAP confirmable messages, MQTT QoS) rather than baked into a stream.\n\nAt the link layer, **802.15.4** radios carry only ~127-byte frames, far too small for a 40-byte IPv6 header. **6LoWPAN** is the adaptation layer that makes IPv6 fit: it **compresses** the IPv6/UDP headers (eliding fields derivable from link context, e.g. deriving the interface ID from the L2 address) and fragments larger packets. On top of 6LoWPAN sits **Thread**, a self-healing IPv6 mesh for the home, and **Matter**, the application/data-model layer that runs over Thread (and WiFi) to unify smart-home devices across vendors — the modern convergence point. Net effect: a coin-cell sensor speaks real IPv6 end-to-end, just heavily squeezed.",
+      "items": [
+        {
+          "id": "embedded-networking-l2-fc1",
+          "type": "flashcard",
+          "front": "How does MQTT-SN differ from MQTT for constrained devices?",
+          "back": "MQTT-SN runs the same pub/sub model over UDP (or non-IP links) instead of TCP, uses short 2-byte topic IDs instead of strings, adds gateways, and includes sleep-aware semantics for battery nodes."
+        },
+        {
+          "id": "embedded-networking-l2-fc2",
+          "type": "flashcard",
+          "front": "What is CoAP, what transport does it use, and how is it secured?",
+          "back": "CoAP is a compact binary RESTful protocol (GET/POST/PUT/DELETE with HTTP-like response codes) for constrained devices. It runs over UDP and is secured with DTLS (TLS adapted for datagrams)."
+        },
+        {
+          "id": "embedded-networking-l2-fc3",
+          "type": "flashcard",
+          "front": "Why do pub/sub plus UDP fit lossy, low-power links so well?",
+          "back": "UDP has no handshake, no kept-alive connection state, and no head-of-line blocking, so a node can wake, fire one datagram, and sleep. Pub/sub decouples senders from receivers via a broker, so a sleeping subscriber misses nothing.",
+          "hint": "No connection to babysit; broker buffers the decoupling."
+        },
+        {
+          "id": "embedded-networking-l2-fc4",
+          "type": "flashcard",
+          "front": "What problem does 6LoWPAN solve, and how?",
+          "back": "802.15.4 frames are only ~127 bytes — too small for a 40-byte IPv6 header. 6LoWPAN is an adaptation layer that compresses IPv6/UDP headers (eliding context-derivable fields) and fragments larger packets so IPv6 fits."
+        },
+        {
+          "id": "embedded-networking-l2-fc5",
+          "type": "flashcard",
+          "front": "How does header compression derive the IPv6 interface identifier on 802.15.4?",
+          "back": "It can be elided and reconstructed from the link-layer (L2) address, since the interface ID is derivable from context — so those bytes need not travel in the compressed header."
+        },
+        {
+          "id": "embedded-networking-l2-fc6",
+          "type": "flashcard",
+          "front": "Distinguish Thread from Matter.",
+          "back": "Thread is a self-healing low-power IPv6 mesh network (built on 802.15.4/6LoWPAN). Matter is the application/data-model layer that runs over Thread or WiFi to make smart-home devices interoperate across vendors."
+        },
+        {
+          "id": "embedded-networking-l2-mc1",
+          "type": "mcq",
+          "prompt": "A battery sensor on an 802.15.4 mesh must report once a minute and sleep otherwise. Why is CoAP-over-UDP a better fit than HTTP-over-TCP?",
+          "choices": [
+            "TCP cannot carry sensor data",
+            "UDP avoids a connection handshake and kept-alive state, so the node can fire one datagram and sleep",
+            "HTTP cannot be secured at all",
+            "CoAP guarantees delivery without any acknowledgements"
+          ],
+          "answerIndex": 1,
+          "explanation": "TCP's handshake and connection keep-alive cost energy and RAM for a node that mostly sleeps. UDP is stateless; CoAP adds optional confirmable reliability only when needed."
+        },
+        {
+          "id": "embedded-networking-l2-mc2",
+          "type": "mcq",
+          "prompt": "DTLS exists rather than plain TLS for CoAP because:",
+          "choices": [
+            "DTLS uses stronger ciphers than TLS",
+            "TLS assumes a reliable, ordered byte stream; DTLS adapts the handshake/record layer to unreliable UDP datagrams",
+            "DTLS is unencrypted but authenticated",
+            "CoAP devices cannot do public-key cryptography"
+          ],
+          "answerIndex": 1,
+          "explanation": "TLS depends on TCP's reliable ordered stream. DTLS modifies the record and handshake layers to tolerate loss, reordering, and the datagram model of UDP."
+        },
+        {
+          "id": "embedded-networking-l2-mc3",
+          "type": "mcq",
+          "prompt": "An IPv6 packet must cross an 802.15.4 link with a ~127-byte MTU. What does 6LoWPAN do?",
+          "choices": [
+            "Drops the packet because IPv6 is incompatible with 802.15.4",
+            "Compresses the IPv6/UDP headers and fragments the packet to fit the small frame",
+            "Converts the packet to IPv4 to save space",
+            "Disables addressing to make room for payload"
+          ],
+          "answerIndex": 1,
+          "explanation": "6LoWPAN is the adaptation layer that header-compresses and fragments IPv6 so it physically fits the tiny 802.15.4 frame while remaining real IPv6 end-to-end."
+        },
+        {
+          "id": "embedded-networking-l2-mc4",
+          "type": "mcq",
+          "prompt": "In the modern smart-home stack, what is Matter's role relative to Thread?",
+          "choices": [
+            "Matter is the radio PHY; Thread is the cipher suite",
+            "Matter is the cross-vendor application/data-model layer; Thread is the underlying low-power IPv6 mesh transport",
+            "They are competing radios and cannot coexist",
+            "Thread replaces IPv6 entirely with a proprietary scheme"
+          ],
+          "answerIndex": 1,
+          "explanation": "Thread provides the IPv6 mesh network; Matter sits above it (and WiFi) as the interoperable application/data model so devices from different vendors work together."
+        }
+      ]
+    },
+    {
+      "id": "embedded-networking-l3",
+      "title": "Edge Security, Power-vs-Connectivity & the End-to-End Trace",
+      "order": 3,
+      "difficulty": 3,
+      "content": "A networked sensor is only useful if it is **trustworthy** and **lives on its battery**, and those two goals fight each other. Security on a constrained device starts at boot: **secure boot** verifies a cryptographic signature on the firmware before running it, so an attacker cannot swap in malicious code; a hardware **root of trust** anchors that chain. Link confidentiality comes from **DTLS** (for UDP/CoAP) or TLS (for TCP/MQTT), but public-key math is expensive, so devices lean on **hardware crypto** — AES/SHA accelerators and a secure element holding keys that never leave the chip. The pattern is: do the costly key exchange rarely, then ride a cheap symmetric session.\n\nThe **power-vs-connectivity** trade-off dominates everything else. A radio that is always listening drains a coin cell in days, so devices **duty-cycle**: the MCU and radio sleep most of the time and wake on a timer to sample and transmit. To stay reachable while asleep, designs use **wake-on-radio** — a low-power receiver that listens for a wake-up pattern and only then powers the main radio — or they accept latency and poll. More radio time means more reachability but less battery; this is the central design dial. **Edge/fog computing** eases it: pushing aggregation, filtering, and inference onto a nearby gateway means the device sends less, and sends it less often.\n\nPut it together by tracing one reading. The MCU samples the **sensor** over I2C; lwIP builds a **pbuf**, wraps it in **UDP/TCP**, applies **DTLS/TLS**, and forms an MQTT **PUBLISH**; the **802.11 (or 802.15.4) PHY** transmits it; the **AP/router** bridges WiFi to Ethernet and NATs it; the **MQTT broker** receives the PUBLISH and fans it out to every matching **subscriber** — every layer from Module 1 crossed in one hop of telemetry.",
+      "items": [
+        {
+          "id": "embedded-networking-l3-fc1",
+          "type": "flashcard",
+          "front": "What does secure boot guarantee, and what anchors it?",
+          "back": "Secure boot verifies a cryptographic signature on the firmware before executing it, so only authentic code runs. It is anchored by a hardware root of trust (immutable boot ROM / keys fused into silicon)."
+        },
+        {
+          "id": "embedded-networking-l3-fc2",
+          "type": "flashcard",
+          "front": "Why do constrained devices rely on hardware crypto and a secure element?",
+          "back": "Public-key and bulk-cipher math is slow and power-hungry in software. AES/SHA accelerators speed it up, and a secure element stores keys that never leave the chip — protecting them even if firmware is compromised."
+        },
+        {
+          "id": "embedded-networking-l3-fc3",
+          "type": "flashcard",
+          "front": "State the duty-cycling strategy for battery sensors in one line.",
+          "back": "Keep the MCU and radio asleep most of the time; wake periodically on a timer to sample and transmit, then sleep again — radio-on time is the dominant power cost."
+        },
+        {
+          "id": "embedded-networking-l3-fc4",
+          "type": "flashcard",
+          "front": "What is wake-on-radio and what trade-off does it manage?",
+          "back": "A low-power receiver listens for a wake-up pattern and only then powers the main radio. It keeps a sleeping device reachable without the battery cost of a fully-on receiver — balancing reachability vs power."
+        },
+        {
+          "id": "embedded-networking-l3-fc5",
+          "type": "flashcard",
+          "front": "How does edge/fog computing ease the power-vs-connectivity dial?",
+          "back": "Pushing aggregation, filtering, and inference onto a nearby gateway lets the device transmit less data, less often — saving radio energy and reducing bandwidth and latency to the cloud."
+        },
+        {
+          "id": "embedded-networking-l3-fc6",
+          "type": "flashcard",
+          "front": "Trace one sensor reading from sensor -> MCU stack -> wireless PHY -> AP -> broker -> subscriber.",
+          "back": "MCU samples the sensor (I2C/SPI/ADC) -> lwIP builds a pbuf, adds UDP/TCP, applies DTLS/TLS, forms an MQTT PUBLISH -> 802.11/802.15.4 PHY transmits -> AP/router bridges WiFi->Ethernet and NATs -> MQTT broker receives PUBLISH and fans out to every matching subscriber.",
+          "hint": "Read, encapsulate, radiate, bridge, publish, fan-out.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/embedded-networking-1.svg"
+        },
+        {
+          "id": "embedded-networking-l3-mc1",
+          "type": "mcq",
+          "prompt": "Why is it standard to do the DTLS/TLS key exchange rarely and then reuse a symmetric session on a constrained device?",
+          "choices": [
+            "Symmetric keys are more secure than asymmetric ones",
+            "Asymmetric/public-key operations are far more CPU- and energy-expensive, so you amortize them over a cheap symmetric session",
+            "Datagram protocols forbid repeated handshakes",
+            "The secure element can only run one handshake in its lifetime"
+          ],
+          "answerIndex": 1,
+          "explanation": "Public-key math (the handshake) is the costly part; once a symmetric session key is established, bulk encryption is cheap, so you handshake infrequently and resume sessions."
+        },
+        {
+          "id": "embedded-networking-l3-mc2",
+          "type": "mcq",
+          "prompt": "A coin-cell sensor must remain remotely commandable but lasts only days with its receiver always on. Which approach best balances reachability and battery life?",
+          "choices": [
+            "Keep the main radio receiving continuously",
+            "Disable all networking after boot",
+            "Use wake-on-radio: a low-power receiver listens for a wake pattern and only then powers the main radio",
+            "Switch from IPv6 to IPv4 to save power"
+          ],
+          "answerIndex": 2,
+          "explanation": "Wake-on-radio keeps a tiny receiver listening cheaply and powers the energy-hungry main radio only when summoned, preserving reachability without continuous receive current."
+        },
+        {
+          "id": "embedded-networking-l3-mc3",
+          "type": "mcq",
+          "prompt": "In the end-to-end trace, where is the MQTT PUBLISH first turned into something an 802.11 radio can transmit, and what does the AP do next?",
+          "choices": [
+            "The broker frames it; the AP decrypts the payload",
+            "The MCU's stack encapsulates PUBLISH in TCP/IP and the 802.11 MAC/PHY frames it; the AP bridges WiFi to Ethernet and NATs the egress",
+            "The subscriber frames it; the AP routes with BGP",
+            "The sensor itself emits 802.11 frames directly over I2C"
+          ],
+          "answerIndex": 1,
+          "explanation": "The MCU stack builds the TCP/IP encapsulation and the 802.11 MAC/PHY puts it on the air; the AP/router then bridges the WiFi frame onto Ethernet and performs NAT for the upstream path to the broker."
+        },
+        {
+          "id": "embedded-networking-l3-mc4",
+          "type": "mcq",
+          "prompt": "What security guarantee does secure boot provide that DTLS alone does not?",
+          "choices": [
+            "It encrypts data in transit",
+            "It authenticates the firmware image at startup so only signed code runs, defending against tampered/malicious firmware",
+            "It compresses IPv6 headers",
+            "It hides the device's MAC address from the AP"
+          ],
+          "answerIndex": 1,
+          "explanation": "DTLS protects data on the wire; secure boot protects the integrity of the code itself, verifying the firmware signature before execution — complementary, not redundant."
+        }
+      ]
+    }
+  ]
+}

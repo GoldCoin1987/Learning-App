@@ -1,0 +1,414 @@
+{
+  "id": "transport-tcp-udp",
+  "title": "Transport: TCP, UDP, Ports & Sockets",
+  "order": 10,
+  "lessons": [
+    {
+      "id": "transport-tcp-udp-ports-udp",
+      "title": "Ports, the 4-Tuple & UDP",
+      "order": 1,
+      "difficulty": 1,
+      "content": "# Ports, the 4-Tuple, and UDP\n\nThe transport layer's core job is **process-to-process delivery**. IP gets a packet to the right *host*; a 16-bit **port** number gets it to the right *process*. A connection (or flow) is uniquely identified by the **4-tuple**: `(src IP, src port, dst IP, dst port)`. Two browser tabs to the same server differ only in their ephemeral *source* port, yet the kernel demultiplexes them perfectly.\n\nPort ranges: **well-known** 0-1023 (80 HTTP, 443 HTTPS, 53 DNS, 22 SSH), **registered** 1024-49151, and **ephemeral/dynamic** ~49152-65535 (Linux default `32768-60999`) handed out for outbound client sockets.\n\n**UDP** is the minimal transport: a fixed **8-byte header** (src port, dst port, length, checksum) wrapping a datagram. It is **connectionless, unordered, and unreliable** — no handshake, no retransmission, no flow or congestion control. The kernel just stamps the header and hands it to IP. That austerity is a feature: there is no head-of-line blocking and no setup latency, so it is ideal for **DNS** (one tiny request/reply), **DHCP**, **VoIP/streaming** (a late packet is worthless — better to drop it), gaming, and as the **substrate for QUIC**, which rebuilds reliability and ordering per-stream in user space.\n\n```python\nimport socket\ns = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # UDP\ns.sendto(b'ping', ('192.0.2.10', 9999))   # fire-and-forget, no connect\ndata, addr = s.recvfrom(2048)             # who replied is in addr\n```\n",
+      "items": [
+        {
+          "id": "transport-tcp-udp-ports-001",
+          "type": "flashcard",
+          "front": "What four values uniquely identify a transport connection, and what is this called?",
+          "back": "The **4-tuple**: `(source IP, source port, destination IP, destination port)`. The transport layer uses it to *demultiplex* arriving segments to the correct socket/process.",
+          "hint": "Two endpoints, two fields each."
+        },
+        {
+          "id": "transport-tcp-udp-ports-002",
+          "type": "flashcard",
+          "front": "Why can two browser tabs connect to the same `server:443` simultaneously without collision?",
+          "back": "They share dst IP, dst port (443), and src IP, but each gets a distinct **ephemeral source port**, so the 4-tuples differ and the kernel keeps the flows separate.",
+          "hint": "Only one field needs to differ."
+        },
+        {
+          "id": "transport-tcp-udp-ports-003",
+          "type": "flashcard",
+          "front": "List the three port ranges and give an example of each.",
+          "back": "**Well-known** 0-1023 (e.g. 443 HTTPS); **registered** 1024-49151 (e.g. 5432 PostgreSQL); **ephemeral/dynamic** ~49152-65535 (Linux 32768-60999) for client source ports.",
+          "hint": "Three bands across 0-65535."
+        },
+        {
+          "id": "transport-tcp-udp-ports-004",
+          "type": "flashcard",
+          "front": "What are the four fields of the UDP header and its total size?",
+          "back": "**Source port, destination port, length, checksum** — each 16 bits, for a fixed **8-byte** header. Length and checksum cover header + data.",
+          "hint": "Eight bytes, four 16-bit fields."
+        },
+        {
+          "id": "transport-tcp-udp-ports-005",
+          "type": "flashcard",
+          "front": "Name three properties UDP does NOT provide that TCP does.",
+          "back": "No **reliability** (retransmission), no **ordering**, and no **flow/congestion control**. It is connectionless and fire-and-forget; the application must add anything it needs.",
+          "hint": "Reliability, ordering, control."
+        },
+        {
+          "id": "transport-tcp-udp-ports-010",
+          "type": "mcq",
+          "prompt": "A VoIP application drops a voice packet that arrives 300 ms late rather than waiting for it. Which transport best matches this need and why?",
+          "choices": [
+            "TCP, because in-order delivery guarantees clean audio",
+            "UDP, because retransmitting stale audio is useless and adds latency",
+            "TCP, because its congestion control prevents jitter",
+            "UDP, because it guarantees ordered delivery without ACKs"
+          ],
+          "answerIndex": 1,
+          "explanation": "Real-time media values timeliness over completeness. TCP would stall the stream retransmitting a packet that is already too old to play. UDP lets the app discard late data — and UDP gives no ordering guarantee, ruling out the last choice."
+        },
+        {
+          "id": "transport-tcp-udp-ports-011",
+          "type": "mcq",
+          "prompt": "What is the size of the UDP header?",
+          "choices": [
+            "20 bytes",
+            "8 bytes",
+            "12 bytes",
+            "Variable, 20-60 bytes"
+          ],
+          "answerIndex": 1,
+          "explanation": "UDP is fixed at 8 bytes (src port, dst port, length, checksum, each 16 bits). 20-60 bytes describes the TCP/IPv4 header, not UDP."
+        },
+        {
+          "id": "transport-tcp-udp-ports-012",
+          "type": "mcq",
+          "prompt": "Why is UDP a natural substrate for QUIC?",
+          "choices": [
+            "UDP already provides encryption QUIC can reuse",
+            "UDP's lack of built-in ordering/retransmission lets QUIC implement per-stream reliability in user space without kernel TCP semantics",
+            "UDP guarantees in-order delivery that QUIC needs",
+            "UDP has a larger header that QUIC fills with stream IDs"
+          ],
+          "answerIndex": 1,
+          "explanation": "QUIC needs a thin, ubiquitously-routed datagram layer it can build on. UDP imposes no ordering or HOL blocking, so QUIC adds reliability, congestion control, and TLS 1.3 itself — in user space, deployable without OS changes."
+        },
+        {
+          "id": "transport-tcp-udp-ports-013",
+          "type": "mcq",
+          "prompt": "When a Linux client opens an outbound TCP connection, where does its source port typically come from?",
+          "choices": [
+            "It reuses the destination port number",
+            "The ephemeral range (e.g. 32768-60999) assigned by the kernel",
+            "It is always 0 until the handshake completes",
+            "The well-known range 0-1023"
+          ],
+          "answerIndex": 1,
+          "explanation": "Clients bind an ephemeral source port automatically; the well-known range is reserved for listening servers and needs privilege on Unix."
+        }
+      ]
+    },
+    {
+      "id": "transport-tcp-udp-tcp-header-handshake",
+      "title": "TCP Header, Flags, Handshake & Teardown",
+      "order": 2,
+      "difficulty": 2,
+      "content": "# TCP Header, Flags, Handshake & Teardown\n\nTCP turns IP's best-effort packets into a **reliable, ordered byte stream**. Its header is normally 20 bytes (plus options): **source/destination ports**, a 32-bit **sequence number**, a 32-bit **acknowledgment number**, a data-offset (header length), **control flags**, a 16-bit **receive window**, **checksum**, and urgent pointer.\n\nKey flags: **SYN** (synchronize — open, carries the initial sequence number/ISN), **ACK** (the ack field is valid), **FIN** (graceful close, no more data this direction), **RST** (abrupt reset — 'this connection is dead/refused'), **PSH** (push buffered data to the app), **URG** (urgent, largely obsolete).\n\n**Three-way handshake:** client sends `SYN seq=x`; server replies `SYN,ACK seq=y ack=x+1`; client sends `ACK ack=y+1`. Both sides now know each other's ISN; the connection is **ESTABLISHED**. The SYN and FIN each consume one sequence number even though they carry no data.\n\n**Teardown** is a four-way exchange (each direction closes independently): `FIN` / `ACK` one way, then `FIN` / `ACK` the other. The active closer enters **TIME_WAIT** for ~2×MSL so a delayed duplicate segment can't be misread by a new connection on the same 4-tuple, and so the final ACK is reliably delivered. A **RST** skips all of this — it tears the connection down immediately, e.g. when you connect to a port with nothing listening.\n\n```\nss -tan        # see states: LISTEN, SYN-SENT, ESTABLISHED, TIME-WAIT, ...\n```\n",
+      "items": [
+        {
+          "id": "transport-tcp-udp-tcp-001",
+          "type": "flashcard",
+          "front": "What does TCP provide on top of IP, in one phrase?",
+          "back": "A **reliable, ordered, byte-stream** connection between two processes — with retransmission, sequencing, flow control, and congestion control layered over IP's best-effort packets.",
+          "hint": "Reliable ordered stream."
+        },
+        {
+          "id": "transport-tcp-udp-tcp-002",
+          "type": "flashcard",
+          "front": "Describe the TCP three-way handshake with sequence numbers.",
+          "back": "Client → `SYN seq=x`. Server → `SYN,ACK seq=y, ack=x+1`. Client → `ACK ack=y+1`. Each side learns the other's initial sequence number; connection becomes ESTABLISHED. SYN consumes one sequence number.",
+          "hint": "SYN, SYN-ACK, ACK.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/transport-tcp-udp-1.svg"
+        },
+        {
+          "id": "transport-tcp-udp-tcp-003",
+          "type": "flashcard",
+          "front": "What does each TCP flag mean: SYN, ACK, FIN, RST?",
+          "back": "**SYN** open/synchronize ISN; **ACK** acknowledgment field is valid; **FIN** graceful half-close (no more data this direction); **RST** abrupt reset/refuse — immediate teardown, no FIN dance.",
+          "hint": "Open, acknowledge, finish, reset."
+        },
+        {
+          "id": "transport-tcp-udp-tcp-004",
+          "type": "flashcard",
+          "front": "Why does graceful teardown take four segments, not two?",
+          "back": "Each direction is closed independently: one side sends FIN and gets an ACK, then the other side sends its own FIN and gets an ACK. A connection can be half-open (one side done sending) in between.",
+          "hint": "Each direction closes on its own."
+        },
+        {
+          "id": "transport-tcp-udp-tcp-005",
+          "type": "flashcard",
+          "front": "What does a RST signify and when do you see one?",
+          "back": "An **abrupt reset**: kill the connection now, discard state. Common causes: connecting to a port with no listener (connection refused), a crashed peer, or a firewall injecting RSTs.",
+          "hint": "Connection refused / abort."
+        },
+        {
+          "id": "transport-tcp-udp-tcp-010",
+          "type": "mcq",
+          "prompt": "A client sends SYN seq=1000. What does a correct SYN-ACK acknowledgment number contain?",
+          "choices": [
+            "1000",
+            "1001",
+            "0",
+            "The server's own ISN"
+          ],
+          "answerIndex": 1,
+          "explanation": "SYN consumes one sequence number, so the server acknowledges the next expected byte: 1000+1 = 1001. The server's ISN goes in the *sequence* field of the same segment, not the ack field."
+        },
+        {
+          "id": "transport-tcp-udp-tcp-011",
+          "type": "mcq",
+          "prompt": "You run `ss -tan` and many sockets sit in TIME-WAIT on the client. What does this indicate?",
+          "choices": [
+            "The connections failed to open",
+            "These sockets actively closed and are waiting ~2*MSL before fully releasing the 4-tuple",
+            "The server is refusing connections with RST",
+            "Flow control has paused the connections"
+          ],
+          "answerIndex": 1,
+          "explanation": "TIME_WAIT is normal for the side that performed the active close. It prevents a delayed duplicate from a prior connection being accepted by a new one on the same 4-tuple and ensures the final ACK is delivered."
+        },
+        {
+          "id": "transport-tcp-udp-tcp-012",
+          "type": "mcq",
+          "prompt": "Which sequence of flags represents a normal connection setup?",
+          "choices": [
+            "SYN -> ACK -> FIN",
+            "SYN -> SYN,ACK -> ACK",
+            "SYN,ACK -> ACK -> RST",
+            "ACK -> SYN -> SYN,ACK"
+          ],
+          "answerIndex": 1,
+          "explanation": "The three-way handshake is SYN, then SYN+ACK, then ACK. Anything starting with ACK or involving RST/FIN is not a clean open."
+        },
+        {
+          "id": "transport-tcp-udp-tcp-013",
+          "type": "mcq",
+          "prompt": "Connecting to TCP port 9999 where no process is listening typically yields what?",
+          "choices": [
+            "A SYN-ACK then immediate FIN",
+            "A RST from the host (connection refused)",
+            "Silence, then a successful handshake after timeout",
+            "An ICMP echo reply"
+          ],
+          "answerIndex": 1,
+          "explanation": "With no listener, the kernel responds to the SYN with a RST, surfaced to the app as 'connection refused'. (A firewall may instead drop it silently, causing a timeout.)"
+        }
+      ]
+    },
+    {
+      "id": "transport-tcp-udp-reliability-congestion",
+      "title": "Reliability, Sliding Window & Congestion Control",
+      "order": 3,
+      "difficulty": 3,
+      "content": "# Reliability, Sliding Window & Congestion Control\n\nTCP numbers **every byte**. The receiver ACKs the next byte it expects (cumulative ACK). Lost or reordered data is detected and retransmitted, then delivered to the app **in order** — hence *byte stream*, not packets.\n\n**Flow control** stops a fast sender from drowning a slow receiver: the receiver advertises a **receive window** (rwnd) = free buffer space; the sender may have at most rwnd unacknowledged bytes in flight. **Window scaling** (an option) extends rwnd beyond 64 KB for long-fat networks.\n\n**Congestion control** protects the *network*. The sender keeps a **congestion window** (cwnd) and sends `min(cwnd, rwnd)`. Phases: **slow start** grows cwnd exponentially (roughly doubling each RTT) until it hits `ssthresh`; then **congestion avoidance** grows it linearly (+1 MSS/RTT) — this is the **AI** in **AIMD**. On loss signalled by **three duplicate ACKs**, **fast retransmit** resends the missing segment immediately and **fast recovery** halves cwnd (the **MD**) — producing the classic **sawtooth**. A full **retransmission timeout (RTO)** is worse: it collapses cwnd to 1 MSS and restarts slow start.\n\n**SACK** (selective ACK) lets the receiver report exactly which non-contiguous blocks arrived, so the sender retransmits only the true gaps. Modern Linux defaults to **CUBIC** (a cubic growth curve, loss-based). **BBR** is the modern alternative: it *models* the bottleneck bandwidth and RTT instead of reacting to loss, which often gives higher throughput and lower latency on lossy or buffer-bloated paths.\n\n```\nsysctl net.ipv4.tcp_congestion_control   # cubic (default) or bbr\n```\n",
+      "items": [
+        {
+          "id": "transport-tcp-udp-rel-001",
+          "type": "flashcard",
+          "front": "What does a TCP acknowledgment number actually acknowledge?",
+          "back": "The **next byte the receiver expects** (cumulative). An ACK of N means 'I have all bytes up to N-1'. TCP numbers bytes, not segments, which is why it delivers a reliable ordered byte stream.",
+          "hint": "Next expected byte, cumulative."
+        },
+        {
+          "id": "transport-tcp-udp-rel-002",
+          "type": "flashcard",
+          "front": "Distinguish flow control from congestion control in TCP.",
+          "back": "**Flow control** protects the *receiver* via the advertised receive window (rwnd). **Congestion control** protects the *network* via the sender's congestion window (cwnd). The sender uses `min(cwnd, rwnd)`.",
+          "hint": "Receiver buffer vs network capacity."
+        },
+        {
+          "id": "transport-tcp-udp-rel-003",
+          "type": "flashcard",
+          "front": "Explain AIMD and the sawtooth shape of cwnd.",
+          "back": "**Additive Increase, Multiplicative Decrease**: grow cwnd by ~1 MSS per RTT in congestion avoidance; on loss (3 dup-ACKs) halve it. Repeated probe-then-back-off draws a sawtooth that hunts around the path's capacity.",
+          "hint": "Climb slowly, drop sharply.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/transport-tcp-udp-2.svg"
+        },
+        {
+          "id": "transport-tcp-udp-rel-004",
+          "type": "flashcard",
+          "front": "How does a fast-retransmit (3 dup-ACKs) recovery differ from an RTO?",
+          "back": "3 dup-ACKs → **fast retransmit** the one missing segment and **halve** cwnd (fast recovery) — a mild dip. An **RTO** means no ACKs at all arrived in time → cwnd collapses to 1 MSS and slow start restarts — a severe throughput hit.",
+          "hint": "Halve vs collapse to 1."
+        },
+        {
+          "id": "transport-tcp-udp-rel-005",
+          "type": "flashcard",
+          "front": "What problem does SACK solve over plain cumulative ACKs?",
+          "back": "Cumulative ACKs only report the highest contiguous byte, so a single gap can force resending good data after it. **Selective ACK** lists the exact non-contiguous blocks received, so the sender retransmits only the real holes.",
+          "hint": "Report exactly which blocks arrived."
+        },
+        {
+          "id": "transport-tcp-udp-rel-006",
+          "type": "flashcard",
+          "front": "CUBIC vs BBR — what is the fundamental difference?",
+          "back": "**CUBIC** (Linux default) is **loss-based**: it grows cwnd along a cubic curve and treats packet loss as the congestion signal. **BBR** is **model-based**: it estimates bottleneck **bandwidth × RTT** and paces to it, largely ignoring loss — better on lossy or buffer-bloated links.",
+          "hint": "React to loss vs model BW×RTT."
+        },
+        {
+          "id": "transport-tcp-udp-rel-010",
+          "type": "mcq",
+          "prompt": "During slow start, how does the congestion window grow per RTT (before reaching ssthresh)?",
+          "choices": [
+            "Linearly, +1 MSS per RTT",
+            "Exponentially, roughly doubling each RTT",
+            "It stays fixed at the receiver window",
+            "It halves each RTT"
+          ],
+          "answerIndex": 1,
+          "explanation": "Slow start increases cwnd by one MSS per ACK, which roughly doubles cwnd every RTT — exponential growth — until it reaches ssthresh, where linear congestion avoidance takes over."
+        },
+        {
+          "id": "transport-tcp-udp-rel-011",
+          "type": "mcq",
+          "prompt": "A sender receives three duplicate ACKs for the same sequence number. What does TCP do?",
+          "choices": [
+            "Collapse cwnd to 1 MSS and restart slow start",
+            "Fast-retransmit the missing segment and halve cwnd (fast recovery)",
+            "Send a RST to reset the connection",
+            "Increase cwnd to probe for more bandwidth"
+          ],
+          "answerIndex": 1,
+          "explanation": "Three dup-ACKs strongly imply a single segment was lost while later ones arrived. TCP retransmits it immediately (fast retransmit) and enters fast recovery, halving cwnd rather than collapsing it as a timeout would."
+        },
+        {
+          "id": "transport-tcp-udp-rel-012",
+          "type": "mcq",
+          "prompt": "On a long-fat network (high bandwidth, high RTT), throughput is capped well below link rate. The most likely fix is:",
+          "choices": [
+            "Disabling Nagle's algorithm",
+            "Enabling TCP window scaling so the window can exceed 64 KB",
+            "Switching from IPv4 to IPv6",
+            "Reducing the MTU"
+          ],
+          "answerIndex": 1,
+          "explanation": "Full utilization requires the window to hold a bandwidth-delay product of data in flight. The base 16-bit window tops out at 64 KB; window scaling lets it grow large enough to fill a long-fat pipe."
+        },
+        {
+          "id": "transport-tcp-udp-rel-013",
+          "type": "mcq",
+          "prompt": "Why might BBR outperform CUBIC across a lossy wireless or transoceanic link?",
+          "choices": [
+            "BBR retransmits faster after every lost packet",
+            "BBR does not treat random (non-congestion) loss as a signal to back off, so it keeps the pipe full",
+            "BBR uses a larger receive window automatically",
+            "BBR disables congestion control entirely"
+          ],
+          "answerIndex": 1,
+          "explanation": "Loss-based CUBIC mistakes random link loss for congestion and repeatedly halves cwnd. BBR paces to its bandwidth×RTT estimate and ignores such loss, sustaining higher throughput on lossy paths."
+        }
+      ]
+    },
+    {
+      "id": "transport-tcp-udp-sockets-scaling",
+      "title": "Sockets API, Blocking vs Non-Blocking & Reading a Capture",
+      "order": 4,
+      "difficulty": 4,
+      "content": "# Berkeley Sockets, Blocking vs Non-Blocking & Reading a Capture\n\nThe **Berkeley sockets API** is the universal interface to transport. A TCP server walks `socket() -> bind() -> listen() -> accept()` (one accept per incoming connection), while a client does `socket() -> connect()`. Both then `send()/recv()` (or `read/write`) and `close()`. UDP skips listen/accept: you `socket()` then `sendto()/recvfrom()` directly, since there is no connection state.\n\n```c\nint s = socket(AF_INET, SOCK_STREAM, 0);   // TCP\nbind(s, (struct sockaddr*)&addr, sizeof addr);\nlisten(s, 128);                            // backlog\nint c = accept(s, NULL, NULL);             // blocks until a client arrives\nrecv(c, buf, sizeof buf, 0);               // blocks until data or close\n```\n\nBy default sockets are **blocking**: `accept`, `recv`, `connect` sleep until they can proceed. Set `O_NONBLOCK` and they return immediately with `EAGAIN/EWOULDBLOCK` when there is nothing to do. To serve many connections in one thread you ask the kernel which sockets are ready: **select**/**poll** scan an O(n) list each call; **epoll** (Linux) registers interest once and returns only the ready sockets, scaling to tens of thousands of connections — the basis of nginx, Redis, and async runtimes.\n\n**Nagle's algorithm** coalesces small writes to avoid tiny 'tinygram' packets; **delayed ACK** holds an ACK ~40 ms hoping to piggyback it. Together they can **deadlock briefly** on request/response workloads (sender waits for an ACK, receiver waits for more data) — cure with `TCP_NODELAY`. Note **head-of-line blocking**: one lost TCP segment stalls *all* bytes behind it because the byte stream must stay ordered — the very pain that motivated QUIC's independent streams.\n\nTo **narrate a capture**: SYN/SYN-ACK/ACK opens it; watch cwnd ramp as ACKs return; a gap + 3 dup-ACKs marks a loss, a single fast-retransmit fills it, throughput dips then climbs (sawtooth); FIN/ACK ×2 closes it, active side rests in TIME_WAIT.",
+      "items": [
+        {
+          "id": "transport-tcp-udp-sock-001",
+          "type": "flashcard",
+          "front": "Give the Berkeley sockets call sequence for a TCP server and a TCP client.",
+          "back": "**Server:** `socket -> bind -> listen -> accept` (then `recv/send`, `close`). **Client:** `socket -> connect` (then `send/recv`, `close`). UDP uses `socket` then `sendto/recvfrom` with no listen/accept/connect.",
+          "hint": "Server binds and listens; client connects."
+        },
+        {
+          "id": "transport-tcp-udp-sock-002",
+          "type": "flashcard",
+          "front": "What is the difference between a blocking and a non-blocking socket?",
+          "back": "A **blocking** socket sleeps in `recv`/`accept`/`connect` until the operation can complete. A **non-blocking** socket (`O_NONBLOCK`) returns immediately, signalling `EAGAIN`/`EWOULDBLOCK` when it would have blocked — the basis of event loops.",
+          "hint": "Sleep vs return EAGAIN."
+        },
+        {
+          "id": "transport-tcp-udp-sock-003",
+          "type": "flashcard",
+          "front": "Why does epoll scale better than select/poll for many connections?",
+          "back": "`select`/`poll` pass and scan the *entire* fd set on every call — O(n). `epoll` registers interest once and the kernel returns only the **ready** fds — O(ready) — so it handles tens of thousands of sockets cheaply.",
+          "hint": "O(n) rescan vs O(ready)."
+        },
+        {
+          "id": "transport-tcp-udp-sock-004",
+          "type": "flashcard",
+          "front": "Explain the Nagle + delayed-ACK pathology and its fix.",
+          "back": "Nagle withholds a small write until prior data is ACKed; delayed ACK withholds the ACK ~40 ms hoping to piggyback. On request/response traffic each side waits for the other — a ~40 ms stall. Fix: set **TCP_NODELAY** to disable Nagle.",
+          "hint": "Both sides wait; set TCP_NODELAY."
+        },
+        {
+          "id": "transport-tcp-udp-sock-005",
+          "type": "flashcard",
+          "front": "What is TCP head-of-line blocking and what does it motivate?",
+          "back": "Because TCP delivers one ordered byte stream, a single lost segment stalls *all* later bytes until it is retransmitted — even data for an unrelated request multiplexed on the same connection. This motivated **QUIC**, whose independent streams don't block each other.",
+          "hint": "One loss stalls everything behind it; QUIC."
+        },
+        {
+          "id": "transport-tcp-udp-sock-006",
+          "type": "flashcard",
+          "front": "When would you reach for UDP instead of TCP?",
+          "back": "When you need low latency and can tolerate or handle loss/ordering yourself: real-time media (VoIP, video, games), simple request/reply (DNS), broadcast/multicast, or as a base to build your own transport (QUIC). Reach for TCP when you need a reliable ordered stream and don't want to reinvent it.",
+          "hint": "Real-time, request/reply, multicast, custom transport."
+        },
+        {
+          "id": "transport-tcp-udp-sock-007",
+          "type": "flashcard",
+          "front": "Narrate the life of a TCP connection as seen in a packet capture, including a loss event.",
+          "back": "1) **SYN / SYN-ACK / ACK** — handshake. 2) Data flows; **cwnd ramps** (slow start then linear) as ACKs return, throughput climbing. 3) A segment is lost → receiver sends **3 duplicate ACKs**; sender does a **fast retransmit** and **halves cwnd** (recovery), so throughput dips then re-climbs (sawtooth). 4) **FIN / ACK** each way tears it down; the active closer sits in **TIME_WAIT** ~2×MSL.",
+          "hint": "Handshake, window growth, dup-ACK loss, recovery, teardown."
+        },
+        {
+          "id": "transport-tcp-udp-sock-010",
+          "type": "mcq",
+          "prompt": "Which call does a UDP program NOT use that a TCP server does?",
+          "choices": [
+            "socket()",
+            "sendto()",
+            "listen() / accept()",
+            "close()"
+          ],
+          "answerIndex": 2,
+          "explanation": "UDP is connectionless: there is no connection to listen for or accept. A UDP program uses socket(), then sendto()/recvfrom(), and close(). listen()/accept() are TCP-only."
+        },
+        {
+          "id": "transport-tcp-udp-sock-011",
+          "type": "mcq",
+          "prompt": "An interactive request/response protocol shows ~40 ms stalls on small writes. The most likely cause and fix:",
+          "choices": [
+            "Receive window too small; enable window scaling",
+            "Nagle's algorithm interacting with delayed ACK; set TCP_NODELAY",
+            "Congestion control set to BBR; switch to CUBIC",
+            "MTU mismatch; lower the MTU"
+          ],
+          "answerIndex": 1,
+          "explanation": "The signature ~40 ms stall on tiny writes is the classic Nagle + delayed-ACK deadlock. Disabling Nagle with TCP_NODELAY lets small segments go out immediately."
+        },
+        {
+          "id": "transport-tcp-udp-sock-012",
+          "type": "mcq",
+          "prompt": "Why does one lost TCP segment delay delivery of later, already-received data to the application?",
+          "choices": [
+            "TCP discards out-of-order data",
+            "TCP must deliver the byte stream in order, so the receiver holds later bytes until the gap is filled (head-of-line blocking)",
+            "The receive window shrinks to zero on any loss",
+            "The connection resets and restarts"
+          ],
+          "answerIndex": 1,
+          "explanation": "TCP guarantees in-order delivery of a single byte stream. Out-of-order segments are buffered but not handed up until the missing bytes arrive — head-of-line blocking, the motivation for QUIC's per-stream independence."
+        },
+        {
+          "id": "transport-tcp-udp-sock-013",
+          "type": "mcq",
+          "prompt": "In a capture you see data flowing, then three identical ACKs for the same seq, then one retransmitted segment, then ACKs jump forward. What happened?",
+          "choices": [
+            "The connection was reset",
+            "A segment was lost; 3 dup-ACKs triggered fast retransmit, which filled the gap and let cumulative ACKs advance",
+            "The receiver ran out of buffer (zero window)",
+            "Nagle coalesced several segments into one"
+          ],
+          "answerIndex": 1,
+          "explanation": "Three dup-ACKs are TCP's loss signal; the sender fast-retransmits the missing segment, the receiver gets the gap filled, and the cumulative ACK jumps past all the buffered data — a textbook fast-recovery sequence."
+        }
+      ]
+    }
+  ]
+}

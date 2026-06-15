@@ -1,0 +1,283 @@
+{
+  "id": "models-layering",
+  "title": "Models, Layering & the Shape of the Problem",
+  "order": 1,
+  "lessons": [
+    {
+      "id": "models-layering-l1",
+      "title": "The Problem Networking Solves",
+      "order": 1,
+      "difficulty": 1,
+      "content": "Strip away the jargon and networking has one job: move bits between two processes running on different machines, addressed to the right place, reliably *enough*, over media that are shared, imperfect, and lossy. Every protocol you will ever meet is a partial answer to some slice of that sentence.\n\nUnpack the hard parts. \"Different machines\" means you need **addressing** so a sender can name a destination it has never met. \"Shared media\" means many talkers contend for one wire or one slice of spectrum, so you need rules for **access** and a way to mark where one message ends and the next begins (**framing**). \"Imperfect\" means signals attenuate, collide, and flip bits, so you need **error detection** and sometimes retransmission. \"Right process\" means the destination host runs many programs at once, so a host address is not enough; you need a **port** to reach the correct process.\n\nNo single protocol does all of this. Instead the work is split into **layers**, each solving one slice and trusting the layer below to have solved the previous one. The application trusts that a byte stream arrives in order; transport trusts that packets can be forwarded; the network layer trusts that a frame can cross one hop.\n\nFor you this is familiar territory wearing new clothes. Framing a message, recovering a clock, contending for a shared channel, computing a link budget against noise — these are radar and signaling problems. Networking is the same physics with a protocol vocabulary bolted on top, and the layered split is just good engineering: isolate concerns so each can change independently.",
+      "items": [
+        {
+          "id": "models-layering-l1-fc1",
+          "type": "flashcard",
+          "front": "State the one-sentence problem that networking solves.",
+          "back": "Move bits between processes on different machines, addressed correctly and reliably enough, over imperfect shared media.",
+          "hint": "Think: who, what, how reliably, over what."
+        },
+        {
+          "id": "models-layering-l1-fc2",
+          "type": "flashcard",
+          "front": "Why is a host address (e.g. an IP) not sufficient to deliver data to the right program?",
+          "back": "A host runs many processes at once. You also need a port number so the transport layer can demultiplex to the correct process."
+        },
+        {
+          "id": "models-layering-l1-fc3",
+          "type": "flashcard",
+          "front": "What is the purpose of framing on a shared medium?",
+          "back": "It marks where one message begins and ends so a receiver can separate back-to-back transmissions from a continuous bit stream."
+        },
+        {
+          "id": "models-layering-l1-fc4",
+          "type": "flashcard",
+          "front": "Why split networking into layers at all?",
+          "back": "Separation of concerns: each layer solves one slice of the problem and trusts the layer below, so any layer can change independently of the others.",
+          "hint": "Same reason you modularize any system."
+        },
+        {
+          "id": "models-layering-l1-fc5",
+          "type": "flashcard",
+          "front": "Name three reasons real media force error handling.",
+          "back": "Attenuation/noise flipping bits, collisions on shared media, and corruption in transit — all mean delivery is best-effort, not guaranteed."
+        },
+        {
+          "id": "models-layering-l1-mc1",
+          "type": "mcq",
+          "prompt": "Which concern does a PORT number address?",
+          "choices": [
+            "Finding the physical route across the Internet",
+            "Selecting which process on a host should receive the data",
+            "Detecting bit errors on the wire",
+            "Marking the boundary between two frames"
+          ],
+          "answerIndex": 1,
+          "explanation": "Host addresses (IP) locate the machine; ports demultiplex among the many processes running on that machine."
+        },
+        {
+          "id": "models-layering-l1-mc2",
+          "type": "mcq",
+          "prompt": "\"Reliably enough\" in the networking problem statement implies that:",
+          "choices": [
+            "Every layer must guarantee perfect delivery",
+            "Reliability is optional and layered on only where the workload needs it",
+            "The physical layer corrects all errors",
+            "Reliability and addressing are the same concern"
+          ],
+          "answerIndex": 1,
+          "explanation": "The base service is best-effort. Reliability (ordering, retransmission) is added at a higher layer only when an application needs it — which is exactly why UDP can skip it."
+        },
+        {
+          "id": "models-layering-l1-mc3",
+          "type": "mcq",
+          "prompt": "Why does the text call networking \"the same physics in new clothes\" for someone from a radar/signaling background?",
+          "choices": [
+            "Because routing tables are identical to radar scopes",
+            "Because framing, clock recovery, channel contention, and SNR/link budgets are shared underlying concepts",
+            "Because both use the OSI model internally",
+            "Because IP addresses derive from pulse repetition frequency"
+          ],
+          "answerIndex": 1,
+          "explanation": "The low-level signaling and contention problems are common to both fields; networking adds a protocol vocabulary on top of the same physics."
+        }
+      ]
+    },
+    {
+      "id": "models-layering-l2",
+      "title": "Two Models: OSI vs TCP/IP and Why They Disagree",
+      "order": 2,
+      "difficulty": 2,
+      "content": "There are two layering models you must hold at once. The **OSI 7-layer model** is a *teaching taxonomy*: Physical, Data Link, Network, Transport, Session, Presentation, Application (mnemonic, bottom-up: Please Do Not Throw Sausage Pizza Away). The **TCP/IP 4-layer model** is what actually runs: Link, Internet, Transport, Application.\n\nThey do not line up cleanly, and that mismatch is the point. TCP/IP's **Link** layer rolls OSI's Physical + Data Link together. Its **Internet** layer maps to OSI's Network. **Transport** maps directly. The interesting collapse is at the top: OSI's **Session** (5) and **Presentation** (6) layers never materialized as distinct network layers — they evaporated into applications and libraries. Session management, encryption, and data formatting are done inside the app or a library (TLS, JSON, gzip), not by a separate on-the-wire layer. So TCP/IP folds OSI layers 5–7 into one **Application** layer.\n\nThis is why the classic argument that \"TLS is really presentation-layer\" is both true and useless in practice: by OSI's intent TLS does presentation-layer work (it transforms the byte stream into ciphertext), but in the running stack it lives in the application layer as a library above TCP.\n\n**Each layer has a unit — a Protocol Data Unit (PDU).** At the Link layer the PDU is a **frame**; at the Internet/Network layer it is a **packet**; at the Transport layer it is a **segment** (TCP) or **datagram** (UDP); above that you have application **data** or **messages**. Naming the PDU tells you instantly which layer someone is discussing. The takeaway: learn OSI to talk and reason; trust TCP/IP to describe what is on the wire.",
+      "items": [
+        {
+          "id": "models-layering-l2-fc1",
+          "type": "flashcard",
+          "front": "List the OSI 7 layers bottom-up and a mnemonic.",
+          "back": "Physical, Data Link, Network, Transport, Session, Presentation, Application. Mnemonic: Please Do Not Throw Sausage Pizza Away.",
+          "hint": "Seven layers, P-D-N-T-S-P-A."
+        },
+        {
+          "id": "models-layering-l2-fc2",
+          "type": "flashcard",
+          "front": "List the TCP/IP 4 layers and what each maps to in OSI.",
+          "back": "Link (= OSI Physical + Data Link), Internet (= Network), Transport (= Transport), Application (= Session + Presentation + Application).",
+          "hint": "Four layers; the top one swallows three OSI layers."
+        },
+        {
+          "id": "models-layering-l2-fc3",
+          "type": "flashcard",
+          "front": "What happened to OSI's Session and Presentation layers in the real stack?",
+          "back": "They evaporated into applications and libraries: session handling, encryption (TLS), and formatting (JSON/gzip) happen in the app, not as separate wire layers."
+        },
+        {
+          "id": "models-layering-l2-fc4",
+          "type": "flashcard",
+          "front": "Match each PDU name to its layer: frame, packet, segment/datagram, data.",
+          "back": "Frame = Link/Data Link (L2); Packet = Internet/Network (L3); Segment (TCP) or Datagram (UDP) = Transport (L4); Data/message = Application (L7).",
+          "hint": "Naming the PDU pins the layer.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-1.svg"
+        },
+        {
+          "id": "models-layering-l2-fc5",
+          "type": "flashcard",
+          "front": "In one line, resolve \"TLS is really presentation-layer.\"",
+          "back": "By OSI intent yes (it transforms/encrypts the byte stream), but in the running stack it lives in the application layer as a library above TCP."
+        },
+        {
+          "id": "models-layering-l2-mc1",
+          "type": "mcq",
+          "prompt": "Which statement best captures why the two models disagree at the top?",
+          "choices": [
+            "OSI omits the transport layer entirely",
+            "TCP/IP adds two extra layers above Application",
+            "OSI splits out Session and Presentation, but TCP/IP folds that work into Application/libraries",
+            "TCP/IP separates Physical from Data Link while OSI merges them"
+          ],
+          "answerIndex": 2,
+          "explanation": "OSI's session/presentation responsibilities are handled inside apps and libraries in the real stack, so TCP/IP collapses OSI 5–7 into one Application layer."
+        },
+        {
+          "id": "models-layering-l2-mc2",
+          "type": "mcq",
+          "prompt": "A packet capture shows a unit at OSI layer 3. What is the correct PDU name?",
+          "choices": ["Frame", "Packet", "Segment", "Datagram"],
+          "answerIndex": 1,
+          "explanation": "Layer 3 is the Network/Internet layer; its PDU is the packet. Frame is L2; segment/datagram is L4."
+        },
+        {
+          "id": "models-layering-l2-mc3",
+          "type": "mcq",
+          "prompt": "Which mapping is INCORRECT?",
+          "choices": [
+            "TCP/IP Link ↔ OSI Physical + Data Link",
+            "TCP/IP Internet ↔ OSI Network",
+            "TCP/IP Transport ↔ OSI Session",
+            "TCP/IP Application ↔ OSI Application + Presentation + Session"
+          ],
+          "answerIndex": 2,
+          "explanation": "Transport maps to Transport. Session is one of the OSI layers absorbed into TCP/IP's Application layer."
+        },
+        {
+          "id": "models-layering-l2-mc4",
+          "type": "mcq",
+          "prompt": "Why prefer TCP/IP over OSI when describing what is actually on the wire?",
+          "choices": [
+            "OSI has fewer layers and hides detail",
+            "TCP/IP is the model the running protocols (IP, TCP, Ethernet) were built around",
+            "OSI does not define a network layer",
+            "TCP/IP includes the session and presentation layers explicitly"
+          ],
+          "answerIndex": 1,
+          "explanation": "The protocols that run the Internet were designed to the TCP/IP model; OSI remains a useful teaching/reasoning vocabulary."
+        }
+      ]
+    },
+    {
+      "id": "models-layering-l3",
+      "title": "Encapsulation, the End-to-End Principle & Mapping Protocols",
+      "order": 3,
+      "difficulty": 3,
+      "content": "**Encapsulation** is the mechanism that makes layering real on the wire. As data descends the stack, each layer wraps the unit it receives in its own header (and sometimes a trailer) — envelopes inside envelopes. Application data gets a TCP header to become a **segment**; that segment gets an IP header to become a **packet**; that packet gets an Ethernet header and FCS trailer to become a **frame** put on the wire. On receipt the destination performs **decapsulation**: each layer strips its own header, reads its fields, and hands the payload up. Crucially, a layer never inspects the layers above it — to Ethernet, an entire IP packet is just opaque payload. This is exactly the nested framing you saw in radar pulse trains: a structure wrapping a structure wrapping a structure.\n\nThe **end-to-end principle** explains where intelligence belongs: functions like reliability, ordering, and encryption are best implemented at the communicating endpoints, not in the network's middle. The network's job is to forward best-effort; the hosts add guarantees. This is why TCP reliability lives on your machine, not in routers, and it is the design choice that let the Internet scale with a dumb, fast core and smart edges.\n\n**Standards bodies** decide what the envelopes look like. The **IETF** publishes **RFCs** governing IP, TCP, DNS, QUIC, TLS — the Internet/Transport/Application layers. **IEEE 802** owns the LAN/link layer: 802.3 (Ethernet), 802.11 (WiFi), 802.1Q (VLANs). The **ITU** handles telecom/physical-layer and carrier standards.\n\nFinally, the payoff skill: hand me a protocol and I name its layer. **ARP** sits at the L2/L3 boundary (resolves IP→MAC). **BGP** is application-layer in mechanics (runs over TCP/179) but does L3 routing. **QUIC** is transport, riding on UDP. **802.11** is link/physical. **DHCP** is application-layer, over UDP. Layer placement tells you where to look when it breaks.",
+      "items": [
+        {
+          "id": "models-layering-l3-fc1",
+          "type": "flashcard",
+          "front": "Define encapsulation and decapsulation in one line each.",
+          "back": "Encapsulation: each descending layer wraps the unit in its own header/trailer. Decapsulation: each ascending layer strips its own header and hands the payload up.",
+          "hint": "Envelopes inside envelopes, going down then up."
+        },
+        {
+          "id": "models-layering-l3-fc2",
+          "type": "flashcard",
+          "front": "Trace the headers added to application data as it descends to the wire.",
+          "back": "App data + TCP header = segment; + IP header = packet; + Ethernet header & FCS trailer = frame on the wire.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-1.svg"
+        },
+        {
+          "id": "models-layering-l3-fc3",
+          "type": "flashcard",
+          "front": "State the end-to-end principle and one consequence.",
+          "back": "Intelligence (reliability, ordering, encryption) belongs at the endpoints, not in the network core. Consequence: TCP reliability runs on hosts, letting the core stay dumb, fast, and scalable."
+        },
+        {
+          "id": "models-layering-l3-fc4",
+          "type": "flashcard",
+          "front": "Which standards body owns: IP/TCP/QUIC, Ethernet/WiFi/VLANs, and carrier/telecom PHY?",
+          "back": "IETF (RFCs) for IP/TCP/QUIC/DNS/TLS; IEEE 802 for Ethernet (802.3), WiFi (802.11), VLANs (802.1Q); ITU for telecom/carrier physical standards."
+        },
+        {
+          "id": "models-layering-l3-fc5",
+          "type": "flashcard",
+          "front": "At what layer does ARP operate, and what does it do?",
+          "back": "ARP sits at the L2/L3 boundary: given an IP (L3) it resolves the MAC (L2) needed to build the frame."
+        },
+        {
+          "id": "models-layering-l3-mc1",
+          "type": "mcq",
+          "prompt": "QUIC is best classified as which layer, and on what does it ride?",
+          "choices": [
+            "Network layer, riding on IP directly",
+            "Transport layer, riding on UDP",
+            "Application layer, riding on TCP",
+            "Link layer, riding on Ethernet"
+          ],
+          "answerIndex": 1,
+          "explanation": "QUIC is a transport protocol providing reliability, streams, and TLS 1.3, implemented in user space over UDP."
+        },
+        {
+          "id": "models-layering-l3-mc2",
+          "type": "mcq",
+          "prompt": "BGP is unusual because it:",
+          "choices": [
+            "Runs directly on the physical layer",
+            "Performs L3 routing but runs as an application over TCP port 179",
+            "Is a link-layer protocol like ARP",
+            "Replaces IP entirely"
+          ],
+          "answerIndex": 1,
+          "explanation": "BGP's job is network-layer routing between autonomous systems, but mechanically it is carried as an application over a TCP connection (port 179)."
+        },
+        {
+          "id": "models-layering-l3-mc3",
+          "type": "mcq",
+          "prompt": "DHCP is which layer and over which transport?",
+          "choices": [
+            "Application layer over UDP",
+            "Network layer over IP only",
+            "Transport layer over TCP",
+            "Link layer with no transport"
+          ],
+          "answerIndex": 0,
+          "explanation": "DHCP is an application-layer service that uses UDP (the DORA exchange uses broadcast on UDP ports 67/68)."
+        },
+        {
+          "id": "models-layering-l3-mc4",
+          "type": "mcq",
+          "prompt": "To an Ethernet frame, an encapsulated IP packet is:",
+          "choices": [
+            "Inspected and rewritten field by field",
+            "Opaque payload it does not interpret",
+            "Discarded if it is not also Ethernet",
+            "Converted into a TCP segment"
+          ],
+          "answerIndex": 1,
+          "explanation": "A layer treats the upper layer's unit as opaque payload — it reads only its own header. That isolation is what makes layering work."
+        },
+        {
+          "id": "models-layering-l3-mc5",
+          "type": "mcq",
+          "prompt": "802.11 (WiFi) operates primarily at which OSI layer(s)?",
+          "choices": [
+            "Transport and Application",
+            "Network and Transport",
+            "Physical and Data Link",
+            "Session and Presentation"
+          ],
+          "answerIndex": 2,
+          "explanation": "802.11 defines the wireless physical layer and the MAC (data link) layer — the link layer in TCP/IP terms."
+        }
+      ]
+    }
+  ]
+}

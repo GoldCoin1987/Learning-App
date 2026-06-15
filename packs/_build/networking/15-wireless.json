@@ -1,0 +1,435 @@
+{
+  "id": "wireless",
+  "title": "Wireless Networking: PHY On-Ramp to RF",
+  "order": 15,
+  "lessons": [
+    {
+      "id": "wireless-l1",
+      "title": "RF Fundamentals: Spectrum, Wavelength, and the dB Way of Thinking",
+      "order": 1,
+      "difficulty": 1,
+      "content": "Every wireless link starts with the same physics you already know from radar. A signal occupies a **frequency** $f$ and propagates at $c \\approx 3\\times10^8$ m/s, so its **wavelength** is $\\lambda = c/f$. At WiFi's 2.4 GHz, $\\lambda \\approx 12.5$ cm; at 5 GHz, $\\approx 6$ cm; at 28 GHz mmWave, $\\approx 1.1$ cm. Wavelength sets antenna size (a quarter-wave whip scales with $\\lambda$) and governs how waves diffract, reflect, and penetrate walls — lower frequencies travel and penetrate better, higher frequencies carry more bandwidth but die fast.\n\nSpectrum is either **licensed** (an operator pays a regulator for exclusive use — cellular bands) or **unlicensed ISM** (industrial/scientific/medical bands anyone may share under power/duty rules — 2.4 GHz, 5 GHz, 6 GHz, sub-GHz 868/915 MHz). Licensed means clean and predictable; unlicensed means free but crowded, so the protocols must tolerate interference.\n\nRF engineers live in **decibels** because gains and losses multiply, and logarithms turn multiplication into addition. Power ratio in dB is $10\\log_{10}(P_1/P_2)$; **dBm** is power referenced to 1 mW, so $0$ dBm $= 1$ mW and $+20$ dBm $= 100$ mW. Handy anchors: $+3$ dB doubles power, $-3$ dB halves it, $+10$ dB is $10\\times$. This is exactly the link-budget arithmetic from your radar days — every gain and loss just adds or subtracts on a dB ledger, and you read off the result against a sensitivity threshold. The rest of this subtopic builds on these three pillars: wavelength, band rules, and dB bookkeeping.",
+      "items": [
+        {
+          "id": "wireless-l1-fc1",
+          "type": "flashcard",
+          "front": "Write the frequency-wavelength relationship and give $\\lambda$ at 2.4 GHz.",
+          "back": "$\\lambda = c/f$ with $c \\approx 3\\times10^8$ m/s. At 2.4 GHz, $\\lambda \\approx 0.125$ m (about 12.5 cm).",
+          "hint": "Divide the speed of light by the frequency."
+        },
+        {
+          "id": "wireless-l1-fc2",
+          "type": "flashcard",
+          "front": "Why do lower frequencies propagate and penetrate better than higher ones?",
+          "back": "Longer wavelengths diffract around obstacles and suffer less material/atmospheric absorption, so they travel farther and penetrate walls; higher frequencies offer more bandwidth but attenuate and are blocked far more easily."
+        },
+        {
+          "id": "wireless-l1-fc3",
+          "type": "flashcard",
+          "front": "Licensed vs unlicensed (ISM) spectrum: tradeoff in one line.",
+          "back": "Licensed = exclusive, clean, predictable, costs money (cellular). Unlicensed/ISM = free and shared under power/duty limits (WiFi, BLE, LoRa) but must tolerate heavy interference."
+        },
+        {
+          "id": "wireless-l1-fc4",
+          "type": "flashcard",
+          "front": "Define dBm and give the values for 1 mW and 100 mW.",
+          "back": "dBm is power relative to 1 mW: $P_{\\mathrm{dBm}} = 10\\log_{10}(P/1\\,\\mathrm{mW})$. So 1 mW = 0 dBm and 100 mW = +20 dBm.",
+          "hint": "+10 dB per decade of milliwatts."
+        },
+        {
+          "id": "wireless-l1-fc5",
+          "type": "flashcard",
+          "front": "What do +3 dB, -3 dB, and +10 dB do to power?",
+          "back": "+3 dB doubles power, -3 dB halves it, +10 dB multiplies by 10. These anchors let you do link math in your head."
+        },
+        {
+          "id": "wireless-l1-mc1",
+          "type": "mcq",
+          "prompt": "A transmitter outputs +23 dBm. In milliwatts that is approximately:",
+          "choices": ["50 mW", "100 mW", "200 mW", "230 mW"],
+          "answerIndex": 2,
+          "explanation": "+20 dBm = 100 mW, and +3 dB doubles it, so +23 dBm ≈ 200 mW."
+        },
+        {
+          "id": "wireless-l1-mc2",
+          "type": "mcq",
+          "prompt": "Which band has the SHORTEST wavelength and thus the most bandwidth but worst penetration?",
+          "choices": ["Sub-GHz 915 MHz", "2.4 GHz", "5 GHz", "28 GHz mmWave"],
+          "answerIndex": 3,
+          "explanation": "At 28 GHz, λ ≈ 1.1 cm. mmWave offers huge bandwidth but is blocked by walls, foliage, and even rain/hands."
+        },
+        {
+          "id": "wireless-l1-mc3",
+          "type": "mcq",
+          "prompt": "Why do RF engineers express link budgets in decibels?",
+          "choices": [
+            "dB values are always positive and easier to store",
+            "Logarithms turn multiplicative gains/losses into additions you can sum on a ledger",
+            "Decibels eliminate the need to know transmit power",
+            "dB is the SI unit of power"
+          ],
+          "answerIndex": 1,
+          "explanation": "Cascaded gains and path losses multiply linearly; in dB they add, so the whole budget becomes simple addition/subtraction."
+        },
+        {
+          "id": "wireless-l1-mc4",
+          "type": "mcq",
+          "prompt": "2.4 GHz, 5 GHz, 6 GHz, and 868/915 MHz are examples of:",
+          "choices": [
+            "Licensed cellular bands",
+            "Unlicensed ISM/shared bands",
+            "Satellite-only allocations",
+            "Bands reserved for radar"
+          ],
+          "answerIndex": 1,
+          "explanation": "These are unlicensed/shared bands (ISM and similar) used by WiFi, BLE, and LPWAN under regulatory power and duty-cycle limits."
+        }
+      ]
+    },
+    {
+      "id": "wireless-l2",
+      "title": "Modulation, Spread Spectrum, OFDM, and the Link Budget",
+      "order": 2,
+      "difficulty": 2,
+      "content": "**Modulation** maps bits onto a carrier by varying amplitude (**ASK**), frequency (**FSK**), phase (**PSK**), or amplitude+phase together (**QAM**). Bits per symbol grows with constellation size: BPSK = 1, QPSK = 2, 16-QAM = 4, 256-QAM = 8, 1024-QAM = 10. Denser constellations pack points closer, so they need higher SNR to keep symbols distinguishable below a target bit-error rate.\n\n**Spread spectrum** deliberately uses more bandwidth than the data needs. **DSSS** multiplies the signal by a fast pseudo-random chip code, spreading energy thin; the receiver de-spreads with the same code, recovering processing gain and rejecting narrowband interferers. **FHSS** rapidly hops the carrier across many channels so any one jammed channel costs only a fraction of the traffic. Both resist interference and hide signals in the noise floor — exactly the LPI/anti-jam logic of military radar.\n\n**OFDM** is the modern workhorse (WiFi, LTE, 5G). It splits the channel into many narrow, orthogonal **subcarriers**, each carrying a low-rate QAM stream. Narrow subcarriers see a flat (non-frequency-selective) channel, which tames multipath and lets a cheap per-subcarrier equalizer work.\n\nThe **link budget** is the ledger that decides whether a link closes:\n$$P_{rx} = P_{tx} + G_{tx} + G_{rx} - \\mathrm{FSPL} - L$$\nwith everything in dB/dBm. **Free-space path loss** is $\\mathrm{FSPL(dB)} = 20\\log_{10}(d) + 20\\log_{10}(f) + 32.44$ for $d$ in km and $f$ in MHz. The link works when $P_{rx}$ exceeds the receiver **sensitivity**; the difference is your **fade margin**. SNR (or **SINR**, which counts interference too) then sets the highest **MCS** (modulation-and-coding scheme) you can run, and Shannon caps the rate at $C = B\\log_2(1+\\mathrm{SNR})$.",
+      "items": [
+        {
+          "id": "wireless-l2-fc1",
+          "type": "flashcard",
+          "front": "What does each modulation family vary: ASK, FSK, PSK, QAM?",
+          "back": "ASK varies amplitude, FSK varies frequency, PSK varies phase, and QAM varies amplitude AND phase together to pack more bits per symbol.",
+          "hint": "Amplitude, frequency, phase, both."
+        },
+        {
+          "id": "wireless-l2-fc2",
+          "type": "flashcard",
+          "front": "How many bits per symbol do BPSK, QPSK, 16-QAM, and 256-QAM carry?",
+          "back": "BPSK = 1, QPSK = 2, 16-QAM = 4, 256-QAM = 8. Bits/symbol = $\\log_2(\\text{number of constellation points})$.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/wireless-2.svg"
+        },
+        {
+          "id": "wireless-l2-fc3",
+          "type": "flashcard",
+          "front": "How do DSSS and FHSS resist interference?",
+          "back": "DSSS spreads energy with a chip code and de-spreads at the receiver, gaining processing gain against narrowband interferers. FHSS hops the carrier across many channels so any single jammed channel only loses a fraction of traffic."
+        },
+        {
+          "id": "wireless-l2-fc4",
+          "type": "flashcard",
+          "front": "Why does OFDM tame multipath?",
+          "back": "It divides the band into many narrow orthogonal subcarriers; each narrow subcarrier sees an approximately flat channel, so frequency-selective multipath fading is handled by a simple per-subcarrier equalizer."
+        },
+        {
+          "id": "wireless-l2-fc5",
+          "type": "flashcard",
+          "front": "Write the link-budget and FSPL equations.",
+          "back": "$P_{rx} = P_{tx} + G_{tx} + G_{rx} - \\mathrm{FSPL} - L$ (all dB/dBm). $\\mathrm{FSPL(dB)} = 20\\log_{10}(d) + 20\\log_{10}(f) + 32.44$ for $d$ in km, $f$ in MHz.",
+          "hint": "Gains add, losses subtract; FSPL grows 20 dB per decade of distance and of frequency."
+        },
+        {
+          "id": "wireless-l2-fc6",
+          "type": "flashcard",
+          "front": "Define fade margin and how SNR/SINR maps to rate.",
+          "back": "Fade margin = received power minus receiver sensitivity (the dB reserve before the link drops). Higher SNR/SINR allows a denser MCS; Shannon caps it at $C = B\\log_2(1+\\mathrm{SNR})$."
+        },
+        {
+          "id": "wireless-l2-mc1",
+          "type": "mcq",
+          "prompt": "LINK-BUDGET CALC: Ptx = +20 dBm, Gtx = Grx = +6 dBi, FSPL = 100 dB, other losses L = 3 dB. What is Prx, and does it close against a -82 dBm sensitivity?",
+          "choices": [
+            "Prx = -71 dBm; closes with 11 dB margin",
+            "Prx = -77 dBm; closes with 5 dB margin",
+            "Prx = -85 dBm; fails by 3 dB",
+            "Prx = -65 dBm; closes with 17 dB margin"
+          ],
+          "answerIndex": 0,
+          "explanation": "Prx = 20 + 6 + 6 - 100 - 3 = -71 dBm. Sensitivity is -82 dBm, so margin = -71 - (-82) = 11 dB. The link closes.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/wireless-1.svg"
+        },
+        {
+          "id": "wireless-l2-mc2",
+          "type": "mcq",
+          "prompt": "FSPL doubles distance from 1 km to 2 km. How much does free-space path loss increase?",
+          "choices": ["About 3 dB", "About 6 dB", "About 10 dB", "About 20 dB"],
+          "answerIndex": 1,
+          "explanation": "FSPL uses 20·log10(d); doubling d adds 20·log10(2) ≈ 6 dB. (A decade of distance adds 20 dB.)"
+        },
+        {
+          "id": "wireless-l2-mc3",
+          "type": "mcq",
+          "prompt": "Why does 1024-QAM require a higher SNR than QPSK?",
+          "choices": [
+            "It uses more bandwidth",
+            "Its constellation points sit closer together, so more SNR is needed to keep them separable below the BER target",
+            "It hops frequencies faster",
+            "It needs a larger antenna"
+          ],
+          "answerIndex": 1,
+          "explanation": "Higher-order QAM packs 1024 points into the I/Q plane; tighter spacing means noise more easily pushes a symbol into a neighbor, demanding higher SNR."
+        },
+        {
+          "id": "wireless-l2-mc4",
+          "type": "mcq",
+          "prompt": "SINR differs from SNR because it also accounts for:",
+          "choices": [
+            "Thermal noise only",
+            "Co-channel and adjacent interference, not just noise",
+            "Antenna gain",
+            "Cable loss"
+          ],
+          "answerIndex": 1,
+          "explanation": "SINR = signal / (interference + noise). In crowded unlicensed bands, interference often dominates, so SINR is the realistic predictor of usable MCS."
+        },
+        {
+          "id": "wireless-l2-mc5",
+          "type": "mcq",
+          "prompt": "A 20 MHz channel at 20 dB SNR has a Shannon capacity of about:",
+          "choices": ["20 Mbps", "67 Mbps", "133 Mbps", "200 Mbps"],
+          "answerIndex": 2,
+          "explanation": "SNR 20 dB = ratio 100. C = 20e6 · log2(1+100) = 20e6 · 6.66 ≈ 133 Mbps. Real rates fall below this from overhead and margin."
+        }
+      ]
+    },
+    {
+      "id": "wireless-l3",
+      "title": "Multipath, MIMO, Antennas, WiFi, and Bluetooth/BLE",
+      "order": 3,
+      "difficulty": 3,
+      "content": "Real channels are not free space. Reflections arrive at the receiver with different delays and phases, producing **multipath** that can constructively or destructively combine — **fading**. Slow movement causes deep nulls; this is the radar multipath/clutter problem in disguise. **MIMO** turns multipath from foe to friend: multiple antennas at each end let the system either send independent streams over distinct spatial paths (**spatial multiplexing**, multiplying throughput) or weight antennas to steer energy toward the receiver (**beamforming**, boosting SNR). **Antenna** basics still rule: **gain/directivity** (dBi) concentrates power in a direction, and **polarization** must match or you pay a mismatch loss.\n\n**WiFi (802.11)** runs in 2.4/5/6 GHz with OFDM/OFDMA. The alphabet: a/b/g (legacy), n = WiFi 4 (MIMO), ac = WiFi 5 (5 GHz, MU-MIMO, 256-QAM), ax = WiFi 6/6E (OFDMA, 1024-QAM, 6 GHz), be = WiFi 7 (320 MHz, 4096-QAM, multi-link). Because the medium is shared and a node cannot hear its own collisions on RF, WiFi uses **CSMA/CA** (carrier sense, collision avoidance with random backoff). The **hidden-node problem** — two stations that hear the AP but not each other — is solved with optional **RTS/CTS** handshakes that reserve the channel. **OFDMA** subdivides a channel into resource units so the AP can serve many clients at once; **MU-MIMO** serves several spatial streams simultaneously. Security moved from WPA2 (AES-CCMP, PSK) to **WPA3** (SAE handshake resisting offline dictionary attacks).\n\n**Bluetooth/BLE** also lives at 2.4 GHz using **GFSK** with **adaptive frequency hopping** to dodge WiFi interference. BLE separates **advertising** (broadcast on 3 primary channels for discovery/beacons) from **connections** (data exchange), exposes data through **GATT** (services and characteristics), and supports **BLE mesh** for many-to-many IoT topologies. Low duty cycle is why a coin cell lasts years.",
+      "items": [
+        {
+          "id": "wireless-l3-fc1",
+          "type": "flashcard",
+          "front": "What is multipath fading and why is it familiar from radar?",
+          "back": "Reflected copies of the signal arrive with different delays/phases and add constructively or destructively, causing fades/nulls. It is the same reflection/clutter physics that produces radar multipath and target scintillation."
+        },
+        {
+          "id": "wireless-l3-fc2",
+          "type": "flashcard",
+          "front": "Distinguish spatial multiplexing from beamforming in MIMO.",
+          "back": "Spatial multiplexing sends independent data streams over distinct spatial paths to multiply throughput. Beamforming weights the antenna elements to steer energy toward the receiver, raising SNR/range."
+        },
+        {
+          "id": "wireless-l3-fc3",
+          "type": "flashcard",
+          "front": "What do antenna gain (dBi) and polarization affect?",
+          "back": "Gain/directivity concentrates radiated power in a direction (more dBi = narrower, stronger beam). Polarization (vertical/horizontal/circular) must match between ends or a polarization-mismatch loss is incurred."
+        },
+        {
+          "id": "wireless-l3-fc4",
+          "type": "flashcard",
+          "front": "Why does WiFi use CSMA/CA instead of CSMA/CD?",
+          "back": "A radio cannot reliably hear its own transmission to detect a collision (no full-duplex sense on the same channel), so WiFi AVOIDS collisions with carrier sense plus random backoff rather than detecting them."
+        },
+        {
+          "id": "wireless-l3-fc5",
+          "type": "flashcard",
+          "front": "What is the hidden-node problem and its fix?",
+          "back": "Two stations can hear the AP but not each other, so they transmit simultaneously and collide at the AP. Fix: RTS/CTS handshake that reserves the channel before the data frame."
+        },
+        {
+          "id": "wireless-l3-fc6",
+          "type": "flashcard",
+          "front": "BLE: band, modulation, and advertising vs connections.",
+          "back": "2.4 GHz GFSK with adaptive frequency hopping. Advertising broadcasts on primary channels for discovery/beacons; connections are established for ongoing data exchange via GATT services/characteristics.",
+          "hint": "GFSK + hopping; broadcast then connect."
+        },
+        {
+          "id": "wireless-l3-mc1",
+          "type": "mcq",
+          "prompt": "PER-TECH SUMMARY: Which row correctly describes WiFi 6 (802.11ax)?",
+          "choices": [
+            "Band 2.4/5/6 GHz; OFDMA + 1024-QAM; CSMA/CA access; high rate, short-to-medium range",
+            "Band 900 MHz; chirp spread spectrum; ALOHA access; very long range, very low rate",
+            "Band 2.4 GHz; GFSK; frequency hopping; short range, low rate",
+            "Band mmWave only; SC-FDMA; scheduled access; cellular range"
+          ],
+          "answerIndex": 0,
+          "explanation": "WiFi 6/6E operates across 2.4/5/6 GHz, uses OFDMA and up to 1024-QAM, accesses the medium with CSMA/CA, and trades high throughput for limited indoor range."
+        },
+        {
+          "id": "wireless-l3-mc2",
+          "type": "mcq",
+          "prompt": "What did WPA3 improve over WPA2 for personal networks?",
+          "choices": [
+            "Replaced AES with DES",
+            "Introduced the SAE handshake resistant to offline dictionary attacks on captured handshakes",
+            "Removed encryption to speed up roaming",
+            "Switched the band to 6 GHz"
+          ],
+          "answerIndex": 1,
+          "explanation": "WPA3-Personal uses Simultaneous Authentication of Equals (SAE / Dragonfly), which prevents the offline brute-forcing of a captured WPA2 4-way handshake."
+        },
+        {
+          "id": "wireless-l3-mc3",
+          "type": "mcq",
+          "prompt": "OFDMA in WiFi 6 primarily helps by:",
+          "choices": [
+            "Increasing transmit power",
+            "Subdividing a channel into resource units so the AP serves many clients in one transmission, cutting latency under load",
+            "Hopping frequencies to avoid jammers",
+            "Eliminating the need for antennas"
+          ],
+          "answerIndex": 1,
+          "explanation": "OFDMA allocates subsets of subcarriers (resource units) to different clients simultaneously, improving efficiency and latency for many small flows."
+        },
+        {
+          "id": "wireless-l3-mc4",
+          "type": "mcq",
+          "prompt": "Why can a BLE beacon run for years on a coin cell?",
+          "choices": [
+            "It uses solar power",
+            "It transmits brief advertising packets at a very low duty cycle, sleeping most of the time",
+            "GFSK consumes no power",
+            "It offloads computation to the phone"
+          ],
+          "answerIndex": 1,
+          "explanation": "BLE's low duty cycle (short advertising bursts, long sleep) keeps average current in microamps, so a small cell lasts months to years."
+        },
+        {
+          "id": "wireless-l3-mc5",
+          "type": "mcq",
+          "prompt": "MIMO exploits multipath rather than fighting it by:",
+          "choices": [
+            "Filtering out all reflections",
+            "Using the distinct spatial paths as parallel channels to carry independent streams",
+            "Lowering the modulation order",
+            "Switching to a single antenna"
+          ],
+          "answerIndex": 1,
+          "explanation": "Rich multipath creates decorrelated spatial channels; MIMO spatial multiplexing sends independent streams across them, multiplying capacity."
+        }
+      ]
+    },
+    {
+      "id": "wireless-l4",
+      "title": "LoRa/LPWAN (Chirps!) and Cellular 2G to 5G NR",
+      "order": 4,
+      "difficulty": 4,
+      "content": "**LoRa** will feel like home: its PHY is **chirp spread spectrum (CSS)** — the symbol is a linear frequency sweep, the same up/down chirp you used in radar pulse compression. Sweeping across the whole bandwidth gives enormous processing gain, so LoRa decodes signals *below the noise floor*, buying kilometers of range at very low data rate. It uses **sub-GHz ISM** bands (868 MHz EU, 915 MHz US) for better penetration. The **spreading factor** (SF7-SF12) trades rate for range: higher SF means longer, more robust chirps, slower bits, and longer **airtime** — which collides with strict **duty-cycle** limits (e.g. 1% in EU), capping how often a node may transmit. **LoRaWAN** layers a star architecture on top: end devices broadcast to any **gateway** in range (ALOHA-style, no association), gateways forward IP-backhauled packets to a **network server** that de-duplicates and handles keys, then on to application servers. Cellular LPWAN alternatives **NB-IoT** and **LTE-M** trade the unlicensed freedom for licensed-band reliability and carrier management.\n\n**Cellular** evolved 2G (GSM, voice/SMS) -> 3G (UMTS, data) -> 4G/LTE (all-IP, OFDMA down, **SC-FDMA** up to ease the handset's power amplifier) -> **5G NR** (sub-6 GHz plus **mmWave**, massive MIMO, network slicing, private 5G). The architecture is constant: the **UE** (handset/modem) talks over the air to the **RAN** (base station: eNB in LTE, gNB in 5G), which connects to the **core** (EPC / 5GC) for mobility, authentication, and the gateway to the Internet. mmWave delivers gigabit rates but its short wavelength is blocked by buildings, foliage, even a hand, so it needs dense small cells and beamforming. Because operators must address billions of devices and IPv4 is exhausted, cellular networks are heavily **IPv6** (often IPv6-only with NAT64), tying this subtopic back to the addressing modules and forward into topic 07's propagation theory.",
+      "items": [
+        {
+          "id": "wireless-l4-fc1",
+          "type": "flashcard",
+          "front": "What is LoRa's PHY and why is it radar-adjacent?",
+          "back": "Chirp spread spectrum (CSS): each symbol is a linear frequency sweep (chirp). It is the same chirp waveform used in radar pulse compression, giving high processing gain and decoding below the noise floor."
+        },
+        {
+          "id": "wireless-l4-fc2",
+          "type": "flashcard",
+          "front": "How does LoRa spreading factor trade range against rate and airtime?",
+          "back": "Higher SF (SF7→SF12) uses longer chirps: more processing gain and range, but lower bit rate and much longer airtime per packet, which strains duty-cycle limits.",
+          "hint": "Longer chirps = farther but slower."
+        },
+        {
+          "id": "wireless-l4-fc3",
+          "type": "flashcard",
+          "front": "Sketch the LoRaWAN architecture end to end.",
+          "back": "End device -> any in-range Gateway (ALOHA broadcast, no association) -> Network Server (de-dup, security, scheduling) over IP backhaul -> Application Server. A star-of-stars topology."
+        },
+        {
+          "id": "wireless-l4-fc4",
+          "type": "flashcard",
+          "front": "What are NB-IoT and LTE-M?",
+          "back": "Cellular LPWAN technologies in LICENSED bands managed by carriers: NB-IoT (very narrowband, deep coverage, low rate) and LTE-M (higher rate, mobility/voice) — alternatives to LoRa for IoT."
+        },
+        {
+          "id": "wireless-l4-fc5",
+          "type": "flashcard",
+          "front": "Name the three cellular architecture pieces and an example of each in 5G.",
+          "back": "UE (user equipment, the handset/modem), RAN (radio access network, the gNB base station in 5G), and Core (5GC) handling mobility, auth, and the Internet gateway."
+        },
+        {
+          "id": "wireless-l4-fc6",
+          "type": "flashcard",
+          "front": "Why does LTE use SC-FDMA on the uplink but OFDMA on the downlink?",
+          "back": "OFDM has a high peak-to-average power ratio, straining the handset's battery-powered amplifier. SC-FDMA has a lower PAPR, so the uplink is more power-efficient; the base station can afford OFDMA on the downlink."
+        },
+        {
+          "id": "wireless-l4-fc7",
+          "type": "flashcard",
+          "front": "Why is cellular heavily IPv6?",
+          "back": "Carriers must address billions of devices and IPv4 is exhausted, so mobile cores are commonly IPv6 (frequently IPv6-only with NAT64/DNS64 to reach legacy IPv4 services)."
+        },
+        {
+          "id": "wireless-l4-mc1",
+          "type": "mcq",
+          "prompt": "PER-TECH SUMMARY: Which row best describes LoRa?",
+          "choices": [
+            "Sub-GHz ISM; chirp spread spectrum (CSS); ALOHA access; very long range, very low rate, duty-cycle limited",
+            "2.4 GHz; OFDM; CSMA/CA; short range, high rate",
+            "mmWave; OFDMA; scheduled; gigabit, short range",
+            "2.4 GHz; GFSK; frequency hopping; medium range, medium rate"
+          ],
+          "answerIndex": 0,
+          "explanation": "LoRa: sub-GHz unlicensed, CSS modulation, unscheduled ALOHA-style access in LoRaWAN, extreme range at kilobit rates under strict duty-cycle caps."
+        },
+        {
+          "id": "wireless-l4-mc2",
+          "type": "mcq",
+          "prompt": "LINK-BUDGET CALC: a LoRa node has Ptx = +14 dBm, Gtx = +2 dBi, Grx = +6 dBi, path loss + losses = 145 dB. Receiver sensitivity at SF12 is -137 dBm. Does the link close and by how much?",
+          "choices": [
+            "Prx = -123 dBm; closes with 14 dB margin",
+            "Prx = -137 dBm; closes with 0 dB margin (marginal)",
+            "Prx = -145 dBm; fails by 8 dB",
+            "Prx = -110 dBm; closes with 27 dB margin"
+          ],
+          "answerIndex": 0,
+          "explanation": "Prx = 14 + 2 + 6 - 145 = -123 dBm. Margin = -123 - (-137) = 14 dB. LoRa's very low SF12 sensitivity (~-137 dBm) is what enables long range."
+        },
+        {
+          "id": "wireless-l4-mc3",
+          "type": "mcq",
+          "prompt": "A 1% duty-cycle limit on an 868 MHz LoRa device means:",
+          "choices": [
+            "It may use 1% of the available bandwidth",
+            "It may transmit only 1% of the time on a sub-band, so high-SF (long-airtime) packets must be sent infrequently",
+            "Its power must be 1% of maximum",
+            "Only 1% of packets may be acknowledged"
+          ],
+          "answerIndex": 1,
+          "explanation": "Duty cycle caps transmit TIME. Long SF12 airtimes quickly consume the budget, forcing infrequent transmissions — a core LPWAN design constraint."
+        },
+        {
+          "id": "wireless-l4-mc4",
+          "type": "mcq",
+          "prompt": "Why does 5G mmWave need dense small cells and beamforming?",
+          "choices": [
+            "mmWave is licensed and cheap",
+            "Its short wavelength suffers severe path loss and is blocked by buildings/foliage/hands, so coverage is short and must be focused",
+            "mmWave penetrates walls better than sub-6 GHz",
+            "Beamforming reduces data rate"
+          ],
+          "answerIndex": 1,
+          "explanation": "mmWave offers huge bandwidth but tiny range due to high FSPL and blockage; dense cells plus massive-MIMO beamforming concentrate and steer energy to make it usable."
+        },
+        {
+          "id": "wireless-l4-mc5",
+          "type": "mcq",
+          "prompt": "Order the cellular generations by primary leap.",
+          "choices": [
+            "2G voice/SMS -> 3G mobile data -> 4G all-IP/LTE -> 5G NR mmWave & slicing",
+            "2G data -> 3G voice -> 4G mmWave -> 5G SMS",
+            "2G all-IP -> 3G slicing -> 4G voice -> 5G data",
+            "2G LTE -> 3G NR -> 4G GSM -> 5G UMTS"
+          ],
+          "answerIndex": 0,
+          "explanation": "Roughly: 2G (GSM voice/SMS), 3G (UMTS data), 4G (LTE, all-IP, OFDMA), 5G (NR, sub-6+mmWave, massive MIMO, network slicing)."
+        },
+        {
+          "id": "wireless-l4-mc6",
+          "type": "mcq",
+          "prompt": "In LoRaWAN, an end device sends an uplink. What happens at the network server?",
+          "choices": [
+            "It assigns the device a permanent channel",
+            "It de-duplicates copies received by multiple gateways, checks security/keys, and forwards to the application server",
+            "It performs CSMA/CA backoff for the device",
+            "It establishes a GATT connection"
+          ],
+          "answerIndex": 1,
+          "explanation": "Multiple gateways may hear the same broadcast uplink; the network server de-duplicates, validates message integrity/keys, manages ADR, and routes to the app server."
+        }
+      ]
+    }
+  ]
+}
