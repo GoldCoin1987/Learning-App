@@ -3,15 +3,22 @@ package com.studyforge.app.data
 import com.studyforge.app.domain.Sm2
 import com.studyforge.app.model.CatalogIndex
 import com.studyforge.app.model.Item
+import com.studyforge.app.model.Lesson
 import com.studyforge.app.model.Pack
+import com.studyforge.app.model.Subtopic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
-/** A study item paired with its owning pack id, so it can be graded back to storage. */
-data class StudyCard(val packId: String, val item: Item)
+/** A study item with display context, ready to grade back to storage. */
+data class StudyCard(
+    val packId: String,
+    val item: Item,
+    val subtopicTitle: String,
+    val lessonTitle: String,
+)
 
 private val json = Json { ignoreUnknownKeys = true }
 
@@ -38,13 +45,21 @@ class PackRepository(
                 id = pack.id,
                 title = pack.title,
                 version = pack.version,
-                curriculumIndex = pack.curriculumIndex,
                 description = pack.description,
                 requiresCsv = pack.requires.joinToString(","),
                 installedAt = todayEpochDay,
             )
         )
-        db.itemDao().insertAll(pack.items.map { it.toEntity(pack.id, todayEpochDay) })
+        val entities = buildList {
+            for (subtopic in pack.subtopics) {
+                for (lesson in subtopic.lessons) {
+                    for (item in lesson.items) {
+                        add(item.toEntity(pack.id, subtopic, lesson, todayEpochDay))
+                    }
+                }
+            }
+        }
+        db.itemDao().insertAll(entities)
     }
 
     private fun httpGet(url: String): String {
@@ -55,27 +70,28 @@ class PackRepository(
     }
 }
 
-/** Builds daily study sessions and applies grades. */
+/** Builds (optionally scoped) study sessions and applies grades. */
 class StudyRepository(private val db: StudyDatabase) {
 
     fun observeDueCount(today: Long) = db.itemDao().observeDueCount(today)
 
-    /**
-     * Session = all due reviews first (SM-2), then a capped number of NEW items drawn only from
-     * unlocked difficulty tiers. A tier is unlocked once every lower-tier item has been attempted.
-     */
-    suspend fun buildSession(today: Long, newLimit: Int = 10, reviewLimit: Int = 50): List<StudyCard> {
-        val due = db.itemDao().dueItems(today, reviewLimit).map { StudyCard(it.packId, it.toItem()) }
+    suspend fun subtopics(packId: String, today: Long): List<SubtopicSummary> =
+        db.itemDao().subtopicSummaries(packId, today)
 
-        val fresh = mutableListOf<StudyCard>()
-        for (packId in db.packDao().installedIds()) {
-            if (fresh.size >= newLimit) break
-            val tier = db.itemDao().lowestUnintroducedTier(packId) ?: continue
-            if (db.itemDao().unmasteredBelowTier(packId, tier) > 0) continue // tier still locked
-            val take = newLimit - fresh.size
-            fresh += db.itemDao().newItemsInTier(packId, tier, take).map { StudyCard(it.packId, it.toItem()) }
-        }
-        return due + fresh
+    /**
+     * Session = due reviews first (SM-2), then new items introduced in easy→hard order.
+     * [packId]/[subtopicId] null = study everything; set them to scope to a topic or sub-topic.
+     */
+    suspend fun buildSession(
+        today: Long,
+        packId: String? = null,
+        subtopicId: String? = null,
+        newLimit: Int = 20,
+        reviewLimit: Int = 80,
+    ): List<StudyCard> {
+        val due = db.itemDao().dueItemsScoped(today, packId, subtopicId, reviewLimit)
+        val fresh = db.itemDao().newItemsScoped(packId, subtopicId, newLimit)
+        return (due + fresh).map { it.toStudyCard() }
     }
 
     suspend fun grade(packId: String, itemId: String, grade: Int, today: Long) {
@@ -84,20 +100,31 @@ class StudyRepository(private val db: StudyDatabase) {
     }
 }
 
-private fun Item.toEntity(packId: String, todayEpochDay: Long): ItemEntity = ItemEntity(
-    packId = packId,
-    itemId = id,
-    type = type.name,
-    difficulty = difficulty,
-    topic = topic,
-    requiresCsv = requires.joinToString(","),
-    payloadJson = json.encodeToString(Item.serializer(), this),
-    ef = 2.5,
-    intervalDays = 0,
-    reps = 0,
-    dueEpochDay = todayEpochDay,
-    lastReviewedEpochDay = 0,
-    introduced = false,
-)
+private fun Item.toEntity(packId: String, subtopic: Subtopic, lesson: Lesson, todayEpochDay: Long): ItemEntity =
+    ItemEntity(
+        packId = packId,
+        itemId = id,
+        subtopicId = subtopic.id,
+        subtopicTitle = subtopic.title,
+        subtopicOrder = subtopic.order,
+        lessonId = lesson.id,
+        lessonTitle = lesson.title,
+        lessonOrder = lesson.order,
+        difficulty = lesson.difficulty,
+        seq = subtopic.order * 10000 + lesson.order * 100 + lesson.difficulty,
+        type = type.name,
+        payloadJson = json.encodeToString(Item.serializer(), this),
+        ef = 2.5,
+        intervalDays = 0,
+        reps = 0,
+        dueEpochDay = todayEpochDay,
+        lastReviewedEpochDay = 0,
+        introduced = false,
+    )
 
-private fun ItemEntity.toItem(): Item = json.decodeFromString(Item.serializer(), payloadJson)
+private fun ItemEntity.toStudyCard(): StudyCard = StudyCard(
+    packId = packId,
+    item = json.decodeFromString(Item.serializer(), payloadJson),
+    subtopicTitle = subtopicTitle,
+    lessonTitle = lessonTitle,
+)

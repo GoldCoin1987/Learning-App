@@ -1,73 +1,97 @@
-# Content Pack Schema (schemaVersion 1)
+# Content Pack Schema (schemaVersion 2)
 
-A **pack** is one curriculum module: metadata, prerequisite links, and a list of study items
-(flashcards + multiple-choice questions). Plain JSON, UTF-8.
+A **pack = one Topic**. It contains **sub-topics**, each containing **lessons**, each containing
+study **items** (flashcards + MCQs). This three-level hierarchy lets you study an entire topic,
+a single sub-topic, or just what's due — and it drives the easy→hard ordering.
 
-## Pack object
+```
+Topic (pack)         e.g. "Mathematics"
+└─ Sub-topic         e.g. "Algebra"
+   └─ Lesson         e.g. "Ratios & Proportions"   (a difficulty tier)
+      └─ Item        flashcard or multiple-choice question
+```
 
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `schemaVersion` | int | yes | Currently `1`. |
-| `id` | string | yes | Globally unique, stable, kebab-case (e.g. `math-foundations`). Used as the install key. |
-| `title` | string | yes | Display name. |
-| `version` | string | yes | Semver. Bump when content changes; re-import preserves SRS state. |
-| `curriculumIndex` | string | no | e.g. `"01"` — sort/display order within the curriculum. |
-| `description` | string | no | Short blurb. |
-| `requires` | string[] | no | Pack `id`s that must be installed first (prerequisite edges). |
-| `tags` | string[] | no | Free-form. |
-| `items` | Item[] | yes | The study items. |
+**Progression order** is computed from `subtopic.order`, then `lesson.order`, then
+`lesson.difficulty` — new material is always introduced in that sequence (easy first), throttled
+by a per-session new-item cap. Between packs, `requires` enforces topic prerequisites.
 
-## Item object
-
-Shared fields:
+## Pack (Topic)
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `id` | string | yes | Unique **within the pack**. |
-| `type` | string | yes | `"flashcard"` or `"mcq"`. |
-| `difficulty` | int | yes | Tier; `1` = easiest. Lower tiers are introduced/unlocked first. |
-| `topic` | string | no | Sub-topic label for grouping. |
-| `requires` | string[] | no | Item `id`s (within this pack) to learn first. |
+| `schemaVersion` | int | yes | `2`. |
+| `id` | string | yes | Globally unique, stable, kebab-case (e.g. `mathematics`). |
+| `title` | string | yes | Topic display name. |
+| `version` | string | yes | Semver; bump on content change (re-import preserves SRS state). |
+| `description` | string | no | |
+| `requires` | string[] | no | Pack ids that must be installed first. |
+| `tags` | string[] | no | |
+| `subtopics` | Subtopic[] | yes | |
 
-Flashcard (`type: "flashcard"`):
-
-| Field | Type | Required |
-|---|---|---|
-| `front` | string | yes |
-| `back` | string | yes |
-| `hint` | string | no |
-
-Multiple choice (`type: "mcq"`):
+## Sub-topic
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `prompt` | string | yes | |
-| `choices` | string[] | yes | 2+ options. |
-| `answerIndex` | int | yes | 0-based index of the correct choice. |
-| `explanation` | string | no | Shown after answering. |
+| `id` | string | yes | Unique within the pack. |
+| `title` | string | yes | |
+| `order` | int | yes | Sequence within the topic (1-based). |
+| `lessons` | Lesson[] | yes | |
 
-## Catalog index (`catalog.json`)
+## Lesson
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | string | yes | Unique within the pack. |
+| `title` | string | yes | |
+| `order` | int | yes | Sequence within the sub-topic (1-based). |
+| `difficulty` | int | yes | Tier; `1` = easiest. |
+| `items` | Item[] | yes | |
+
+## Item
+
+Shared: `id` (unique within pack), `type` (`"flashcard"` | `"mcq"`).
+
+Flashcard: `front` (req), `back` (req), `hint` (opt).
+MCQ: `prompt` (req), `choices` (req, 2+), `answerIndex` (req, 0-based), `explanation` (opt).
+
+## Example
 
 ```json
 {
-  "schemaVersion": 1,
-  "name": "StudyForge Curriculum Catalog",
-  "updated": "2026-06-15",
-  "packs": [
+  "schemaVersion": 2,
+  "id": "mathematics",
+  "title": "Mathematics",
+  "version": "1.0.0",
+  "description": "Refresher math spine for EE/radar/software.",
+  "requires": [],
+  "subtopics": [
     {
-      "id": "math-foundations",
-      "title": "Math Foundations",
-      "version": "1.0.0",
-      "curriculumIndex": "01",
-      "description": "Complex numbers, phasors, transforms — the spine.",
-      "requires": [],
-      "itemCount": 6,
-      "url": "https://raw.githubusercontent.com/YOU/studyforge-packs/main/math-foundations/pack.json",
-      "sha256": null
+      "id": "algebra",
+      "title": "Algebra",
+      "order": 1,
+      "lessons": [
+        {
+          "id": "ratios",
+          "title": "Ratios & Proportions",
+          "order": 1,
+          "difficulty": 1,
+          "items": [
+            { "id": "alg-rat-001", "type": "flashcard",
+              "front": "Define a ratio.", "back": "A comparison of two quantities by division, a:b or a/b." },
+            { "id": "alg-rat-002", "type": "mcq",
+              "prompt": "If a:b = 2:3 and a = 8, what is b?",
+              "choices": ["6", "12", "10", "16"], "answerIndex": 1,
+              "explanation": "a/b = 2/3 → 8/b = 2/3 → b = 12." }
+          ]
+        }
+      ]
     }
   ]
 }
 ```
 
-`url` is an absolute link to that pack's `pack.json`. `sha256` is optional integrity (reserved
-for a future verification step). Host the catalog and packs on any static host.
+## Catalog index (`catalog.json`) — unchanged from v1
+
+Lists available packs with `id`, `title`, `version`, `description`, `requires`, `itemCount`,
+and an absolute `url` to each pack's `pack.json`. Hosted on any static host (the app fetches it
+anonymously, so the host must be public).

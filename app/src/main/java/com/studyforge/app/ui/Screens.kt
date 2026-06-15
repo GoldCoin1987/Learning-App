@@ -1,7 +1,9 @@
 package com.studyforge.app.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -27,11 +30,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.studyforge.app.AppContainer
 import com.studyforge.app.data.StudyCard
+import com.studyforge.app.data.SubtopicSummary
 import com.studyforge.app.domain.Gating
 import com.studyforge.app.domain.Sm2
 import com.studyforge.app.model.CatalogEntry
@@ -47,7 +53,24 @@ fun AppNav(container: AppContainer) {
     NavHost(navController = nav, startDestination = "home") {
         composable("home") { HomeScreen(container, nav::navigate) }
         composable("catalog") { CatalogScreen(container) }
-        composable("study") { StudyScreen(container, onDone = { nav.popBackStack() }) }
+        composable("topics") { TopicsScreen(container, nav::navigate) }
+        composable("topic/{packId}") { entry ->
+            SubtopicsScreen(container, entry.arguments?.getString("packId").orEmpty(), nav::navigate)
+        }
+        composable(
+            route = "study?packId={packId}&subtopicId={subtopicId}",
+            arguments = listOf(
+                navArgument("packId") { type = NavType.StringType; nullable = true; defaultValue = null },
+                navArgument("subtopicId") { type = NavType.StringType; nullable = true; defaultValue = null },
+            ),
+        ) { entry ->
+            StudyScreen(
+                container = container,
+                packId = entry.arguments?.getString("packId"),
+                subtopicId = entry.arguments?.getString("subtopicId"),
+                onDone = { nav.popBackStack() },
+            )
+        }
     }
 }
 
@@ -61,15 +84,75 @@ private fun HomeScreen(container: AppContainer, navigate: (String) -> Unit) {
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text("StudyForge", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Text("Installed packs: ${packs.size}", style = MaterialTheme.typography.bodyLarge)
+        Text("Installed topics: ${packs.size}", style = MaterialTheme.typography.bodyLarge)
         Text("Cards due today: $due", style = MaterialTheme.typography.titleLarge)
 
         Spacer(Modifier.height(8.dp))
         Button(onClick = { navigate("study") }, modifier = Modifier.fillMaxWidth()) {
-            Text("Start study session")
+            Text("Study all due")
+        }
+        OutlinedButton(onClick = { navigate("topics") }, modifier = Modifier.fillMaxWidth()) {
+            Text("Browse topics")
         }
         OutlinedButton(onClick = { navigate("catalog") }, modifier = Modifier.fillMaxWidth()) {
-            Text("Browse / download packs")
+            Text("Download topics")
+        }
+    }
+}
+
+@Composable
+private fun TopicsScreen(container: AppContainer, navigate: (String) -> Unit) {
+    val packs by container.packRepo.observePacks().collectAsState(initial = emptyList())
+    Column(Modifier.fillMaxSize().padding(16.dp)) {
+        Text("Topics", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(12.dp))
+        if (packs.isEmpty()) {
+            Text("No topics installed yet. Use \"Download topics\".")
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                items(packs) { pack ->
+                    Card(Modifier.fillMaxWidth().clickable { navigate("topic/${pack.id}") }) {
+                        Column(Modifier.padding(16.dp)) {
+                            Text(pack.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            if (pack.description.isNotBlank()) {
+                                Text(pack.description, style = MaterialTheme.typography.bodyMedium)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SubtopicsScreen(container: AppContainer, packId: String, navigate: (String) -> Unit) {
+    var subs by remember { mutableStateOf<List<SubtopicSummary>?>(null) }
+    LaunchedEffect(packId) { subs = container.studyRepo.subtopics(packId, today()) }
+
+    Column(Modifier.fillMaxSize().padding(16.dp)) {
+        Text("Sub-topics", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(12.dp))
+        Button(onClick = { navigate("study?packId=$packId") }, modifier = Modifier.fillMaxWidth()) {
+            Text("Study entire topic")
+        }
+        Spacer(Modifier.height(12.dp))
+        when (val list = subs) {
+            null -> CircularProgressIndicator()
+            else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                items(list) { st ->
+                    Card(Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(16.dp)) {
+                            Text(st.subtopicTitle, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text("${st.total} cards · ${st.due} due · ${st.newCount} new", style = MaterialTheme.typography.labelMedium)
+                            Spacer(Modifier.height(8.dp))
+                            Button(onClick = { navigate("study?packId=$packId&subtopicId=${st.subtopicId}") }) {
+                                Text("Study")
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -84,7 +167,7 @@ private fun CatalogScreen(container: AppContainer) {
     var error by remember { mutableStateOf<String?>(null) }
     var entries by remember { mutableStateOf<List<CatalogEntry>>(emptyList()) }
 
-    LaunchedEffectOnce {
+    LaunchedEffect(Unit) {
         try {
             entries = container.packRepo.fetchCatalog().packs
         } catch (e: Exception) {
@@ -95,7 +178,7 @@ private fun CatalogScreen(container: AppContainer) {
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Text("Catalog", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text("Download topics", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(12.dp))
         when {
             loading -> CircularProgressIndicator()
@@ -133,38 +216,31 @@ private fun CatalogScreen(container: AppContainer) {
 }
 
 @Composable
-private fun StudyScreen(container: AppContainer, onDone: () -> Unit) {
+private fun StudyScreen(container: AppContainer, packId: String?, subtopicId: String?, onDone: () -> Unit) {
     val scope = rememberCoroutineScope()
     var session by remember { mutableStateOf<List<StudyCard>?>(null) }
     var index by remember { mutableStateOf(0) }
 
-    LaunchedEffectOnce {
-        session = container.studyRepo.buildSession(today())
+    LaunchedEffect(packId, subtopicId) {
+        session = container.studyRepo.buildSession(today(), packId, subtopicId)
     }
 
     val cards = session
     when {
-        cards == null -> Box { CircularProgressIndicator() }
-        cards.isEmpty() || index >= cards.size -> {
-            Column(
-                Modifier.fillMaxSize().padding(24.dp),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(if (cards.isEmpty()) "Nothing due. Download a pack or come back later." else "Session complete 🎉")
-                Spacer(Modifier.height(16.dp))
-                Button(onClick = onDone) { Text("Back to home") }
-            }
+        cards == null -> Centered { CircularProgressIndicator() }
+        cards.isEmpty() || index >= cards.size -> Centered {
+            Text(if (cards.isEmpty()) "Nothing to study here right now." else "Session complete 🎉")
+            Spacer(Modifier.height(16.dp))
+            Button(onClick = onDone) { Text("Back") }
         }
         else -> {
             val card = cards[index]
-            fun grade(g: Int) {
+            CardView(card, position = index + 1, total = cards.size) { grade ->
                 scope.launch {
-                    container.studyRepo.grade(card.packId, card.item.id, g, today())
+                    container.studyRepo.grade(card.packId, card.item.id, grade, today())
                     index += 1
                 }
             }
-            CardView(card, position = index + 1, total = cards.size, onGrade = ::grade)
         }
     }
 }
@@ -176,7 +252,8 @@ private fun CardView(card: StudyCard, position: Int, total: Int, onGrade: (Int) 
     var selected by remember(item.id) { mutableStateOf<Int?>(null) }
 
     Column(modifier = Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("$position / $total · ${item.topic} · tier ${item.difficulty}", style = MaterialTheme.typography.labelMedium)
+        Text("$position / $total", style = MaterialTheme.typography.labelMedium)
+        Text("${card.subtopicTitle} › ${card.lessonTitle}", style = MaterialTheme.typography.labelMedium)
         HorizontalDivider()
 
         if (item.type == ItemType.FLASHCARD) {
@@ -196,8 +273,8 @@ private fun CardView(card: StudyCard, position: Int, total: Int, onGrade: (Int) 
             Text(item.prompt.orEmpty(), style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.height(8.dp))
             item.choices.forEachIndexed { i, choice ->
-                val correct = item.answerIndex == i
                 val show = selected != null
+                val correct = item.answerIndex == i
                 OutlinedButton(
                     onClick = { if (selected == null) selected = i },
                     modifier = Modifier.fillMaxWidth(),
@@ -226,23 +303,21 @@ private fun CardView(card: StudyCard, position: Int, total: Int, onGrade: (Int) 
 @Composable
 private fun GradeButtons(onGrade: (Int) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button(onClick = { onGrade(Sm2.GRADE_AGAIN) }, modifier = Modifier.fillMaxWidth()) { Text("Again") }
-        Button(onClick = { onGrade(Sm2.GRADE_HARD) }, modifier = Modifier.fillMaxWidth()) { Text("Hard") }
-        Button(onClick = { onGrade(Sm2.GRADE_GOOD) }, modifier = Modifier.fillMaxWidth()) { Text("Good") }
-        Button(onClick = { onGrade(Sm2.GRADE_EASY) }, modifier = Modifier.fillMaxWidth()) { Text("Easy") }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { onGrade(Sm2.GRADE_AGAIN) }, modifier = Modifier.weight(1f)) { Text("Again") }
+            Button(onClick = { onGrade(Sm2.GRADE_HARD) }, modifier = Modifier.weight(1f)) { Text("Hard") }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { onGrade(Sm2.GRADE_GOOD) }, modifier = Modifier.weight(1f)) { Text("Good") }
+            Button(onClick = { onGrade(Sm2.GRADE_EASY) }, modifier = Modifier.weight(1f)) { Text("Easy") }
+        }
     }
 }
 
-/** Runs a suspend block exactly once when the composable enters composition. */
 @Composable
-private fun LaunchedEffectOnce(block: suspend () -> Unit) {
-    androidx.compose.runtime.LaunchedEffect(Unit) { block() }
-}
-
-@Composable
-private fun Box(content: @Composable () -> Unit) {
+private fun Centered(content: @Composable () -> Unit) {
     Column(
-        Modifier.fillMaxSize(),
+        Modifier.fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) { content() }

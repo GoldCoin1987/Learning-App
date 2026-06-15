@@ -25,6 +25,9 @@ class StudyForgeApp : Application() {
 class AppContainer(context: Context) {
     val db: StudyDatabase = Room
         .databaseBuilder(context, StudyDatabase::class.java, "studyforge.db")
+        // Schema v2 (hierarchical packs). Content is re-downloadable, so a destructive
+        // upgrade is acceptable here rather than hand-writing a migration.
+        .fallbackToDestructiveMigration()
         .build()
 
     /** Catalog index URL. Point this at your hosted catalog.json (editable in a settings screen later). */

@@ -16,24 +16,29 @@ data class PackEntity(
     @PrimaryKey val id: String,
     val title: String,
     val version: String,
-    val curriculumIndex: String,
     val description: String,
     val requiresCsv: String,
     val installedAt: Long,
 )
 
 /**
- * One study item plus its embedded SM-2 scheduling state.
- * Keyed on (packId, itemId) so re-importing a pack can IGNORE existing rows and preserve progress.
+ * One study item, denormalized with its sub-topic/lesson context and embedded SM-2 state.
+ * Keyed on (packId, itemId) so re-importing a pack IGNOREs existing rows and preserves progress.
+ * [seq] = subtopicOrder*10000 + lessonOrder*100 + difficulty — the easy→hard progression order.
  */
 @Entity(tableName = "items", primaryKeys = ["packId", "itemId"])
 data class ItemEntity(
     val packId: String,
     val itemId: String,
-    val type: String,
+    val subtopicId: String,
+    val subtopicTitle: String,
+    val subtopicOrder: Int,
+    val lessonId: String,
+    val lessonTitle: String,
+    val lessonOrder: Int,
     val difficulty: Int,
-    val topic: String,
-    val requiresCsv: String,
+    val seq: Int,
+    val type: String,
     val payloadJson: String,
     // SRS state
     val ef: Double,
@@ -44,9 +49,19 @@ data class ItemEntity(
     val introduced: Boolean,
 )
 
+/** Aggregated counts for a sub-topic, for the browse screen. */
+data class SubtopicSummary(
+    val subtopicId: String,
+    val subtopicTitle: String,
+    val subtopicOrder: Int,
+    val total: Int,
+    val due: Int,
+    val newCount: Int,
+)
+
 @Dao
 interface PackDao {
-    @Query("SELECT * FROM packs ORDER BY curriculumIndex, title")
+    @Query("SELECT * FROM packs ORDER BY title")
     fun observePacks(): Flow<List<PackEntity>>
 
     @Query("SELECT id FROM packs")
@@ -77,28 +92,38 @@ interface ItemDao {
     @Query("SELECT COUNT(*) FROM items WHERE introduced = 1 AND dueEpochDay <= :today")
     fun observeDueCount(today: Long): Flow<Int>
 
+    /** Due reviews in scope (null packId/subtopicId = unrestricted). */
     @Query(
-        "SELECT * FROM items WHERE introduced = 1 AND dueEpochDay <= :today " +
-            "ORDER BY difficulty, dueEpochDay LIMIT :limit"
+        "SELECT * FROM items " +
+            "WHERE introduced = 1 AND dueEpochDay <= :today " +
+            "AND (:packId IS NULL OR packId = :packId) " +
+            "AND (:subtopicId IS NULL OR subtopicId = :subtopicId) " +
+            "ORDER BY seq, dueEpochDay LIMIT :limit"
     )
-    suspend fun dueItems(today: Long, limit: Int): List<ItemEntity>
+    suspend fun dueItemsScoped(today: Long, packId: String?, subtopicId: String?, limit: Int): List<ItemEntity>
 
-    /** Lowest difficulty tier in this pack that still has un-introduced items. */
-    @Query("SELECT MIN(difficulty) FROM items WHERE packId = :packId AND introduced = 0")
-    suspend fun lowestUnintroducedTier(packId: String): Int?
-
-    /** Count of not-yet-attempted items below a tier — if > 0, the tier stays locked. */
-    @Query("SELECT COUNT(*) FROM items WHERE packId = :packId AND difficulty < :tier AND reps = 0")
-    suspend fun unmasteredBelowTier(packId: String, tier: Int): Int
+    /** New (never-introduced) items in scope, in easy→hard progression order. */
+    @Query(
+        "SELECT * FROM items " +
+            "WHERE introduced = 0 " +
+            "AND (:packId IS NULL OR packId = :packId) " +
+            "AND (:subtopicId IS NULL OR subtopicId = :subtopicId) " +
+            "ORDER BY seq, itemId LIMIT :limit"
+    )
+    suspend fun newItemsScoped(packId: String?, subtopicId: String?, limit: Int): List<ItemEntity>
 
     @Query(
-        "SELECT * FROM items WHERE introduced = 0 AND packId = :packId AND difficulty = :tier " +
-            "ORDER BY itemId LIMIT :limit"
+        "SELECT subtopicId, subtopicTitle, subtopicOrder, " +
+            "COUNT(*) AS total, " +
+            "SUM(CASE WHEN introduced = 1 AND dueEpochDay <= :today THEN 1 ELSE 0 END) AS due, " +
+            "SUM(CASE WHEN introduced = 0 THEN 1 ELSE 0 END) AS newCount " +
+            "FROM items WHERE packId = :packId " +
+            "GROUP BY subtopicId, subtopicTitle, subtopicOrder ORDER BY subtopicOrder"
     )
-    suspend fun newItemsInTier(packId: String, tier: Int, limit: Int): List<ItemEntity>
+    suspend fun subtopicSummaries(packId: String, today: Long): List<SubtopicSummary>
 }
 
-@Database(entities = [PackEntity::class, ItemEntity::class], version = 1, exportSchema = false)
+@Database(entities = [PackEntity::class, ItemEntity::class], version = 2, exportSchema = false)
 abstract class StudyDatabase : RoomDatabase() {
     abstract fun packDao(): PackDao
     abstract fun itemDao(): ItemDao

@@ -17,8 +17,10 @@ it in-app — no app update required.
 
 ## Status
 
-Schema-first scaffold (engine + a sample pack proving the full loop). Bulk curriculum content
-(generated from the 10 lesson plans in `../curriculum/`) comes next.
+Working end-to-end (v0.2.0). Hierarchical schema (Topic → Sub-topic → Lesson → Item),
+spaced repetition, scoped study, and daily reminders. First full content topic shipped:
+**Mathematics** — 12 sub-topics, 48 lessons, 526 items (flashcards + MCQs), tiered easy→hard.
+Installable APK: `dist/studyforge-v0.2.0-debug.apk`.
 
 ## Build & run
 

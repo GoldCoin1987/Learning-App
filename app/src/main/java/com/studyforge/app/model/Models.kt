@@ -3,10 +3,10 @@ package com.studyforge.app.model
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-/** Index of available packs, fetched from a static catalog URL. */
+/** Index of available packs, fetched from a static (public) catalog URL. */
 @Serializable
 data class CatalogIndex(
-    val schemaVersion: Int = 1,
+    val schemaVersion: Int = 2,
     val name: String = "",
     val updated: String = "",
     val packs: List<CatalogEntry> = emptyList(),
@@ -17,7 +17,6 @@ data class CatalogEntry(
     val id: String,
     val title: String,
     val version: String,
-    val curriculumIndex: String = "",
     val description: String = "",
     val requires: List<String> = emptyList(),
     val itemCount: Int = 0,
@@ -25,17 +24,33 @@ data class CatalogEntry(
     val sha256: String? = null,
 )
 
-/** A downloadable content module ("plugin"). */
+/** A downloadable Topic ("plugin"): Topic → Sub-topics → Lessons → Items. */
 @Serializable
 data class Pack(
-    val schemaVersion: Int = 1,
+    val schemaVersion: Int = 2,
     val id: String,
     val title: String,
     val version: String,
-    val curriculumIndex: String = "",
     val description: String = "",
     val requires: List<String> = emptyList(),
     val tags: List<String> = emptyList(),
+    val subtopics: List<Subtopic> = emptyList(),
+)
+
+@Serializable
+data class Subtopic(
+    val id: String,
+    val title: String,
+    val order: Int = 0,
+    val lessons: List<Lesson> = emptyList(),
+)
+
+@Serializable
+data class Lesson(
+    val id: String,
+    val title: String,
+    val order: Int = 0,
+    val difficulty: Int = 1,
     val items: List<Item> = emptyList(),
 )
 
@@ -45,17 +60,11 @@ enum class ItemType {
     @SerialName("mcq") MCQ,
 }
 
-/**
- * A single study item. Flashcard fields and MCQ fields share one class with optional
- * properties to keep pack JSON and serialization simple.
- */
+/** A single study item. Flashcard and MCQ share one class with optional fields. */
 @Serializable
 data class Item(
     val id: String,
     val type: ItemType,
-    val difficulty: Int = 1,
-    val topic: String = "",
-    val requires: List<String> = emptyList(),
     // flashcard
     val front: String? = null,
     val back: String? = null,
