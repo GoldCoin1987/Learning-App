@@ -1,0 +1,400 @@
+{
+  "id": "timing-metastability",
+  "title": "Timing, Setup/Hold, Skew & Metastability",
+  "order": 8,
+  "lessons": [
+    {
+      "id": "timing-metastability-l1",
+      "title": "Delays & Flip-Flop Timing Parameters",
+      "order": 1,
+      "difficulty": "easy",
+      "content": "Every gate and wire takes time to respond. **Propagation delay** $t_{pd}$ is the *maximum* time from a stable input change to a stable output; **contamination delay** $t_{cd}$ is the *minimum* time before the output *starts* to change. So after an input edge the output is guaranteed stable only after $t_{pd}$, and guaranteed unchanged only up to $t_{cd}$. Note $t_{cd} \\le t_{pd}$ always.\n\nA flip-flop adds three timing parameters that define a window around its clock edge:\n\n- **Setup time** $t_{su}$ — the input $D$ must be stable for at least $t_{su}$ *before* the active clock edge.\n- **Hold time** $t_{h}$ — $D$ must remain stable for at least $t_{h}$ *after* the edge.\n- **Clock-to-Q delay** $t_{cq}$ — after the edge, $Q$ is valid after $t_{cq}$ (datasheets often give both $t_{cq,max}$ and a $t_{cq,min}$, akin to $t_{pd}$ vs $t_{cd}$ for combinational logic).\n\nViolate $t_{su}$ or $t_{h}$ and the flop may capture a wrong value or go *metastable* (Lesson 4). As a radar tech you measured rise/fall times on a scope; these are the same physics, now abstracted into datasheet numbers your timing tools consume.\n\nThink of a register-to-register path: the launching flop fires ($t_{cq}$), the signal crosses combinational logic ($t_{pd}$), and must arrive at the capturing flop's $D$ before its $t_{su}$. That chain is the seed of every timing constraint in the rest of this subtopic.",
+      "items": [
+        {
+          "id": "timing-metastability-l1-fc1",
+          "type": "flashcard",
+          "front": "Define propagation delay $t_{pd}$.",
+          "back": "The **maximum** time from an input change until the output is **guaranteed stable** at its new value. It bounds the worst-case (slowest) path.",
+          "hint": "Worst case, output settled."
+        },
+        {
+          "id": "timing-metastability-l1-fc2",
+          "type": "flashcard",
+          "front": "Define contamination delay $t_{cd}$ and its relation to $t_{pd}$.",
+          "back": "The **minimum** time before an output **begins** to change after an input change. Always $t_{cd} \\le t_{pd}$. It bounds the fastest path and matters for hold timing.",
+          "hint": "Earliest the output can move."
+        },
+        {
+          "id": "timing-metastability-l1-fc3",
+          "type": "flashcard",
+          "front": "What is setup time $t_{su}$?",
+          "back": "The minimum time the data input $D$ must be **stable before** the active clock edge for the flip-flop to capture it reliably.",
+          "hint": "Stable before the edge.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/timing-metastability-1.svg"
+        },
+        {
+          "id": "timing-metastability-l1-fc4",
+          "type": "flashcard",
+          "front": "What is hold time $t_{h}$?",
+          "back": "The minimum time $D$ must remain **stable after** the active clock edge for reliable capture.",
+          "hint": "Stable after the edge."
+        },
+        {
+          "id": "timing-metastability-l1-fc5",
+          "type": "flashcard",
+          "front": "What is clock-to-Q delay $t_{cq}$?",
+          "back": "The delay from the active clock edge until the flip-flop output $Q$ is valid. It is the time the launching flop adds to a register-to-register path.",
+          "hint": "Edge to valid output."
+        },
+        {
+          "id": "timing-metastability-l1-mc1",
+          "type": "mcq",
+          "prompt": "Data must be held stable for a window around the clock edge. Which two parameters bound that window?",
+          "choices": [
+            "$t_{pd}$ before and $t_{cd}$ after",
+            "$t_{su}$ before and $t_{h}$ after",
+            "$t_{cq}$ before and $t_{su}$ after",
+            "$t_{h}$ before and $t_{su}$ after"
+          ],
+          "answerIndex": 1,
+          "explanation": "Setup time $t_{su}$ is measured before the edge and hold time $t_{h}$ after it; together they form the keep-out window for $D$."
+        },
+        {
+          "id": "timing-metastability-l1-mc2",
+          "type": "mcq",
+          "prompt": "Which inequality between a gate's delays is always true?",
+          "choices": [
+            "$t_{cd} \\ge t_{pd}$",
+            "$t_{cd} = 2 t_{pd}$",
+            "$t_{cd} \\le t_{pd}$",
+            "$t_{cd}$ and $t_{pd}$ are unrelated"
+          ],
+          "answerIndex": 2,
+          "explanation": "The output cannot finish settling ($t_{pd}$) before it even starts to change ($t_{cd}$), so $t_{cd} \\le t_{pd}$."
+        },
+        {
+          "id": "timing-metastability-l1-mc3",
+          "type": "mcq",
+          "prompt": "On a register-to-register path, which delay does the launching flip-flop contribute before the signal enters the combinational logic?",
+          "choices": [
+            "$t_{su}$",
+            "$t_{h}$",
+            "$t_{cq}$",
+            "$t_{cd}$ of the capturing flop"
+          ],
+          "answerIndex": 2,
+          "explanation": "After the launch edge, $Q$ becomes valid only after $t_{cq}$; that is the launching flop's contribution to the path delay."
+        },
+        {
+          "id": "timing-metastability-l1-mc4",
+          "type": "mcq",
+          "prompt": "A datasheet lists $t_{cq,max}$ and $t_{cq,min}$. Why distinguish them?",
+          "choices": [
+            "They are the same number written twice",
+            "$t_{cq,max}$ feeds worst-case (setup) analysis; $t_{cq,min}$ feeds fastest-path (hold) analysis",
+            "$t_{cq,min}$ is used only for power estimation",
+            "$t_{cq,max}$ applies only to the clock tree"
+          ],
+          "answerIndex": 1,
+          "explanation": "Setup checks use the slowest (max) launch, while hold checks use the fastest (min) launch—analogous to using $t_{pd}$ vs $t_{cd}$ in combinational logic."
+        }
+      ]
+    },
+    {
+      "id": "timing-metastability-l2",
+      "title": "The Setup & Hold Inequalities, f_max, and the Critical Path",
+      "order": 2,
+      "difficulty": "medium",
+      "content": "Consider two flip-flops separated by combinational logic, both on clock period $T_{clk}$. After a launch edge the data is valid at $D$ of the capturing flop at time $t_{cq}+t_{pd}$, and it must arrive at least $t_{su}$ before the *next* edge. That gives the **setup constraint**:\n\n$$t_{cq} + t_{pd,max} + t_{su} \\le T_{clk}$$\n\nSolving for the period sets the **maximum clock frequency**:\n\n$$f_{max} = \\frac{1}{t_{cq} + t_{pd,max} + t_{su}}$$\n\nThe slowest register-to-register path—the **critical path**—is the one that maximizes $t_{cq}+t_{pd,max}$ and therefore caps $f_{max}$. **Slack** is how much margin a path has: $\\text{slack} = T_{clk} - (t_{cq}+t_{pd,max}+t_{su})$; negative slack means a setup failure.\n\nThe **hold constraint** is different—it compares fastest data against the *same* edge:\n\n$$t_{cq,min} + t_{cd} \\ge t_{h}$$\n\nNotice $T_{clk}$ does **not** appear. Hold is **frequency-independent**: the data launched at an edge must not race through and corrupt the capturing flop's input *before* its hold window closes after that same edge. This is why **slowing the clock can fix setup violations but never hold violations**—a classic rust-knocker. Hold failures are fixed by adding delay (buffers) on short paths or fixing skew, not by lowering frequency.",
+      "items": [
+        {
+          "id": "timing-metastability-l2-fc1",
+          "type": "flashcard",
+          "front": "State the setup (max-delay) constraint for a register-to-register path.",
+          "back": "$t_{cq} + t_{pd,max} + t_{su} \\le T_{clk}$. The launched data plus worst-case logic plus setup must fit inside one clock period.",
+          "hint": "Everything must fit in $T_{clk}$."
+        },
+        {
+          "id": "timing-metastability-l2-fc2",
+          "type": "flashcard",
+          "front": "Give the formula for $f_{max}$ from setup timing (zero skew).",
+          "back": "$f_{max} = \\dfrac{1}{t_{cq} + t_{pd,max} + t_{su}}$, set by the critical (slowest) path.",
+          "hint": "Reciprocal of the longest path period."
+        },
+        {
+          "id": "timing-metastability-l2-fc3",
+          "type": "flashcard",
+          "front": "State the hold (min-delay) constraint and note what is absent.",
+          "back": "$t_{cq,min} + t_{cd} \\ge t_{h}$. **No $T_{clk}$ term**—hold is frequency-independent.",
+          "hint": "Fastest data vs. the same edge."
+        },
+        {
+          "id": "timing-metastability-l2-fc4",
+          "type": "flashcard",
+          "front": "Define the critical path.",
+          "back": "The register-to-register path with the largest $t_{cq}+t_{pd,max}$; it has the least setup slack and therefore determines $f_{max}$.",
+          "hint": "Slowest path = lowest slack."
+        },
+        {
+          "id": "timing-metastability-l2-fc5",
+          "type": "flashcard",
+          "front": "Why can't you fix a hold violation by slowing the clock?",
+          "back": "The hold inequality $t_{cq,min}+t_{cd} \\ge t_{h}$ has no $T_{clk}$ term. It's a race against the *same* edge, so a longer period does nothing—you must add path delay or fix skew.",
+          "hint": "No period in the equation."
+        },
+        {
+          "id": "timing-metastability-l2-mc1",
+          "type": "mcq",
+          "prompt": "Given $t_{cq}=0.3\\,\\text{ns}$, $t_{pd,max}=4.2\\,\\text{ns}$, $t_{su}=0.5\\,\\text{ns}$ and zero skew, what is $f_{max}$?",
+          "choices": [
+            "About 200 MHz",
+            "About 238 MHz",
+            "About 500 MHz",
+            "About 100 MHz"
+          ],
+          "answerIndex": 0,
+          "explanation": "Sum $= 0.3+4.2+0.5 = 5.0\\,\\text{ns}$, so $f_{max} = 1/5\\,\\text{ns} = 200\\,\\text{MHz}$."
+        },
+        {
+          "id": "timing-metastability-l2-mc2",
+          "type": "mcq",
+          "prompt": "A path has $T_{clk}=8\\,\\text{ns}$, $t_{cq}=0.4$, $t_{pd,max}=6.0$, $t_{su}=0.6\\,\\text{ns}$. What is the setup slack?",
+          "choices": [
+            "$-1.0\\,\\text{ns}$ (fails)",
+            "$+1.0\\,\\text{ns}$",
+            "$+2.0\\,\\text{ns}$",
+            "$0\\,\\text{ns}$"
+          ],
+          "answerIndex": 1,
+          "explanation": "Slack $= T_{clk} - (t_{cq}+t_{pd,max}+t_{su}) = 8 - (0.4+6.0+0.6) = 8 - 7.0 = +1.0\\,\\text{ns}$."
+        },
+        {
+          "id": "timing-metastability-l2-mc3",
+          "type": "mcq",
+          "prompt": "Which variable does NOT appear in the hold-time inequality?",
+          "choices": [
+            "$t_{cq,min}$",
+            "$t_{cd}$",
+            "$t_{h}$",
+            "$T_{clk}$"
+          ],
+          "answerIndex": 3,
+          "explanation": "Hold is $t_{cq,min}+t_{cd} \\ge t_{h}$; the clock period is absent, which is exactly why hold is frequency-independent."
+        },
+        {
+          "id": "timing-metastability-l2-mc4",
+          "type": "mcq",
+          "prompt": "A design fails hold on a short path between two adjacent flops. What is a valid fix?",
+          "choices": [
+            "Lower the clock frequency",
+            "Add buffer/delay on the data path or fix the skew",
+            "Increase $t_{su}$ of the capturing flop",
+            "Remove pipeline registers"
+          ],
+          "answerIndex": 1,
+          "explanation": "Hold violations need more minimum data delay (buffers) or skew correction; period changes have no effect because $T_{clk}$ is not in the inequality."
+        }
+      ]
+    },
+    {
+      "id": "timing-metastability-l3",
+      "title": "Clock Skew, Jitter, and Pipelining",
+      "order": 3,
+      "difficulty": "medium",
+      "content": "**Clock skew** is the difference in clock arrival time between the launching and capturing flops, $t_{skew} = t_{clk,capture} - t_{clk,launch}$. Skew shifts both constraints. With skew the setup constraint becomes\n\n$$t_{cq} + t_{pd,max} + t_{su} \\le T_{clk} + t_{skew}$$\n\nPositive skew (clock reaches the capture flop *later*) *relaxes* setup—it effectively lends time. But the same positive skew *tightens* hold:\n\n$$t_{cq,min} + t_{cd} \\ge t_{h} + t_{skew}$$\n\nSo skew is a double-edged sword; tools budget it carefully, and uncontrolled skew (e.g., from gating a clock) is dangerous.\n\n**Jitter** is cycle-to-cycle variation in the clock edge position—random (phase noise) and deterministic. Unlike static skew, jitter is uncertain, so it eats directly into your timing budget: subtract it from the period for setup. Your radar phase-noise intuition transfers exactly—jitter is phase noise in the time domain.\n\n**Pipelining** raises throughput by inserting registers to chop one long combinational path into shorter stages. If a path of delay $D$ is split into $k$ balanced stages, each stage is $\\approx D/k$, so $f_{max}$ rises (ideally by $\\approx k\\times$, minus the added $t_{cq}+t_{su}$ per stage). The cost is **latency**: results now take $k$ cycles to emerge, and you must add matching pipeline delays to side signals. Pipelining is the standard answer when a critical path won't meet timing—central to FPGA radar DSP, where deep MAC pipelines run at line rate.",
+      "items": [
+        {
+          "id": "timing-metastability-l3-fc1",
+          "type": "flashcard",
+          "front": "Define clock skew.",
+          "back": "$t_{skew} = t_{clk,capture} - t_{clk,launch}$: the difference in clock arrival time between the capturing and launching flip-flops.",
+          "hint": "Capture-edge arrival minus launch-edge arrival."
+        },
+        {
+          "id": "timing-metastability-l3-fc2",
+          "type": "flashcard",
+          "front": "How does positive skew affect the setup and hold constraints?",
+          "back": "Positive skew **relaxes setup** ($\\dots \\le T_{clk}+t_{skew}$) but **tightens hold** ($t_{cq,min}+t_{cd} \\ge t_{h}+t_{skew}$). It's a trade-off, not free time.",
+          "hint": "Helps one, hurts the other."
+        },
+        {
+          "id": "timing-metastability-l3-fc3",
+          "type": "flashcard",
+          "front": "How does clock jitter differ from skew, and how is it budgeted?",
+          "back": "Skew is a fixed spatial offset; jitter is random/cycle-to-cycle uncertainty in edge timing. Jitter is subtracted from the usable period for setup analysis. It is phase noise viewed in the time domain.",
+          "hint": "Static vs. uncertain."
+        },
+        {
+          "id": "timing-metastability-l3-fc4",
+          "type": "flashcard",
+          "front": "What does pipelining do to $f_{max}$ and to latency?",
+          "back": "Splitting a path into $k$ balanced stages raises $f_{max}$ by up to $\\approx k\\times$ (minus per-stage $t_{cq}+t_{su}$), but increases latency to $k$ cycles before the first result emerges.",
+          "hint": "Higher throughput, more cycles of delay."
+        },
+        {
+          "id": "timing-metastability-l3-fc5",
+          "type": "flashcard",
+          "front": "When pipelining a datapath, what must you do to parallel/side signals?",
+          "back": "Delay them by matching pipeline registers so they stay aligned with the data they accompany; otherwise control/data become misaligned by the pipeline depth.",
+          "hint": "Keep everything in step, stage for stage."
+        },
+        {
+          "id": "timing-metastability-l3-mc1",
+          "type": "mcq",
+          "prompt": "With positive clock skew $t_{skew}$, the setup constraint becomes:",
+          "choices": [
+            "$t_{cq}+t_{pd,max}+t_{su} \\le T_{clk} - t_{skew}$",
+            "$t_{cq}+t_{pd,max}+t_{su} \\le T_{clk} + t_{skew}$",
+            "$t_{cq}+t_{pd,max}+t_{su} \\ge T_{clk} + t_{skew}$",
+            "$t_{cq}+t_{pd,max} \\le t_{h} + t_{skew}$"
+          ],
+          "answerIndex": 1,
+          "explanation": "Positive skew delays the capture edge, effectively adding $t_{skew}$ to the available period and relaxing setup."
+        },
+        {
+          "id": "timing-metastability-l3-mc2",
+          "type": "mcq",
+          "prompt": "A 12 ns combinational path is pipelined into 3 balanced stages of 4 ns each (ignore added $t_{cq}/t_{su}$). The new throughput period is roughly:",
+          "choices": [
+            "12 ns (unchanged)",
+            "4 ns",
+            "36 ns",
+            "1.3 ns"
+          ],
+          "answerIndex": 1,
+          "explanation": "Each stage is now the critical path at ~4 ns, so the clock period drops to ~4 ns even though end-to-end latency is still ~12 ns (3 cycles)."
+        },
+        {
+          "id": "timing-metastability-l3-mc3",
+          "type": "mcq",
+          "prompt": "Why is gating a clock with an AND-enable considered bad practice for timing?",
+          "choices": [
+            "It saves too much power",
+            "It introduces uncontrolled skew/glitches on the clock and complicates timing closure",
+            "It increases $t_{su}$ of every flop",
+            "It is the only way to reduce hold violations"
+          ],
+          "answerIndex": 1,
+          "explanation": "Logic in the clock path adds skew and can glitch the clock; use a synchronous clock-enable on the flop instead."
+        },
+        {
+          "id": "timing-metastability-l3-mc4",
+          "type": "mcq",
+          "prompt": "Clock jitter most directly hurts which budget?",
+          "choices": [
+            "It only affects power consumption",
+            "It relaxes the setup budget",
+            "It eats into the effective period, tightening the setup budget",
+            "It has no effect on synchronous timing"
+          ],
+          "answerIndex": 2,
+          "explanation": "Because the next edge may arrive early, jitter is subtracted from the usable period, shrinking setup margin (just as phase noise degrades a radar's coherence)."
+        }
+      ]
+    },
+    {
+      "id": "timing-metastability-l4",
+      "title": "Metastability, Synchronizers, CDC & Reset",
+      "order": 4,
+      "difficulty": "hard",
+      "content": "When a flip-flop's setup/hold window is violated—inevitable when sampling a signal asynchronous to the clock—its output can hover between logic levels for an unbounded time before resolving randomly. This is **metastability**. It is a physical bistable-circuit phenomenon (a ball balanced on a hill), so it can never be fully eliminated, only made statistically rare.\n\nThe figure of merit is **mean time between failures**:\n\n$$\\text{MTBF} = \\frac{e^{\\,t_{r}/\\tau}}{f_{clk}\\, f_{data}\\, T_{0}}$$\n\nwhere $t_{r}$ is the resolution time allowed before the value is used, $\\tau$ and $T_0$ are device constants, and $f_{clk}$, $f_{data}$ are the clock and data-event rates. MTBF grows *exponentially* with the resolution time $t_{r}$—the lever we control.\n\nThe **two-flop synchronizer** buys one full clock of resolution time: FF1 samples the async input (and may go metastable), and FF2 resamples FF1's output one cycle later, by which time it has almost certainly resolved. That single-bit recipe is the foundation of **clock-domain crossing (CDC)**.\n\nMulti-bit buses can't use parallel two-flop synchronizers—bits would resolve on different cycles, producing illegal intermediate values. Instead: encode counters in **Gray code** (only one bit changes per step, so at most one bit is mid-transition), use a **handshake** (req/ack with the data held stable), or use an **asynchronous FIFO** (the standard for streaming data, combining Gray-coded pointers and dual-clock RAM).\n\nFinally, **reset strategy**: prefer **asynchronous assert, synchronous de-assert**. Assert reset immediately regardless of clock, but release it synchronized to the destination clock so flops don't exit reset near a clock edge and go metastable—the same synchronizer reasoning applied to the reset line itself.",
+      "items": [
+        {
+          "id": "timing-metastability-l4-fc1",
+          "type": "flashcard",
+          "front": "What is metastability and why is it unavoidable?",
+          "back": "A flip-flop output stuck between valid logic levels for an unbounded time after a setup/hold violation. It's an intrinsic bistable-circuit phenomenon (unstable equilibrium), so it can only be made rare, never eliminated.",
+          "hint": "Ball balanced on a hill."
+        },
+        {
+          "id": "timing-metastability-l4-fc2",
+          "type": "flashcard",
+          "front": "Write the metastability MTBF expression and name the lever you control.",
+          "back": "$\\text{MTBF} = \\dfrac{e^{\\,t_{r}/\\tau}}{f_{clk}\\,f_{data}\\,T_{0}}$. The controllable lever is the resolution time $t_{r}$; MTBF grows **exponentially** with it.",
+          "hint": "Exponential in resolution time."
+        },
+        {
+          "id": "timing-metastability-l4-fc3",
+          "type": "flashcard",
+          "front": "How does a two-flop synchronizer reduce failure rate?",
+          "back": "FF1 samples the async signal and may go metastable; FF2 resamples FF1's output a full clock later, giving ~one period of resolution time ($t_r$), which raises MTBF exponentially.",
+          "hint": "Second flop buys settling time.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/timing-metastability-2.svg"
+        },
+        {
+          "id": "timing-metastability-l4-fc4",
+          "type": "flashcard",
+          "front": "Why can't you synchronize a multi-bit bus with parallel two-flop synchronizers?",
+          "back": "Individual bits may resolve on different cycles, yielding illegal transient combinations. Use Gray-coded counters, a handshake, or an async FIFO instead.",
+          "hint": "Bits resolve out of step."
+        },
+        {
+          "id": "timing-metastability-l4-fc5",
+          "type": "flashcard",
+          "front": "State the recommended reset strategy and its rationale.",
+          "back": "**Asynchronous assert, synchronous de-assert**: assert reset immediately, but release it synchronized to the destination clock so flops don't exit reset near an edge and go metastable.",
+          "hint": "Assert now, release in sync."
+        },
+        {
+          "id": "timing-metastability-l4-fc6",
+          "type": "flashcard",
+          "front": "Why is Gray code used for CDC counter (e.g., FIFO pointer) crossings?",
+          "back": "Only one bit changes between consecutive Gray-code values, so at most one bit can be mid-transition when sampled—any captured value is either the old or new count, never an illegal in-between.",
+          "hint": "One-bit-change-per-step property."
+        },
+        {
+          "id": "timing-metastability-l4-mc1",
+          "type": "mcq",
+          "prompt": "In the MTBF expression, increasing which quantity raises MTBF exponentially?",
+          "choices": [
+            "The data toggle rate $f_{data}$",
+            "The clock frequency $f_{clk}$",
+            "The available resolution time $t_{r}$",
+            "The device constant $T_{0}$"
+          ],
+          "answerIndex": 2,
+          "explanation": "MTBF $\\propto e^{t_r/\\tau}$; only $t_r$ sits in the exponent. The rate terms in the denominator make MTBF worse as they grow."
+        },
+        {
+          "id": "timing-metastability-l4-mc2",
+          "type": "mcq",
+          "prompt": "What is the role of the FIRST flop in a two-flop synchronizer?",
+          "choices": [
+            "It guarantees a glitch-free output immediately",
+            "It samples the async input and absorbs the (possible) metastable event, giving FF2 a full cycle to see a resolved value",
+            "It performs Gray-to-binary decoding",
+            "It generates the destination clock"
+          ],
+          "answerIndex": 1,
+          "explanation": "FF1 is the one allowed to go metastable; the design relies on it resolving within one clock so FF2 captures a clean level."
+        },
+        {
+          "id": "timing-metastability-l4-mc3",
+          "type": "mcq",
+          "prompt": "You must stream a wide data word from a fast ADC clock domain to a slower processing domain. Best mechanism?",
+          "choices": [
+            "Parallel two-flop synchronizers on every data bit",
+            "A single-bit synchronizer on bit 0 only",
+            "An asynchronous (dual-clock) FIFO with Gray-coded pointers",
+            "Gate the source clock with an enable"
+          ],
+          "answerIndex": 2,
+          "explanation": "Streaming multi-bit data across domains is exactly what an async FIFO solves: data RAM is dual-clock and the read/write pointers cross safely via Gray code."
+        },
+        {
+          "id": "timing-metastability-l4-mc4",
+          "type": "mcq",
+          "prompt": "Why de-assert reset synchronously even when asserting it asynchronously?",
+          "choices": [
+            "To make reset assertion slower",
+            "So flops don't release from reset too close to a clock edge and risk metastability",
+            "Because asynchronous assert is forbidden by all tools",
+            "To save the global reset routing resources"
+          ],
+          "answerIndex": 1,
+          "explanation": "Async assert guarantees immediate reset regardless of clock state, while synchronized de-assert ensures all flops leave reset on a clean edge, avoiding a metastable exit."
+        }
+      ]
+    }
+  ]
+}

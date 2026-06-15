@@ -1,0 +1,359 @@
+{
+  "id": "finite-state-machines",
+  "title": "Finite State Machines",
+  "order": 7,
+  "lessons": [
+    {
+      "id": "finite-state-machines-lesson-fundamentals",
+      "title": "What an FSM Is: States, Diagrams, and Tables",
+      "order": 1,
+      "difficulty": "easy",
+      "content": "A **finite state machine (FSM)** is the formal model for any sequential system: at every clock edge it sits in one of a finite set of *states*, reads its *inputs*, and decides both its *next state* and its *outputs*. Mathematically it is the tuple $(S, I, O, \\delta, \\lambda, s_0)$ — states, inputs, outputs, the next-state function $\\delta: S \\times I \\to S$, the output function $\\lambda$, and a reset state $s_0$.\n\nYou already know this pattern from radar: a timing controller cycling through *idle → transmit → listen → process* is an FSM, and so is the PRI/PRF sequencer. In firmware it shows up as a `switch` on a `state` variable; in hardware it is flip-flops (the state register) plus combinational logic.\n\nTwo views capture the same machine. The **state diagram** is the graph: circles are states, directed arcs are transitions labeled by the input that triggers them. The **state/transition table** is the tabular form — one row per (current state, input) pair giving the next state and output. The table is what you hand to logic/HDL; the diagram is what you reason with.\n\nA well-formed synchronous FSM has exactly one clock, every state change happens on the active clock edge, and the reset is explicit. The number of flip-flops needed is $\\lceil \\log_2 |S| \\rceil$ for a binary encoding — so a 5-state machine needs 3 bits. Get the diagram right first; encoding and HDL come later. The discipline here — enumerate states, define every transition — is what stops the \"it works until input X arrives\" class of bug.",
+      "items": [
+        {
+          "id": "finite-state-machines-fc-tuple",
+          "type": "flashcard",
+          "front": "What six elements formally define a finite state machine?",
+          "back": "States S, inputs I, outputs O, next-state function δ (S×I→S), output function λ, and an initial/reset state s₀.",
+          "hint": "Think tuple: two sets you read, one you produce, two functions, one starting point."
+        },
+        {
+          "id": "finite-state-machines-fc-diagram-vs-table",
+          "type": "flashcard",
+          "front": "What is the difference between a state diagram and a state/transition table?",
+          "back": "They describe the same machine. The diagram is a graph (circles = states, arcs = transitions labeled by input) used for reasoning; the table lists, per (current state, input), the next state and output, and is what you translate into logic or HDL.",
+          "hint": "One is visual, one is row-per-(state,input)."
+        },
+        {
+          "id": "finite-state-machines-fc-ff-count",
+          "type": "flashcard",
+          "front": "How many flip-flops does a binary-encoded FSM with N states need?",
+          "back": "⌈log₂ N⌉ flip-flops. For example, 5 states need 3 bits.",
+          "hint": "Same as bits to count to N."
+        },
+        {
+          "id": "finite-state-machines-fc-sync-discipline",
+          "type": "flashcard",
+          "front": "What are the rules of a well-formed synchronous FSM?",
+          "back": "Exactly one clock; every state change occurs on the active clock edge; there is an explicit reset state. No gated clocks, no asynchronous state changes.",
+          "hint": "One clock, edge-triggered, defined reset."
+        },
+        {
+          "id": "finite-state-machines-fc-firmware-parallel",
+          "type": "flashcard",
+          "front": "How does an FSM typically appear in C firmware?",
+          "back": "As a switch statement on a state variable inside a loop: each case computes outputs and assigns the next value of the state variable. It is the same model as the hardware FSM.",
+          "hint": "switch(state) { ... }"
+        },
+        {
+          "id": "finite-state-machines-mcq-state-count",
+          "type": "mcq",
+          "prompt": "An FSM has 9 distinct states and uses a binary encoding. What is the minimum number of state flip-flops required?",
+          "choices": ["3", "4", "8", "9"],
+          "answerIndex": 1,
+          "explanation": "⌈log₂ 9⌉ = 4 bits (3 bits only count to 8). The remaining 16−9 = 7 codes are unused/illegal states."
+        },
+        {
+          "id": "finite-state-machines-mcq-delta",
+          "type": "mcq",
+          "prompt": "In the FSM tuple, which function has the signature S × I → S?",
+          "choices": ["The output function λ", "The next-state function δ", "The reset function", "The clock function"],
+          "answerIndex": 1,
+          "explanation": "δ (delta) maps the current state and current input to the next state. λ (lambda) is the output function."
+        },
+        {
+          "id": "finite-state-machines-mcq-radar-example",
+          "type": "mcq",
+          "prompt": "A radar timing controller cycles idle → transmit → listen → process → idle. This is best modeled as:",
+          "choices": ["Pure combinational logic", "A finite state machine", "A single D latch", "An asynchronous ripple counter"],
+          "answerIndex": 1,
+          "explanation": "Sequenced, state-dependent behavior driven by a clock and inputs is exactly an FSM — control sequencers like this are a canonical FSM application."
+        }
+      ]
+    },
+    {
+      "id": "finite-state-machines-lesson-moore-mealy",
+      "title": "Moore vs Mealy and the Sequence Detector",
+      "order": 2,
+      "difficulty": "medium",
+      "content": "FSMs split into two output styles. In a **Moore** machine the output depends on the *state only*: $\\lambda(s)$. In a **Mealy** machine the output depends on *state and current input*: $\\lambda(s, i)$.\n\nThe trade-offs matter in practice. **Moore** outputs are written from the state register, so they are *registered, glitch-free, and synchronous* — ideal when an output drives something timing-sensitive. The cost is latency: an input change is reflected one clock later, and Moore machines often need *more states*. **Mealy** outputs respond *combinationally in the same cycle*, so they react faster and usually need *fewer states*, but they can glitch and they expose the output to input hazards. A common compromise is a Mealy machine with a registered output — you get Mealy's state economy plus a clean registered output.\n\nThe classic exercise is a **\"1011\" sequence detector with overlap**: assert $y=1$ for one cycle each time the serial bit stream ends in 1011, reusing the trailing 11 so the streams ...1011011... fire twice.\n\nAs a **Moore** machine you need states tracking progress: S0 (nothing), S1 (saw 1), S10 (saw 10), S101 (saw 101), S1011 (match, $y=1$) — five states, output asserted in S1011 only. As a **Mealy** machine you fold the match into the transition: from the S101 state, input 1 both moves you and asserts $y=1$ on that same edge — four states. The Moore diagram below shows the state-only output and the overlap arcs (a match returns toward S10/S101 rather than S0).\n\n$$ \\text{states}_{\\text{Moore}} = 5, \\qquad \\text{states}_{\\text{Mealy}} = 4 $$",
+      "items": [
+        {
+          "id": "finite-state-machines-fc-moore-def",
+          "type": "flashcard",
+          "front": "In a Moore machine, what does the output depend on?",
+          "back": "The current state only: output = λ(s). It does not depend directly on the current input.",
+          "hint": "Output is a label on the state circle."
+        },
+        {
+          "id": "finite-state-machines-fc-mealy-def",
+          "type": "flashcard",
+          "front": "In a Mealy machine, what does the output depend on?",
+          "back": "Both the current state and the current input: output = λ(s, i). Outputs are labeled on the transition arcs.",
+          "hint": "Output is a label on the arrow, not the circle."
+        },
+        {
+          "id": "finite-state-machines-fc-moore-tradeoff",
+          "type": "flashcard",
+          "front": "What are the advantages and costs of a Moore machine?",
+          "back": "Advantages: outputs are registered, glitch-free, and synchronous. Costs: one-cycle output latency and usually more states than the equivalent Mealy machine.",
+          "hint": "Clean but slower and bigger."
+        },
+        {
+          "id": "finite-state-machines-fc-mealy-tradeoff",
+          "type": "flashcard",
+          "front": "What are the advantages and costs of a Mealy machine?",
+          "back": "Advantages: faster response (output changes the same cycle as the input) and usually fewer states. Costs: outputs can glitch and are exposed to input hazards because they are combinational.",
+          "hint": "Fast and small but can glitch."
+        },
+        {
+          "id": "finite-state-machines-fc-compromise",
+          "type": "flashcard",
+          "front": "What is the common compromise between Moore and Mealy output styles?",
+          "back": "A Mealy machine with a registered output: you keep Mealy's reduced state count but pass the output through a flip-flop to get a clean, glitch-free registered signal (at the cost of one cycle of delay).",
+          "hint": "Mealy logic, but flop the output."
+        },
+        {
+          "id": "finite-state-machines-fc-overlap",
+          "type": "flashcard",
+          "front": "In a '1011' overlapping sequence detector, why doesn't a match return to the start state?",
+          "back": "Because the trailing '11' of one match can begin the next pattern. After detecting 1011 the machine returns to the state representing having just seen the '1' (toward S101/S10), so streams like 1011011 fire on each completed 1011.",
+          "hint": "The tail bits are reused as a head."
+        },
+        {
+          "id": "finite-state-machines-mcq-state-counts",
+          "type": "mcq",
+          "prompt": "For an overlapping '1011' detector, the Moore version needs 5 states and the Mealy version needs 4. Why does Mealy need fewer?",
+          "choices": [
+            "Mealy machines cannot detect overlapping patterns",
+            "The Mealy output is asserted on the final transition itself, so it does not need a dedicated 'matched' state",
+            "Mealy machines always use one-hot encoding",
+            "Moore machines cannot use a reset state"
+          ],
+          "answerIndex": 1,
+          "explanation": "Moore needs a separate S1011 state to carry the output; Mealy folds the assertion into the arc into the would-be match, eliminating that state."
+        },
+        {
+          "id": "finite-state-machines-mcq-timing-sensitive",
+          "type": "mcq",
+          "prompt": "You must generate a clean, glitch-free strobe that gates another synchronous block. Which output style is the safest choice?",
+          "choices": [
+            "Mealy with combinational output",
+            "Moore (registered, state-only output)",
+            "Asynchronous output from a latch",
+            "Either one, glitches are irrelevant here"
+          ],
+          "answerIndex": 1,
+          "explanation": "Moore outputs come straight from the state register and are glitch-free and synchronous — ideal for a strobe that must be clean. A combinational Mealy output can momentarily glitch."
+        },
+        {
+          "id": "finite-state-machines-mcq-latency",
+          "type": "mcq",
+          "prompt": "Compared to a Mealy machine, a Moore machine's response to an input change is:",
+          "choices": [
+            "Faster by one clock cycle",
+            "Identical in timing",
+            "Delayed, typically appearing one clock cycle later",
+            "Asynchronous and immediate"
+          ],
+          "answerIndex": 2,
+          "explanation": "Because a Moore output depends only on the state, the input must first change the state at a clock edge before the output reflects it — a one-cycle latency Mealy avoids."
+        }
+      ]
+    },
+    {
+      "id": "finite-state-machines-lesson-encoding-minimization",
+      "title": "State Encoding and Minimization",
+      "order": 3,
+      "difficulty": "medium",
+      "content": "Once the diagram is right, you assign each symbolic state a bit pattern — the **state encoding**. The choice changes the next-state/output logic, the flip-flop count, speed, and power.\n\n- **Binary (sequential):** $\\lceil \\log_2 N \\rceil$ flip-flops, fewest registers. Good when registers are scarce (e.g., discrete logic, small CPLDs). Next-state logic can be wide.\n- **Gray:** like binary but adjacent states differ by one bit. Minimizes simultaneous bit flips, which cuts switching noise and is helpful when the *state bits themselves cross a clock domain* (the same reason Gray code is used in CDC and encoders).\n- **One-hot:** one flip-flop per state, exactly one bit high at a time (e.g., 0001, 0010, 0100, 1000). Uses the most flip-flops but the *next-state logic is trivially simple and fast* — each state's enable is a small AND of a single bit and an input.\n\n**Why one-hot wins on FPGAs:** FPGAs are flip-flop-rich (every logic cell has a register) but the combinational LUTs are the scarce, delay-dominating resource. One-hot trades cheap flip-flops for shallow, fast next-state logic, raising $f_{max}$. Synthesizers default to one-hot for FPGA targets and binary for ASIC/CPLD targets.\n\n**State minimization** removes redundant states before encoding. Two states are *equivalent* if, for every input sequence, they produce identical outputs and transition to equivalent states. Merging equivalent states (via an implication chart or partition refinement) shrinks the register count and logic. Modern synthesis does this automatically, but recognizing equivalent states keeps your hand-drawn diagrams honest and your HDL `case` statements lean.\n\n$$ \\text{one-hot FFs} = N, \\qquad \\text{binary FFs} = \\lceil \\log_2 N \\rceil $$",
+      "items": [
+        {
+          "id": "finite-state-machines-fc-binary-enc",
+          "type": "flashcard",
+          "front": "What is binary (sequential) state encoding and its main advantage?",
+          "back": "States are numbered 0,1,2,... in straight binary, using ⌈log₂ N⌉ flip-flops. Advantage: the fewest flip-flops, good when registers are scarce. Downside: next-state logic can be wide/slow.",
+          "hint": "Fewest registers."
+        },
+        {
+          "id": "finite-state-machines-fc-gray-enc",
+          "type": "flashcard",
+          "front": "Why might you use Gray-code state encoding?",
+          "back": "Adjacent states differ by exactly one bit, minimizing simultaneous bit transitions. This reduces switching noise and is valuable if the state bits themselves must cross a clock domain (same rationale as Gray code in CDC/encoders).",
+          "hint": "One bit changes at a time."
+        },
+        {
+          "id": "finite-state-machines-fc-onehot-enc",
+          "type": "flashcard",
+          "front": "What is one-hot encoding?",
+          "back": "One flip-flop per state with exactly one bit asserted at a time (e.g., 0001, 0010, 0100, 1000). Uses N flip-flops but yields very simple, fast next-state logic.",
+          "hint": "Exactly one '1' bit per state."
+        },
+        {
+          "id": "finite-state-machines-fc-onehot-fpga",
+          "type": "flashcard",
+          "front": "Why is one-hot encoding preferred on FPGAs?",
+          "back": "FPGAs are flip-flop-rich (a register per logic cell) but LUT logic depth dominates delay. One-hot spends cheap flip-flops to make the next-state logic shallow and fast, raising f_max. Synthesizers default to one-hot for FPGA targets.",
+          "hint": "FFs are cheap, LUT depth is expensive."
+        },
+        {
+          "id": "finite-state-machines-fc-equivalent-states",
+          "type": "flashcard",
+          "front": "When are two FSM states equivalent (and mergeable)?",
+          "back": "When, for every possible input sequence, they produce identical outputs and transition to equivalent next states. Equivalent states can be merged to reduce the state count.",
+          "hint": "Same outputs and same onward behavior, forever."
+        },
+        {
+          "id": "finite-state-machines-mcq-onehot-count",
+          "type": "mcq",
+          "prompt": "A 6-state FSM is implemented one-hot. How many state flip-flops does it use?",
+          "choices": ["3", "4", "6", "64"],
+          "answerIndex": 2,
+          "explanation": "One-hot uses one flip-flop per state, so 6 states need 6 flip-flops. Binary would need only ⌈log₂ 6⌉ = 3."
+        },
+        {
+          "id": "finite-state-machines-mcq-encoding-tradeoff",
+          "type": "mcq",
+          "prompt": "Which statement best captures the binary-vs-one-hot trade-off?",
+          "choices": [
+            "Binary uses fewer flip-flops; one-hot uses simpler/faster next-state logic",
+            "One-hot always uses fewer flip-flops and less logic",
+            "Binary is always faster on every technology",
+            "They are identical in resource use"
+          ],
+          "answerIndex": 0,
+          "explanation": "Binary minimizes register count; one-hot minimizes logic depth at the cost of more registers — which is why one-hot suits FF-rich FPGAs."
+        },
+        {
+          "id": "finite-state-machines-mcq-gray-cdc",
+          "type": "mcq",
+          "prompt": "If FSM state bits must be read in another clock domain, which encoding most reduces metastability risk?",
+          "choices": [
+            "Binary, because it uses fewer bits",
+            "One-hot, because only one bit is ever high",
+            "Gray, because only one bit changes per transition",
+            "Encoding has no effect on CDC"
+          ],
+          "answerIndex": 2,
+          "explanation": "Gray encoding guarantees a single bit changes per transition, so a sample taken during the change yields either the old or new value — never a corrupt multi-bit intermediate. This is the standard CDC trick for multi-bit values."
+        },
+        {
+          "id": "finite-state-machines-mcq-minimization",
+          "type": "mcq",
+          "prompt": "What is the primary benefit of FSM state minimization?",
+          "choices": [
+            "It increases the clock frequency by definition",
+            "It removes redundant equivalent states, reducing flip-flops and logic",
+            "It converts a Mealy machine into a Moore machine",
+            "It guarantees a one-hot encoding"
+          ],
+          "answerIndex": 1,
+          "explanation": "Minimization merges behaviorally equivalent states, shrinking the state set and therefore the register and next-state-logic cost."
+        }
+      ]
+    },
+    {
+      "id": "finite-state-machines-lesson-hdl-fsmd",
+      "title": "Three-Block HDL, Illegal-State Recovery, and FSMD",
+      "order": 4,
+      "difficulty": "hard",
+      "content": "The professional way to code an FSM is the **three-block (three-process) structure**, which separates concerns the synthesizer and reader both expect:\n\n1. **State register** — a clocked block, non-blocking assignments, with reset: `always @(posedge clk) if (rst) state <= S0; else state <= next;`\n2. **Next-state logic** — a purely combinational block (`always @(*)`, blocking `=`) that computes `next` from `state` and inputs. Always include a `default` so no state is left unassigned (an incomplete `case` infers an unwanted latch).\n3. **Output logic** — combinational for Mealy, or driven from `state` for Moore. Keeping it separate makes the Moore/Mealy choice explicit.\n\nThis maps directly onto the diagram: block 2 is $\\delta$, block 3 is $\\lambda$, block 1 is the memory. The same skeleton becomes a C `switch` in firmware.\n\n**Illegal-state recovery:** with one-hot encoding, $N$ states use only $N$ of $2^N$ codes; even binary leaves $2^{\\lceil\\log_2 N\\rceil} - N$ unused codes. A glitch, single-event upset, or power transient can land the register in an undefined code. The `default` branch of the next-state `case` must steer any unlisted code back to a safe state (usually reset/idle). For high-reliability work, declare an explicit recovery and avoid `full_case`/`parallel_case` pragmas that *tell the tool to ignore* those codes.\n\n**FSMD (FSM with datapath):** real designs pair a control FSM with a datapath (registers, ALUs, counters, memories). The FSM issues control signals — load, shift, add, mux-select — and reads status flags (zero, done, overflow) back from the datapath to decide transitions. This control/datapath partition is the bridge from toy detectors to actual processors and the capstone acquisition pipeline: an idle→acquire→process→output controller sequencing a FIR datapath is exactly an FSMD.",
+      "items": [
+        {
+          "id": "finite-state-machines-fc-three-block",
+          "type": "flashcard",
+          "front": "What are the three blocks of the canonical three-block FSM HDL structure?",
+          "back": "(1) State register — clocked, with reset; (2) next-state logic — combinational, computes next from state+inputs; (3) output logic — from state (Moore) or state+inputs (Mealy).",
+          "hint": "Memory, δ, λ."
+        },
+        {
+          "id": "finite-state-machines-fc-blocking-rule",
+          "type": "flashcard",
+          "front": "Which assignment type goes in the clocked state-register block, and which in the combinational next-state block?",
+          "back": "Clocked block (always @(posedge clk)): non-blocking (<=). Combinational block (always @(*)): blocking (=). Mixing them up is the #1 HDL trap.",
+          "hint": "Non-blocking for clocked, blocking for combinational."
+        },
+        {
+          "id": "finite-state-machines-fc-default-latch",
+          "type": "flashcard",
+          "front": "Why must the combinational next-state case include a default (or assign next at the top)?",
+          "back": "An incomplete case leaves 'next' unassigned for some inputs, so the synthesizer infers a latch to hold the old value — an unintended, hazard-prone storage element. A default assignment avoids it.",
+          "hint": "Incomplete case → inferred latch."
+        },
+        {
+          "id": "finite-state-machines-fc-illegal-recovery",
+          "type": "flashcard",
+          "front": "How do you make an FSM recover from an illegal/undefined state?",
+          "back": "Route every unlisted state code (the default branch of the next-state case) back to a safe state such as reset/idle. Avoid full_case/parallel_case pragmas that tell the tool to treat those codes as don't-cares.",
+          "hint": "default → go to a safe state."
+        },
+        {
+          "id": "finite-state-machines-fc-fsmd",
+          "type": "flashcard",
+          "front": "What is an FSMD (FSM with datapath)?",
+          "back": "A control FSM coupled to a datapath (registers, ALUs, counters, memories). The FSM issues control signals (load, shift, mux-select) and reads status flags (zero, done, overflow) to decide transitions — the control/datapath split underlying real processors.",
+          "hint": "Controller + datapath, talking via control and status signals."
+        },
+        {
+          "id": "finite-state-machines-fc-illegal-count",
+          "type": "flashcard",
+          "front": "Why are illegal states even possible in a one-hot or binary FSM?",
+          "back": "The encoding spans more codes than there are valid states (one-hot: N of 2^N; binary: 2^⌈log₂N⌉ − N spare codes). Glitches, single-event upsets, or power transients can drop the register into one of these undefined codes.",
+          "hint": "Unused codes exist; upsets can reach them."
+        },
+        {
+          "id": "finite-state-machines-mcq-nonblocking",
+          "type": "mcq",
+          "prompt": "In the three-block style, the state register update inside always @(posedge clk) should use:",
+          "choices": [
+            "Blocking assignment (=)",
+            "Non-blocking assignment (<=)",
+            "A continuous assign",
+            "An initial block"
+          ],
+          "answerIndex": 1,
+          "explanation": "Clocked sequential logic uses non-blocking (<=) so all registers update from their pre-edge values simultaneously, matching real flip-flop behavior. Blocking in clocked logic causes simulate/synthesize mismatches."
+        },
+        {
+          "id": "finite-state-machines-mcq-incomplete-case",
+          "type": "mcq",
+          "prompt": "A combinational next-state always @(*) block has a case with no default and leaves 'next' unassigned for some states. What does synthesis most likely infer?",
+          "choices": [
+            "A faster, smaller design",
+            "An unintended latch holding the old value",
+            "An extra clock domain",
+            "A one-hot encoder"
+          ],
+          "answerIndex": 1,
+          "explanation": "When a combinational output is not assigned on every path, the tool must remember the previous value, so it infers a transparent latch — a classic, hazard-prone bug. A default fixes it."
+        },
+        {
+          "id": "finite-state-machines-mcq-recovery-default",
+          "type": "mcq",
+          "prompt": "For an illegal-state-recoverable FSM, the safest treatment of unused state codes is to:",
+          "choices": [
+            "Mark them don't-care with full_case/parallel_case pragmas",
+            "Leave them unassigned to save logic",
+            "Have the default branch transition to a known safe state (e.g., reset/idle)",
+            "Tie the state register to an asynchronous latch"
+          ],
+          "answerIndex": 2,
+          "explanation": "Explicitly steering any undefined code to a safe state guarantees recovery. The full_case/parallel_case pragmas do the opposite — they let the tool optimize those codes away, removing the recovery path."
+        },
+        {
+          "id": "finite-state-machines-mcq-fsmd-flags",
+          "type": "mcq",
+          "prompt": "In an FSMD, how does the control FSM decide some of its transitions based on computation results?",
+          "choices": [
+            "It re-reads the clock period",
+            "It samples status flags (e.g., zero, done, overflow) fed back from the datapath",
+            "It uses asynchronous resets only",
+            "It cannot react to the datapath at all"
+          ],
+          "answerIndex": 1,
+          "explanation": "The datapath returns status signals (zero, done, carry/overflow, comparison results) to the FSM, which uses them as transition conditions — e.g., loop until a counter's done flag asserts."
+        }
+      ]
+    }
+  ]
+}

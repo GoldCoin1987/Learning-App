@@ -1,0 +1,358 @@
+{
+  "id": "combinational-blocks",
+  "title": "Combinational Logic Building Blocks",
+  "order": 4,
+  "lessons": [
+    {
+      "id": "combinational-blocks-l1-selectors",
+      "title": "Selectors: Multiplexers, Demuxes, Decoders & Encoders",
+      "order": 1,
+      "difficulty": "easy",
+      "content": "Combinational logic is memoryless: outputs are a pure function of present inputs. The design flow is always **spec → truth table → minimized logic → schematic**. This lesson covers the routing/selection primitives that dominate real datapaths.\n\nA **multiplexer (mux)** selects one of $2^n$ data inputs onto a single output using $n$ select lines. The 2:1 mux is the atom:\n\n$$Y = \\overline{S}\\,I_0 + S\\,I_1$$\n\nThe key insight for a software dev: **every `if`/`case`/ternary in HDL synthesizes to a mux.** Muxes are also *universal* — a $2^n$:1 mux with the variables on its select lines implements **any** $n$-variable function by hardwiring each data input to the corresponding truth-table row (0 or 1). You can even do an $n$-variable function with a $2^{n-1}$:1 mux by feeding the last variable (or its complement, or 0/1) into the data inputs (Shannon expansion).\n\nA **demultiplexer** is the inverse: it routes one input to one of $2^n$ outputs. A **decoder** (e.g. 3:8) asserts exactly one of $2^n$ outputs for each input code — it generates all minterms, so it's a natural SOP engine and the basis of address/chip-select decoding.\n\nAn **encoder** does the reverse (one-hot → binary) but breaks if two inputs are active. A **priority encoder** fixes this by outputting the code of the *highest-priority* asserted input plus a \"valid\" bit — exactly what an interrupt controller does. As an ex-radar tech: think of a decoder as range-gate selection and a priority encoder as picking the strongest return.",
+      "items": [
+        {
+          "id": "combinational-blocks-l1-img-mux",
+          "type": "flashcard",
+          "front": "2:1 multiplexer symbol and equation",
+          "back": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/combinational-blocks-2.svg"
+        },
+        {
+          "id": "combinational-blocks-l1-fc-mux-eq",
+          "type": "flashcard",
+          "front": "Write the Boolean equation for a 2:1 multiplexer with inputs $I_0$, $I_1$ and select $S$.",
+          "back": "$Y = \\overline{S}\\,I_0 + S\\,I_1$. When $S=0$ the output follows $I_0$; when $S=1$ it follows $I_1$.",
+          "hint": "Select line and its complement gate the two data inputs."
+        },
+        {
+          "id": "combinational-blocks-l1-fc-mux-universal",
+          "type": "flashcard",
+          "front": "Why is an $n$-select multiplexer called a universal logic element?",
+          "back": "A $2^n$:1 mux with the input variables driving its select lines can realize ANY $n$-variable function: tie each data input to that minterm's truth-table value (0 or 1). Each select code picks the right row.",
+          "hint": "Think about what the data inputs represent relative to a truth table."
+        },
+        {
+          "id": "combinational-blocks-l1-fc-decoder",
+          "type": "flashcard",
+          "front": "What does an $n$-to-$2^n$ decoder output, and why is it a natural SOP generator?",
+          "back": "It asserts exactly one of its $2^n$ outputs — the one matching the input code. Each output line is one minterm, so ORing selected outputs builds any sum-of-products function directly.",
+          "hint": "One-hot output, one line per input combination."
+        },
+        {
+          "id": "combinational-blocks-l1-fc-priority",
+          "type": "flashcard",
+          "front": "How does a priority encoder differ from a plain encoder?",
+          "back": "A plain encoder produces wrong output if more than one input is active. A priority encoder outputs the binary code of the HIGHEST-priority active input and adds a 'valid'/'any' output. Used in interrupt controllers.",
+          "hint": "What happens when two inputs are high at once?"
+        },
+        {
+          "id": "combinational-blocks-l1-fc-demux",
+          "type": "flashcard",
+          "front": "Contrast a demultiplexer with a decoder.",
+          "back": "A demux routes a single data input to one of $2^n$ outputs chosen by the select lines. A decoder with an enable input IS a demux — feed data into the enable and the address into the select lines.",
+          "hint": "They share hardware; the difference is which line carries 'data'."
+        },
+        {
+          "id": "combinational-blocks-l1-mcq-shannon",
+          "type": "mcq",
+          "prompt": "You want to implement a 4-variable function using a single 8:1 mux (3 select lines). What goes on the data inputs?",
+          "choices": [
+            "Constant 0 or 1 for every input",
+            "The fourth variable, its complement, 0, or 1 as determined by Shannon expansion",
+            "All four variables on the data inputs and constants on select",
+            "It is impossible; you need a 16:1 mux"
+          ],
+          "answerIndex": 1,
+          "explanation": "With 3 variables on the select lines, the residue function of the 4th variable on each data line is one of {0, 1, $x_4$, $\\overline{x_4}$}. This Shannon-expansion trick halves the needed mux size."
+        },
+        {
+          "id": "combinational-blocks-l1-mcq-hdl",
+          "type": "mcq",
+          "prompt": "In HDL, which construct most directly synthesizes into a multiplexer?",
+          "choices": [
+            "A `case` statement selecting an output by a control signal",
+            "An `always @(posedge clk)` block",
+            "A continuous `assign` of a constant",
+            "A module port declaration"
+          ],
+          "answerIndex": 0,
+          "explanation": "`if`/`case`/ternary expressions that choose among values based on a control signal map directly to muxes — the single most common structure inferred by synthesis. A clocked block infers flip-flops instead."
+        },
+        {
+          "id": "combinational-blocks-l1-mcq-encoder-out",
+          "type": "mcq",
+          "prompt": "An 8-to-3 priority encoder has inputs $D_5$ and $D_2$ both asserted (priority increases with index). What is the 3-bit output?",
+          "choices": [
+            "010 (2)",
+            "111 (7)",
+            "101 (5)",
+            "000 (0)"
+          ],
+          "answerIndex": 2,
+          "explanation": "The highest-index active input wins. $D_5$ outranks $D_2$, so the output is binary 101 = 5, with the valid bit set."
+        }
+      ]
+    },
+    {
+      "id": "combinational-blocks-l2-compare-parity",
+      "title": "Comparators, Parity & Code Converters",
+      "order": 2,
+      "difficulty": "easy",
+      "content": "Beyond routing, combinational logic answers questions about data. A **comparator** evaluates two operands. Equality is the simplest: bitwise XNOR each pair and AND the results.\n\n$$\\text{EQ} = \\prod_{i=0}^{n-1}\\overline{(A_i \\oplus B_i)}$$\n\n**Magnitude** comparison ($A>B$, $A=B$, $A<B$) is built MSB-first: compare the top bits; only descend to lower bits where the higher bits are equal. Cascadable comparators (e.g. 74x85) chain this across bytes.\n\n**Parity** is pure XOR. An even-parity generator outputs $P = D_0 \\oplus D_1 \\oplus \\cdots \\oplus D_{n-1}$, appended so the total number of 1s is even. A checker XORs all received bits (including the parity bit); a nonzero result flags an odd number of bit errors. As a radar tech you met this on telemetry links — single-bit error *detection*, no correction, and it misses even-count errors. Modern links extend the idea to CRC (an XOR/shift structure) and Hamming/ECC codes.\n\n**Code converters** are just functions tabulated and minimized. Two recur constantly:\n- **Binary ↔ Gray**: to Gray, $G_i = B_{i+1} \\oplus B_i$ with $G_{\\text{MSB}} = B_{\\text{MSB}}$ (one XOR per bit). Gray's single-bit-change property prevents decoding glitches in encoders and is essential for clock-domain crossing.\n- **Binary → BCD** (e.g. double-dabble) and the **7-segment decoder**, a classic 4-input/7-output truth-table-to-logic exercise that drives displays.\n\nAll of these are memoryless functions: derive the truth table, minimize (next lesson's K-maps help), done.",
+      "items": [
+        {
+          "id": "combinational-blocks-l2-fc-eq",
+          "type": "flashcard",
+          "front": "How do you build an $n$-bit equality comparator from gates?",
+          "back": "XNOR each bit pair ($A_i \\odot B_i$ is true when bits match), then AND all the XNOR outputs: $\\text{EQ} = \\prod_i \\overline{(A_i \\oplus B_i)}$. Any mismatch forces EQ low.",
+          "hint": "XNOR detects 'bits are equal'."
+        },
+        {
+          "id": "combinational-blocks-l2-fc-magnitude",
+          "type": "flashcard",
+          "front": "What ordering does a magnitude comparator use to decide $A>B$?",
+          "back": "MSB-first. Compare the most significant bits; the operand with a 1 where the other has 0 (at the highest differing position) is larger. Lower bits only matter where all higher bits are equal.",
+          "hint": "Same way you compare multi-digit decimal numbers."
+        },
+        {
+          "id": "combinational-blocks-l2-fc-parity-gen",
+          "type": "flashcard",
+          "front": "Write the even-parity bit for data $D_0 \\ldots D_{n-1}$ and state what a checker computes.",
+          "back": "$P = D_0 \\oplus D_1 \\oplus \\cdots \\oplus D_{n-1}$ (XOR of all data bits). The checker XORs all received bits including $P$; a result of 1 means an odd number of bits flipped (error detected).",
+          "hint": "Parity is just a big XOR tree."
+        },
+        {
+          "id": "combinational-blocks-l2-fc-parity-limit",
+          "type": "flashcard",
+          "front": "What is the fundamental limitation of single-bit parity?",
+          "back": "It detects only an ODD number of bit errors and cannot correct any. Two flipped bits (or any even count) pass undetected. Stronger schemes (CRC, Hamming/ECC) are needed for detection of bursts or for correction.",
+          "hint": "Think about what happens with two simultaneous errors."
+        },
+        {
+          "id": "combinational-blocks-l2-fc-gray",
+          "type": "flashcard",
+          "front": "Give the binary-to-Gray conversion formula and why Gray code matters here.",
+          "back": "$G_{\\text{MSB}} = B_{\\text{MSB}}$, and $G_i = B_{i+1} \\oplus B_i$ for lower bits. Successive Gray codes differ by exactly one bit, eliminating decode glitches in shaft/position encoders and enabling safe clock-domain crossing.",
+          "hint": "One XOR per bit, top bit unchanged."
+        },
+        {
+          "id": "combinational-blocks-l2-mcq-gray-convert",
+          "type": "mcq",
+          "prompt": "Convert binary 1011 to Gray code.",
+          "choices": [
+            "1110",
+            "1101",
+            "1011",
+            "1100"
+          ],
+          "answerIndex": 0,
+          "explanation": "MSB stays: G3=1. G2=B3⊕B2=1⊕0=1. G1=B2⊕B1=0⊕1=1. G0=B1⊕B0=1⊕1=0. Result 1110."
+        },
+        {
+          "id": "combinational-blocks-l2-mcq-7seg",
+          "type": "mcq",
+          "prompt": "A 7-segment decoder is best characterized as which kind of circuit?",
+          "choices": [
+            "A sequential circuit requiring a clock",
+            "A combinational truth-table mapping 4 input bits to 7 output segments",
+            "A priority encoder",
+            "A tri-state bus driver"
+          ],
+          "answerIndex": 1,
+          "explanation": "It is purely combinational: 4 input lines (a BCD/hex digit) map to 7 segment-drive outputs via a fixed truth table that you minimize per segment. No state, no clock."
+        },
+        {
+          "id": "combinational-blocks-l2-mcq-parity-errors",
+          "type": "mcq",
+          "prompt": "A byte protected by even parity arrives with two bits flipped during transmission. What does the parity checker report?",
+          "choices": [
+            "It corrects both errors",
+            "It flags an error and identifies the bad bits",
+            "No error — the errors go undetected",
+            "It always reports a framing error"
+          ],
+          "answerIndex": 2,
+          "explanation": "Two flips keep the total number of 1s the same parity, so the checker computes 0 (no error). Even-count errors are invisible to single-bit parity — its core weakness."
+        }
+      ]
+    },
+    {
+      "id": "combinational-blocks-l3-adders",
+      "title": "Adders: Half, Full, Ripple-Carry & Carry-Lookahead",
+      "order": 3,
+      "difficulty": "medium",
+      "content": "Arithmetic is the heart of the datapath. A **half-adder** adds two bits:\n\n$$S = A \\oplus B, \\qquad C_{\\text{out}} = A \\cdot B$$\n\nIt can't accept a carry-in, so it's only useful for the LSB. A **full-adder** adds three bits ($A$, $B$, $C_{\\text{in}}$):\n\n$$S = A \\oplus B \\oplus C_{\\text{in}}, \\qquad C_{\\text{out}} = AB + C_{\\text{in}}(A \\oplus B)$$\n\nChain $n$ full-adders, carry-out to carry-in, and you get a **ripple-carry adder (RCA)**. It's tiny and regular, but slow: the carry must propagate through every stage, so worst-case delay grows **linearly**, $t \\approx n \\cdot t_{\\text{FA}}$ — the classic critical path.\n\n**Carry-lookahead (CLA)** breaks this. Define per-bit **generate** and **propagate**:\n\n$$G_i = A_i B_i, \\qquad P_i = A_i \\oplus B_i$$\n\nThen $C_{i+1} = G_i + P_i C_i$, which unrolls into a flat expression — e.g.\n\n$$C_1 = G_0 + P_0 C_0, \\quad C_2 = G_1 + P_1 G_0 + P_1 P_0 C_0$$\n\nAll carries compute in parallel from $C_0$, giving roughly **logarithmic** delay at the cost of more gates and fan-in. **Carry-select** adders take a different tack: compute each block twice (assuming carry-in 0 and 1) and mux the right answer once the real carry arrives — trading area for speed. **Subtraction** reuses the adder: $A - B = A + \\overline{B} + 1$, forcing $C_0 = 1$ and inverting $B$ (two's complement). Multipliers are arrays of adders (array/Wallace-tree); these become the MAC units that dominate FPGA DSP and radar pulse compression.",
+      "items": [
+        {
+          "id": "combinational-blocks-l3-img-fa",
+          "type": "flashcard",
+          "front": "Full-adder gate diagram",
+          "back": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/combinational-blocks-1.svg"
+        },
+        {
+          "id": "combinational-blocks-l3-fc-halfadder",
+          "type": "flashcard",
+          "front": "Give the sum and carry equations for a half-adder and state its limitation.",
+          "back": "$S = A \\oplus B$, $C_{\\text{out}} = A \\cdot B$. Limitation: it has no carry-in, so it can only be used at the least-significant bit position of a multi-bit adder.",
+          "hint": "XOR for sum, AND for carry; what's missing as an input?"
+        },
+        {
+          "id": "combinational-blocks-l3-fc-fulladder",
+          "type": "flashcard",
+          "front": "Write the full-adder sum and carry-out equations.",
+          "back": "$S = A \\oplus B \\oplus C_{\\text{in}}$ and $C_{\\text{out}} = AB + C_{\\text{in}}(A \\oplus B)$ (equivalently $AB + AC_{\\text{in}} + BC_{\\text{in}}$, the majority function).",
+          "hint": "Sum is three-way XOR; carry is majority-of-three."
+        },
+        {
+          "id": "combinational-blocks-l3-fc-ripple-delay",
+          "type": "flashcard",
+          "front": "Why is a ripple-carry adder slow, and how does its delay scale with width $n$?",
+          "back": "Each stage's carry-out depends on the previous stage's carry, so the carry ripples serially through all stages. Worst-case delay is linear: $t \\approx n \\cdot t_{\\text{FA}}$. This carry chain is the critical path.",
+          "hint": "Follow the carry from LSB to MSB."
+        },
+        {
+          "id": "combinational-blocks-l3-fc-gp",
+          "type": "flashcard",
+          "front": "Define the generate and propagate signals used in carry-lookahead.",
+          "back": "$G_i = A_i B_i$ (the bit generates a carry regardless of carry-in) and $P_i = A_i \\oplus B_i$ (the bit propagates an incoming carry). Then $C_{i+1} = G_i + P_i C_i$.",
+          "hint": "One ANDs the inputs, the other XORs them."
+        },
+        {
+          "id": "combinational-blocks-l3-fc-subtract",
+          "type": "flashcard",
+          "front": "How is two's-complement subtraction $A-B$ done with an adder?",
+          "back": "Compute $A + \\overline{B} + 1$: invert every bit of $B$ and force the carry-in $C_0 = 1$. A single XOR row controlled by a 'sub' line lets one adder do both add and subtract.",
+          "hint": "Negation = invert + add one."
+        },
+        {
+          "id": "combinational-blocks-l3-mcq-cla-delay",
+          "type": "mcq",
+          "prompt": "Compared to ripple-carry, carry-lookahead primarily improves which metric, and at what cost?",
+          "choices": [
+            "Reduces gate count at the cost of speed",
+            "Reduces carry-propagation delay (toward logarithmic) at the cost of more gates and higher fan-in",
+            "Eliminates the need for full-adders",
+            "Removes all combinational hazards"
+          ],
+          "answerIndex": 1,
+          "explanation": "CLA computes all carries in parallel from the generate/propagate terms, cutting the linear ripple delay toward logarithmic. The price is more logic and larger fan-in, which is why deep CLAs are built hierarchically in blocks."
+        },
+        {
+          "id": "combinational-blocks-l3-mcq-c2",
+          "type": "mcq",
+          "prompt": "Using $C_{i+1}=G_i+P_iC_i$, which expression correctly expands $C_2$ in terms of $C_0$?",
+          "choices": [
+            "$C_2 = G_1 + G_0 + C_0$",
+            "$C_2 = G_1 P_1 + P_0 C_0$",
+            "$C_2 = G_1 + P_1 G_0 + P_1 P_0 C_0$",
+            "$C_2 = P_1 G_1 + G_0 C_0$"
+          ],
+          "answerIndex": 2,
+          "explanation": "Substitute $C_1 = G_0 + P_0 C_0$ into $C_2 = G_1 + P_1 C_1$: $C_2 = G_1 + P_1(G_0 + P_0 C_0) = G_1 + P_1 G_0 + P_1 P_0 C_0$. This flat form lets $C_2$ form without waiting on $C_1$."
+        },
+        {
+          "id": "combinational-blocks-l3-mcq-carryselect",
+          "type": "mcq",
+          "prompt": "How does a carry-select adder gain speed?",
+          "choices": [
+            "It computes each block twice (for carry-in 0 and 1) and muxes the correct result once the real carry arrives",
+            "It removes the carry chain entirely",
+            "It uses sequential logic clocked at a higher frequency",
+            "It replaces full-adders with half-adders"
+          ],
+          "answerIndex": 0,
+          "explanation": "Each block is duplicated and precomputes both possible carry-in cases in parallel; a fast mux then selects the right sum when the incoming carry is known. It trades area (two adders per block plus a mux) for reduced latency."
+        }
+      ]
+    },
+    {
+      "id": "combinational-blocks-l4-alu-hazards",
+      "title": "The ALU, Flags & Combinational Hazards",
+      "order": 4,
+      "difficulty": "hard",
+      "content": "An **ALU** fuses the building blocks into one programmable datapath element: a **function-select** input picks among add, subtract, AND, OR, XOR, and shift. A clean structure is a 1-bit **ALU slice** — a full-adder plus logic gates plus an output mux — replicated and chained via the carry to form an $n$-bit ALU. This is the literal heart of every CPU you'll meet in the embedded module.\n\nThe ALU also produces **condition flags**:\n- **Z (Zero):** result is all zeros, $Z = \\overline{R_{n-1} + \\cdots + R_0}$ (NOR of result bits).\n- **N (Negative):** sign bit of the result, $N = R_{n-1}$ (two's-complement MSB).\n- **C (Carry):** carry-out of the MSB — the *unsigned* overflow / borrow indicator.\n- **V (Overflow):** *signed* overflow, $V = C_{n-1} \\oplus C_{n}$ (carry into vs out of the MSB differ), or equivalently when two like-signed operands produce an opposite-signed result.\n\nThe classic rust-knocker: **C and V are different.** $C$ matters for unsigned math; $V$ matters for signed. Mixing them corrupts comparisons and arithmetic.\n\n**Hazards** are transient wrong outputs (glitches) from unequal path delays, even when steady-state logic is correct. A **static-1 hazard**: an output that should stay 1 momentarily dips to 0 (typical of SOP when moving between adjacent K-map terms not covered by a common group). A **static-0 hazard** is the dual. A **dynamic hazard** is multiple transitions on a single intended change, from reconvergent multi-level paths. The fix for a static hazard is to add the **redundant (consensus) product term** that bridges the adjacent groups on the K-map — it costs a gate but holds the output steady. Glitches are harmless into synchronous (clocked) logic if they settle before setup, but deadly on asynchronous control lines, clocks, or resets.",
+      "items": [
+        {
+          "id": "combinational-blocks-l4-fc-aluslice",
+          "type": "flashcard",
+          "front": "Describe the structure of a 1-bit ALU slice and how an $n$-bit ALU is built from it.",
+          "back": "A slice = a full-adder (for add/sub) + AND/OR/XOR gates, with an output mux selected by the function-select lines. Stack $n$ slices, chaining carry-out to carry-in, to form the $n$-bit ALU.",
+          "hint": "Arithmetic unit + logic unit + a selecting mux, replicated bitwise."
+        },
+        {
+          "id": "combinational-blocks-l4-fc-zflag",
+          "type": "flashcard",
+          "front": "How is the Zero (Z) flag computed from an $n$-bit result?",
+          "back": "$Z = \\overline{R_{n-1} + R_{n-2} + \\cdots + R_0}$ — the NOR of all result bits. Z is 1 only when every result bit is 0.",
+          "hint": "All bits zero → NOR them."
+        },
+        {
+          "id": "combinational-blocks-l4-fc-cvsv",
+          "type": "flashcard",
+          "front": "Distinguish the Carry (C) flag from the Overflow (V) flag.",
+          "back": "C is the carry-out of the MSB — it signals UNSIGNED overflow/borrow. V signals SIGNED (two's-complement) overflow: $V = C_{\\text{in,MSB}} \\oplus C_{\\text{out,MSB}}$. They are independent; use C for unsigned math, V for signed.",
+          "hint": "One is for unsigned, the other for two's-complement."
+        },
+        {
+          "id": "combinational-blocks-l4-fc-vformula",
+          "type": "flashcard",
+          "front": "Give two equivalent ways to detect signed overflow (V) in an adder.",
+          "back": "(1) XOR the carry into the MSB with the carry out of the MSB: $V = C_{n-1} \\oplus C_n$. (2) Two operands of the SAME sign yield a result of the OPPOSITE sign. Both detect that the true result fell outside the representable signed range.",
+          "hint": "Carry-in vs carry-out of the top bit; or sign-pattern of operands vs result."
+        },
+        {
+          "id": "combinational-blocks-l4-fc-static1",
+          "type": "flashcard",
+          "front": "What is a static-1 hazard and how is it eliminated?",
+          "back": "A momentary 0-glitch on an output that should remain 1, caused by unequal delays when the input moves between two adjacent minterms covered by different SOP product terms. Fix: add the redundant (consensus) product term that overlaps both groups on the K-map.",
+          "hint": "Glitch while output should stay high; bridge the K-map groups."
+        },
+        {
+          "id": "combinational-blocks-l4-fc-dynamic",
+          "type": "flashcard",
+          "front": "What is a dynamic hazard, and when do hazards actually matter?",
+          "back": "A dynamic hazard is multiple transitions (e.g. 1→0→1→0) on an output that should change just once, arising from reconvergent multi-level paths with differing delays. Hazards are harmless into clocked logic if settled before setup, but dangerous on async lines: clocks, resets, latch enables.",
+          "hint": "More than one transition on a single intended change."
+        },
+        {
+          "id": "combinational-blocks-l4-mcq-vflag",
+          "type": "mcq",
+          "prompt": "Adding two 8-bit two's-complement numbers, 0x70 + 0x10, gives 0x80. Which flags are set?",
+          "choices": [
+            "C=1, V=0 (unsigned overflow only)",
+            "C=0, V=1, N=1 (signed overflow; result looks negative)",
+            "Z=1 only",
+            "No flags set"
+          ],
+          "answerIndex": 1,
+          "explanation": "0x70 (+112) + 0x10 (+16) = 0x80, which as signed is −128 — two positives produced a negative, so V=1 and N=1. There is no carry out of bit 7, so C=0. This is exactly the C≠V trap."
+        },
+        {
+          "id": "combinational-blocks-l4-mcq-hazard-fix",
+          "type": "mcq",
+          "prompt": "A two-level SOP circuit shows a static-1 hazard between two adjacent K-map cells. What is the standard fix?",
+          "choices": [
+            "Slow down the clock",
+            "Add a redundant consensus product term covering both adjacent groups",
+            "Remove the essential prime implicants",
+            "Convert the circuit to POS form"
+          ],
+          "answerIndex": 1,
+          "explanation": "Adding the redundant (consensus) term creates an always-covering group spanning the transition, so the output never drops while inputs change between the two cells. It costs an extra gate but is the canonical hazard cure. Clock speed is irrelevant to a combinational glitch."
+        },
+        {
+          "id": "combinational-blocks-l4-mcq-glitch-safe",
+          "type": "mcq",
+          "prompt": "When are combinational glitches genuinely dangerous rather than harmless?",
+          "choices": [
+            "Always — every glitch corrupts the design",
+            "Never — synchronous logic ignores them",
+            "When they feed asynchronous inputs like clocks, resets, or latch enables",
+            "Only when the supply voltage is below 3.3 V"
+          ],
+          "answerIndex": 2,
+          "explanation": "Into a clocked flip-flop, a glitch that settles before the setup window is sampled away harmlessly. But a glitch on a clock, asynchronous reset/preset, or latch enable can trigger a false event — that's where hazard-free covering matters."
+        }
+      ]
+    }
+  ]
+}

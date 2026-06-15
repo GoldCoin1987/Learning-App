@@ -1,0 +1,251 @@
+{
+  "id": "tristate-buses",
+  "title": "Tri-State Logic & Buses",
+  "order": 10,
+  "lessons": [
+    {
+      "id": "three-states-hiz",
+      "title": "Three Output States & Tri-State Buffers",
+      "order": 1,
+      "difficulty": 1,
+      "content": "An ordinary logic gate has exactly two output states: it actively drives **HIGH** (a low-impedance path to $V_{DD}$ through the PMOS pull-up) or actively drives **LOW** (a low-impedance path to ground through the NMOS pull-down). A **tri-state** output adds a crucial third state: **high-impedance (Hi-Z)**, in which *both* transistors are off and the output is electrically disconnected from the wire. In Hi-Z the pin neither sources nor sinks current; it simply lets the wire float, so some other device can take over driving it.\n\nThe building block is the **tri-state buffer**: a buffer with a data input, an output, and an extra **output-enable (OE)** control. When $OE = 1$ the buffer passes its input ($Y = A$); when $OE = 0$ the output goes Hi-Z regardless of $A$. In Verilog this is the classic pattern `assign y = oe ? a : 1'bz;`, where `z` denotes high impedance. Simulators carry a four-value logic system ($0, 1, x, z$) precisely so they can represent and propagate Hi-Z.\n\nWhy bother? Because Hi-Z is what lets *many* outputs share *one* wire without permanently fighting each other. Coming from radar hardware, think of it like keying a shared transmit line: a stage only asserts the medium when it is its turn, and otherwise gets out of the way electrically. The key mental shift is that Hi-Z is not a logic value you can *read* meaningfully — it is the *absence* of driving. Reading a floating Hi-Z node gives an undefined level unless something else defines it.",
+      "items": [
+        {
+          "id": "tristate-buses-three-states-hiz-001",
+          "type": "flashcard",
+          "front": "Name the three output states of a tri-state device and what each does electrically.",
+          "back": "HIGH: actively driven toward $V_{DD}$ (low impedance). LOW: actively driven toward ground (low impedance). High-impedance (Hi-Z): both output transistors off, so the pin is effectively disconnected and drives nothing.",
+          "hint": "Two driven, one disconnected."
+        },
+        {
+          "id": "tristate-buses-three-states-hiz-002",
+          "type": "flashcard",
+          "front": "What does a tri-state buffer's output-enable (OE) control do?",
+          "back": "When $OE = 1$ the buffer drives $Y = A$ (passes its input). When $OE = 0$ the output goes high-impedance (Hi-Z), disconnecting the buffer from the wire regardless of the input value.",
+          "hint": "Enable on/off, not the data.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/tristate-buses-1.svg"
+        },
+        {
+          "id": "tristate-buses-three-states-hiz-003",
+          "type": "flashcard",
+          "front": "Electrically, what is happening at a CMOS output pin in the Hi-Z state?",
+          "back": "Both the PMOS pull-up and the NMOS pull-down transistors are switched off, so there is no low-impedance path to either rail. The pin presents a very high impedance and neither sources nor sinks appreciable current.",
+          "hint": "Both FETs off."
+        },
+        {
+          "id": "tristate-buses-three-states-hiz-004",
+          "type": "flashcard",
+          "front": "In Verilog, how do you model a tri-state output, and what does 1'bz mean?",
+          "back": "`assign y = oe ? a : 1'bz;`. The literal `1'bz` is the high-impedance value in Verilog's four-value logic ($0, 1, x, z$). When `oe` is low, `y` is driven to Hi-Z and stops contributing a level to the net.",
+          "hint": "Ternary with z on the else branch."
+        },
+        {
+          "id": "tristate-buses-three-states-hiz-005",
+          "type": "flashcard",
+          "front": "Why can't you reliably 'read' a logic value from a floating Hi-Z node?",
+          "back": "Hi-Z means nothing is driving the wire, so its voltage is undefined — it drifts with leakage and coupling. A definite logic level only exists if some other driver, or a pull resistor, actively sets the node.",
+          "hint": "Hi-Z is absence of drive, not a level."
+        },
+        {
+          "id": "tristate-buses-three-states-hiz-006",
+          "type": "mcq",
+          "prompt": "A tri-state buffer has input $A = 0$ and $OE = 0$. What is its output?",
+          "choices": ["High-impedance (Hi-Z)", "Logic 0", "Logic 1", "Undefined logic 1"],
+          "answerIndex": 0,
+          "explanation": "With $OE = 0$ the buffer is disabled, so the output is Hi-Z regardless of the input. The value of $A$ is irrelevant when the buffer is not enabled."
+        },
+        {
+          "id": "tristate-buses-three-states-hiz-007",
+          "type": "mcq",
+          "prompt": "Which statement best distinguishes a Hi-Z output from a driven logic LOW?",
+          "choices": ["Hi-Z presents high impedance and drives no current; logic LOW is a low-impedance path to ground", "Both are identical at the pin", "Hi-Z is a strong pull to ground; LOW is a weak pull", "Hi-Z always reads as logic 1"],
+          "answerIndex": 0,
+          "explanation": "A driven LOW connects the pin to ground through a conducting NMOS (low impedance, sinks current). Hi-Z turns both transistors off, so the pin is high impedance and sinks/sources essentially no current."
+        },
+        {
+          "id": "tristate-buses-three-states-hiz-008",
+          "type": "mcq",
+          "prompt": "In Verilog's four-value logic, which set correctly lists all four values a net can hold?",
+          "choices": ["0, 1, x, z", "0, 1, high, low", "0, 1, 2, 3", "true, false, float, error"],
+          "answerIndex": 0,
+          "explanation": "Verilog nets use $0$, $1$, $x$ (unknown/conflict), and $z$ (high impedance). The $z$ value is what makes modeling tri-state buses and `inout` ports possible."
+        },
+        {
+          "id": "tristate-buses-three-states-hiz-009",
+          "type": "mcq",
+          "prompt": "Why is the Hi-Z state essential for shared buses?",
+          "choices": ["It lets an inactive driver electrically disconnect so another device can drive the wire", "It boosts the voltage on the bus", "It speeds up the rise time of the bus", "It stores the last value driven onto the bus"],
+          "answerIndex": 0,
+          "explanation": "Hi-Z allows all but one driver to step off the wire (high impedance), so exactly one active driver can set the level without the others fighting it. Hi-Z does not store, boost, or speed anything."
+        }
+      ]
+    },
+    {
+      "id": "shared-buses-contention",
+      "title": "Shared Buses, Contention & Open-Drain",
+      "order": 2,
+      "difficulty": 2,
+      "content": "A **shared bus** is a single set of wires that several devices connect to through tri-state outputs. The governing rule is absolute: **exactly one driver may be enabled at a time**. A bus controller (or address-decode logic generating chip-selects) guarantees this by asserting only one device's $OE$ in any cycle; everyone else sits in Hi-Z.\n\nBreak that rule and you get **bus contention**: two or more drivers fight, one pulling HIGH while another pulls LOW. In simulation this shows up as an $x$ (unknown). In real silicon it is far worse — a near-short from $V_{DD}$ to ground through two output stages can draw destructive current and, sustained, can release the magic smoke. Even brief contention degrades reliability. Closely related is **bus turnaround**: when handing the bus from one driver to the next you must insert a dead cycle so the first driver reaches Hi-Z *before* the second asserts, otherwise you create momentary contention.\n\nAn idle bus with every driver in Hi-Z floats at an undefined level. To give it a defined idle state, add a weak **pull-up** (or pull-down) resistor so the bus rests HIGH (or LOW) when nobody drives it.\n\nThe **open-drain** (open-collector) bus is the elegant alternative. Each device can only pull the line LOW (through an NMOS); none can drive HIGH. A single pull-up resistor raises the line when all devices release it. The result is a **wired-AND**: the line is HIGH only if every device lets go, and any one device pulling LOW wins. This needs no enable arbitration and inherently avoids contention — which is exactly why **I2C** uses open-drain SDA and SCL with pull-ups.",
+      "items": [
+        {
+          "id": "tristate-buses-shared-buses-contention-001",
+          "type": "flashcard",
+          "front": "What is the one absolute rule for driving a shared tri-state bus?",
+          "back": "Exactly one driver may be enabled (out of Hi-Z) at any time. All other devices on the bus must hold their outputs in high impedance. Decode/arbitration logic enforces this by asserting only one $OE$ per cycle.",
+          "hint": "One driver, everyone else Hi-Z."
+        },
+        {
+          "id": "tristate-buses-shared-buses-contention-002",
+          "type": "flashcard",
+          "front": "What is bus contention and why is it dangerous in real hardware?",
+          "back": "Contention is two or more drivers enabled at once, one forcing HIGH and another LOW. It creates a near-short from $V_{DD}$ to ground through the output stages, drawing large current that overheats and can permanently damage the parts. In simulation it shows as $x$.",
+          "hint": "Two drivers fighting = near short."
+        },
+        {
+          "id": "tristate-buses-shared-buses-contention-003",
+          "type": "flashcard",
+          "front": "What is bus turnaround time and why must it exist?",
+          "back": "It is a dead interval inserted when handing the bus from one driver to another, ensuring the first driver returns to Hi-Z before the next driver enables. Without it, both drive briefly at once, causing momentary contention.",
+          "hint": "Let go before grabbing."
+        },
+        {
+          "id": "tristate-buses-shared-buses-contention-004",
+          "type": "flashcard",
+          "front": "Why does an idle tri-state bus need a pull-up (or pull-down) resistor?",
+          "back": "When all drivers are in Hi-Z, the bus floats at an undefined voltage and any reader sees garbage. A weak pull-up (or pull-down) resistor defines a known idle level (HIGH or LOW) without interfering with an active driver.",
+          "hint": "Define the floating idle level."
+        },
+        {
+          "id": "tristate-buses-shared-buses-contention-005",
+          "type": "flashcard",
+          "front": "How does an open-drain bus work, and what logic function does it form?",
+          "back": "Each device can only pull the shared line LOW; a single pull-up resistor raises it HIGH when all devices release. This is a wired-AND: the line is HIGH only if every device lets go, and any device pulling LOW dominates. No enable arbitration is needed.",
+          "hint": "Pull-down only + pull-up = wired-AND.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/tristate-buses-2.svg"
+        },
+        {
+          "id": "tristate-buses-shared-buses-contention-006",
+          "type": "flashcard",
+          "front": "Which common serial bus uses open-drain lines with pull-ups, and which signals?",
+          "back": "I2C uses open-drain on both SDA (data) and SCL (clock), each with an external pull-up resistor. Open-drain enables multi-master arbitration and clock stretching, and inherently avoids contention since devices can only pull low.",
+          "hint": "Two-wire bus, SDA/SCL."
+        },
+        {
+          "id": "tristate-buses-shared-buses-contention-007",
+          "type": "mcq",
+          "prompt": "Two tri-state buffers on the same bus are both enabled; one drives HIGH and the other LOW. What is the most accurate outcome?",
+          "choices": ["Contention: a near-short draws large current and may damage the parts (simulators show x)", "The bus cleanly takes the average voltage", "The HIGH driver always wins with no consequence", "The bus goes to Hi-Z automatically"],
+          "answerIndex": 0,
+          "explanation": "Both output stages conduct simultaneously between the rails, creating a low-resistance path that draws excessive current. Sustained, this can destroy the drivers. Simulation flags the conflict as x."
+        },
+        {
+          "id": "tristate-buses-shared-buses-contention-008",
+          "type": "mcq",
+          "prompt": "On an open-drain bus with a pull-up, device A pulls LOW while devices B and C release the line. What is the bus level?",
+          "choices": ["LOW", "HIGH", "Hi-Z (undefined)", "Contention/x"],
+          "answerIndex": 0,
+          "explanation": "Open-drain forms a wired-AND: any single device pulling LOW dominates, so the line reads LOW. It would only be HIGH if all devices released and the pull-up raised it. No contention occurs because no device drives HIGH."
+        },
+        {
+          "id": "tristate-buses-shared-buses-contention-009",
+          "type": "mcq",
+          "prompt": "Why does open-drain inherently avoid the bus-contention hazard that tri-state buses face?",
+          "choices": ["Devices can only pull LOW, never drive HIGH, so two active devices can never short the rails together", "Open-drain has no pull-up resistor", "Open-drain outputs are always in Hi-Z", "Open-drain runs at a higher voltage"],
+          "answerIndex": 0,
+          "explanation": "Since no device sources current to drive HIGH, you can never have one device forcing HIGH against another forcing LOW. Multiple low-pulls simply parallel to ground (still LOW), so the destructive HIGH-vs-LOW fight is impossible."
+        },
+        {
+          "id": "tristate-buses-shared-buses-contention-010",
+          "type": "mcq",
+          "prompt": "A bus master finishes a read and immediately enables a different driver in the same cycle with no dead time. What is the risk?",
+          "choices": ["Momentary bus contention during turnaround as the old driver hasn't reached Hi-Z", "The pull-up resistor overheats", "The new data is delayed by one full clock", "Nothing; turnaround time is never needed"],
+          "answerIndex": 0,
+          "explanation": "If the previous driver has not finished transitioning to Hi-Z when the next driver asserts, both drive simultaneously for a moment — momentary contention. Inserting a turnaround (dead) cycle prevents this overlap."
+        }
+      ]
+    },
+    {
+      "id": "parallel-to-serial-onchip",
+      "title": "From Parallel Buses to Serial Links & On-Chip Fabrics",
+      "order": 3,
+      "difficulty": 3,
+      "content": "Classic microprocessor systems used wide **shared parallel buses**: a multi-bit address bus, a bidirectional data bus, and control lines (read/write, chip-select). Memory and peripherals returned data through tri-state buffers, with address decoding generating the chip-selects so exactly one device drove the data bus per cycle. Some processors **multiplexed** address and data onto the same pins across phases to save pins, latching the address first. It works, but as speeds rose the shared parallel bus hit hard limits: skew between many parallel bits, stub reflections from every device tapped onto the wire, capacitive loading that slows edges, and crosstalk.\n\nThe industry's answer was to abandon shared parallel buses for **point-to-point serial links**. **SPI** keeps it simple — a shared clock plus separate MOSI/MISO lines and one chip-select per slave — using shift registers to convert a parallel word to a bit stream and back (parallel-in/serial-out feeding serial-in/parallel-out). Pushing further, **SerDes** (serializer/deserializer) underlies high-speed standards like PCIe, SATA, and Ethernet PHYs: a few differential pairs run at multi-gigabit rates with embedded clocking, far outrunning any wide parallel bus. The shift register from the sequential-logic module is the literal engine of this parallel-to-serial conversion.\n\nInside a chip, the same shared-bus thinking persists but evolves. On-chip interconnect such as **AXI** (ARM AMBA) and the open **Wishbone** standard define how masters and slaves exchange address and data — but FPGAs and SoCs typically implement them with **multiplexers and arbiters** rather than literal tri-state buffers, since internal tri-state routing is scarce and harder to time. The bus *concept* survives; the tri-state *implementation* mostly moved to the chip pins and legacy boards.",
+      "items": [
+        {
+          "id": "tristate-buses-parallel-to-serial-onchip-001",
+          "type": "flashcard",
+          "front": "In a classic CPU system, how does the shared data bus avoid contention among memory and peripherals?",
+          "back": "Address-decode logic generates chip-selects so that only one device's tri-state output is enabled per cycle to drive the bidirectional data bus; all other devices stay in Hi-Z. Read/write control lines set the direction.",
+          "hint": "Decoder drives one chip-select."
+        },
+        {
+          "id": "tristate-buses-parallel-to-serial-onchip-002",
+          "type": "flashcard",
+          "front": "What is a multiplexed address/data bus and why was it used?",
+          "back": "The same physical pins carry the address in one phase and data in another, with the address latched externally before data transfer. It reduces pin count on the processor package at the cost of an extra latch and a multi-phase cycle.",
+          "hint": "Share pins across time phases."
+        },
+        {
+          "id": "tristate-buses-parallel-to-serial-onchip-003",
+          "type": "flashcard",
+          "front": "List the main reasons shared high-speed parallel buses were abandoned.",
+          "back": "Bit-to-bit skew across many parallel lines, signal-integrity problems from stub reflections and capacitive loading at every tap, crosstalk between adjacent lines, and the difficulty of timing many wires together at high frequency.",
+          "hint": "Skew, reflections, loading, crosstalk."
+        },
+        {
+          "id": "tristate-buses-parallel-to-serial-onchip-004",
+          "type": "flashcard",
+          "front": "What digital building block performs parallel-to-serial and serial-to-parallel conversion in links like SPI?",
+          "back": "The shift register: a parallel-in/serial-out (PISO) register clocks a word out one bit per clock, and a serial-in/parallel-out (SIPO) register reassembles the bits at the receiver. It is the literal engine of serialization.",
+          "hint": "PISO out, SIPO in."
+        },
+        {
+          "id": "tristate-buses-parallel-to-serial-onchip-005",
+          "type": "flashcard",
+          "front": "What is SerDes, and which modern standards rely on it?",
+          "back": "SerDes (serializer/deserializer) converts parallel data to a high-rate serial stream with embedded clocking over a few differential pairs, and back again. It underlies PCIe, SATA, USB 3+, and Ethernet PHYs, running at multi-gigabit-per-lane rates.",
+          "hint": "Multi-gigabit differential serial."
+        },
+        {
+          "id": "tristate-buses-parallel-to-serial-onchip-006",
+          "type": "flashcard",
+          "front": "How are on-chip buses like AXI and Wishbone typically implemented on FPGAs, and why not with tri-state?",
+          "back": "They are implemented with multiplexers and arbiters that route the selected master/slave data, not literal internal tri-state buffers. On-chip tri-state routing is scarce and hard to time, so muxing is preferred. The shared-bus concept survives; the tri-state implementation moved to chip pins.",
+          "hint": "Muxes/arbiters, not internal Hi-Z."
+        },
+        {
+          "id": "tristate-buses-parallel-to-serial-onchip-007",
+          "type": "mcq",
+          "prompt": "Which best explains why point-to-point serial links replaced wide shared parallel buses at high speed?",
+          "choices": ["Serial links sidestep inter-bit skew and bus loading/reflections, letting a few differential pairs run far faster", "Serial links use fewer transistors per bit", "Parallel buses cannot carry binary data", "Serial links require no clock at all"],
+          "answerIndex": 0,
+          "explanation": "Wide parallel buses are limited by skew across bits and signal integrity from every tap. A point-to-point differential serial lane avoids multi-drop loading and skew, so it can clock much higher and net more throughput despite using fewer wires."
+        },
+        {
+          "id": "tristate-buses-parallel-to-serial-onchip-008",
+          "type": "mcq",
+          "prompt": "In an SPI transfer of an 8-bit byte, what role does the shift register play?",
+          "choices": ["It serializes the parallel byte out one bit per clock and deserializes incoming bits back into a byte", "It arbitrates which master owns the bus", "It pulls the bus to a defined idle level", "It detects bus contention and flags an error"],
+          "answerIndex": 0,
+          "explanation": "SPI clocks data bit-by-bit. A PISO shift register shifts the byte out on MOSI one bit per clock, while a SIPO register on the other side shifts MISO bits in and reassembles them into a byte."
+        },
+        {
+          "id": "tristate-buses-parallel-to-serial-onchip-009",
+          "type": "mcq",
+          "prompt": "On a modern FPGA, you need an internal data path where any of four sources can present data to a CPU core. What is the idiomatic implementation?",
+          "choices": ["A multiplexer (with a select/arbiter) choosing one source", "Four internal tri-state buffers on a shared internal wire", "An open-drain internal net with a pull-up", "A shift register cycling through the four sources"],
+          "answerIndex": 0,
+          "explanation": "FPGA fabric favors multiplexers for internal source selection; dedicated internal tri-state routing is scarce and harder to time. AXI/Wishbone interconnect realizes the bus concept with muxes and arbiters rather than internal Hi-Z."
+        },
+        {
+          "id": "tristate-buses-parallel-to-serial-onchip-010",
+          "type": "mcq",
+          "prompt": "A classic processor asserts ALE to latch the lower address byte, then uses the same pins for data. This describes:",
+          "choices": ["A multiplexed address/data bus", "An open-drain wired-AND bus", "A SerDes link", "A pull-up-defined idle bus"],
+          "answerIndex": 0,
+          "explanation": "Reusing the same pins for address in one phase (latched by an address-latch-enable strobe) and data in another is the defining feature of a multiplexed address/data bus, used to reduce package pin count."
+        }
+      ]
+    }
+  ]
+}

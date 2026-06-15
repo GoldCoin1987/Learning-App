@@ -1,0 +1,327 @@
+{
+  "id": "number-systems",
+  "title": "Number Systems & Binary Arithmetic",
+  "order": 1,
+  "lessons": [
+    {
+      "id": "number-systems-lesson-positional",
+      "title": "Positional Notation, Radix & Base Conversion",
+      "order": 1,
+      "difficulty": 1,
+      "content": "Every number system you use is **positional**: a digit's weight is the radix raised to its position index. In radix $r$, the value of a string is $\\sum_{i} d_i \\cdot r^{i}$, where $i$ counts positions from $0$ at the right. Decimal is just $r=10$; binary is $r=2$; octal $r=8$; hex $r=16$. So $\\mathtt{1011}_2 = 1\\cdot2^3 + 0\\cdot2^2 + 1\\cdot2^1 + 1\\cdot2^0 = 11_{10}$.\n\n**Hex is the human-readable face of binary** because $16 = 2^4$: every hex digit maps to exactly one nibble (4 bits), so you regroup bits four at a time with zero arithmetic. $\\mathtt{0xB7} = \\mathtt{1011\\,0111}_2$. Octal ($2^3$) does the same in 3-bit groups and survives mainly in Unix file permissions. To go **binary to hex**, pad to a multiple of 4 bits and translate each group; to go **hex to binary**, expand each digit to 4 bits.\n\nConverting **decimal to binary** uses repeated division: divide by 2, record remainders, read them bottom-up. Going the other way, just sum the set bit-weights. A bit is one binary digit; a **nibble** is 4 bits, a **byte** is 8, and a **word** is whatever your architecture calls native (16/32/64). **Endianness** describes byte ordering in memory: big-endian stores the most-significant byte first, little-endian the least-significant first. The value $\\mathtt{0x12345678}$ on a little-endian machine sits in memory as bytes $\\mathtt{78\\,56\\,34\\,12}$ — a classic source of bugs when you cast a pointer or read a network packet.",
+      "items": [
+        {
+          "id": "number-systems-fc-positional-weight",
+          "type": "flashcard",
+          "front": "In radix $r$, what is the value of a digit string $d_n \\dots d_1 d_0$?",
+          "back": "$\\sum_{i=0}^{n} d_i \\cdot r^{i}$ — each digit is weighted by the radix raised to its position index (counting from 0 at the right).",
+          "hint": "Position index is the exponent on the base."
+        },
+        {
+          "id": "number-systems-fc-hex-nibble",
+          "type": "flashcard",
+          "front": "Why is hexadecimal the natural shorthand for binary?",
+          "back": "Because $16 = 2^4$: each hex digit corresponds to exactly one 4-bit nibble, so converting is pure regrouping with no arithmetic.",
+          "hint": "Think about $16$ as a power of 2."
+        },
+        {
+          "id": "number-systems-fc-bin2hex",
+          "type": "flashcard",
+          "front": "Convert $\\mathtt{1011\\,0111}_2$ to hexadecimal.",
+          "back": "$\\mathtt{1011} = \\mathtt{B}$, $\\mathtt{0111} = 7$, so the value is $\\mathtt{0xB7}$.",
+          "hint": "Split into nibbles and translate each."
+        },
+        {
+          "id": "number-systems-fc-dec2bin-method",
+          "type": "flashcard",
+          "front": "What is the repeated-division method for decimal-to-binary conversion?",
+          "back": "Repeatedly divide by 2, recording each remainder (0 or 1). Read the remainders from last to first (bottom-up) to get the binary digits.",
+          "hint": "Remainders, read in reverse."
+        },
+        {
+          "id": "number-systems-fc-endianness",
+          "type": "flashcard",
+          "front": "Define big-endian vs little-endian byte ordering.",
+          "back": "Big-endian stores the most-significant byte at the lowest address; little-endian stores the least-significant byte first. E.g. $\\mathtt{0x12345678}$ little-endian = bytes $\\mathtt{78\\,56\\,34\\,12}$.",
+          "hint": "Which byte lands at the lowest address?"
+        },
+        {
+          "id": "number-systems-mcq-eval-binary",
+          "type": "mcq",
+          "prompt": "What is the decimal value of $\\mathtt{1011}_2$?",
+          "choices": ["9", "11", "13", "15"],
+          "answerIndex": 1,
+          "explanation": "$1\\cdot8 + 0\\cdot4 + 1\\cdot2 + 1\\cdot1 = 11$."
+        },
+        {
+          "id": "number-systems-mcq-hex-bits",
+          "type": "mcq",
+          "prompt": "How many binary bits does a single hexadecimal digit represent?",
+          "choices": ["2", "3", "4", "8"],
+          "answerIndex": 2,
+          "explanation": "$16 = 2^4$, so each hex digit maps to exactly 4 bits (one nibble)."
+        },
+        {
+          "id": "number-systems-mcq-octal-group",
+          "type": "mcq",
+          "prompt": "When converting binary to octal, bits are grouped in sets of how many?",
+          "choices": ["2", "3", "4", "5"],
+          "answerIndex": 1,
+          "explanation": "$8 = 2^3$, so octal groups bits three at a time, in contrast to hex's four."
+        },
+        {
+          "id": "number-systems-mcq-little-endian",
+          "type": "mcq",
+          "prompt": "A little-endian machine stores the 32-bit value $\\mathtt{0x0A0B0C0D}$. Which byte is at the lowest memory address?",
+          "choices": ["$\\mathtt{0x0A}$", "$\\mathtt{0x0B}$", "$\\mathtt{0x0C}$", "$\\mathtt{0x0D}$"],
+          "answerIndex": 3,
+          "explanation": "Little-endian places the least-significant byte ($\\mathtt{0x0D}$) at the lowest address."
+        }
+      ]
+    },
+    {
+      "id": "number-systems-lesson-twos-complement",
+      "title": "Binary Arithmetic, Signed Representations & Overflow",
+      "order": 2,
+      "difficulty": 2,
+      "content": "Binary addition works column-by-column with carries, exactly like decimal: $1+1 = \\mathtt{10}$ (write 0, carry 1). The interesting question is how to represent **negatives**. Three schemes compete. **Sign-magnitude** dedicates the MSB to sign and leaves the rest as magnitude — simple to read but it has two zeros ($+0$ and $-0$) and needs separate add/subtract logic. **One's complement** negates by flipping every bit; it also has a $\\pm0$ problem and an awkward end-around carry.\n\n**Two's complement won** because it has a single zero and ordinary binary addition \"just works\" across the sign boundary — the same adder hardware handles signed and unsigned. To negate, invert all bits and add 1: $-x = \\overline{x} + 1$. For an $n$-bit word the representable range is $[-2^{n-1},\\ 2^{n-1}-1]$ — asymmetric, with one extra negative value. The MSB carries weight $-2^{n-1}$, so $\\mathtt{1000}_2 = -8$ in 4 bits.\n\n**Overflow detection** is where ex-hardware folks must stay sharp: **carry-out and signed overflow are different flags**. Carry-out (C) is the carry beyond the MSB and signals *unsigned* overflow. Signed **overflow (V)** occurs when two same-sign operands produce a wrong-sign result; equivalently, $V = C_{in} \\oplus C_{out}$ at the MSB. Adding $+5 + +4$ in 4 bits gives $\\mathtt{1001} = -7$: V is set, C is clear. **Sign extension** preserves value when widening: replicate the MSB into the new high bits ($\\mathtt{1011} \\to \\mathtt{1111\\,1011}$).",
+      "items": [
+        {
+          "id": "number-systems-fc-negate-twos",
+          "type": "flashcard",
+          "front": "How do you negate a two's-complement number?",
+          "back": "Invert every bit and add 1: $-x = \\overline{x} + 1$. The same operation applied twice returns the original value.",
+          "hint": "Complement, then increment."
+        },
+        {
+          "id": "number-systems-fc-why-twos-won",
+          "type": "flashcard",
+          "front": "Why did two's complement win over sign-magnitude and one's complement?",
+          "back": "It has a single representation of zero, and ordinary binary addition works correctly across the sign boundary — one adder handles both signed and unsigned arithmetic.",
+          "hint": "Think about zero and reusing the adder."
+        },
+        {
+          "id": "number-systems-fc-range",
+          "type": "flashcard",
+          "front": "What is the representable range of an $n$-bit two's-complement integer?",
+          "back": "$[-2^{n-1},\\ 2^{n-1}-1]$. It is asymmetric: one more negative value than positive because of the single zero.",
+          "hint": "The MSB has weight $-2^{n-1}$."
+        },
+        {
+          "id": "number-systems-fc-v-flag",
+          "type": "flashcard",
+          "front": "Give a formula for the signed overflow (V) flag in an adder.",
+          "back": "$V = C_{in} \\oplus C_{out}$ at the most-significant bit. Equivalently, V is set when two same-sign operands yield a result of the opposite sign.",
+          "hint": "XOR of the two carries into and out of the MSB."
+        },
+        {
+          "id": "number-systems-fc-sign-extension",
+          "type": "flashcard",
+          "front": "How do you sign-extend a two's-complement number to a wider word?",
+          "back": "Replicate the sign bit (MSB) into all the new high-order bits. E.g. $\\mathtt{1011}$ (=-5) extends to $\\mathtt{1111\\,1011}$.",
+          "hint": "Copy the MSB upward."
+        },
+        {
+          "id": "number-systems-mcq-decode-twos",
+          "type": "mcq",
+          "prompt": "What decimal value does $\\mathtt{1000}_2$ represent as a 4-bit two's-complement number?",
+          "choices": ["$-8$", "$-7$", "$+8$", "$-0$"],
+          "answerIndex": 0,
+          "explanation": "The MSB weight is $-2^3 = -8$ and all other bits are 0, so the value is $-8$ — the most negative 4-bit value.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/number-systems-1.svg"
+        },
+        {
+          "id": "number-systems-mcq-overflow",
+          "type": "mcq",
+          "prompt": "Adding 4-bit two's-complement $0101 (+5)$ and $0100 (+4)$ yields $1001$. Which flags are correct?",
+          "choices": ["C set, V clear", "C clear, V set", "C set, V set", "C clear, V clear"],
+          "answerIndex": 1,
+          "explanation": "Two positives produced a negative result ($-7$): signed overflow V is set, but no carry leaves the MSB so C is clear."
+        },
+        {
+          "id": "number-systems-mcq-carry-vs-overflow",
+          "type": "mcq",
+          "prompt": "Which statement about carry-out (C) and signed overflow (V) is correct?",
+          "choices": ["They are always equal", "C signals unsigned overflow; V signals signed overflow", "V signals unsigned overflow; C signals signed overflow", "Only V exists in two's complement"],
+          "answerIndex": 1,
+          "explanation": "Carry-out indicates the result exceeded the unsigned range; V indicates the signed result has the wrong sign. They are independent flags."
+        },
+        {
+          "id": "number-systems-mcq-negate-example",
+          "type": "mcq",
+          "prompt": "In 8-bit two's complement, what is the representation of $-1$?",
+          "choices": ["$\\mathtt{1000\\,0001}$", "$\\mathtt{0000\\,0001}$", "$\\mathtt{1111\\,1111}$", "$\\mathtt{1111\\,1110}$"],
+          "answerIndex": 2,
+          "explanation": "Negate $+1$ ($\\mathtt{0000\\,0001}$): invert to $\\mathtt{1111\\,1110}$, add 1 to get $\\mathtt{1111\\,1111}$."
+        }
+      ]
+    },
+    {
+      "id": "number-systems-lesson-fixed-point",
+      "title": "Fixed-Point (Q-Format), BCD & Gray Code",
+      "order": 3,
+      "difficulty": 3,
+      "content": "When you need fractions but cannot afford floating-point hardware — the daily reality of **DSP and radar signal processing [→08]** — you use **fixed-point**. The bits are still a plain integer; you merely *agree* on an implied binary point. **Q-format** names the split: **Q$m$.$n$** has $m$ integer bits and $n$ fraction bits, with the fraction contributing weights $2^{-1}, 2^{-2}, \\dots, 2^{-n}$. The ubiquitous **Q1.15** packs a sign bit and 15 fraction bits into 16 bits, representing values in $[-1,\\ 1)$ with resolution $2^{-15}$.\n\nThe key discipline is tracking the format through operations. **Addition** requires identical Q-formats and keeps the format. **Multiplication adds the formats**: a Q1.15 $\\times$ Q1.15 product is Q2.30 in a 32-bit register, which you typically shift left by 1 and take the high word to renormalize back to Q1.15. Forgetting that re-scale is the classic fixed-point bug. **Saturating arithmetic** clamps out-of-range results to the max/min instead of **wrapping** (modulo rollover) — essential in signal chains where a wrap turns a loud sample into a catastrophic sign flip.\n\nTwo special codes round out the picture. **Binary-coded decimal (BCD)** stores each decimal digit in its own nibble ($\\mathtt{0010\\,0111} = 27$), trading density for trivial decimal display — it survives in 7-segment displays and real-time clocks. **Gray code** changes exactly one bit between adjacent values, eliminating transition glitches; it is the encoding of choice for rotary/position encoders and for multi-bit clock-domain crossing **[→06]**. Convert binary $b$ to Gray with $g = b \\oplus (b \\gg 1)$.",
+      "items": [
+        {
+          "id": "number-systems-fc-qformat-def",
+          "type": "flashcard",
+          "front": "What does the notation Q$m$.$n$ mean in fixed-point arithmetic?",
+          "back": "$m$ integer bits and $n$ fraction bits, with an implied binary point between them. The fraction bits carry weights $2^{-1}$ through $2^{-n}$.",
+          "hint": "Integer part dot fraction part."
+        },
+        {
+          "id": "number-systems-fc-q115",
+          "type": "flashcard",
+          "front": "What range and resolution does Q1.15 provide?",
+          "back": "16 bits = 1 sign bit + 15 fraction bits, representing $[-1,\\ 1)$ with resolution (LSB) of $2^{-15}$.",
+          "hint": "It's a normalized signed fraction."
+        },
+        {
+          "id": "number-systems-fc-qmult",
+          "type": "flashcard",
+          "front": "What is the output format of a Q1.15 $\\times$ Q1.15 multiplication, and what must you do?",
+          "back": "The raw product is Q2.30 in 32 bits. To return to Q1.15 you shift left by 1 (to drop the redundant sign bit) and take the high 16 bits — i.e. re-scale.",
+          "hint": "Formats add on multiply; then renormalize."
+        },
+        {
+          "id": "number-systems-fc-sat-vs-wrap",
+          "type": "flashcard",
+          "front": "Contrast saturating and wrapping arithmetic.",
+          "back": "Saturating clamps an out-of-range result to the maximum or minimum value; wrapping lets it roll over modulo the word size. DSP prefers saturation to avoid catastrophic sign flips.",
+          "hint": "Clamp vs roll over."
+        },
+        {
+          "id": "number-systems-fc-bcd",
+          "type": "flashcard",
+          "front": "What is binary-coded decimal (BCD) and where does it survive?",
+          "back": "Each decimal digit is stored in its own 4-bit nibble (e.g. $27 = \\mathtt{0010\\,0111}$). It survives in 7-segment displays and real-time clocks, where direct decimal readout matters more than density.",
+          "hint": "One nibble per decimal digit."
+        },
+        {
+          "id": "number-systems-fc-gray-convert",
+          "type": "flashcard",
+          "front": "How do you convert a binary number $b$ to Gray code, and why use Gray code?",
+          "back": "$g = b \\oplus (b \\gg 1)$. Gray code changes only one bit between adjacent values, eliminating multi-bit transition glitches in encoders and clock-domain crossings.",
+          "hint": "XOR with the right-shifted value."
+        },
+        {
+          "id": "number-systems-mcq-qmult-format",
+          "type": "mcq",
+          "prompt": "Multiplying two Q1.15 numbers produces a raw product in which format?",
+          "choices": ["Q1.15", "Q2.30", "Q1.30", "Q2.15"],
+          "answerIndex": 1,
+          "explanation": "Integer and fraction bit counts each add: $1+1=2$ integer bits, $15+15=30$ fraction bits, giving Q2.30 in a 32-bit register."
+        },
+        {
+          "id": "number-systems-mcq-bcd-value",
+          "type": "mcq",
+          "prompt": "What decimal number does the BCD byte $\\mathtt{1001\\,0011}$ represent?",
+          "choices": ["147", "93", "211", "53"],
+          "answerIndex": 1,
+          "explanation": "Each nibble is one decimal digit: $\\mathtt{1001}=9$ and $\\mathtt{0011}=3$, so the value is 93 (not the binary value 147)."
+        },
+        {
+          "id": "number-systems-mcq-gray-adjacent",
+          "type": "mcq",
+          "prompt": "What is the defining property of Gray code that makes it ideal for encoders and CDC?",
+          "choices": ["It is the densest possible code", "Adjacent values differ in exactly one bit", "It has no representation of zero", "It uses fewer bits than binary"],
+          "answerIndex": 1,
+          "explanation": "Only one bit changes between consecutive Gray values, so a sampled transition can never catch an intermediate multi-bit glitch."
+        },
+        {
+          "id": "number-systems-mcq-saturate",
+          "type": "mcq",
+          "prompt": "In an 8-bit unsigned saturating adder, what is $200 + 100$?",
+          "choices": ["44 (wrapped)", "255 (clamped)", "300", "0"],
+          "answerIndex": 1,
+          "explanation": "300 exceeds the 8-bit max of 255, so saturating arithmetic clamps the result to 255 rather than wrapping to 44."
+        }
+      ]
+    },
+    {
+      "id": "number-systems-lesson-ieee754",
+      "title": "IEEE 754 Floating-Point",
+      "order": 4,
+      "difficulty": 4,
+      "content": "Floating-point trades uniform resolution for enormous dynamic range by storing numbers in scientific notation. **IEEE 754 single precision** packs 32 bits as a $1$-bit **sign** $S$, an $8$-bit biased **exponent** $E$, and a $23$-bit **mantissa** (fraction) $M$. For normalized numbers the value is\n\n$$x = (-1)^{S} \\times 1.M \\times 2^{(E - 127)}$$\n\nThe leading $1$ is **implicit** (the \"hidden bit\"), buying a free 24th bit of precision. The exponent uses a **bias** of $127$ (single) or $1023$ (double) so the stored field stays unsigned while representing both positive and negative exponents. Double precision is the same scheme with $11$ exponent bits and a $52$-bit mantissa.\n\nThe exponent field's extremes are reserved. $E = 0$ encodes **zero** (with $M=0$) and **denormals/subnormals** (with $M \\ne 0$), which drop the implicit 1 to represent values gradually underflowing toward zero. $E = 255$ (all ones) encodes $\\pm\\infty$ (with $M=0$) and **NaN** (Not-a-Number, $M \\ne 0$), the result of $0/0$ or $\\sqrt{-1}$. NaN famously compares unequal to everything, including itself.\n\nBecause the mantissa is binary, decimal fractions like $0.1$ have **no exact representation** — $0.1$ is a repeating binary fraction, so it is rounded to the nearest representable value, which is why $0.1 + 0.2 \\ne 0.3$ in float. The default rounding mode is **round-to-nearest, ties-to-even**. As a returning engineer, the practical takeaways are: never test floats for exact equality, watch for catastrophic cancellation when subtracting near-equal values, and reach for fixed-point when you need deterministic, exact-scaled arithmetic on an FPGA.",
+      "items": [
+        {
+          "id": "number-systems-fc-ieee-fields",
+          "type": "flashcard",
+          "front": "What are the three fields of an IEEE 754 single-precision number and their widths?",
+          "back": "Sign $S$ (1 bit), biased exponent $E$ (8 bits), and mantissa/fraction $M$ (23 bits), for 32 bits total.",
+          "hint": "1 + 8 + 23 = 32."
+        },
+        {
+          "id": "number-systems-fc-ieee-value",
+          "type": "flashcard",
+          "front": "Write the value formula for a normalized IEEE 754 single-precision number.",
+          "back": "$x = (-1)^{S} \\times 1.M \\times 2^{(E - 127)}$. The leading 1 is implicit and the exponent bias is 127.",
+          "hint": "Hidden bit and bias of 127."
+        },
+        {
+          "id": "number-systems-fc-bias-why",
+          "type": "flashcard",
+          "front": "Why does IEEE 754 store the exponent with a bias instead of two's complement?",
+          "back": "Bias keeps the stored exponent field unsigned (so float magnitude comparison can use integer comparison), while still representing both positive and negative exponents. Single uses bias 127, double uses 1023.",
+          "hint": "Keeps the field unsigned and orderable."
+        },
+        {
+          "id": "number-systems-fc-nan-inf",
+          "type": "flashcard",
+          "front": "How are $\\pm\\infty$ and NaN encoded in IEEE 754?",
+          "back": "Exponent field all ones ($E=255$ in single): mantissa $M=0$ gives $\\pm\\infty$, while $M \\ne 0$ gives NaN. NaN compares unequal to everything, including itself.",
+          "hint": "Max exponent; mantissa zero vs nonzero."
+        },
+        {
+          "id": "number-systems-fc-denormal",
+          "type": "flashcard",
+          "front": "What do denormal (subnormal) numbers represent and how are they encoded?",
+          "back": "$E = 0$ with $M \\ne 0$. They drop the implicit leading 1, allowing gradual underflow — representing very small magnitudes below the smallest normalized value down toward zero.",
+          "hint": "Exponent field zero, nonzero mantissa, no hidden bit."
+        },
+        {
+          "id": "number-systems-fc-01-inexact",
+          "type": "flashcard",
+          "front": "Why is $0.1$ not exactly representable in binary floating-point?",
+          "back": "$0.1$ is a repeating fraction in binary (like $1/3$ in decimal), so it is rounded to the nearest representable value. This is why $0.1 + 0.2 \\ne 0.3$ exactly.",
+          "hint": "Repeating binary expansion, then rounding."
+        },
+        {
+          "id": "number-systems-mcq-double-exp",
+          "type": "mcq",
+          "prompt": "How many exponent bits and what bias does IEEE 754 double precision use?",
+          "choices": ["8 bits, bias 127", "11 bits, bias 1023", "10 bits, bias 511", "12 bits, bias 2047"],
+          "answerIndex": 1,
+          "explanation": "Double precision has 11 exponent bits with a bias of 1023, plus a 52-bit mantissa and 1 sign bit (64 bits total)."
+        },
+        {
+          "id": "number-systems-mcq-hidden-bit",
+          "type": "mcq",
+          "prompt": "The 'hidden bit' in normalized IEEE 754 numbers refers to what?",
+          "choices": ["The sign bit", "An implicit leading 1 before the mantissa's binary point", "A parity bit", "The most-significant exponent bit"],
+          "answerIndex": 1,
+          "explanation": "Normalized values are $1.M$; the leading 1 is implied and not stored, giving 24 bits of effective precision in single from a 23-bit field."
+        },
+        {
+          "id": "number-systems-mcq-nan-compare",
+          "type": "mcq",
+          "prompt": "Which expression is true for an IEEE 754 NaN value x?",
+          "choices": ["$x == x$ is true", "$x == x$ is false", "$x > 0$ is true", "$x < \\infty$ is true"],
+          "answerIndex": 1,
+          "explanation": "NaN is unordered: every comparison except inequality returns false, so $x == x$ is false. This is the standard way to detect NaN."
+        },
+        {
+          "id": "number-systems-mcq-default-rounding",
+          "type": "mcq",
+          "prompt": "What is the default IEEE 754 rounding mode?",
+          "choices": ["Round toward zero (truncate)", "Round toward $+\\infty$", "Round-to-nearest, ties-to-even", "Round away from zero"],
+          "answerIndex": 2,
+          "explanation": "Round-to-nearest, ties-to-even (banker's rounding) is the default; it minimizes statistical bias when ties occur.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/number-systems-2.svg"
+        }
+      ]
+    }
+  ]
+}

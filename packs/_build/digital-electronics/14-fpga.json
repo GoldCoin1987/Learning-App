@@ -1,0 +1,391 @@
+{
+  "id": "fpga",
+  "title": "FPGAs: Architecture & Flow",
+  "order": 14,
+  "lessons": [
+    {
+      "id": "fpga-fabric",
+      "title": "The FPGA Fabric: What's Actually on the Die",
+      "order": 1,
+      "difficulty": 1,
+      "content": "An **FPGA** (Field-Programmable Gate Array) is not a fixed chip — it is a sea of **configurable resources** wired together by a programmable interconnect, all defined at power-up by a loaded **bitstream**. Where a CPU executes instructions sequentially, an FPGA *becomes* your circuit: every block runs in parallel, every clock cycle, deterministically.\n\nThe building blocks you must know:\n\n- **Configurable logic blocks (CLBs / logic cells / slices / ALMs).** The atom of the fabric is a **LUT + flip-flop**. A $k$-input **lookup table (LUT)** is a tiny $2^k\\times 1$ SRAM that stores the truth table of *any* Boolean function of $k$ inputs (typically $k=4$ to $6$). Its output optionally feeds a **flip-flop** so the cell can be combinational or registered. This is *LUT-based* logic, not gate-based — synthesis maps your design into LUT contents.\n- **Block RAM (BRAM).** Dedicated dual-port SRAM blocks (tens of kbits each) for buffers, FIFOs, and sample memory — far denser than building RAM out of flip-flops.\n- **DSP slices.** Hardened **multiply-accumulate (MAC)** units (e.g., $18\\times 18$ or $27\\times 18$ multipliers with an accumulator). These are the workhorses for filters and FFTs.\n- **Clock management (PLL/MMCM).** Synthesize, phase-shift, and deskew clocks from a board crystal.\n- **Configurable I/O.** Banked I/O supporting many standards (LVCMOS, LVDS, etc.) with per-pin drive and termination.\n\nKnowing the fabric is knowing your budget: every design is a placement of LUTs, FFs, BRAMs, and DSPs onto fixed silicon.",
+      "items": [
+        {
+          "id": "fpga-fabric-001",
+          "type": "flashcard",
+          "front": "What is the fundamental logic element of an FPGA fabric, and what are its two parts?",
+          "back": "The configurable logic cell, built from a **LUT + flip-flop**. The $k$-input lookup table (a $2^k\\times1$ SRAM) computes any Boolean function of $k$ inputs; the optional flip-flop registers the output, making the cell combinational or sequential. Thousands of these plus a programmable interconnect form the fabric.",
+          "hint": "Lookup table feeds an optional register."
+        },
+        {
+          "id": "fpga-fabric-002",
+          "type": "flashcard",
+          "front": "How does a LUT implement an arbitrary logic function?",
+          "back": "A $k$-input LUT is a $2^k$-entry SRAM addressed by the $k$ inputs; each entry holds the function's output for that input combination — literally the truth table. The bitstream loads the SRAM contents, so the same physical LUT can be AND, XOR, a 3-input majority, etc. This is why FPGA logic is 'LUT-based,' not fixed gates.",
+          "hint": "It stores the truth table in SRAM addressed by the inputs."
+        },
+        {
+          "id": "fpga-fabric-003",
+          "type": "flashcard",
+          "front": "What are DSP slices and why do they exist as hardened blocks?",
+          "back": "DSP slices are dedicated, hardened **multiply-accumulate (MAC)** units (e.g., an $18\\times18$ or $27\\times18$ multiplier with a wide accumulator and pre-adder). Building a fast multiplier out of LUTs is slow and area-hungry, so vendors harden them — giving high clock rates and low power for the multiply-heavy math (FIR, FFT, correlation) that dominates DSP.",
+          "hint": "Hardened multipliers + accumulators for the MAC math."
+        },
+        {
+          "id": "fpga-fabric-004",
+          "type": "flashcard",
+          "front": "What is block RAM (BRAM) and when do you use it instead of flip-flops or distributed RAM?",
+          "back": "BRAM is dedicated dual-port SRAM (typically tens of kbits per block) built into the fabric. Use it for anything sizeable: sample buffers, line/frame stores, FIFOs, coefficient tables, and CDC async FIFOs. Building the same storage from flip-flops or LUT-based 'distributed RAM' wastes huge fabric resources and won't reach the density or speed.",
+          "hint": "Dedicated dual-port SRAM for buffers and FIFOs."
+        },
+        {
+          "id": "fpga-fabric-005",
+          "type": "mcq",
+          "prompt": "A 6-input LUT can implement how many distinct entries (and thus any function of 6 inputs)?",
+          "choices": [
+            "64 entries ($2^6$)",
+            "6 entries",
+            "12 entries",
+            "36 entries"
+          ],
+          "answerIndex": 0,
+          "explanation": "A $k$-input LUT is a $2^k\\times1$ SRAM, so a 6-LUT has $2^6=64$ entries — the full truth table of any 6-input Boolean function. Picking $k=6$ balances logic density against the SRAM cost of $2^k$ bits per LUT."
+        },
+        {
+          "id": "fpga-fabric-006",
+          "type": "mcq",
+          "prompt": "Which on-chip resource is the right choice to buffer a 16k-sample block of ADC data inside the FPGA?",
+          "choices": [
+            "Block RAM (BRAM)",
+            "A bank of individual flip-flops",
+            "DSP slices",
+            "The configurable I/O ring"
+          ],
+          "answerIndex": 0,
+          "explanation": "BRAM is dedicated dual-port SRAM sized exactly for buffers and FIFOs. Sixteen thousand samples in flip-flops would consume an enormous share of the fabric; DSP slices do arithmetic, not bulk storage; I/O is for pins."
+        },
+        {
+          "id": "fpga-fabric-007",
+          "type": "mcq",
+          "prompt": "What configures an FPGA's logic the moment it powers up?",
+          "choices": [
+            "A bitstream loaded into the fabric's configuration SRAM",
+            "A compiled C program in flash executed by a CPU",
+            "Permanent metal mask layers set at the foundry",
+            "The board's crystal oscillator frequency"
+          ],
+          "answerIndex": 0,
+          "explanation": "SRAM-based FPGAs hold their LUT contents, routing, and block settings in configuration SRAM, loaded from a bitstream at power-up (from flash or JTAG). It's volatile — remove power and the configuration is gone, which is why a config flash sits next to most FPGAs."
+        },
+        {
+          "id": "fpga-fabric-008",
+          "type": "mcq",
+          "prompt": "The clearest architectural difference between an FPGA and a CPU is that the FPGA:",
+          "choices": [
+            "Physically instantiates spatial, parallel hardware that all runs every clock, rather than time-multiplexing one datapath across an instruction stream",
+            "Runs software faster because it has a higher clock frequency",
+            "Stores its program in DRAM instead of cache",
+            "Can only implement combinational logic, never sequential"
+          ],
+          "answerIndex": 0,
+          "explanation": "An FPGA spends area to gain parallelism: you lay down as many MACs, FIFOs, and state machines as fit, and they all operate concurrently and deterministically each cycle. A CPU reuses one datapath sequentially. FPGAs usually clock *slower* than CPUs but win on throughput-per-clock and latency determinism."
+        },
+        {
+          "id": "fpga-fabric-009",
+          "type": "flashcard",
+          "front": "A logic cell: LUT + flip-flop",
+          "back": "A k-input LUT (an SRAM truth table) computes any Boolean function of its inputs; an output mux selects either the raw combinational LUT output or a registered version from the flip-flop (clocked by clk). Thousands of these cells plus a programmable interconnect make up the FPGA fabric.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/fpga-2.svg"
+        }
+      ]
+    },
+    {
+      "id": "fpga-flow",
+      "title": "The Implementation Flow: HDL to Bitstream",
+      "order": 2,
+      "difficulty": 2,
+      "content": "Getting your HDL onto silicon is a pipeline of distinct tool stages. Treat it like a compiler-and-linker chain for hardware.\n\n1. **Design entry (HDL).** Write synthesizable Verilog/VHDL (RTL) plus the IP you instantiate.\n2. **Simulation.** Before touching the fabric, verify behavior with a **testbench** (Icarus/Verilator/vendor sim). Catching bugs here is orders of magnitude cheaper than on hardware.\n3. **Synthesis.** The tool elaborates RTL and maps it to fabric primitives — LUTs, FFs, BRAM, DSP — and does logic optimization (the K-map/minimization work, automated). Output: a technology-mapped netlist.\n4. **Place & route (P&R, 'implementation').** Assign each primitive to a physical site (place) and connect them through the routing fabric (route). This is the hard, slow, NP-ish step; routing congestion and physical distance set your achievable speed.\n5. **Static timing analysis (STA).** Against your **timing constraints**, the tool checks every path's setup and hold using post-route delays and reports **slack**. This ties straight back to the setup/hold and $f_{max}$ math from the timing module — now with real numbers.\n6. **Bitstream generation.** Serialize the placed-and-routed configuration into the binary the chip loads.\n7. **Configuration.** Download the bitstream to the board (JTAG for bring-up, SPI flash for boot).\n\nAlong the way you read two report families constantly: the **utilization report** (how much LUT/FF/BRAM/DSP you used) and the **timing report** (did every path close?). Both gate whether the design is shippable.",
+      "items": [
+        {
+          "id": "fpga-flow-001",
+          "type": "flashcard",
+          "front": "List the FPGA implementation flow in order, from HDL to a configured board.",
+          "back": "HDL design entry, then simulation, then synthesis (map RTL to LUT/FF/BRAM/DSP), then place & route, then static timing analysis (STA), then bitstream generation, then configuration (download to the board). Reports of utilization and timing are read throughout.",
+          "hint": "Entry, sim, synth, P&R, STA, bitstream, config."
+        },
+        {
+          "id": "fpga-flow-002",
+          "type": "flashcard",
+          "front": "What does synthesis actually produce, and what does it optimize?",
+          "back": "Synthesis elaborates RTL and maps it to fabric primitives (LUTs, flip-flops, BRAM, DSP slices), producing a technology-mapped netlist. It performs logic optimization automatically — the Boolean minimization and state-encoding work you'd do by hand with K-maps — and infers blocks like RAMs and multipliers from your coding patterns.",
+          "hint": "RTL becomes a netlist of fabric primitives, with logic minimized."
+        },
+        {
+          "id": "fpga-flow-003",
+          "type": "flashcard",
+          "front": "What happens during place & route (P&R), and why is it the slow, hard step?",
+          "back": "**Place** assigns each netlist primitive to a specific physical site on the die; **route** connects them through the fixed programmable interconnect. It's a large combinatorial optimization (NP-hard in general): the placer must minimize wire length and congestion while the router must find legal paths that also meet timing. Physical distance and routing delay ultimately cap your clock speed.",
+          "hint": "Assign primitives to sites and wire them up — a huge optimization problem."
+        },
+        {
+          "id": "fpga-flow-004",
+          "type": "flashcard",
+          "front": "Why simulate before synthesizing, given you'll test on hardware anyway?",
+          "back": "Simulation with a testbench gives full observability and fast iteration: you see every signal, can force inputs, and catch logic bugs in seconds. A full synth/P&R/bitstream cycle can take minutes to hours, and on-board debug has limited visibility (you only see what you route to a probe/ILA). Fixing a bug in sim is orders of magnitude cheaper than after implementation.",
+          "hint": "Full observability and fast iteration vs slow builds and limited on-chip visibility."
+        },
+        {
+          "id": "fpga-flow-005",
+          "type": "mcq",
+          "prompt": "In which stage are post-route, real interconnect delays used to verify that every path meets setup and hold?",
+          "choices": [
+            "Static timing analysis (STA)",
+            "Synthesis",
+            "Behavioral simulation",
+            "Bitstream generation"
+          ],
+          "answerIndex": 0,
+          "explanation": "STA runs after place & route, when actual cell and routing delays are known, and checks every timing path against the constraints, reporting slack. Behavioral simulation has no real delays; synthesis only estimates; bitstream generation just serializes the result."
+        },
+        {
+          "id": "fpga-flow-006",
+          "type": "mcq",
+          "prompt": "Your design synthesizes and places fine but the timing report shows several paths failing. The most direct interpretation is:",
+          "choices": [
+            "Those paths have negative slack — they can't meet the constraint at the requested clock, so the design is not guaranteed to work at speed",
+            "The design used too many LUTs",
+            "The bitstream is corrupt",
+            "The testbench is wrong"
+          ],
+          "answerIndex": 0,
+          "explanation": "Failing timing paths have negative slack: required time minus arrival time is negative, meaning data doesn't settle before the capturing edge. The design may work intermittently or not at all at that clock. Fixes: pipeline the path, restructure logic, relax the clock, or fix constraints."
+        },
+        {
+          "id": "fpga-flow-007",
+          "type": "mcq",
+          "prompt": "What is the role of a bitstream file in the flow?",
+          "choices": [
+            "It is the serialized binary that loads LUT contents, routing, and block settings into the FPGA's configuration memory",
+            "It is the human-readable HDL source for the design",
+            "It is the timing report summarizing slack on each path",
+            "It is the testbench stimulus used in simulation"
+          ],
+          "answerIndex": 0,
+          "explanation": "The bitstream encodes the entire placed-and-routed configuration — every LUT truth table, routing switch, and block setting. Loading it (via JTAG or from a config flash) is what turns the generic fabric into your specific circuit."
+        },
+        {
+          "id": "fpga-flow-008",
+          "type": "mcq",
+          "prompt": "Two reports you consult on essentially every build are:",
+          "choices": [
+            "The utilization report and the timing report",
+            "The schematic and the BOM",
+            "The datasheet and the errata",
+            "The power-on log and the crash dump"
+          ],
+          "answerIndex": 0,
+          "explanation": "Utilization tells you how much LUT/FF/BRAM/DSP you've consumed (are you about to overflow the part?), and timing tells you whether every path closes (will it run at the target clock?). Together they decide whether the design fits and runs."
+        },
+        {
+          "id": "fpga-flow-009",
+          "type": "flashcard",
+          "front": "FPGA implementation flow",
+          "back": "The flow runs HDL entry, then simulation against a testbench, then synthesis, then place & route, then static timing analysis (STA), then bitstream generation, then configuring the board. STA reports slack; negative slack fails timing and feeds back to fixing the RTL or the constraints.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/fpga-1.svg"
+        }
+      ]
+    },
+    {
+      "id": "fpga-constraints-ip",
+      "title": "Constraints, Slack, Utilization, and IP",
+      "order": 3,
+      "difficulty": 3,
+      "content": "Two text artifacts and one library decide whether a design is real: **constraints**, **reports**, and **IP**.\n\n**Timing constraints (.xdc for Vivado, .sdc for Quartus/SDC tools).** STA has no idea how fast you intend to run unless you tell it. At minimum you `create_clock` with a period; you also specify **input/output delays** (when external data is valid relative to a clock at the pins) and any false/multicycle paths. Garbage constraints give garbage timing sign-off — a design that 'meets timing' against no clock means nothing.\n\n**Slack.** For each path, $\\text{slack} = \\text{required time} - \\text{arrival time}$. **Positive slack** = margin (good). **Negative slack** = a violation. **Worst Negative Slack (WNS)** is the headline number; **Total Negative Slack (TNS)** sums all violations. Setup slack scales with the clock period; **hold slack is frequency-independent** — you can't slow the clock to fix a hold violation (a direct callback to the timing module).\n\n**Utilization.** The report tallies LUTs, FFs, BRAM, and DSP used vs available. Hit ~80–90% and routing congestion spikes, P&R slows, and timing gets harder — leave headroom.\n\n**Pin / physical constraints** map HDL top-level ports to physical package pins (`set_property PACKAGE_PIN`) and I/O standards — buttons, LEDs, PMOD, the clock input. Wrong pin assignment is the classic 'LED won't blink' bug.\n\n**IP: hard vs soft.** **Hard IP** is fixed silicon (PCIe transceivers, DDR controllers, the PLL/MMCM, DSP) — fast and power-efficient, but fixed. **Soft IP** is synthesized into the fabric from HDL — flexible, costs LUTs. A **soft CPU** (RISC-V, MicroBlaze, Nios) is soft IP: a whole processor built in the fabric, letting you run C alongside custom accelerators.",
+      "items": [
+        {
+          "id": "fpga-ci-001",
+          "type": "flashcard",
+          "front": "What is a timing constraints file and what is the single most important thing it must declare?",
+          "back": "It's a text file (.xdc for Vivado, .sdc for Quartus) telling STA the design's timing intent. The essential entry is the **clock**: `create_clock` with a period (and waveform). Without it STA has nothing to check against — 'meeting timing' against no clock is meaningless. It also sets input/output delays and false/multicycle paths.",
+          "hint": "Defines clocks and I/O timing for STA; clock definition is mandatory."
+        },
+        {
+          "id": "fpga-ci-002",
+          "type": "flashcard",
+          "front": "Define slack, WNS, and TNS.",
+          "back": "**Slack** = required time minus arrival time for a path; positive is margin, negative is a violation. **WNS** (Worst Negative Slack) is the single most-violating path's slack — the headline. **TNS** (Total Negative Slack) sums all negative slacks, indicating how many paths fail and how badly. You sign off timing when WNS $\\ge 0$.",
+          "hint": "Slack = required - arrival; WNS = worst path; TNS = sum of all violations."
+        },
+        {
+          "id": "fpga-ci-003",
+          "type": "flashcard",
+          "front": "Contrast hard IP and soft IP, with examples.",
+          "back": "**Hard IP** is dedicated silicon: PCIe/SerDes transceivers, DDR memory controllers, PLL/MMCM, DSP slices — fast, power-efficient, but fixed in capability and location. **Soft IP** is HDL synthesized into the fabric (UARTs, AXI interconnect, FIR cores, a soft CPU) — fully flexible and portable across parts, but it consumes LUTs/FFs and runs at fabric speeds.",
+          "hint": "Hard = fixed silicon block; soft = synthesized into LUTs."
+        },
+        {
+          "id": "fpga-ci-004",
+          "type": "flashcard",
+          "front": "What is a soft-core CPU, and why drop one into an FPGA?",
+          "back": "A soft CPU (RISC-V, Xilinx MicroBlaze, Intel Nios) is a full processor described in HDL and synthesized into the fabric. You use it for control-plane and housekeeping tasks (config, slow protocols, decision logic) written in C, while the fabric does the heavy parallel DSP. It gives software flexibility without an external MCU, and RISC-V makes it open and license-friendly.",
+          "hint": "A processor built from fabric logic; runs C for control while hardware does DSP."
+        },
+        {
+          "id": "fpga-ci-005",
+          "type": "mcq",
+          "prompt": "STA reports a hold-time violation. Which action can fix it?",
+          "choices": [
+            "Add delay on the short path or fix clock skew/routing — slowing the clock will NOT help",
+            "Lower the clock frequency",
+            "Increase the clock frequency",
+            "Reduce LUT utilization"
+          ],
+          "answerIndex": 0,
+          "explanation": "Hold violations are frequency-independent: $t_{cq}+t_{pd,min} \\ge t_h + \\text{skew}$ has no clock period in it. Slowing the clock fixes setup, never hold. You fix hold by adding delay to the too-fast path or correcting skew — usually the tools do it automatically by inserting routing."
+        },
+        {
+          "id": "fpga-ci-006",
+          "type": "mcq",
+          "prompt": "A path has required time 8.0 ns and arrival time 9.3 ns. Its slack is:",
+          "choices": [
+            "-1.3 ns (a setup violation)",
+            "+1.3 ns (passing with margin)",
+            "+17.3 ns",
+            "0 ns exactly"
+          ],
+          "answerIndex": 0,
+          "explanation": "Slack = required - arrival = 8.0 - 9.3 = -1.3 ns. Negative slack means data arrives after it was required (too late for the capturing edge): a setup violation. Pipeline the path, restructure logic, or relax the clock."
+        },
+        {
+          "id": "fpga-ci-007",
+          "type": "mcq",
+          "prompt": "Your HDL is correct in simulation but the on-board LED never lights. The most likely cause is:",
+          "choices": [
+            "A wrong or missing pin/physical constraint mapping the top-level port to the LED's package pin (or wrong I/O standard)",
+            "The synthesis tool minimized the LED logic away on purpose",
+            "BRAM is full",
+            "The clock constraint period is too long"
+          ],
+          "answerIndex": 0,
+          "explanation": "Simulation doesn't know about physical pins; only the constraints file maps HDL ports to package pins and I/O standards. A wrong PACKAGE_PIN, missing constraint, or incorrect I/O standard/voltage is the classic reason hardware behavior diverges from a perfect simulation."
+        },
+        {
+          "id": "fpga-ci-008",
+          "type": "mcq",
+          "prompt": "Pushing fabric utilization toward 90% typically causes:",
+          "choices": [
+            "Routing congestion that slows place & route and makes timing closure harder",
+            "Lower power and faster timing automatically",
+            "The bitstream to shrink proportionally",
+            "Hold violations to disappear"
+          ],
+          "answerIndex": 0,
+          "explanation": "As the device fills, the router has fewer free tracks and must take longer detours, increasing delay and congestion. P&R runtime balloons and timing closure becomes fragile. Good practice is to leave headroom (often target well under ~80% for timing-critical designs)."
+        },
+        {
+          "id": "fpga-ci-009",
+          "type": "flashcard",
+          "front": "Why are PLL/MMCM blocks usually hard IP rather than soft?",
+          "back": "Clock generation needs analog/mixed-signal precision (voltage-controlled oscillator, phase detector, low jitter) that can't be built from LUTs. So vendors harden the PLL/MMCM as dedicated silicon you configure via a clocking wizard. It multiplies/divides the board crystal, phase-shifts, and deskews clocks — feeding the global clock network with low jitter.",
+          "hint": "Clock synthesis is analog/mixed-signal; LUTs can't do it, so it's hardened."
+        }
+      ]
+    },
+    {
+      "id": "fpga-tradeoffs-radar",
+      "title": "FPGA vs MCU/ASIC/GPU, Ecosystems, and Why Radar/SDR Lives on FPGAs",
+      "order": 4,
+      "difficulty": 4,
+      "content": "**Choosing the right silicon.** Four contenders, four sweet spots:\n\n- **MCU:** cheapest, lowest power, easiest (C firmware), but a single sequential core — fine for control and modest sampling, poor for sustained high-rate DSP. **[->04]**\n- **GPU:** thousands of cores, huge throughput on batched/floating-point workloads, but high power and **high, variable latency** (batches, memory hierarchy, OS) — great offline, awkward for hard-real-time streaming.\n- **ASIC:** ultimate performance/watt and unit cost at volume, but enormous **NRE** (mask/design cost) and zero flexibility once taped out — only sane at very high volume.\n- **FPGA:** reconfigurable parallel hardware with **deterministic, low latency** and line-rate throughput, no per-design mask cost, reprogrammable in the field. Wins for low-to-mid volume, evolving standards, and hard-real-time streaming DSP.\n\n**Vendor ecosystems.** AMD/Xilinx → **Vivado** (Artix/Kintex/Zynq; Arty, Basys 3 boards). Intel/Altera → **Quartus** (Cyclone/Arria/Stratix). Lattice and small parts → the **open-source flow**: **Yosys** (synthesis) + **nextpnr** (P&R) + project IceStorm/Trellis (iCE40/ECP5; iCEBreaker, ULX3S). Open tools mean no license wall and scriptable, reproducible builds.\n\n**Why FPGAs dominate radar/SDR.** Modern receivers digitize at hundreds of MS/s to GS/s, producing a firehose no single CPU can keep up with at low latency. FPGAs map the math spatially: arrays of **DSP-slice MACs** compute **FIR filtering**, **pulse compression** (matched filtering / correlation), **FFTs**, and **digital beamforming** every clock, in parallel, at line rate with deterministic latency. You instantiate, say, 128 taps as 128 MACs that all fire each cycle — the literal building block of a radar signal chain. That parallel-MAC-at-line-rate property, plus reconfigurability for evolving waveforms, is exactly why FPGAs (often alongside a soft or hard CPU on a Zynq-class device) are the centerpiece of contemporary radar and SDR — and why the skill is in demand. **[->08]**",
+      "items": [
+        {
+          "id": "fpga-tr-001",
+          "type": "flashcard",
+          "front": "When does an FPGA beat an MCU, and when does the MCU win?",
+          "back": "FPGA wins when you need sustained high-throughput parallel processing with deterministic low latency (streaming DSP, line-rate filtering, custom protocols). The MCU wins for cost, power, and developer-speed on control-plane and modest workloads — sequential C is far easier than HDL. Many systems use both: MCU/soft-CPU for control, fabric for the heavy parallel math.",
+          "hint": "FPGA = parallel/deterministic/high-rate; MCU = cheap/low-power/easy/sequential."
+        },
+        {
+          "id": "fpga-tr-002",
+          "type": "flashcard",
+          "front": "Compare FPGA vs ASIC on the axes that actually drive the decision.",
+          "back": "ASIC gives the best performance-per-watt and lowest unit cost — but only after huge **NRE** (mask and design cost) and with **zero post-tapeout flexibility**. FPGA has higher per-unit cost and power but **near-zero NRE**, field reprogrammability, and fast iteration. ASIC pays off only at very high volume or extreme perf/power needs; FPGA wins for low-to-mid volume and evolving requirements.",
+          "hint": "ASIC: low unit cost/high NRE/fixed. FPGA: higher unit cost/no NRE/reprogrammable."
+        },
+        {
+          "id": "fpga-tr-003",
+          "type": "flashcard",
+          "front": "Why is an FPGA often preferred over a GPU for real-time radar/SDR streaming, despite the GPU's raw throughput?",
+          "back": "GPUs excel at batched, high-throughput floating-point but carry high and variable latency (batching, deep memory hierarchy, host/OS scheduling) and high power. Radar/SDR needs deterministic, low, fixed latency on a continuous sample stream at line rate. The FPGA processes each sample spatially every clock with predictable timing, making it the better hard-real-time streaming engine.",
+          "hint": "GPU = high but variable latency; FPGA = deterministic low latency at line rate."
+        },
+        {
+          "id": "fpga-tr-004",
+          "type": "flashcard",
+          "front": "Name the three main FPGA toolchains/ecosystems and the families they target.",
+          "back": "AMD/Xilinx → **Vivado** (Artix/Kintex/Zynq; Arty, Basys 3). Intel/Altera → **Quartus** (Cyclone/Arria/Stratix). Open-source → **Yosys + nextpnr** (with IceStorm/Trellis) for Lattice iCE40/ECP5 (iCEBreaker, ULX3S) and some Gowin parts. Open tools are license-free, scriptable, and reproducible.",
+          "hint": "Vivado (Xilinx), Quartus (Intel), Yosys/nextpnr (Lattice, open)."
+        },
+        {
+          "id": "fpga-tr-005",
+          "type": "mcq",
+          "prompt": "A startup needs 2,000 units of an evolving SDR product with hard-real-time, line-rate filtering and must ship in months. Best choice:",
+          "choices": [
+            "FPGA — parallel, deterministic, reprogrammable, near-zero NRE, fast iteration",
+            "ASIC — lowest unit cost",
+            "MCU — cheapest and simplest",
+            "GPU — most raw throughput"
+          ],
+          "answerIndex": 0,
+          "explanation": "Low-to-mid volume (2k units) and evolving requirements rule out the ASIC's huge NRE and fixed function. Hard-real-time line-rate DSP rules out the MCU (too sequential) and GPU (latency/power). The FPGA's reprogrammable parallel fabric with deterministic latency fits all three constraints."
+        },
+        {
+          "id": "fpga-tr-006",
+          "type": "mcq",
+          "prompt": "The core reason FPGAs map radar signal processing so well is that they can:",
+          "choices": [
+            "Instantiate many DSP-slice MACs that all compute in parallel every clock, sustaining FIR/pulse-compression/FFT/beamforming math at line rate with deterministic latency",
+            "Run a faster clock than any CPU or GPU",
+            "Store the entire radar return in a single flip-flop",
+            "Execute C code more efficiently than an MCU"
+          ],
+          "answerIndex": 0,
+          "explanation": "Radar DSP is multiply-accumulate-heavy (filters, correlation, transforms, weighted sums for beamforming). An FPGA lays those MACs down spatially so all taps/channels compute concurrently each cycle at the ADC's sample rate, with fixed latency — exactly what hard-real-time radar needs, and what a sequential core cannot match at low latency."
+        },
+        {
+          "id": "fpga-tr-007",
+          "type": "mcq",
+          "prompt": "Pulse compression in a radar receiver is implemented in the FPGA primarily as:",
+          "choices": [
+            "A matched filter / correlation — a long FIR (MAC chain) against the transmitted waveform, often via FFT-multiply-IFFT",
+            "A single DSP multiply with no accumulation",
+            "A soft-CPU C loop running once per pulse",
+            "A look-up in block RAM with no arithmetic"
+          ],
+          "answerIndex": 0,
+          "explanation": "Pulse compression correlates the return against the known transmit waveform (matched filtering), which is a long FIR/MAC operation (time-domain) or an FFT-multiply-IFFT (frequency-domain) — both MAC-dominated. The FPGA's DSP slices and BRAM make this feasible at the incoming sample rate with deterministic latency."
+        },
+        {
+          "id": "fpga-tr-008",
+          "type": "mcq",
+          "prompt": "Why does a 128-tap FIR filter often run comfortably at line rate on an FPGA but stress a single CPU core?",
+          "choices": [
+            "The FPGA can place 128 MACs that all execute every clock in parallel, while the CPU must execute the 128 multiply-accumulates sequentially per sample",
+            "The FPGA clock is 128 times faster than the CPU",
+            "FIR filters cannot run on a CPU at all",
+            "The CPU lacks any multiplier hardware"
+          ],
+          "answerIndex": 0,
+          "explanation": "A direct-form FIR needs N MACs per output sample. The FPGA instantiates N DSP slices that fire concurrently each clock, producing one output per cycle. A CPU core does those N MACs in sequence (or a few via SIMD), so per-sample throughput drops as N grows — the classic spatial-vs-temporal trade-off."
+        },
+        {
+          "id": "fpga-tr-009",
+          "type": "flashcard",
+          "front": "On a Zynq-class device, how do the FPGA fabric and an on-chip CPU divide the radar/SDR workload?",
+          "back": "The hardened CPU (e.g., ARM, or a RISC-V/MicroBlaze soft core) handles the control plane: configuration, mode/PRI sequencing, slow protocols, networking, and decision logic in C/Linux. The fabric handles the data plane: line-rate FIR, pulse compression, FFT, and beamforming in parallel DSP slices. They communicate over an on-chip bus (AXI), pairing software flexibility with hardware throughput.",
+          "hint": "CPU = control plane (C); fabric = data plane (parallel DSP); linked by AXI."
+        }
+      ]
+    }
+  ]
+}

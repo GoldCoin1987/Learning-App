@@ -1,0 +1,437 @@
+{
+  "id": "hdl",
+  "title": "HDL: Verilog & VHDL",
+  "order": 13,
+  "lessons": [
+    {
+      "id": "hdl-l1",
+      "title": "What an HDL Is (and Isn't): Hardware, Not Software",
+      "order": 1,
+      "difficulty": "easy",
+      "content": "## HDL describes hardware, not a program\n\nThe single biggest mental reset for a software developer: **HDL describes structure, not steps**. When you write Verilog, you are drawing a *parallel* schematic in text — every statement at module scope is \"alive\" simultaneously, like wires soldered on a board. There is no program counter, no top-to-bottom execution. A C `for` loop iterates over time; an HDL construct *unrolls into hardware* that all exists at once.\n\nTwo HDLs dominate. **Verilog** (and its modern superset **SystemVerilog**) is C-flavored and is the default in commercial chip and FPGA work. **VHDL** is Ada-flavored, verbose, and strongly typed; it is entrenched in defense, aerospace, and radar shops, so reading literacy pays off **[->08]**. We focus on Verilog and read VHDL.\n\nA design is a tree of **modules**. Each module has a name, a port list (its pins), and a body that connects sub-modules and logic:\n\n```verilog\nmodule and_gate(input a, input b, output y);\n  assign y = a & b;   // continuous: y tracks a&b forever\nendmodule\n```\n\nThat `assign` is not \"run once.\" It is a permanent connection — change `a` or `b` and `y` updates after a propagation delay, exactly like a real gate. The whole flow mirrors test-driven software you already know: **simulate, then synthesize**. Simulation runs your HDL as an event model to check behavior; synthesis maps the *synthesizable subset* onto real LUTs and flip-flops. Keeping those two worlds straight is the theme of this entire sub-topic.",
+      "items": [
+        {
+          "id": "hdl-fc-1",
+          "type": "flashcard",
+          "front": "How does HDL execution differ from a C program?",
+          "back": "It does not execute step-by-step. HDL describes parallel hardware: every module-scope statement is concurrently 'live,' like wires on a board. There is no program counter."
+        },
+        {
+          "id": "hdl-fc-2",
+          "type": "flashcard",
+          "front": "What are the two dominant HDLs and where does each prevail?",
+          "back": "Verilog/SystemVerilog: C-flavored, the commercial chip/FPGA default. VHDL: Ada-flavored, strongly typed, entrenched in defense/aerospace/radar.",
+          "hint": "One is C-like, one is Ada-like."
+        },
+        {
+          "id": "hdl-fc-3",
+          "type": "flashcard",
+          "front": "What is a Verilog `module`?",
+          "back": "The fundamental design unit: a named block with a port list (its pins) and a body that connects sub-modules and logic. Designs are trees of modules."
+        },
+        {
+          "id": "hdl-fc-4",
+          "type": "flashcard",
+          "front": "What does a continuous `assign` statement do over time?",
+          "back": "It is a permanent connection, not a one-time run. The LHS continuously tracks the RHS expression, updating after propagation delay, exactly like a real gate."
+        },
+        {
+          "id": "hdl-fc-5",
+          "type": "flashcard",
+          "front": "What is the simulate-then-synthesize workflow?",
+          "back": "Simulation runs the HDL as an event model to verify behavior; synthesis maps the synthesizable subset onto real LUTs/flip-flops. It mirrors test-driven development.",
+          "hint": "Two separate tools, two purposes."
+        },
+        {
+          "id": "hdl-fc-6",
+          "type": "flashcard",
+          "front": "Why is 'an always block is a function call' a dangerous analogy?",
+          "back": "Because it isn't a call. always blocks describe persistent hardware that reacts to events forever; treating HDL as sequential/procedural software leads to wrong designs."
+        },
+        {
+          "id": "hdl-mcq-1",
+          "type": "mcq",
+          "prompt": "What is the most accurate description of what Verilog code represents?",
+          "choices": [
+            "A sequence of CPU instructions executed top-to-bottom",
+            "A structural description of parallel hardware",
+            "A scripting language for configuring a CPU",
+            "A purely mathematical proof of correctness"
+          ],
+          "answerIndex": 1,
+          "explanation": "HDL describes hardware structure that all exists simultaneously; there is no program counter or sequential execution at module scope."
+        },
+        {
+          "id": "hdl-mcq-2",
+          "type": "mcq",
+          "prompt": "Why is VHDL literacy specifically valuable for this learner?",
+          "choices": [
+            "It is faster to simulate than Verilog",
+            "It is the only synthesizable HDL",
+            "Defense, aerospace, and radar shops commonly use it",
+            "It compiles to smaller bitstreams"
+          ],
+          "answerIndex": 2,
+          "explanation": "VHDL is entrenched in defense/aerospace/radar [->08], so reading it opens those doors even when you write Verilog day-to-day."
+        },
+        {
+          "id": "hdl-mcq-3",
+          "type": "mcq",
+          "prompt": "In `assign y = a & b;`, when does `y` change?",
+          "choices": [
+            "Only once, when simulation starts",
+            "Only when the module is explicitly called",
+            "Continuously, whenever a or b changes (after delay)",
+            "Only on the next clock edge"
+          ],
+          "answerIndex": 2,
+          "explanation": "A continuous assignment is a permanent connection; y tracks a&b at all times, like a physical AND gate, with no clock involved."
+        }
+      ]
+    },
+    {
+      "id": "hdl-l2",
+      "title": "Modules, Ports, and wire vs reg",
+      "order": 2,
+      "difficulty": "easy",
+      "content": "## Modules, ports, and `wire` vs `reg`\n\nA module's interface is its **port list**: `input`, `output`, or `inout`, each optionally a vector (bus). Vectors use a `[msb:lsb]` range:\n\n```verilog\nmodule adder #(parameter W = 8)\n  (input  [W-1:0] a, b,\n   input          cin,\n   output [W-1:0] sum,\n   output         cout);\n  assign {cout, sum} = a + b + cin;\nendmodule\n```\n\n`{cout, sum}` is **concatenation** — here it captures the carry-out into the extra top bit. `#(parameter W=8)` makes the module *sized at instantiation*, the HDL answer to generics/templates.\n\nNow the classic confusion: **`wire` vs `reg`**. These are not \"combinational vs sequential\" — they are about *who drives the signal*. A `wire` is driven continuously, by an `assign` or by a module output. A `reg` is a variable assigned *inside a procedural* (`always`/`initial`) block. A `reg` does **not** imply a hardware register; an `always @(*)` block assigning a `reg` synthesizes to pure combinational logic. The name is a historical wart.\n\nThe rule of thumb:\n- Left side of `assign`, or a module output port left unconnected procedurally -> `wire`.\n- Anything assigned inside an `always`/`initial` -> `reg`.\n\nSystemVerilog fixes the wart with **`logic`**, a single 4-state type usable in both contexts; you simply stop worrying about `wire`/`reg` and write `logic`. Ports default to `wire`/`logic` on input; outputs you assign procedurally must be `reg`/`logic`. Vectors slice naturally: `bus[3:0]`, `bus[i]`, and the literal width syntax `4'b1010` (4 bits, binary) or `8'hFF` (8 bits, hex) keeps sizes explicit — vital, because mismatched widths silently zero-extend or truncate.",
+      "items": [
+        {
+          "id": "hdl-fc-7",
+          "type": "flashcard",
+          "front": "What declares a module port and how are buses sized?",
+          "back": "`input`/`output`/`inout`, optionally a vector with a `[msb:lsb]` range, e.g. `input [7:0] a`. The range gives the bus width."
+        },
+        {
+          "id": "hdl-fc-8",
+          "type": "flashcard",
+          "front": "What does `#(parameter W=8)` do?",
+          "back": "It declares a parameter so the module is sized at instantiation, the HDL equivalent of a generic/template. Override it per instance to reuse the module at any width.",
+          "hint": "Think C++ template / generic."
+        },
+        {
+          "id": "hdl-fc-9",
+          "type": "flashcard",
+          "front": "What does the concatenation `{cout, sum} = a + b + cin;` accomplish?",
+          "back": "It joins signals into one wider bus; here the carry-out lands in the extra top bit while the lower bits hold the sum, capturing overflow cleanly."
+        },
+        {
+          "id": "hdl-fc-10",
+          "type": "flashcard",
+          "front": "What truly distinguishes `wire` from `reg` in Verilog?",
+          "back": "Who drives it, NOT comb vs seq. A wire is continuously driven (assign/module output); a reg is assigned inside a procedural always/initial block.",
+          "hint": "It is about the driver, not about clocking."
+        },
+        {
+          "id": "hdl-fc-11",
+          "type": "flashcard",
+          "front": "Does declaring something `reg` create a hardware register?",
+          "back": "No. A reg assigned in `always @(*)` synthesizes to pure combinational logic. 'reg' is a historical naming wart, not a flip-flop guarantee."
+        },
+        {
+          "id": "hdl-fc-12",
+          "type": "flashcard",
+          "front": "What does SystemVerilog `logic` solve?",
+          "back": "It is a single 4-state type usable in both continuous and procedural contexts, so you stop choosing between wire and reg and just write logic."
+        },
+        {
+          "id": "hdl-fc-13",
+          "type": "flashcard",
+          "front": "Why are sized literals like `4'b1010` and `8'hFF` important?",
+          "back": "They make bit widths explicit. Mismatched widths silently zero-extend or truncate, a quiet source of bugs; explicit sizing prevents it."
+        },
+        {
+          "id": "hdl-mcq-4",
+          "type": "mcq",
+          "prompt": "Which statement about `wire` vs `reg` is correct?",
+          "choices": [
+            "reg always means a flip-flop in hardware",
+            "wire is for combinational, reg is for sequential logic",
+            "The distinction is which one is procedurally assigned",
+            "wire can only be 1 bit wide"
+          ],
+          "answerIndex": 2,
+          "explanation": "The split is about how a signal is driven: continuous (wire) vs assigned inside a procedural block (reg). A reg in always @(*) is combinational."
+        },
+        {
+          "id": "hdl-mcq-5",
+          "type": "mcq",
+          "prompt": "A signal assigned inside an `always @(*)` block must be declared as:",
+          "choices": [
+            "wire",
+            "reg (or logic)",
+            "input",
+            "parameter"
+          ],
+          "answerIndex": 1,
+          "explanation": "Anything assigned in a procedural block must be reg (or SystemVerilog logic); wire is only for continuous assignment / port connections."
+        },
+        {
+          "id": "hdl-mcq-6",
+          "type": "mcq",
+          "prompt": "What is the purpose of `parameter` in a module header?",
+          "choices": [
+            "To declare a clock signal",
+            "To make the module sized/configurable at instantiation",
+            "To force latch inference",
+            "To mark the module as simulation-only"
+          ],
+          "answerIndex": 1,
+          "explanation": "Parameters (Verilog) / generics (VHDL) let one module be reused at different widths or constants, set when the module is instantiated."
+        }
+      ]
+    },
+    {
+      "id": "hdl-l3",
+      "title": "Combinational vs Sequential: = , <= , and Why It Matters",
+      "order": 3,
+      "difficulty": "medium",
+      "content": "## Combinational vs sequential: `=`, `<=`, and the rules\n\nThis lesson is the heart of the sub-topic and the source of the field's #1 trap. There are two procedural block styles.\n\n**Combinational** logic uses `always @(*)` (or a continuous `assign`). The `(*)` is an *automatic complete sensitivity list* — it re-evaluates whenever any input changes. Inside, use **blocking** assignments (`=`), which execute in order like software, so intermediate temporaries read back immediately:\n\n```verilog\nalways @(*) begin          // pure combinational\n  if (sel) y = a;\n  else     y = b;          // every branch assigns y\nend\n```\n\n**Sequential** logic uses `always @(posedge clk)` and must use **non-blocking** assignments (`<=`):\n\n```verilog\nalways @(posedge clk) begin\n  q1 <= d;                 // all RHS sampled, THEN\n  q2 <= q1;                // all LHS updated together\nend\n```\n\n**Why `<=` matters:** non-blocking assignments evaluate *all right-hand sides* using the values *at the clock edge*, then update *all left-hand sides* simultaneously. That is exactly what a bank of flip-flops does — every FF samples its input at the edge at once. The code above is a 2-stage shift register. Rewrite it with blocking `=` and `q2 = q1` reads the *already-updated* `q1`, collapsing two flip-flops into one: it may simulate \"fine\" yet synthesize wrong, or create a simulation race versus synthesis mismatch.\n\n**The discipline, memorized:**\n- Clocked (`posedge clk`) block -> **non-blocking `<=`**.\n- Combinational (`always @(*)`) block -> **blocking `=`**.\n- Never assign the same signal from two different `always` blocks.\n\nThis rule comes from Cliff Cummings' SNUG papers and is non-negotiable. Drill it until it is reflex; it is *the* HDL rust-knocker.",
+      "items": [
+        {
+          "id": "hdl-fc-14",
+          "type": "flashcard",
+          "front": "What does `always @(*)` mean and what assignment goes in it?",
+          "back": "It is a combinational block with an automatic complete sensitivity list (re-evaluates on any input change). Use blocking `=` assignments inside.",
+          "hint": "Combinational; the (*) builds the list for you."
+        },
+        {
+          "id": "hdl-fc-15",
+          "type": "flashcard",
+          "front": "What block and assignment operator model a flip-flop?",
+          "back": "`always @(posedge clk)` with non-blocking `<=` assignments. This is the only correct way to infer edge-triggered registers."
+        },
+        {
+          "id": "hdl-fc-16",
+          "type": "flashcard",
+          "front": "WHY must clocked blocks use non-blocking `<=`?",
+          "back": "Non-blocking samples ALL right-hand sides at the clock edge, then updates ALL left-hand sides together, exactly mirroring a bank of flip-flops sampling at once.",
+          "hint": "Real flip-flops all sample simultaneously."
+        },
+        {
+          "id": "hdl-fc-17",
+          "type": "flashcard",
+          "front": "What happens if you use blocking `=` in `q1=d; q2=q1;` inside a clocked block?",
+          "back": "q2 reads the already-updated q1, collapsing a 2-stage shift register into a single flip-flop, and can cause sim-vs-synthesis mismatch / races."
+        },
+        {
+          "id": "hdl-fc-18",
+          "type": "flashcard",
+          "front": "Why do blocking assignments behave 'like software' in a comb block?",
+          "back": "They execute in order, so an intermediate temporary is read back immediately by later lines, which is what you want for combinational data flow."
+        },
+        {
+          "id": "hdl-fc-19",
+          "type": "flashcard",
+          "front": "State the memorized blocking/non-blocking discipline.",
+          "back": "Clocked posedge block -> non-blocking <=. Combinational always @(*) -> blocking =. Never drive the same signal from two always blocks.",
+          "hint": "Two lines plus one prohibition."
+        },
+        {
+          "id": "hdl-fc-20",
+          "type": "flashcard",
+          "front": "Why can the wrong `=`/`<=` choice be especially insidious?",
+          "back": "It can simulate 'fine' while synthesizing to different hardware (or create a simulation race), so the bug hides until hardware behaves unexpectedly."
+        },
+        {
+          "id": "hdl-fc-21",
+          "type": "flashcard",
+          "front": "Whose practitioner notes codified the non-blocking rule?",
+          "back": "Cliff Cummings' SNUG papers on non-blocking assignments; they are the definitive reference for the discipline.",
+          "hint": "SNUG conference papers."
+        },
+        {
+          "id": "hdl-mcq-7",
+          "type": "mcq",
+          "prompt": "Inside `always @(posedge clk)`, which assignment operator is correct?",
+          "choices": [
+            "= (blocking)",
+            "<= (non-blocking)",
+            "assign",
+            "=="
+          ],
+          "answerIndex": 1,
+          "explanation": "Clocked blocks model flip-flops; non-blocking <= samples all RHS at the edge then updates all LHS together, matching simultaneous FF behavior."
+        },
+        {
+          "id": "hdl-mcq-8",
+          "type": "mcq",
+          "prompt": "Why does `q1<=d; q2<=q1;` correctly build a 2-stage shift register?",
+          "choices": [
+            "Because <= updates q1 before q2 reads it",
+            "Because both RHS use the OLD values, sampled at the edge, then update together",
+            "Because = would be even more correct here",
+            "Because @(*) rebuilds the sensitivity list"
+          ],
+          "answerIndex": 1,
+          "explanation": "Non-blocking evaluates q1 and q2's RHS using pre-edge values, then updates both, so q2 gets the OLD q1 and two real flip-flops are inferred.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/hdl-1.svg"
+        },
+        {
+          "id": "hdl-mcq-9",
+          "type": "mcq",
+          "prompt": "Using blocking `=` for `q1=d; q2=q1;` in a clocked block typically yields:",
+          "choices": [
+            "A correct 2-stage shift register",
+            "A single flip-flop, because q2 reads the new q1",
+            "An inferred latch",
+            "A syntax error"
+          ],
+          "answerIndex": 1,
+          "explanation": "Blocking executes in order, so q2 reads the already-updated q1, collapsing both stages into one register, often with sim/synth mismatch."
+        },
+        {
+          "id": "hdl-mcq-10",
+          "type": "mcq",
+          "prompt": "Which is the correct operator choice by block type?",
+          "choices": [
+            "Blocking in clocked, non-blocking in combinational",
+            "Non-blocking everywhere",
+            "Non-blocking in clocked, blocking in combinational",
+            "Blocking everywhere"
+          ],
+          "answerIndex": 2,
+          "explanation": "The discipline: non-blocking <= in posedge clk blocks, blocking = in always @(*) combinational blocks. This is the #1 HDL rust-knocker."
+        },
+        {
+          "id": "hdl-mcq-11",
+          "type": "mcq",
+          "prompt": "Mixing up `=` and `<=` is dangerous mainly because:",
+          "choices": [
+            "It always produces a compile error caught immediately",
+            "It can simulate fine yet synthesize to different hardware",
+            "It changes the FPGA pinout",
+            "It only affects VHDL, not Verilog"
+          ],
+          "answerIndex": 1,
+          "explanation": "The failure is silent: behavior may match in simulation but diverge in synthesized hardware (or create a race), hiding the bug until late."
+        }
+      ]
+    },
+    {
+      "id": "hdl-l4",
+      "title": "FSMs, Inferred Latches, Testbenches, and SystemVerilog",
+      "order": 4,
+      "difficulty": "hard",
+      "content": "## FSMs, latches, testbenches, and SystemVerilog\n\n**Inferred latches** are the second great trap. In a combinational `always @(*)`, if a signal is *not* assigned on every path, the synthesizer must \"remember\" its old value — it infers a transparent **latch**, which wrecks timing and is almost never intended. The fix: assign every output a **default first**, and complete every `if` with an `else` and every `case` with `default`.\n\n```verilog\nalways @(*) begin\n  y = 1'b0;          // default kills latch inference\n  if (sel) y = a;    // no else needed now\nend\n```\n\nThe **three-block FSM template** (from Module 7) is the canonical sequential pattern:\n\n```verilog\n// 1) state register (clocked, non-blocking)\nalways @(posedge clk)\n  if (rst) state <= IDLE;\n  else     state <= next;\n// 2) next-state logic (combinational, default + case)\nalways @(*) begin\n  next = state;            // default avoids a latch\n  case (state)\n    IDLE: if (go) next = RUN;\n    RUN:  next = IDLE;\n  endcase\nend\n// 3) output logic (combinational)\nassign busy = (state == RUN);\n```\n\n**Testbenches** are simulation-only and may use non-synthesizable constructs freely: `initial` blocks, `#10` delays, `$display`/`$monitor`, and self-checking `if (got !== exp) $error(...)`. Drive stimulus, compare against expected, and view waveforms in GTKWave. Never put `#delays` or `initial` for state in *synthesizable* RTL — that is the **synthesizable vs sim-only** line.\n\n**SystemVerilog** makes intent explicit and lets the tool *enforce* it: `always_ff @(posedge clk)` flags accidental combinational use, `always_comb` auto-builds the sensitivity list *and warns on inferred latches*, and `logic` replaces `wire`/`reg`. Use them on every new design.",
+      "items": [
+        {
+          "id": "hdl-fc-22",
+          "type": "flashcard",
+          "front": "What is an inferred latch and why is it bad?",
+          "back": "In a comb always @(*), if a signal isn't assigned on every path, the tool keeps its old value by inferring a transparent latch, wrecking timing; almost always unintended.",
+          "hint": "Happens with incomplete if/case."
+        },
+        {
+          "id": "hdl-fc-23",
+          "type": "flashcard",
+          "front": "How do you prevent inferred latches?",
+          "back": "Assign every output a default value first, and complete every `if` with `else` and every `case` with `default` so every path drives the signal."
+        },
+        {
+          "id": "hdl-fc-24",
+          "type": "flashcard",
+          "front": "Name the three blocks of the canonical HDL FSM template.",
+          "back": "1) clocked state register (state <= next), 2) combinational next-state logic (default + case), 3) combinational/registered output logic.",
+          "hint": "Register, next-state, output."
+        },
+        {
+          "id": "hdl-fc-25",
+          "type": "flashcard",
+          "front": "Why is `next = state;` placed first in the next-state block?",
+          "back": "It is a default assignment so that any unlisted case path still drives `next`, preventing an inferred latch on the next-state signal."
+        },
+        {
+          "id": "hdl-fc-26",
+          "type": "flashcard",
+          "front": "What constructs are legal in a testbench but NOT in synthesizable RTL?",
+          "back": "`initial` blocks for state, `#delays`, `$display`/`$monitor`, and `$error`. They are simulation-only; using them as hardware state crosses the synth/sim line."
+        },
+        {
+          "id": "hdl-fc-27",
+          "type": "flashcard",
+          "front": "What makes a testbench 'self-checking'?",
+          "back": "It compares the DUT output against an expected value and flags mismatches automatically, e.g. `if (got !== exp) $error(...)`, instead of relying on eyeballing waveforms."
+        },
+        {
+          "id": "hdl-fc-28",
+          "type": "flashcard",
+          "front": "What does SystemVerilog `always_comb` add over `always @(*)`?",
+          "back": "It auto-builds the sensitivity list AND makes the tool warn/error on inferred latches and accidental sequential use, enforcing combinational intent.",
+          "hint": "It enforces the intent the name states."
+        },
+        {
+          "id": "hdl-fc-29",
+          "type": "flashcard",
+          "front": "What does `always_ff @(posedge clk)` enforce?",
+          "back": "It declares intent to model flip-flops; the tool flags any accidental combinational coding, catching mistakes the plain `always` keyword would silently allow."
+        },
+        {
+          "id": "hdl-mcq-12",
+          "type": "mcq",
+          "prompt": "An inferred latch most commonly results from:",
+          "choices": [
+            "Using <= in a clocked block",
+            "An incomplete if/case in a combinational block (a path leaves a signal unassigned)",
+            "Declaring a port as inout",
+            "Using a parameter"
+          ],
+          "answerIndex": 1,
+          "explanation": "When a comb always @(*) leaves a signal unassigned on some path, the synthesizer must remember its old value, inferring an unintended transparent latch."
+        },
+        {
+          "id": "hdl-mcq-13",
+          "type": "mcq",
+          "prompt": "Which technique most reliably avoids inferred latches?",
+          "choices": [
+            "Adding more clocks",
+            "Assigning every signal a default value at the top of the comb block",
+            "Using blocking assignments in clocked blocks",
+            "Removing the sensitivity list"
+          ],
+          "answerIndex": 1,
+          "explanation": "A leading default (plus full else/default) guarantees every path drives the signal, so no latch is inferred. always_comb also warns when you slip."
+        },
+        {
+          "id": "hdl-mcq-14",
+          "type": "mcq",
+          "prompt": "In the three-block FSM template, the state register block should use:",
+          "choices": [
+            "assign",
+            "blocking = in always @(*)",
+            "non-blocking <= in always @(posedge clk)",
+            "an initial block"
+          ],
+          "answerIndex": 2,
+          "explanation": "The state register is sequential: clocked always @(posedge clk) with non-blocking <=. Next-state and output logic are the combinational blocks."
+        },
+        {
+          "id": "hdl-mcq-15",
+          "type": "mcq",
+          "prompt": "Which construct belongs ONLY in a testbench, never in synthesizable RTL?",
+          "choices": [
+            "assign",
+            "always @(posedge clk)",
+            "`#10` time delays and `$display`",
+            "case statements"
+          ],
+          "answerIndex": 2,
+          "explanation": "`#delays`, $display/$monitor, and initial-for-state are simulation-only. Synthesizable RTL must avoid them; that is the synth-vs-sim boundary."
+        },
+        {
+          "id": "hdl-mcq-16",
+          "type": "mcq",
+          "prompt": "What is the chief advantage of SystemVerilog `always_comb` / `always_ff`?",
+          "choices": [
+            "They run faster in simulation",
+            "They let the tool enforce your combinational/sequential intent and catch inferred latches",
+            "They eliminate the need for clocks",
+            "They make wire and reg interchangeable in all contexts"
+          ],
+          "answerIndex": 1,
+          "explanation": "always_comb auto-builds the sensitivity list and warns on inferred latches; always_ff flags accidental combinational coding. They encode and enforce intent."
+        }
+      ]
+    }
+  ]
+}

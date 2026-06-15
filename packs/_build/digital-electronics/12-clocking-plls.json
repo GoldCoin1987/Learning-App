@@ -1,0 +1,284 @@
+{
+  "id": "clocking-plls",
+  "title": "Clocking, Oscillators & PLLs",
+  "order": 12,
+  "lessons": [
+    {
+      "id": "oscillators-stability",
+      "title": "Clock Sources & Frequency Stability",
+      "order": 1,
+      "difficulty": 1,
+      "content": "A synchronous system is only as good as its **clock source**. Several technologies trade cost against accuracy.\n\nThe **Pierce crystal oscillator** uses a quartz resonator — a mechanically vibrating crystal with an extremely high quality factor ($Q$ often $>10{,}000$) — as the frequency-selective element in an inverter-based loop. Quartz is piezoelectric, so its sharp mechanical resonance sets the frequency far more tightly than any LC tank. **Ceramic resonators** are cheaper, smaller, and start faster, but are looser (hundreds of ppm). **MEMS oscillators** use a micromachined silicon resonator plus an on-chip PLL/fractional divider; they are shock-robust and programmable but historically noisier. **RC oscillators** (the internal MCU clock) need no external parts but drift wildly with voltage and temperature — fine for a UART-free blink loop, useless for precise timing.\n\nAccuracy is quoted in **parts per million**. A frequency error $\\Delta f$ gives\n\n$$\\text{ppm} = \\frac{\\Delta f}{f_0}\\times 10^{6}.$$\n\nA $\\pm 20$ ppm crystal at $25\\,\\text{MHz}$ drifts up to $\\pm 500\\,\\text{Hz}$. A plain crystal varies over temperature in a parabola; a **TCXO** adds temperature compensation ($\\sim\\pm 0.5$–$2$ ppm), and an **OCXO** holds the crystal in a tiny heated oven for $\\sim\\pm 0.01$ ppm — the precision reference your radar timing chain would demand. **Startup time** matters too: high-$Q$ crystals can take milliseconds to reach full amplitude, which firmware must wait out before trusting the clock.",
+      "items": [
+        {
+          "id": "clocking-plls-oscillators-stability-001",
+          "type": "flashcard",
+          "front": "Why does a quartz crystal set frequency far more precisely than an LC tank?",
+          "back": "Quartz is a piezoelectric mechanical resonator with a very high quality factor $Q$ (often $>10{,}000$). The sharp, stable mechanical resonance gives tight frequency selectivity and low drift, far better than the modest $Q$ of an LC circuit.",
+          "hint": "Think mechanical resonance and Q."
+        },
+        {
+          "id": "clocking-plls-oscillators-stability-002",
+          "type": "flashcard",
+          "front": "Name the four clock-source technologies in order of typical accuracy, worst to best.",
+          "back": "RC oscillator (worst, percent-level drift) -> ceramic resonator (hundreds of ppm) -> quartz crystal (tens of ppm) -> TCXO/OCXO (sub-ppm, best).",
+          "hint": "Internal RC at one end, oven-controlled at the other."
+        },
+        {
+          "id": "clocking-plls-oscillators-stability-003",
+          "type": "flashcard",
+          "front": "What is the formula relating a frequency error to ppm?",
+          "back": "$\\text{ppm} = \\dfrac{\\Delta f}{f_0}\\times 10^{6}$. So a 500 Hz error on a 25 MHz clock is $\\dfrac{500}{25\\times10^{6}}\\times10^{6} = 20$ ppm.",
+          "hint": "Fractional error times one million."
+        },
+        {
+          "id": "clocking-plls-oscillators-stability-004",
+          "type": "flashcard",
+          "front": "What does a TCXO add over a bare crystal, and an OCXO over a TCXO?",
+          "back": "A TCXO adds temperature compensation (correcting the crystal's parabolic temp curve) for ~$\\pm0.5$-$2$ ppm. An OCXO holds the crystal in a heated oven at a fixed temperature for ~$\\pm0.01$ ppm, at higher power and cost.",
+          "hint": "Compensate vs. control the temperature."
+        },
+        {
+          "id": "clocking-plls-oscillators-stability-005",
+          "type": "flashcard",
+          "front": "Why must firmware wait after enabling a crystal oscillator before using its clock?",
+          "back": "High-$Q$ crystals build amplitude slowly; startup can take milliseconds. Until the oscillation reaches full amplitude the clock is unreliable, so MCUs gate the system clock behind a 'clock ready/stable' flag.",
+          "hint": "High Q means slow buildup."
+        },
+        {
+          "id": "clocking-plls-oscillators-stability-006",
+          "type": "flashcard",
+          "front": "What are the tradeoffs of a MEMS oscillator versus a quartz crystal?",
+          "back": "MEMS uses a micromachined silicon resonator plus an on-chip PLL/divider: very shock- and vibration-robust, programmable frequency, small. Downsides are historically higher close-in phase noise/jitter and reliance on the internal PLL.",
+          "hint": "Silicon resonator + PLL; rugged but noisier."
+        },
+        {
+          "id": "clocking-plls-oscillators-stability-007",
+          "type": "mcq",
+          "prompt": "A datasheet specifies a $\\pm25$ ppm crystal at a nominal $48\\,\\text{MHz}$. What is the worst-case absolute frequency error?",
+          "choices": [
+            "$\\pm 25\\,\\text{Hz}$",
+            "$\\pm 120\\,\\text{Hz}$",
+            "$\\pm 1.2\\,\\text{kHz}$",
+            "$\\pm 12\\,\\text{kHz}$"
+          ],
+          "answerIndex": 2,
+          "explanation": "$\\Delta f = \\text{ppm}\\times 10^{-6}\\times f_0 = 25\\times10^{-6}\\times 48\\times10^{6} = 1200\\,\\text{Hz} = \\pm1.2\\,\\text{kHz}$."
+        },
+        {
+          "id": "clocking-plls-oscillators-stability-008",
+          "type": "mcq",
+          "prompt": "Which clock source is the right choice for a precision frequency reference in a coherent radar timing chain?",
+          "choices": [
+            "The MCU's internal RC oscillator",
+            "A ceramic resonator",
+            "An OCXO (oven-controlled crystal oscillator)",
+            "An undivided ring oscillator on the FPGA fabric"
+          ],
+          "answerIndex": 2,
+          "explanation": "An OCXO holds the crystal at a controlled temperature for ~$\\pm0.01$ ppm stability and low close-in phase noise — exactly what coherent radar needs. RC and ceramic are far too loose; a fabric ring oscillator is the worst, with large temperature/voltage drift and high jitter."
+        },
+        {
+          "id": "clocking-plls-oscillators-stability-009",
+          "type": "mcq",
+          "prompt": "An MCU boots on its internal RC oscillator instead of the external crystal. The most likely consequence for a UART link is:",
+          "choices": [
+            "Lower power consumption with no functional impact",
+            "Baud-rate error large enough to corrupt the serial link",
+            "Improved timing accuracy because RC has no startup delay",
+            "Immediate metastability on every flip-flop"
+          ],
+          "answerIndex": 1,
+          "explanation": "RC oscillators drift by percent-level over voltage and temperature. UART tolerates only a few percent total baud error, so an uncalibrated RC clock readily pushes the bit timing out of range and corrupts characters. This is a classic 'works on the bench, fails hot/cold' bug."
+        }
+      ]
+    },
+    {
+      "id": "pll-synthesis",
+      "title": "PLLs, Frequency Synthesis & Loop Bandwidth",
+      "order": 2,
+      "difficulty": 2,
+      "content": "A **phase-locked loop** generates a high, programmable output frequency from a stable reference. Trace the loop in the diagram: the **phase-frequency detector (PFD)** compares the reference edge against the divided-down feedback edge and emits up/down pulses proportional to the phase error. A **charge pump** converts those pulses into current, which the **loop filter** (a low-pass RC network) integrates into a smooth control voltage. That voltage tunes the **VCO**, whose output is fed back through a **divider** ($\\div N$) to the PFD.\n\nIn lock, the PFD sees zero phase error, so the divided VCO output equals the reference. With a reference predivider $\\div M$ and feedback $\\div N$:\n\n$$f_{out}=\\frac{N}{M}\\,f_{ref}.$$\n\nThis is **frequency synthesis** — a $25\\,\\text{MHz}$ crystal becomes a $150\\,\\text{MHz}$ core clock with $N/M = 6$. **Fractional-N** PLLs dither $N$ to hit non-integer ratios for fine resolution.\n\nThe **loop bandwidth** (set by the loop filter) is the central tradeoff. A *wide* loop locks fast and tracks reference cleanly, suppressing VCO noise but passing reference noise; a *narrow* loop filters reference spurs and gives a cleaner far-out spectrum but locks slowly and lets the VCO's own noise through close to the carrier. **Lock time** scales inversely with loop bandwidth. You place the crossover where the reference and VCO phase-noise curves intersect to minimize total integrated noise.\n\nA **DLL** is a cousin: instead of a VCO it uses a voltage-controlled *delay line* to align phase, so it cannot multiply frequency, only deskew or phase-shift — but it has no accumulating phase error and is unconditionally stable (first order).",
+      "items": [
+        {
+          "id": "clocking-plls-pll-synthesis-001",
+          "type": "flashcard",
+          "front": "Study this diagram.",
+          "back": "A charge-pump PLL: PFD compares reference and divided feedback, charge pump + loop filter make a control voltage, VCO generates the output, and a $\\div N$ divider closes the loop. In lock $f_{out}=N\\,f_{ref}$.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/clocking-plls-1.svg"
+        },
+        {
+          "id": "clocking-plls-pll-synthesis-002",
+          "type": "flashcard",
+          "front": "List the five blocks of a charge-pump PLL and each one's job.",
+          "back": "1) PFD - measures phase/frequency error, emits up/down pulses. 2) Charge pump - turns pulses into current. 3) Loop filter - low-passes current into a smooth control voltage. 4) VCO - converts voltage to frequency. 5) Divider $\\div N$ - scales output back for comparison.",
+          "hint": "PFD, pump, filter, VCO, divider."
+        },
+        {
+          "id": "clocking-plls-pll-synthesis-003",
+          "type": "flashcard",
+          "front": "What is the output frequency of a PLL with reference predivider M and feedback divider N?",
+          "back": "$f_{out}=\\dfrac{N}{M}\\,f_{ref}$. The PFD drives the divided feedback to equal the divided reference, so the VCO must run at $N/M$ times the reference.",
+          "hint": "Feedback divider multiplies, reference divider divides."
+        },
+        {
+          "id": "clocking-plls-pll-synthesis-004",
+          "type": "flashcard",
+          "front": "What does a fractional-N PLL do that an integer-N PLL cannot?",
+          "back": "It dithers/modulates the feedback divider between integer values (often with a delta-sigma modulator) so the *average* divide ratio is fractional, giving very fine output frequency resolution without needing a tiny reference frequency. The cost is added fractional spurs/noise.",
+          "hint": "Average a changing N to get a fraction."
+        },
+        {
+          "id": "clocking-plls-pll-synthesis-005",
+          "type": "flashcard",
+          "front": "How does a DLL differ structurally from a PLL, and what can it not do?",
+          "back": "A DLL replaces the VCO with a voltage-controlled delay line and aligns phase rather than frequency. It cannot multiply frequency (no oscillator), only deskew or phase-shift an existing clock. It has no accumulating phase error and is unconditionally (first-order) stable.",
+          "hint": "Delay line, not oscillator."
+        },
+        {
+          "id": "clocking-plls-pll-synthesis-006",
+          "type": "flashcard",
+          "front": "Why is the loop filter the component that sets PLL loop bandwidth?",
+          "back": "The loop filter integrates and low-passes the charge-pump current into the VCO control voltage. Its pole/zero locations set how fast the control voltage can respond, which is exactly the loop's bandwidth and the dominant factor in stability and lock time.",
+          "hint": "It shapes the control-voltage response."
+        },
+        {
+          "id": "clocking-plls-pll-synthesis-007",
+          "type": "mcq",
+          "prompt": "You need a $156.25\\,\\text{MHz}$ clock from a $25\\,\\text{MHz}$ reference. Using $f_{out}=\\frac{N}{M}f_{ref}$, which $(N, M)$ works?",
+          "choices": [
+            "$N=6,\\ M=1$",
+            "$N=25,\\ M=8$",
+            "$N=25,\\ M=4$",
+            "$N=125,\\ M=25$"
+          ],
+          "answerIndex": 2,
+          "explanation": "Need $N/M = 156.25/25 = 6.25 = 25/4$, so $N=25, M=4$ gives $\\frac{25}{4}\\times25=156.25\\,\\text{MHz}$. $6/1$ gives 150 MHz, $25/8$ gives $\\approx78\\,\\text{MHz}$, and $125/25=5$ gives 125 MHz."
+        },
+        {
+          "id": "clocking-plls-pll-synthesis-008",
+          "type": "mcq",
+          "prompt": "Choosing a NARROW PLL loop bandwidth (relative to a wide one) primarily results in:",
+          "choices": [
+            "Faster lock and better suppression of VCO close-in phase noise",
+            "Slower lock, better filtering of reference spurs, but more VCO close-in noise passes through",
+            "Higher output frequency for the same divider settings",
+            "Elimination of the need for a loop filter"
+          ],
+          "answerIndex": 1,
+          "explanation": "A narrow loop filters reference-side noise/spurs well and gives a clean far-from-carrier spectrum, but locks slowly and does little to suppress the VCO's own close-in phase noise (the loop can't correct what it can't track fast). Lock time scales inversely with loop bandwidth."
+        },
+        {
+          "id": "clocking-plls-pll-synthesis-009",
+          "type": "mcq",
+          "prompt": "A design must phase-align (deskew) an incoming clock to internal logic but does NOT need a different frequency. The best choice is:",
+          "choices": [
+            "An integer-N PLL with N=1",
+            "A DLL (delay-locked loop)",
+            "A free-running ring oscillator",
+            "A fractional-N PLL"
+          ],
+          "answerIndex": 1,
+          "explanation": "A DLL uses a voltage-controlled delay line to align phase without changing frequency, is unconditionally stable, and adds no VCO phase noise. A PLL would work but is overkill and adds VCO jitter; deskew at the same frequency is precisely the DLL's job."
+        }
+      ]
+    },
+    {
+      "id": "jitter-distribution",
+      "title": "Jitter, Phase Noise, Clock Distribution & FPGA Resources",
+      "order": 3,
+      "difficulty": 3,
+      "content": "A clock's *timing imperfection* shows up two ways. In the **time domain** it is **jitter**: **period jitter** (variation of one cycle's length), **cycle-to-cycle jitter** (adjacent-period difference), and **long-term/accumulated jitter**. In the **frequency domain** the same imperfection is **phase noise** $\\mathcal{L}(f)$, the power in skirts around the carrier, in dBc/Hz. The two are Fourier duals: integrating phase noise over a band yields RMS jitter.\n\nWhy an EE who built radars cares: clock jitter directly caps converter performance. For a sine input at $f_{in}$ sampled by an ADC with RMS aperture jitter $t_j$, the jitter-limited SNR is\n\n$$\\text{SNR}_{jitter}=-20\\log_{10}\\!\\left(2\\pi f_{in}\\,t_j\\right)\\ \\text{dB}.$$\n\nAt high IF this can dominate over quantization noise — capping the ENOB you computed in Module 11. In **radar**, oscillator phase noise sets the **Doppler/clutter floor**: close-in phase noise masks slow-moving targets near strong clutter, and pulse-to-pulse jitter blurs coherent integration. Phase coherence is everything for MTI/Doppler processing.\n\n**Clock distribution** must deliver this clock with minimal **skew** (arrival-time difference between endpoints). Designs use balanced **clock trees** (H-trees) and matched buffers so every flip-flop sees the edge together; skew eats directly into the setup/hold budget from Module 8.\n\nOn an **FPGA**, you do not route clocks on ordinary fabric. Dedicated **clock-capable input pins** feed **global clock buffers** (low-skew spines) and **MMCM/PLL** blocks (the 'clock wizard') that synthesize, phase-shift, and deskew derived clocks. **Spread-spectrum clocking** deliberately dithers the frequency slightly to spread EMI energy — helpful for compliance, but it adds jitter you must not feed into a sampling clock.",
+      "items": [
+        {
+          "id": "clocking-plls-jitter-distribution-001",
+          "type": "flashcard",
+          "front": "Study this diagram.",
+          "back": "A 25 MHz crystal feeds a PLL/MMCM that multiplies it (x6 -> 150 MHz); a global clock buffer drives a balanced H-tree so the clock reaches every flip-flop with minimal skew.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/clocking-plls-2.svg"
+        },
+        {
+          "id": "clocking-plls-jitter-distribution-002",
+          "type": "flashcard",
+          "front": "Distinguish period jitter, cycle-to-cycle jitter, and long-term jitter.",
+          "back": "Period jitter: deviation of a single clock period from ideal. Cycle-to-cycle jitter: difference between two adjacent periods (rate of change). Long-term/accumulated jitter: phase error built up over many cycles relative to an ideal clock.",
+          "hint": "One period, adjacent periods, many periods."
+        },
+        {
+          "id": "clocking-plls-jitter-distribution-003",
+          "type": "flashcard",
+          "front": "How are jitter (time domain) and phase noise (frequency domain) related?",
+          "back": "They are Fourier duals of the same imperfection. Phase noise $\\mathcal{L}(f)$ is power in skirts around the carrier (dBc/Hz); integrating it over a frequency band and converting yields the RMS jitter in that band.",
+          "hint": "Integrate phase noise to get RMS jitter."
+        },
+        {
+          "id": "clocking-plls-jitter-distribution-004",
+          "type": "flashcard",
+          "front": "Give the jitter-limited SNR of an ADC and explain why high input frequency hurts.",
+          "back": "$\\text{SNR}_{jitter}=-20\\log_{10}(2\\pi f_{in} t_j)$ dB, where $t_j$ is RMS aperture jitter. SNR falls as $f_{in}$ rises because a fixed timing error $t_j$ produces a larger voltage error on a faster-slewing signal ($\\Delta V \\approx t_j \\cdot dV/dt$).",
+          "hint": "Error voltage scales with slew rate, which scales with f_in."
+        },
+        {
+          "id": "clocking-plls-jitter-distribution-005",
+          "type": "flashcard",
+          "front": "Why does radar care intensely about oscillator phase noise?",
+          "back": "Coherent (MTI/Doppler) processing relies on stable pulse-to-pulse phase. Close-in phase noise raises the clutter/Doppler floor, masking slow targets near strong returns, and jitter smears coherent integration — degrading detection and velocity accuracy.",
+          "hint": "Phase coherence sets the Doppler/clutter floor."
+        },
+        {
+          "id": "clocking-plls-jitter-distribution-006",
+          "type": "flashcard",
+          "front": "What is clock skew and how do FPGAs minimize it?",
+          "back": "Skew is the difference in clock arrival time between endpoints. FPGAs route clocks on dedicated low-skew global clock buffers/spines (fed by clock-capable pins) and balanced trees, not ordinary fabric routing, so all flip-flops see the edge nearly simultaneously.",
+          "hint": "Arrival-time difference; use dedicated global buffers."
+        },
+        {
+          "id": "clocking-plls-jitter-distribution-007",
+          "type": "flashcard",
+          "front": "What is spread-spectrum clocking and why can it be a problem for sampling?",
+          "back": "SSC deliberately dithers the clock frequency slightly to spread EMI energy over a band, lowering peak emissions for compliance. But the intentional frequency modulation is added jitter, so you must not use an SSC clock as an ADC/DAC sampling clock where timing purity sets SNR.",
+          "hint": "Smears EMI peaks, but adds jitter."
+        },
+        {
+          "id": "clocking-plls-jitter-distribution-008",
+          "type": "mcq",
+          "prompt": "An ADC samples a $70\\,\\text{MHz}$ IF with $0.5\\,\\text{ps}$ RMS aperture jitter. Approximately what jitter-limited SNR results? (Use $\\text{SNR}=-20\\log_{10}(2\\pi f_{in}t_j)$.)",
+          "choices": [
+            "About 33 dB",
+            "About 53 dB",
+            "About 73 dB",
+            "About 93 dB"
+          ],
+          "answerIndex": 2,
+          "explanation": "$2\\pi f_{in} t_j = 2\\pi(70\\times10^{6})(0.5\\times10^{-12}) \\approx 2.20\\times10^{-4}$. $-20\\log_{10}(2.20\\times10^{-4}) \\approx 73\\,\\text{dB}$. At higher IF the same 0.5 ps would cap SNR even lower, limiting ENOB."
+        },
+        {
+          "id": "clocking-plls-jitter-distribution-009",
+          "type": "mcq",
+          "prompt": "On a Xilinx-style FPGA, the correct way to derive a 200 MHz processing clock from a 50 MHz board oscillator is to:",
+          "choices": [
+            "Build a ring oscillator from LUTs and divide it on the fabric",
+            "Bring the oscillator in on a clock-capable pin and use an MMCM/PLL (clock wizard) onto global clock buffers",
+            "Route the 50 MHz clock through general fabric and gate it with an enable to multiply it",
+            "Use a combinational counter to AND the clock with itself"
+          ],
+          "answerIndex": 1,
+          "explanation": "Clocks enter on dedicated clock-capable input pins, feed an MMCM/PLL to synthesize the derived frequency, and distribute on low-skew global clock buffers. Fabric ring oscillators are jittery and uncontrolled; you cannot 'gate to multiply,' and gating clocks on fabric wrecks skew/timing (Module 8's rule)."
+        },
+        {
+          "id": "clocking-plls-jitter-distribution-010",
+          "type": "mcq",
+          "prompt": "Two clock domains in an FPGA come from the SAME MMCM with related, phase-aligned outputs. Compared to two independent oscillators, this means:",
+          "choices": [
+            "Crossing between them never needs any synchronizer",
+            "The clocks are synchronous/related, so timing can often be constrained and analyzed statically rather than treated as a true asynchronous crossing",
+            "Skew is irrelevant because they share an MMCM",
+            "Jitter is automatically zero on both outputs"
+          ],
+          "answerIndex": 1,
+          "explanation": "Outputs of one MMCM are frequency- and phase-related, so the tool can analyze paths between them with static timing rather than as a metastability-prone asynchronous crossing. Truly independent oscillators are asynchronous and still require synchronizers/async FIFOs. Shared MMCM does not zero out skew or jitter."
+        }
+      ]
+    }
+  ]
+}
