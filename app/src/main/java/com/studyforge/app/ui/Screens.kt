@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -31,7 +32,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -52,9 +56,19 @@ import java.time.LocalDate
 
 private fun today() = LocalDate.now().toEpochDay()
 
+/** Converts a physical millimeter value to Dp using the display's real DPI. */
+@Composable
+private fun mmToDp(mm: Float): Dp {
+    val ydpi = LocalContext.current.resources.displayMetrics.ydpi
+    val px = mm / 25.4f * ydpi
+    return with(LocalDensity.current) { px.toDp() }
+}
+
 @Composable
 fun AppNav(container: AppContainer) {
     val nav = rememberNavController()
+    val edge = mmToDp(6f) // buffer clear of the OS status bar (top) and nav/gesture bar (bottom)
+    Box(modifier = Modifier.fillMaxSize().padding(top = edge, bottom = edge)) {
     NavHost(navController = nav, startDestination = "home") {
         composable("home") { HomeScreen(container, nav::navigate) }
         composable("catalog") { CatalogScreen(container) }
@@ -94,6 +108,7 @@ fun AppNav(container: AppContainer) {
                 onDone = { nav.popBackStack() },
             )
         }
+    }
     }
 }
 
