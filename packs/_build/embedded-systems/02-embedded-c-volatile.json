@@ -1,0 +1,393 @@
+{
+  "id": "embedded-c-volatile",
+  "title": "Embedded C, Pointers & volatile",
+  "order": 2,
+  "lessons": [
+    {
+      "id": "embedded-c-volatile-l1-pointers-as-addresses",
+      "title": "Pointers as Addresses: Reaching a Register",
+      "order": 1,
+      "difficulty": "easy",
+      "content": "On a desktop, a pointer is a handle to an object the runtime placed somewhere. On bare metal, a pointer *is* a physical bus address, and some of those addresses are not RAM at all -- they are peripheral control registers. To talk to one you take the integer address from the reference manual and cast it to a pointer of the right width and qualification.\n\nThe canonical move: a 32-bit register at `0x40020014` becomes a `volatile uint32_t *`.\n\n```c\n#include <stdint.h>\n\n#define GPIOA_ODR (*(volatile uint32_t *)0x40020014UL)\n\nvoid set_pin5(void) {\n    GPIOA_ODR |= (1u << 5);   /* read-modify-write of one register */\n}\n```\n\nThree things matter here. First, the width: a 32-bit register must be accessed as `uint32_t`, not `int` or `char` -- the bus transaction size has to match what the peripheral expects, and a byte write to a word-only register can fault or be ignored. Second, the `UL` suffix keeps the literal an unsigned long so it does not overflow `int` and is not sign-extended. Third, `volatile` (covered next lesson) tells the compiler this access has side effects and must actually happen.\n\nWhy a macro that dereferences, rather than a bare pointer? Because the register lives at a fixed, known address forever -- there is no allocation, no lifetime, no `NULL`. The address comes straight from the datasheet's memory map. This is the whole reframe: memory here is the silicon address space from Module 1, and a pointer is just how C names a spot in it.",
+      "items": [
+        {
+          "id": "embedded-c-volatile-l1-fc-pointer-is-address",
+          "type": "flashcard",
+          "front": "On a bare-metal MCU, what does a pointer value physically represent?",
+          "back": "A physical bus address. Dereferencing it issues a real load/store transaction on the bus to that address -- which may be RAM, flash, or a peripheral register, not a runtime-managed object.",
+          "hint": "There is no allocator or virtual memory underneath you."
+        },
+        {
+          "id": "embedded-c-volatile-l1-fc-cast-syntax",
+          "type": "flashcard",
+          "front": "Write the expression that accesses the 32-bit register at address 0x40020014.",
+          "back": "*(volatile uint32_t *)0x40020014UL -- cast the literal address to a pointer of the correct width and volatility, then dereference.",
+          "hint": "Width + volatile qualifier + cast + dereference."
+        },
+        {
+          "id": "embedded-c-volatile-l1-fc-width-match",
+          "type": "flashcard",
+          "front": "Why must the pointer type width match the register's defined access width?",
+          "back": "The pointer type determines the bus transaction size (byte/half-word/word). Many peripheral registers only support word access; a mismatched-width access can fault, be ignored, or corrupt adjacent bits.",
+          "hint": "The C type controls LDR/LDRB/LDRH selection."
+        },
+        {
+          "id": "embedded-c-volatile-l1-fc-ul-suffix",
+          "type": "flashcard",
+          "front": "Why append UL to an address literal like 0x40020014UL?",
+          "back": "To force the literal to unsigned long so it is not treated as a (possibly signed) int that overflows or gets sign-extended when cast to a pointer.",
+          "hint": "Signedness and size of the integer constant."
+        },
+        {
+          "id": "embedded-c-volatile-l1-mcq-where-address-comes-from",
+          "type": "mcq",
+          "prompt": "Where does the numeric address you cast to a register pointer come from?",
+          "choices": [
+            "The linker assigns it at link time from the .data section",
+            "The MCU's reference manual / datasheet memory map fixes it in silicon",
+            "malloc returns it at runtime",
+            "The OS maps it during process startup"
+          ],
+          "answerIndex": 1,
+          "explanation": "Peripheral register addresses are fixed by the chip's memory map in the reference manual. There is no allocator and (on a typical MCU) no MMU remapping; the address is a constant baked into the silicon."
+        },
+        {
+          "id": "embedded-c-volatile-l1-mcq-byte-vs-word",
+          "type": "mcq",
+          "prompt": "You access a word-only peripheral register through a volatile uint8_t *. What is the most likely consequence?",
+          "choices": [
+            "Identical behavior to a uint32_t access",
+            "A byte-sized bus transaction that may fault or fail to update the register correctly",
+            "The compiler silently promotes it to a 32-bit access",
+            "A compile-time error in every conformant compiler"
+          ],
+          "answerIndex": 1,
+          "explanation": "The pointer type selects the transaction size. A byte access to a register that only supports word access can bus-fault or update only part of the register. C will not error and will not silently widen it."
+        },
+        {
+          "id": "embedded-c-volatile-l1-mcq-null-check",
+          "type": "mcq",
+          "prompt": "Why is a NULL check meaningless for a hardcoded register pointer like GPIOA?",
+          "choices": [
+            "Because volatile pointers can never be NULL",
+            "Because the address is a fixed nonzero constant from the memory map, not a runtime allocation that can fail",
+            "Because the compiler removes all NULL checks at -O2",
+            "Because peripheral registers are always at address 0"
+          ],
+          "answerIndex": 1,
+          "explanation": "The pointer is a compile-time constant address from the datasheet. There is no allocation step that could yield NULL, so the check has no purpose (and 0x00000000 is itself a valid address region on many MCUs)."
+        },
+        {
+          "id": "embedded-c-volatile-l1-fc-mmio-read-side-effect",
+          "type": "flashcard",
+          "front": "Give an example of a register read that has a side effect.",
+          "back": "Reading a peripheral's data/status register can clear a flag (e.g. reading the UART data register clears the RXNE 'data ready' bit). So even a read is not free of consequences -- which is part of why volatile is required.",
+          "hint": "Think UART RX or a status-then-data sequence."
+        },
+        {
+          "id": "embedded-c-volatile-l1-fc-rmw-preview",
+          "type": "flashcard",
+          "front": "What three bus operations does `GPIOA_ODR |= (1u << 5);` actually perform?",
+          "back": "A read of ODR, an OR in a CPU register, and a write back of ODR -- a read-modify-write. This is non-atomic and can race with an ISR or DMA that also touches ODR (covered later).",
+          "hint": "Expand the compound assignment."
+        }
+      ]
+    },
+    {
+      "id": "embedded-c-volatile-l2-what-volatile-does",
+      "title": "What volatile Does -- and Does Not -- Guarantee",
+      "order": 2,
+      "difficulty": "medium",
+      "content": "`volatile` has exactly one job: it tells the compiler that every read and write of that object in the source must become a real memory access, in program order *relative to other volatile accesses*. The compiler may not cache the value in a register, may not elide a 'redundant' load, and may not invent or merge accesses. That is the entire guarantee.\n\nThe classic failure is a flag set in an ISR and polled in `main`:\n\n```c\nvolatile uint8_t flag = 0;          /* set in ISR */\n\nvoid wait(void) {\n    while (!flag) { }               /* must reload flag each pass */\n}\n```\n\nWithout `volatile`, the optimizer sees no store to `flag` inside the loop, reads it once into a register, and spins forever -- this is the textbook 'works at -O0, hangs at -O2' bug. The same applies to a hardware register: drop `volatile` on a register pointer and a poll loop reading a status bit can be hoisted out entirely.\n\nNow the limits, because they bite hard. `volatile` does NOT give you atomicity: `reg |= bit;` is still a read-modify-write that an interrupt can split. It does NOT order a volatile access relative to a *non-volatile* one -- the compiler may freely move ordinary code across a volatile access. It does NOT emit any CPU memory barrier, so the *processor* (or write buffer / store buffer) can still reorder or delay the actual bus transaction even though the compiler kept them in order. And it does NOT make a multi-word object update atomic.\n\nSo `volatile` is necessary for register and ISR-shared access, but it is not sufficient for concurrency. The next lesson is about closing those three gaps: atomicity, ordering, and barriers.",
+      "items": [
+        {
+          "id": "embedded-c-volatile-l2-fc-one-guarantee",
+          "type": "flashcard",
+          "front": "State the single guarantee volatile provides.",
+          "back": "Every source-level read/write of the object becomes a real memory access that the compiler will not cache, elide, reorder relative to other volatile accesses, invent, or merge.",
+          "hint": "It is about the compiler making accesses real and keeping volatile-vs-volatile order."
+        },
+        {
+          "id": "embedded-c-volatile-l2-fc-not-atomic",
+          "type": "flashcard",
+          "front": "Does volatile make `reg |= mask;` atomic?",
+          "back": "No. It is still a read-modify-write; an interrupt or DMA can occur between the read and the write. volatile guarantees the accesses happen, not that they are indivisible.",
+          "hint": "Atomicity and visibility are different properties."
+        },
+        {
+          "id": "embedded-c-volatile-l2-fc-not-order-nonvolatile",
+          "type": "flashcard",
+          "front": "Does volatile order a volatile access relative to surrounding non-volatile accesses?",
+          "back": "No. The compiler only preserves ordering among volatile accesses. Ordinary (non-volatile) reads/writes may be moved across a volatile access.",
+          "hint": "The ordering promise is volatile-to-volatile only."
+        },
+        {
+          "id": "embedded-c-volatile-l2-fc-not-barrier",
+          "type": "flashcard",
+          "front": "Does volatile emit a CPU memory barrier?",
+          "back": "No. It constrains the compiler, not the hardware. The processor's write/store buffer and memory system can still reorder or delay the actual bus transactions; you need DMB/DSB/ISB for that.",
+          "hint": "Compiler ordering is not the same as hardware ordering."
+        },
+        {
+          "id": "embedded-c-volatile-l2-mcq-o2-hang",
+          "type": "mcq",
+          "prompt": "A `while (!flag) {}` loop on a non-volatile flag set by an ISR runs fine at -O0 but hangs at -O2. Why?",
+          "choices": [
+            "The ISR is disabled at -O2",
+            "At -O2 the optimizer caches flag in a register since nothing in the loop writes it, never reloading from memory",
+            "-O2 reorders the ISR after the loop",
+            "The flag variable is placed in flash at -O2"
+          ],
+          "answerIndex": 1,
+          "explanation": "Without volatile the compiler proves the loop body never modifies flag, so it loads it once into a register and spins on the stale copy. volatile forces a reload of the actual memory each iteration."
+        },
+        {
+          "id": "embedded-c-volatile-l2-mcq-what-volatile-fixes",
+          "type": "mcq",
+          "prompt": "Adding volatile to the ISR-shared flag fixes the -O2 hang. What problem does it specifically solve?",
+          "choices": [
+            "It makes the read atomic",
+            "It forces an actual memory load on each access instead of reusing a cached register copy",
+            "It inserts a DMB before the load",
+            "It disables interrupts during the read"
+          ],
+          "answerIndex": 1,
+          "explanation": "volatile's only effect is making each access a real memory access the compiler cannot cache away. It does not add atomicity, barriers, or interrupt masking."
+        },
+        {
+          "id": "embedded-c-volatile-l2-mcq-reg-without-volatile",
+          "type": "mcq",
+          "prompt": "You poll a hardware status bit through a non-volatile register pointer at -O2. The likely result is:",
+          "choices": [
+            "The poll works but is slower",
+            "The compiler may read the register once and hoist the check out of the loop, so it never sees the bit change",
+            "A BusFault on the first read",
+            "The compiler inserts a barrier automatically"
+          ],
+          "answerIndex": 1,
+          "explanation": "Without volatile the compiler treats the register like ordinary memory it can prove is unchanged, hoisting the load out of the loop. The hardware updates the bit but the code never re-reads it. This is the same class of bug as the ISR flag."
+        },
+        {
+          "id": "embedded-c-volatile-l2-fc-multiword",
+          "type": "flashcard",
+          "front": "Is a write to a volatile 64-bit variable guaranteed atomic on a 32-bit Cortex-M?",
+          "back": "No. A 64-bit store compiles to two 32-bit stores; an interrupt can observe a half-updated value. volatile does not bundle multi-word accesses into one atomic transaction.",
+          "hint": "Bus width vs object width."
+        },
+        {
+          "id": "embedded-c-volatile-l2-fc-elide-merge",
+          "type": "flashcard",
+          "front": "Name two specific optimizations volatile forbids on the qualified object.",
+          "back": "Eliding a 'redundant' load/store, and merging/coalescing multiple accesses into one. It also forbids caching the value in a register and reordering relative to other volatile accesses.",
+          "hint": "Dead-store elimination and load coalescing."
+        }
+      ]
+    },
+    {
+      "id": "embedded-c-volatile-l3-barriers-atomics-rmw",
+      "title": "Barriers, Atomics, and RMW Hazards",
+      "order": 3,
+      "difficulty": "hard",
+      "content": "Since `volatile` gives neither atomicity nor hardware ordering, you close those gaps explicitly.\n\nThe read-modify-write hazard: `GPIO->ODR |= (1u << 5);` reads ODR, ORs, writes back. If an ISR sets bit 6 between the read and the write, your write-back clobbers it. Two fixes. Use a dedicated atomic set/reset register where the hardware provides one -- on Cortex-M the GPIO **BSRR** sets/clears bits in a single write with no read:\n\n```c\nGPIO->BSRR = (1u << 5);          /* atomic set bit 5  */\nGPIO->BSRR = (1u << (5 + 16));   /* atomic clear bit 5 */\n```\n\nOr, for plain RAM shared with an ISR, use a critical section (`__disable_irq()`/`__enable_irq()` or BASEPRI masking), or a C11 `_Atomic` object where the toolchain supports it on your core.\n\nBarriers address *ordering*, and there are two independent kinds. A **compiler barrier** (`asm volatile(\"\" ::: \"memory\");`) stops the compiler reordering memory accesses across it but emits no instruction. A **CPU barrier** is a real instruction: `__DMB()` (Data Memory Barrier) orders memory accesses as seen by the system; `__DSB()` (Data Synchronization Barrier) additionally waits until all prior accesses complete; `__ISB()` (Instruction Synchronization Barrier) flushes the pipeline so newly-written config takes effect.\n\nWhen do you need them on Cortex-M? Typical cases: after writing a register that must fully land before the next step (e.g. enabling a peripheral clock -- `__DSB()` then use it); after reprogramming something that affects instruction fetch or priority masking (`__ISB()`); and around DMA buffer handoff, where you must order CPU writes before kicking the DMA. Single-core Cortex-M is largely in-order for normal memory, so barriers are rarer than on big multicore SoCs -- but write buffers and the specific 'must complete before X' cases above still require them.\n\n```c\nRCC->AHB1ENR |= RCC_GPIOAEN;     /* enable clock  */\n__DSB();                          /* ensure it landed before use */\n(void)RCC->AHB1ENR;               /* read-back also forces completion */\n```",
+      "items": [
+        {
+          "id": "embedded-c-volatile-l3-fc-rmw-clobber",
+          "type": "flashcard",
+          "front": "How can `port |= bit5;` in main lose a bit that an ISR set?",
+          "back": "It is a read-modify-write. If the ISR sets bit6 after main reads the register but before main writes it back, the write-back uses the stale value and clears bit6 -- a lost update.",
+          "hint": "Interleave the read and the write with the ISR."
+        },
+        {
+          "id": "embedded-c-volatile-l3-fc-bsrr",
+          "type": "flashcard",
+          "front": "How does the Cortex-M GPIO BSRR register avoid the RMW hazard?",
+          "back": "BSRR is write-only with set bits in the low half-word and reset bits in the high half-word. Writing it sets/clears the chosen pins in one bus write with no read step, so it cannot clobber bits the program did not touch.",
+          "hint": "A single write, no read-back, separate set and reset fields."
+        },
+        {
+          "id": "embedded-c-volatile-l3-fc-compiler-vs-cpu-barrier",
+          "type": "flashcard",
+          "front": "Distinguish a compiler barrier from a CPU memory barrier.",
+          "back": "A compiler barrier (asm volatile(\"\" ::: \"memory\")) only stops the compiler reordering memory ops across it and emits no instruction. A CPU barrier (DMB/DSB/ISB) is a real instruction that orders/completes accesses in the hardware itself.",
+          "hint": "One constrains code generation, the other the processor."
+        },
+        {
+          "id": "embedded-c-volatile-l3-fc-dmb-dsb-isb",
+          "type": "flashcard",
+          "front": "What do DMB, DSB, and ISB each do on Cortex-M?",
+          "back": "DMB orders memory accesses (no access after it is observed before accesses before it). DSB also waits until all prior accesses complete. ISB flushes the pipeline so newly written configuration affects subsequent instruction execution.",
+          "hint": "Order vs complete vs flush-the-pipeline."
+        },
+        {
+          "id": "embedded-c-volatile-l3-mcq-which-barrier-clock",
+          "type": "mcq",
+          "prompt": "You enable a peripheral clock and immediately write its config register, but the first writes are lost. The standard fix is:",
+          "choices": [
+            "Mark the config register volatile",
+            "Insert a delay/DSB (or read back the enable register) so the clock-enable completes before the config access",
+            "Wrap the writes in __disable_irq()/__enable_irq()",
+            "Use _Atomic on the enable register"
+          ],
+          "answerIndex": 1,
+          "explanation": "The clock-enable write must fully take effect before the peripheral can accept config writes. A DSB or a read-back of the enable register forces completion. volatile, irq masking, and _Atomic address different problems (caching, atomicity)."
+        },
+        {
+          "id": "embedded-c-volatile-l3-mcq-volatile-not-enough-concurrency",
+          "type": "mcq",
+          "prompt": "Two flags written by main are read by an ISR that depends on the order of the writes. volatile keeps them in order in the generated code, yet the ISR still occasionally sees them reordered. Why, and what fixes it?",
+          "choices": [
+            "The compiler ignores volatile in ISRs; recompile",
+            "The hardware/write buffer can reorder the actual transactions; a DMB between the writes enforces order",
+            "volatile only works on uint32_t; change the type",
+            "Nothing can fix this on Cortex-M"
+          ],
+          "answerIndex": 1,
+          "explanation": "volatile preserves order in the instruction stream but emits no barrier, so the memory system/write buffer may still reorder the observable accesses. A DMB between the writes enforces the ordering at the hardware level."
+        },
+        {
+          "id": "embedded-c-volatile-l3-mcq-atomic-bit-clear-method",
+          "type": "mcq",
+          "prompt": "Which is the safest way for main to set one GPIO output bit without disturbing others, on a Cortex-M with a BSRR register?",
+          "choices": [
+            "ODR |= (1u<<5); with ODR volatile",
+            "Write (1u<<5) to BSRR",
+            "Disable interrupts, then ODR |= (1u<<5);, then enable",
+            "Both B and C are race-free; B needs no critical section"
+          ],
+          "answerIndex": 3,
+          "explanation": "BSRR performs the set in a single non-read-modify-write store, so it is inherently race-free without a critical section. Masking interrupts around the ODR RMW also works but is heavier. The bare volatile RMW (A) is still a race."
+        },
+        {
+          "id": "embedded-c-volatile-l3-fc-atomic-c11",
+          "type": "flashcard",
+          "front": "When is C11 _Atomic an appropriate tool on an MCU, and what is the caveat?",
+          "back": "For lock-free shared variables (e.g. between ISR and main) where the toolchain/core supports the needed atomic ops. Caveat: on small cores some _Atomic operations may lower to libcalls or critical sections, and support varies -- verify the generated code.",
+          "hint": "It is real but check what it compiles to on your target."
+        },
+        {
+          "id": "embedded-c-volatile-l3-fc-critical-section",
+          "type": "flashcard",
+          "front": "What does a __disable_irq()/__enable_irq() critical section protect, and what does it cost?",
+          "back": "It makes a sequence (e.g. an RMW on shared state) indivisible with respect to interrupts by masking them. Cost: it adds interrupt latency/jitter for the duration, so keep critical sections as short as possible.",
+          "hint": "Atomicity by exclusion, paid for in latency."
+        },
+        {
+          "id": "embedded-c-volatile-l3-mcq-isb-use",
+          "type": "mcq",
+          "prompt": "After raising BASEPRI to mask certain interrupt priorities, why might you issue an __ISB()?",
+          "choices": [
+            "To flush the data cache",
+            "To ensure the new masking takes effect before subsequent instructions that depend on it execute",
+            "To make the BASEPRI write atomic",
+            "ISB has no effect on BASEPRI"
+          ],
+          "answerIndex": 1,
+          "explanation": "Changing priority masking via a system register can require an ISB so the pipeline is flushed and the new mask is in force before dependent instructions run; otherwise an interrupt could slip through the window."
+        }
+      ]
+    },
+    {
+      "id": "embedded-c-volatile-l4-types-packing-overlay",
+      "title": "Fixed-Width Types, Packed Structs & Register Overlays",
+      "order": 4,
+      "difficulty": "hard",
+      "content": "Embedded layout work demands precise types. Always use `<stdint.h>` fixed-width types (`uint32_t`, `int16_t`, ...) for registers and protocol fields -- never plain `int`/`long`, whose width is implementation-defined and whose signedness/promotion rules cause silent bugs. Use `bool` from `<stdbool.h>` for flags.\n\nThe register-block overlay pattern maps a whole peripheral as a `volatile` struct, with each field at the byte offset from the reference manual:\n\n```c\ntypedef struct {\n    volatile uint32_t MODER;   /* +0x00 */\n    volatile uint32_t OTYPER;  /* +0x04 */\n    uint32_t          _rsv0[3];/* padding to next field's offset */\n    volatile uint32_t ODR;     /* +0x14 */\n    volatile uint32_t BSRR;    /* +0x18 */\n} GPIO_TypeDef;\n\n#define GPIOA ((GPIO_TypeDef *)0x40020000UL)\nGPIOA->BSRR = (1u << 5);       /* atomic set, named access */\n```\n\nThe layout only matches the hardware if every field lands at the right offset, so you insert reserved padding members and rely on the natural alignment of `uint32_t`. **Do not** reach for register layout with bitfields: C does not standardize bitfield ordering or straddling, so portable register access uses explicit masks/shifts, not `struct { uint32_t a:1; ... }`.\n\nPacked structs (`__attribute__((packed))`) are for *protocol/wire* layout, where you must match an exact byte sequence with no padding. The trap: a packed struct can place a multi-byte field on an unaligned address. Taking a pointer to that field and dereferencing it as a normal `uint32_t*` triggers an unaligned access -- which on Cortex-M0/M0+ (and for some access types) is a HardFault, and elsewhere is slower. Read packed fields by value (the compiler emits safe byte accesses) or `memcpy` them out; never alias an unaligned member with a wide pointer. And remember endianness: a packed struct over a wire does not byte-swap for you.",
+      "items": [
+        {
+          "id": "embedded-c-volatile-l4-fc-why-fixed-width",
+          "type": "flashcard",
+          "front": "Why use uint32_t instead of unsigned int for a register or protocol field?",
+          "back": "int/long widths are implementation-defined; fixed-width types from <stdint.h> guarantee exact size and signedness, so layout and arithmetic behave identically across compilers and targets.",
+          "hint": "Portability and exact size."
+        },
+        {
+          "id": "embedded-c-volatile-l4-fc-overlay-pattern",
+          "type": "flashcard",
+          "front": "Describe the volatile struct register-overlay pattern.",
+          "back": "Define a struct whose volatile fields sit at the reference manual's byte offsets (with reserved padding members), then #define the peripheral as a pointer to that struct at its base address. Access registers by name: PERIPH->REG.",
+          "hint": "Struct layout mirrors the memory map; base address cast to the struct pointer."
+        },
+        {
+          "id": "embedded-c-volatile-l4-fc-reserved-padding",
+          "type": "flashcard",
+          "front": "Why do register-overlay structs contain reserved/dummy array members?",
+          "back": "To pad gaps so each real register field lands at its exact datasheet offset. Without the padding the struct's fields would not line up with the hardware addresses.",
+          "hint": "Offsets must match the memory map exactly."
+        },
+        {
+          "id": "embedded-c-volatile-l4-mcq-no-bitfields-for-registers",
+          "type": "mcq",
+          "prompt": "Why are C bitfields a poor choice for mapping a hardware register's individual bits portably?",
+          "choices": [
+            "Bitfields cannot be volatile",
+            "The C standard does not fix bitfield allocation order, straddling, or storage-unit layout, so the bit positions are not guaranteed to match the hardware",
+            "Bitfields always generate a HardFault",
+            "Bitfields force 64-bit accesses"
+          ],
+          "answerIndex": 1,
+          "explanation": "Bitfield layout (order within a unit, straddling, alignment) is implementation-defined. Portable register code uses explicit masks and shifts on a fixed-width volatile word instead."
+        },
+        {
+          "id": "embedded-c-volatile-l4-mcq-packed-unaligned-fault",
+          "type": "mcq",
+          "prompt": "A __packed struct places a uint32_t field at an odd offset. You do `uint32_t *p = &s.field; uint32_t v = *p;` on a Cortex-M0+. What happens?",
+          "choices": [
+            "It works because Cortex-M handles all unaligned accesses",
+            "An unaligned word access that HardFaults on M0/M0+ (which lack unaligned-access support for this case)",
+            "The compiler swaps endianness automatically",
+            "It always works but is just slower"
+          ],
+          "answerIndex": 1,
+          "explanation": "Taking a wide pointer to a misaligned packed member and dereferencing it does a single unaligned word load. Cortex-M0/M0+ fault on it. Read the field by value or memcpy so the compiler emits safe byte-wise accesses."
+        },
+        {
+          "id": "embedded-c-volatile-l4-mcq-packed-purpose",
+          "type": "mcq",
+          "prompt": "What is the correct use of __attribute__((packed))?",
+          "choices": [
+            "To map memory-mapped peripheral registers",
+            "To force atomic access to a struct",
+            "To match an exact on-the-wire/protocol byte layout with no compiler padding",
+            "To make a struct fit in a CPU register"
+          ],
+          "answerIndex": 2,
+          "explanation": "Packing removes inter-field padding so the struct matches an external byte layout (a protocol frame, a flash record). Register overlays use natural alignment, not packing; packing registers would invite unaligned faults."
+        },
+        {
+          "id": "embedded-c-volatile-l4-fc-safe-packed-read",
+          "type": "flashcard",
+          "front": "How do you safely read a multi-byte field out of a packed struct?",
+          "back": "Read it by value (member access) so the compiler emits aligned/byte-wise accesses, or memcpy the bytes into a properly aligned variable. Never take a wide pointer to a possibly-unaligned member and dereference it.",
+          "hint": "By value or memcpy, not by aliasing a wide pointer."
+        },
+        {
+          "id": "embedded-c-volatile-l4-fc-endianness-packed",
+          "type": "flashcard",
+          "front": "Does a packed struct over a serial link handle endianness for you?",
+          "back": "No. Packing only removes padding. Multi-byte fields are stored in the target's native byte order; you must byte-swap explicitly to match the wire/protocol endianness.",
+          "hint": "Packing != byte-swapping."
+        },
+        {
+          "id": "embedded-c-volatile-l4-mcq-integer-promotion",
+          "type": "mcq",
+          "prompt": "`uint8_t a = 0xFF, b = 0xFF; if ((a + b) > 0xFF) ...` -- why does this behave differently than a naive 8-bit mental model?",
+          "choices": [
+            "a + b overflows uint8_t and wraps to 0xFE",
+            "Both operands are promoted to int, so a + b is 0x1FE (510) and the comparison is true",
+            "The comparison is undefined behavior",
+            "uint8_t arithmetic saturates at 0xFF"
+          ],
+          "answerIndex": 1,
+          "explanation": "Integer promotion widens both uint8_t operands to int before the addition, giving 0x1FE, not a wrapped 8-bit value. Forgetting promotion is a common source of mask/shift and overflow bugs; it is merely sloppy on a desktop but can be fatal in firmware."
+        },
+        {
+          "id": "embedded-c-volatile-l4-fc-static-storage",
+          "type": "flashcard",
+          "front": "What does declaring a large ISR-shared buffer `static` (file scope) gain you over a local?",
+          "back": "Static storage duration: it lives in .bss/.data (fixed address, zero-initialized), not on the stack, so it persists across calls and avoids blowing a tiny stack. Combine with volatile if an ISR/DMA touches it.",
+          "hint": "Where it is stored and how long it lives."
+        }
+      ]
+    }
+  ]
+}

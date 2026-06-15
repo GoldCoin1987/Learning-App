@@ -1,0 +1,234 @@
+{
+  "id": "mcu-architecture",
+  "title": "Microcontroller Architecture: CPU, Registers & Buses",
+  "order": 3,
+  "lessons": [
+    {
+      "id": "mcu-architecture-lesson-register-file",
+      "title": "The Cortex-M Register File & Thumb-2",
+      "order": 1,
+      "difficulty": 1,
+      "content": "An ARM **Cortex-M** core is a load/store RISC machine: all arithmetic happens in registers, and memory is touched only by explicit load/store instructions. The visible **register file** is sixteen 32-bit registers. **R0–R12** are general-purpose; by the ARM calling convention (AAPCS) R0–R3 pass arguments and return values and are *caller-saved*, while R4–R11 are *callee-saved*. Three registers have fixed architectural roles: **R13 = SP** (stack pointer), **R14 = LR** (link register, holding the return address after a `BL`), and **R15 = PC** (program counter). Writing PC is a branch.\n\nStatus lives in the **xPSR**, a composite of three views: the **APSR** (condition flags N, Z, C, V, plus Q for saturation), the **IPSR** (the current exception/interrupt number, 0 in thread mode), and the **EPSR** (the **T-bit** and interrupt-continuable state). The T-bit must stay 1: Cortex-M executes only the **Thumb-2** instruction set — a mix of 16- and 32-bit encodings that gives near-ARM performance at roughly Thumb code density. There is no classic 32-bit ARM mode on these cores, which is why a function pointer's least-significant bit is set to mark Thumb state.\n\nFor an ex-radar tech used to bench instruments, the mental model is clean: a small bank of fast 32-bit scratch registers, a flags register the ALU updates, and a PC you can watch march through Thumb-2 opcodes in the debugger. Single-stepping and reading these registers is the foundation of every later debugging skill.",
+      "items": [
+        {
+          "id": "mcu-architecture-fc-reg-count",
+          "type": "flashcard",
+          "front": "How many architecturally-visible core registers does Cortex-M have, and what are R13/R14/R15?",
+          "back": "Sixteen 32-bit registers (R0-R15). R13 = SP (stack pointer), R14 = LR (link register / return address), R15 = PC (program counter).",
+          "hint": "Three of the sixteen have dedicated roles."
+        },
+        {
+          "id": "mcu-architecture-fc-aapcs",
+          "type": "flashcard",
+          "front": "Under AAPCS, which general-purpose registers are caller-saved vs callee-saved?",
+          "back": "R0-R3 are caller-saved (also carry the first four arguments and the return value); R4-R11 are callee-saved (a function must preserve them). R12 is a scratch/intra-procedure register.",
+          "hint": "The argument registers are the volatile ones."
+        },
+        {
+          "id": "mcu-architecture-fc-xpsr",
+          "type": "flashcard",
+          "front": "What three sub-registers make up the xPSR, and what does each hold?",
+          "back": "APSR (condition flags N, Z, C, V, Q), IPSR (current exception number, 0 in thread mode), and EPSR (the Thumb T-bit and interrupt-continuable state).",
+          "hint": "Application, Interrupt, Execution status."
+        },
+        {
+          "id": "mcu-architecture-fc-tbit",
+          "type": "flashcard",
+          "front": "What is the T-bit and why must it always be set on Cortex-M?",
+          "back": "The T-bit (in EPSR) indicates Thumb execution state. Cortex-M only executes Thumb-2; if the T-bit is cleared (e.g. by a bad branch target) the core takes a UsageFault. This is why function-pointer addresses have bit 0 set.",
+          "hint": "Cortex-M has no ARM (A32) mode."
+        },
+        {
+          "id": "mcu-architecture-fc-loadstore",
+          "type": "flashcard",
+          "front": "What does it mean that Cortex-M is a load/store architecture?",
+          "back": "Arithmetic and logic operate only on registers; memory is accessed solely through explicit load (LDR) and store (STR) instructions. You cannot, e.g., add directly to a memory operand as on x86.",
+          "hint": "RISC: compute in registers, move with LDR/STR."
+        },
+        {
+          "id": "mcu-architecture-mcq-pc-write",
+          "type": "mcq",
+          "prompt": "What happens when a value is written to R15 (PC)?",
+          "choices": ["The stack pointer is reset", "Execution branches to that address", "A hard fault is raised unconditionally", "The condition flags are cleared"],
+          "answerIndex": 1,
+          "explanation": "R15 is the program counter; writing it is a branch. This is how returns (e.g. POP {PC}) and computed jumps work."
+        },
+        {
+          "id": "mcu-architecture-mcq-thumb2",
+          "type": "mcq",
+          "prompt": "What characterizes the Thumb-2 instruction set used by Cortex-M?",
+          "choices": ["Fixed 16-bit instructions only", "Fixed 32-bit instructions only", "A mix of 16- and 32-bit instruction encodings", "Variable-length instructions up to 15 bytes"],
+          "answerIndex": 2,
+          "explanation": "Thumb-2 blends 16-bit and 32-bit encodings, achieving near-ARM performance with high code density. There is no separate 32-bit ARM state on Cortex-M."
+        },
+        {
+          "id": "mcu-architecture-mcq-lr",
+          "type": "mcq",
+          "prompt": "What does the link register (LR / R14) hold after a 'BL subroutine' instruction executes?",
+          "choices": ["The address of the subroutine", "The return address (instruction after the BL)", "The current stack pointer", "The exception number"],
+          "answerIndex": 1,
+          "explanation": "BL (branch-with-link) saves the return address into LR; the subroutine returns by branching to LR (e.g. BX LR)."
+        },
+        {
+          "id": "mcu-architecture-mcq-apsr-flags",
+          "type": "mcq",
+          "prompt": "Which set of flags lives in the APSR view of the xPSR?",
+          "choices": ["N, Z, C, V (and Q)", "The current IRQ number", "MSP and PSP selection", "Privilege and Thumb state"],
+          "answerIndex": 0,
+          "explanation": "The APSR holds the condition flags Negative, Zero, Carry, oVerflow, plus the Q saturation flag. The IRQ number is in the IPSR; privilege/stack selection is in CONTROL."
+        }
+      ]
+    },
+    {
+      "id": "mcu-architecture-lesson-stacks-privilege-exceptions",
+      "title": "Stack Pointers, Privilege Modes & the Exception Model",
+      "order": 2,
+      "difficulty": 2,
+      "content": "Cortex-M **banks the stack pointer** into two physical registers: the **Main Stack Pointer (MSP)** and the **Process Stack Pointer (PSP)**. R13 is whichever one is currently active. Out of reset, MSP is used everywhere. An RTOS typically runs handlers and the kernel on MSP while each thread/task uses PSP, so a task's stack overflow can't corrupt the kernel stack and context switching only has to save/restore PSP.\n\nThe core has two **modes** and two **privilege** levels. **Handler mode** (always privileged) runs exception handlers; **thread mode** runs ordinary code and can be privileged or unprivileged, selected by the **CONTROL** register (which also chooses MSP vs PSP in thread mode). Unprivileged thread code plus an **MPU** is how an RTOS sandboxes tasks away from peripheral registers and each other.\n\nThe **reset and exception model** is what makes interrupts deterministic. At address 0 sits the **vector table**: word 0 is the **initial MSP value**, word 1 is the **reset handler address**, and the rest are exception/IRQ handler addresses indexed by exception number. On exception entry the hardware automatically **stacks eight words** — R0–R3, R12, LR, PC (return address), and xPSR — onto the active stack, loads a special **EXC_RETURN** pattern into LR, fetches the handler address from the vector table, and begins executing in handler mode. Because R0–R3/R12 (the caller-saved set) are pushed by hardware, an ISR is a plain C function. On return, the EXC_RETURN value in PC triggers hardware unstacking. This auto-stacking — and tricks like **tail-chaining** between back-to-back interrupts — is the entire answer to \"what the CPU does between an interrupt firing and your handler's first instruction.\"",
+      "items": [
+        {
+          "id": "mcu-architecture-fc-msp-psp",
+          "type": "flashcard",
+          "front": "What are MSP and PSP, and how does an RTOS typically use them?",
+          "back": "Two banked stack pointers (R13 selects one). MSP is the Main Stack Pointer (used out of reset and in handler mode); PSP is the Process Stack Pointer. An RTOS runs the kernel/handlers on MSP and each task on its own PSP, isolating task stacks and simplifying context switches.",
+          "hint": "Main vs Process; kernel vs task."
+        },
+        {
+          "id": "mcu-architecture-fc-handler-thread",
+          "type": "flashcard",
+          "front": "Distinguish handler mode from thread mode on Cortex-M.",
+          "back": "Handler mode runs exception handlers and is always privileged (and always uses MSP). Thread mode runs normal application code and can be privileged or unprivileged, using MSP or PSP as selected by the CONTROL register.",
+          "hint": "Exceptions vs ordinary code."
+        },
+        {
+          "id": "mcu-architecture-fc-control-reg",
+          "type": "flashcard",
+          "front": "What does the CONTROL register select?",
+          "back": "In thread mode it selects the privilege level (privileged vs unprivileged) and which stack pointer is used (MSP vs PSP). It also has an FPU-active bit (FPCA) on cores with an FPU.",
+          "hint": "Privilege and stack-pointer choice for thread mode."
+        },
+        {
+          "id": "mcu-architecture-fc-vector-table",
+          "type": "flashcard",
+          "front": "What are the first two entries of the Cortex-M vector table?",
+          "back": "Word 0 is the initial Main Stack Pointer value (loaded into MSP at reset); word 1 is the reset handler's address (loaded into PC). Subsequent words are exception/IRQ handler addresses indexed by exception number.",
+          "hint": "Initial SP, then reset vector."
+        },
+        {
+          "id": "mcu-architecture-fc-stacked-frame",
+          "type": "flashcard",
+          "front": "Which eight registers does hardware automatically stack on exception entry?",
+          "back": "R0, R1, R2, R3, R12, LR, the return PC, and xPSR (the caller-saved set plus return state). This is why an ISR can be a normal C function with no special prologue.",
+          "hint": "The caller-saved registers plus PC and xPSR."
+        },
+        {
+          "id": "mcu-architecture-fc-exc-return",
+          "type": "flashcard",
+          "front": "What is EXC_RETURN and how does it cause an exception return?",
+          "back": "A special value (e.g. 0xFFFFFFFx) loaded into LR on exception entry. When that value is written to PC (e.g. BX LR at the end of the handler), the hardware recognizes it and performs the unstacking and mode/stack restoration.",
+          "hint": "A magic LR value that triggers HW unstacking."
+        },
+        {
+          "id": "mcu-architecture-mcq-reset-vector",
+          "type": "mcq",
+          "prompt": "At reset, where does the Cortex-M core get the initial stack pointer value?",
+          "choices": ["From a fixed RAM address", "From word 0 of the vector table", "From the CONTROL register", "It defaults to the top of RAM automatically"],
+          "answerIndex": 1,
+          "explanation": "Word 0 of the vector table holds the initial MSP value; word 1 holds the reset handler address. The hardware loads both before the first instruction runs.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/mcu-architecture-1.svg"
+        },
+        {
+          "id": "mcu-architecture-mcq-isr-c-fn",
+          "type": "mcq",
+          "prompt": "Why can a Cortex-M interrupt service routine be written as an ordinary C function with no special attribute?",
+          "choices": ["The compiler inserts a custom prologue for ISRs", "Hardware auto-stacks the caller-saved registers (R0-R3, R12, LR, PC, xPSR) on entry", "Interrupts run with all registers disabled", "ISRs never use registers"],
+          "answerIndex": 1,
+          "explanation": "Because the AAPCS caller-saved registers are pushed automatically by hardware on entry and restored on exit, the C compiler's normal calling convention is already satisfied."
+        },
+        {
+          "id": "mcu-architecture-mcq-handler-priv",
+          "type": "mcq",
+          "prompt": "Which statement about handler mode is correct?",
+          "choices": ["It is always unprivileged", "It is always privileged and uses MSP", "It can use either MSP or PSP", "It is selected by the T-bit"],
+          "answerIndex": 1,
+          "explanation": "Handler mode (entered on any exception) is always privileged and always uses the Main Stack Pointer, regardless of what thread mode was using."
+        }
+      ]
+    },
+    {
+      "id": "mcu-architecture-lesson-core-peripherals-buses",
+      "title": "Core Peripherals, the Bus Matrix & Architecture Contrasts",
+      "order": 3,
+      "difficulty": 3,
+      "content": "Beyond the CPU pipeline, every Cortex-M includes a standard set of **core peripherals** in the System region (the Private Peripheral Bus at 0xE000_0000). The **NVIC** (Nested Vectored Interrupt Controller) manages IRQ enable/pending/active state and priorities; **SysTick** is a simple 24-bit down-counter that gives an OS its periodic tick. Optional blocks include the **MPU** (region-based memory protection — no virtual addressing, just access permissions and attributes) and an **FPU** (single- or double-precision; its registers must be context-saved, hence the extended exception stack frame).\n\nA load or store doesn't reach a peripheral by magic — it traverses a **bus matrix**. Cortex-M uses AMBA buses: the fast **AHB** (multi-master, pipelined) connects the core, memories, DMA, and high-speed peripherals, while slower peripherals hang off one or more **APB** segments behind an AHB-to-APB bridge. The matrix arbitrates concurrent masters (e.g. CPU vs DMA). Because flash is slower than the core clock, fast MCUs insert **flash wait states** and add a **flash accelerator / prefetch / cache** (ST's ART, for example) so the CPU isn't stalled on every fetch. Crucially, the **CPU clock and peripheral (bus) clocks are separate domains** with their own prescalers — the root of \"enable the peripheral clock first\" and of correct DMA/timer configuration later.\n\nFor perspective, contrast the field. The **ESP32** uses Tensilica **Xtensa LX6/LX7** cores (and newer parts use **RISC-V**) rather than ARM. The **RP2040** is a **dual Cortex-M0+** with a bus fabric letting both cores and DMA share peripherals. At the low end, **8-bit AVR and PIC** are typically Harvard, ~8/16-bit, register-file or accumulator machines with far simpler interrupt models — a useful reminder that the Cortex-M conveniences above are not universal.",
+      "items": [
+        {
+          "id": "mcu-architecture-fc-nvic-systick",
+          "type": "flashcard",
+          "front": "What do the NVIC and SysTick core peripherals do?",
+          "back": "The NVIC (Nested Vectored Interrupt Controller) handles interrupt enable/pending/active state, priorities, and vectoring. SysTick is a 24-bit down-counter that provides a simple periodic tick, commonly used as an RTOS scheduler tick.",
+          "hint": "One manages interrupts; one is the OS heartbeat."
+        },
+        {
+          "id": "mcu-architecture-fc-mpu",
+          "type": "flashcard",
+          "front": "What is the Cortex-M MPU and how does it differ from an MMU?",
+          "back": "The Memory Protection Unit enforces access permissions and memory attributes (cacheable, bufferable, executable) over a small number of address regions. Unlike an MMU it does NOT do virtual-to-physical address translation; it only polices accesses to physical addresses.",
+          "hint": "Protection and attributes, but no address translation."
+        },
+        {
+          "id": "mcu-architecture-fc-ahb-apb",
+          "type": "flashcard",
+          "front": "Contrast the AHB and APB buses in a Cortex-M system.",
+          "back": "AHB is the fast, pipelined, multi-master bus connecting the core, memories, DMA, and high-speed peripherals. APB is a simpler, slower bus for low-speed peripherals, reached through an AHB-to-APB bridge.",
+          "hint": "High-performance bus vs peripheral bus."
+        },
+        {
+          "id": "mcu-architecture-fc-wait-states",
+          "type": "flashcard",
+          "front": "Why do fast MCUs need flash wait states and a flash accelerator/cache?",
+          "back": "Flash is slower than a high CPU clock, so the core would stall waiting for each fetch. Wait states tell the bus how many extra cycles flash needs; a prefetch buffer/cache (e.g. ST's ART accelerator) hides that latency so the CPU runs near zero-wait-state throughput.",
+          "hint": "Flash can't keep up with the core clock."
+        },
+        {
+          "id": "mcu-architecture-fc-clock-domains",
+          "type": "flashcard",
+          "front": "Why does it matter that the CPU clock and peripheral bus clocks are separate domains?",
+          "back": "Each bus (AHB, APB1, APB2) has its own prescaler off the system clock, and peripheral clocks must be explicitly enabled. This is the root of the classic 'enable the peripheral clock first' gotcha and underlies correct timer/baud/DMA timing calculations.",
+          "hint": "Separate prescalers; clocks must be enabled."
+        },
+        {
+          "id": "mcu-architecture-fc-fpu-context",
+          "type": "flashcard",
+          "front": "What is the consequence of an active FPU for exception handling?",
+          "back": "The FPU registers (S0-S15, FPSCR) are additional caller-saved state, so when FPU context is active the hardware pushes an extended stack frame on exception entry. Lazy stacking can defer this until the handler actually uses the FPU.",
+          "hint": "Extra registers mean an extended stacked frame."
+        },
+        {
+          "id": "mcu-architecture-mcq-rp2040",
+          "type": "mcq",
+          "prompt": "What CPU configuration does the RP2040 (Raspberry Pi Pico) use?",
+          "choices": ["A single Cortex-M7", "Dual Cortex-M0+ cores", "A single Xtensa LX7", "Quad RISC-V cores"],
+          "answerIndex": 1,
+          "explanation": "The RP2040 contains two Cortex-M0+ cores sharing a bus fabric with DMA and peripherals, a contrast to single-core STM32 parts."
+        },
+        {
+          "id": "mcu-architecture-mcq-esp32-core",
+          "type": "mcq",
+          "prompt": "Which core architecture do classic ESP32 parts use, distinguishing them from STM32/RP2040?",
+          "choices": ["ARM Cortex-A", "Tensilica Xtensa (with newer parts using RISC-V)", "MIPS", "ARM Cortex-M4 only"],
+          "answerIndex": 1,
+          "explanation": "Classic ESP32 uses Tensilica Xtensa LX6/LX7 cores; newer ESP32-C/H parts use RISC-V. Neither is ARM Cortex-M, so the register/exception model differs."
+        },
+        {
+          "id": "mcu-architecture-mcq-avr-contrast",
+          "type": "mcq",
+          "prompt": "Compared with a Cortex-M, how do typical 8-bit AVR/PIC MCUs differ architecturally?",
+          "choices": ["They have a richer 32-register banked interrupt model", "They are usually Harvard, narrower (8/16-bit), with simpler interrupt models", "They use the same AHB/APB bus matrix", "They run Thumb-2 code"],
+          "answerIndex": 1,
+          "explanation": "8-bit AVR/PIC are typically Harvard-architecture, 8/16-bit register-file or accumulator machines with much simpler interrupt handling and no AHB/APB matrix or Thumb-2."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,281 @@
+{
+  "id": "adc-dac",
+  "title": "ADC & DAC (register level)",
+  "order": 8,
+  "lessons": [
+    {
+      "id": "adc-dac-l1",
+      "title": "ADC Fundamentals at the Register Level",
+      "order": 1,
+      "difficulty": "easy",
+      "content": "An ADC maps an analog input onto an $N$-bit integer code. The smallest distinguishable step, one LSB, is\n\n$$V_{LSB}=\\frac{V_{ref}}{2^N}$$\n\nso a 12-bit ADC with $V_{ref}=3.3\\,\\text{V}$ resolves $\\approx 0.806\\,\\text{mV}$. The output code is\n\n$$\\text{code}=\\left\\lfloor \\frac{V_{in}}{V_{ref}}\\cdot 2^N \\right\\rfloor$$\n\nclamped to $[0, 2^N-1]$. At the register level you typically configure a **resolution** field (e.g. 12/10/8/6 bits), select the **reference** (an external pin, VDDA, or an on-chip bandgap), and pick the **input channel** in a sequence register.\n\nThe front end is a **sample-and-hold (S/H)**: a switch charges a hold capacitor $C_H$ through the source resistance $R_S$ plus the internal switch resistance. The sampling capacitor must settle to within $\\tfrac{1}{2}$ LSB, which takes several RC time constants. As a rule of thumb you need\n\n$$t_{samp} \\ge (N+1)\\ln 2 \\cdot R_S C_H$$\n\nso a **high source impedance forces a longer sampling time** (set via the sample-time register) or an op-amp buffer. Skimp on it and you read a value pulled toward the previous channel. This is exactly the radar/instrumentation lesson: characterize your source impedance before trusting a code.",
+      "items": [
+        {
+          "id": "adc-dac-l1-fc1",
+          "type": "flashcard",
+          "front": "Write the formula for one LSB of an N-bit ADC and compute it for 12 bits, Vref = 3.3 V.",
+          "back": "$V_{LSB}=\\frac{V_{ref}}{2^N}$. For 12 bits: $3.3/4096 \\approx 0.806\\,\\text{mV}$.",
+          "hint": "2^12 = 4096."
+        },
+        {
+          "id": "adc-dac-l1-fc2",
+          "type": "flashcard",
+          "front": "What does the sample-and-hold (S/H) circuit do, and what limits how fast it can capture?",
+          "back": "A switch charges a hold capacitor C_H so the input is frozen during conversion. Charging time is set by R_S (source) + R_switch through C_H; the cap must settle to <= 1/2 LSB.",
+          "hint": "Think RC time constant."
+        },
+        {
+          "id": "adc-dac-l1-fc3",
+          "type": "flashcard",
+          "front": "Why does a high source impedance require a longer ADC sampling time?",
+          "back": "Larger R_S increases the RC time constant charging C_H, so more time is needed to settle to within 1/2 LSB. Otherwise charge sharing leaves residual error (often from the previous channel).",
+          "hint": "t_samp scales with R_S * C_H."
+        },
+        {
+          "id": "adc-dac-l1-fc4",
+          "type": "flashcard",
+          "front": "Name three common reference (Vref) sources an MCU ADC can use.",
+          "back": "An external Vref pin, the analog supply VDDA, or an internal bandgap reference. Accuracy of Vref directly scales every conversion.",
+          "hint": "External, supply, internal."
+        },
+        {
+          "id": "adc-dac-l1-mcq1",
+          "type": "mcq",
+          "prompt": "A 10-bit ADC uses Vref = 2.5 V. What is V_LSB?",
+          "choices": [
+            "2.44 mV",
+            "0.610 mV",
+            "9.77 mV",
+            "0.244 mV"
+          ],
+          "answerIndex": 0,
+          "explanation": "V_LSB = 2.5 / 2^10 = 2.5 / 1024 ~= 2.44 mV."
+        },
+        {
+          "id": "adc-dac-l1-mcq2",
+          "type": "mcq",
+          "prompt": "You read a sensor with 100 kohm output impedance and codes look wrong, biased toward the previously sampled channel. Best first fix?",
+          "choices": [
+            "Lower Vref",
+            "Increase the ADC sample-time setting or add a buffer op-amp",
+            "Switch to 8-bit resolution",
+            "Enable continuous mode"
+          ],
+          "answerIndex": 1,
+          "explanation": "Symptom is incomplete S/H settling from high source impedance. Lengthen sample time or buffer the source so C_H fully charges."
+        },
+        {
+          "id": "adc-dac-l1-mcq3",
+          "type": "mcq",
+          "prompt": "Doubling the ADC resolution from 6 to 12 bits, with Vref fixed, changes V_LSB by what factor?",
+          "choices": [
+            "1/2",
+            "1/64",
+            "1/12",
+            "1/4096"
+          ],
+          "answerIndex": 1,
+          "explanation": "V_LSB ~ 1/2^N. Going from 2^6 to 2^12 multiplies the denominator by 2^6 = 64, so V_LSB shrinks to 1/64."
+        },
+        {
+          "id": "adc-dac-l1-mcq4",
+          "type": "mcq",
+          "prompt": "What does the raw ADC code represent?",
+          "choices": [
+            "An absolute voltage independent of Vref",
+            "A ratio of V_in to V_ref scaled by 2^N",
+            "A current proportional to V_in",
+            "The time taken to convert"
+          ],
+          "answerIndex": 1,
+          "explanation": "code = floor((V_in/V_ref) * 2^N). The conversion is ratiometric to the reference, which is why Vref accuracy matters."
+        }
+      ]
+    },
+    {
+      "id": "adc-dac-l2",
+      "title": "Conversion Modes, Triggering & Throughput",
+      "order": 2,
+      "difficulty": "medium",
+      "content": "Once the analog path is sound, you choose **how** conversions are launched. **Single (one-shot)** mode converts once per trigger. **Continuous** mode re-arms itself the instant a conversion finishes, free-running as fast as it can. **Scan/sequence** mode walks an ordered list of channels (regular sequence registers), optionally storing each result via DMA so you can sample, say, four sensors per sweep.\n\n**Triggering** is the crux. **Software trigger** (set the start bit) is convenient but the launch time jitters with whatever the CPU was doing. **Timer (hardware) triggering** ties each conversion to a timer event (e.g. TIM update -> TRGO -> ADC start), giving a hardware-precise, low-jitter sample clock at frequency $f_s$. This is the standard pattern for clean acquisition.\n\nTotal conversion time is the sampling window plus the SAR steps:\n\n$$t_{conv}=t_{samp}+t_{SAR}=t_{samp}+\\frac{N+\\delta}{f_{ADC}}$$\n\nand throughput is $f_{s,max}=1/t_{conv}$.\n\nDon't forget **Nyquist**: to represent a signal of bandwidth $B$ you must sample at $f_s>2B$. Because the ADC samples everything, any energy above $f_s/2$ folds (aliases) back into your band — so the **anti-alias filter is analog, ahead of the ADC**, and cannot be undone in software. A radar tech knows this viscerally: an unfiltered spur at $f_s+f$ lands right on top of your target return.",
+      "items": [
+        {
+          "id": "adc-dac-l2-fc1",
+          "type": "flashcard",
+          "front": "Contrast single, continuous, and scan ADC modes.",
+          "back": "Single: one conversion per trigger. Continuous: re-arms automatically and free-runs. Scan/sequence: steps through an ordered channel list each trigger (often into DMA).",
+          "hint": "One-shot vs free-run vs multi-channel."
+        },
+        {
+          "id": "adc-dac-l2-fc2",
+          "type": "flashcard",
+          "front": "Why is timer triggering preferred over software triggering for signal acquisition?",
+          "back": "A timer launches each conversion on a hardware event (TRGO), giving a precise, low-jitter sample interval independent of CPU activity. Software triggers jitter with code timing, corrupting the time base.",
+          "hint": "Jitter and a clean sample clock."
+        },
+        {
+          "id": "adc-dac-l2-fc3",
+          "type": "flashcard",
+          "front": "State the Nyquist criterion and where the anti-alias filter must live.",
+          "back": "Sample at f_s > 2B for a signal of bandwidth B. The anti-alias filter must be analog, before the ADC; aliasing folds in-band energy and cannot be removed afterward.",
+          "hint": "Filter ahead of the sampler."
+        },
+        {
+          "id": "adc-dac-l2-fc4",
+          "type": "flashcard",
+          "front": "Write conversion time and max throughput in terms of sampling and SAR time.",
+          "back": "$t_{conv}=t_{samp}+t_{SAR}$, with $t_{SAR}\\approx (N+\\delta)/f_{ADC}$. Max throughput $f_{s,max}=1/t_{conv}$.",
+          "hint": "Add the sampling window to the bit-trial time."
+        },
+        {
+          "id": "adc-dac-l2-mcq1",
+          "type": "mcq",
+          "prompt": "An input at 5.2 kHz is sampled at 8 kHz with no anti-alias filter. Where does it appear?",
+          "choices": [
+            "At 5.2 kHz, correctly",
+            "Aliased to 2.8 kHz",
+            "Aliased to 13.2 kHz",
+            "It is rejected automatically"
+          ],
+          "answerIndex": 1,
+          "explanation": "f_s/2 = 4 kHz. 5.2 kHz exceeds Nyquist and folds to |8 - 5.2| = 2.8 kHz, masquerading as a lower-frequency tone."
+        },
+        {
+          "id": "adc-dac-l2-mcq2",
+          "type": "mcq",
+          "prompt": "You need exactly evenly-spaced samples at 50 kHz to feed an FFT. Which trigger source?",
+          "choices": [
+            "Software start in a polling loop",
+            "Timer TRGO at 50 kHz",
+            "Continuous mode with no timer",
+            "EXTI from a push button"
+          ],
+          "answerIndex": 1,
+          "explanation": "A timer at 50 kHz driving the ADC gives a hardware-locked, uniform sample interval. Software/continuous free-run produce non-uniform spacing that smears the FFT."
+        },
+        {
+          "id": "adc-dac-l2-mcq3",
+          "type": "mcq",
+          "prompt": "If t_samp = 1.5 us and t_SAR = 0.9 us, the maximum single-channel throughput is about:",
+          "choices": [
+            "417 kSPS",
+            "1.1 MSPS",
+            "667 kSPS",
+            "2.4 MSPS"
+          ],
+          "answerIndex": 0,
+          "explanation": "t_conv = 1.5 + 0.9 = 2.4 us, so f_s,max = 1/2.4 us ~= 417 kSPS."
+        },
+        {
+          "id": "adc-dac-l2-mcq4",
+          "type": "mcq",
+          "prompt": "Continuous conversion mode means the ADC:",
+          "choices": [
+            "Converts once then stops until re-triggered",
+            "Re-arms itself and converts back-to-back without a new trigger",
+            "Requires a timer event per conversion",
+            "Samples all channels exactly once"
+          ],
+          "answerIndex": 1,
+          "explanation": "Continuous mode automatically restarts after each conversion, free-running at the maximum rate without an external trigger per sample."
+        }
+      ]
+    },
+    {
+      "id": "adc-dac-l3",
+      "title": "Timer+DMA Acquisition, Oversampling, Calibration & DAC/DDS",
+      "order": 3,
+      "difficulty": "hard",
+      "content": "The headline pattern: **timer -> ADC -> DMA -> circular buffer**. A timer's TRGO triggers each conversion; the ADC raises a request on end-of-conversion; the DMA copies the data register into RAM and auto-increments. With a **circular (ping-pong/double) buffer** plus **half-transfer (HT)** and **transfer-complete (TC)** interrupts, the CPU processes the half that just filled while the other half fills — an evenly-sampled block, captured with near-zero CPU babysitting, ready for an FFT.\n\n**Oversampling** trades speed for resolution. Averaging (or decimating) $M$ samples of a signal with sufficient noise dither raises the effective number of bits by\n\n$$\\Delta N=\\frac{1}{2}\\log_2 M$$\n\nso $M=256$ buys 4 extra bits. A hardware oversampler does this in the ADC and right-shifts automatically.\n\n**Calibration** corrects **offset** (zero error) and **gain** (full-scale slope) error; many MCUs run a startup self-calibration into a register. **Internal channels** (a die temperature sensor, the bandgap $V_{ref}$) let you measure VDDA and compensate.\n\nThe **DAC** is the inverse: code in, voltage out, $V_{out}=\\frac{\\text{code}}{2^N}V_{ref}$, with an optional output buffer. Drive it from a **timer + DMA** streaming a sine lookup table and you have **DDS**: output frequency $f_{out}=f_{update}/L$ for a table of length $L$. Finally, **SAR vs sigma-delta**: SAR is fast, low-latency, moderate resolution (great for radar/scan); sigma-delta oversamples a 1-bit modulator for very high resolution at low bandwidth (great for audio/precision DC).",
+      "items": [
+        {
+          "id": "adc-dac-l3-fc1",
+          "type": "flashcard",
+          "front": "Describe the timer -> ADC -> DMA circular-buffer acquisition chain and the CPU's role.",
+          "back": "Timer TRGO triggers each ADC conversion; on EOC the DMA copies the data register to RAM and increments. A circular double buffer with HT/TC interrupts lets the CPU process the just-filled half while the other fills. CPU does no per-sample work.",
+          "hint": "Trigger, copy, ping-pong."
+        },
+        {
+          "id": "adc-dac-l3-fc2",
+          "type": "flashcard",
+          "front": "How many extra effective bits does oversampling by M = 256 give, and why?",
+          "back": "$\\Delta N = \\tfrac{1}{2}\\log_2 M = \\tfrac{1}{2}\\log_2 256 = 4$ bits. Averaging uncorrelated noise reduces it as sqrt(M), gaining 0.5 bit per 4x oversample.",
+          "hint": "Half a bit per factor-of-4."
+        },
+        {
+          "id": "adc-dac-l3-fc3",
+          "type": "flashcard",
+          "front": "What are offset and gain calibration, and what are internal channels good for?",
+          "back": "Offset corrects the zero-point error; gain corrects the full-scale slope. Internal channels (temperature sensor, bandgap Vref) let firmware measure die temp and the true VDDA to compensate readings.",
+          "hint": "Intercept vs slope; on-chip references."
+        },
+        {
+          "id": "adc-dac-l3-fc4",
+          "type": "flashcard",
+          "front": "Give the DDS output-frequency relation for a timer+DMA driving a DAC from a length-L sine table.",
+          "back": "$f_{out}=f_{update}/L$, where f_update is the DAC sample rate set by the timer and L is the lookup-table length. Change f_update (or L, or use a phase accumulator) to tune.",
+          "hint": "One full table = one period."
+        },
+        {
+          "id": "adc-dac-l3-mcq1",
+          "type": "mcq",
+          "prompt": "Why use half-transfer AND transfer-complete interrupts on a circular ADC-DMA buffer?",
+          "choices": [
+            "To double the sample rate",
+            "To process one half while the other half is still being filled (no overwrite)",
+            "To calibrate offset error",
+            "To trigger the timer"
+          ],
+          "answerIndex": 1,
+          "explanation": "HT fires at the midpoint and TC at the end, giving a ping-pong: the CPU consumes the completed half while DMA keeps writing the other, avoiding data races and overwrites."
+        },
+        {
+          "id": "adc-dac-l3-mcq2",
+          "type": "mcq",
+          "prompt": "You oversample by 64x with adequate dither. Effective added resolution is:",
+          "choices": [
+            "1 bit",
+            "2 bits",
+            "3 bits",
+            "6 bits"
+          ],
+          "answerIndex": 2,
+          "explanation": "Delta N = 0.5 * log2(64) = 0.5 * 6 = 3 bits."
+        },
+        {
+          "id": "adc-dac-l3-mcq3",
+          "type": "mcq",
+          "prompt": "For a fast, low-latency, per-sample-converting ADC in a radar/scan front end, which architecture fits best?",
+          "choices": [
+            "Sigma-delta",
+            "SAR",
+            "Dual-slope integrating",
+            "Flash only above 1 GHz"
+          ],
+          "answerIndex": 1,
+          "explanation": "SAR gives one accurate conversion per trigger with low latency and good speed - ideal for timer-triggered scanning. Sigma-delta trades latency/bandwidth for very high resolution, better suited to audio/precision DC."
+        },
+        {
+          "id": "adc-dac-l3-mcq4",
+          "type": "mcq",
+          "prompt": "A DAC sine table has L = 100 entries, updated by a timer at 1 MHz via DMA. Output frequency is:",
+          "choices": [
+            "100 Hz",
+            "1 kHz",
+            "10 kHz",
+            "1 MHz"
+          ],
+          "answerIndex": 2,
+          "explanation": "f_out = f_update / L = 1,000,000 / 100 = 10 kHz. One full table traversal is one output period."
+        },
+        {
+          "id": "adc-dac-l3-img1",
+          "type": "flashcard",
+          "front": "Timer -> ADC -> DMA evenly-sampled buffer",
+          "back": "Block diagram: a timer TRGO triggers the ADC sample-and-hold and SAR, which raises an end-of-conversion request to a circular DMA that writes into an N-sample RAM buffer, with half-transfer and transfer-complete interrupts feeding an FFT/radar stage while the CPU stays idle between buffers.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-1.svg"
+        }
+      ]
+    }
+  ]
+}

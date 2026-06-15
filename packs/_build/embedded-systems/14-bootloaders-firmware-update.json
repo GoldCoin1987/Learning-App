@@ -1,0 +1,323 @@
+{
+  "id": "bootloaders-firmware-update",
+  "title": "Memory-Constrained Design, Bootloaders & Firmware Update",
+  "order": 14,
+  "lessons": [
+    {
+      "id": "bootloaders-firmware-update-lesson-1",
+      "title": "Living in Kilobytes: Budgeting Flash, RAM & the Heap",
+      "order": 1,
+      "difficulty": 1,
+      "content": "On a desktop you ignore memory until you run out of gigabytes. On an MCU you have *kilobytes*, and you account for every one. The ground truth is the **map file** the linker emits: it lists each section's size and address, so you can read off exactly how much flash (`.text`+`.rodata`) and RAM (`.data`+`.bss`+stack+heap) you consume. `arm-none-eabi-size your.elf` gives the summary; the `.map` gives the per-symbol detail when you need to find the hog.\n\nThe usual hogs are predictable. A full `printf` with float support can pull in **8-20 KB** of flash and a big chunk of stack; `malloc`/`free` drag in heap management; software floating point or `double` math on a no-FPU part is huge and slow. The standard mitigations:\n\n- Link **newlib-nano** (`--specs=nano.specs`) for a much smaller libc, and add `-u _printf_float` only if you truly need float formatting.\n- Prefer a tiny custom formatter or integer-only `printf` for logging.\n- Use `float` over `double`, and avoid `double`-promoting constants (`1.0f` not `1.0`).\n\n**Avoid the heap.** Dynamic allocation is non-deterministic, fragments a tiny pool until it fails unpredictably in the field, and is usually ISR-unsafe. The embedded discipline is *static* allocation: fixed-size buffers, object **pools**, and **ring buffers** for streaming I/O, all sized at compile time and visible in the map. Finally, budget the **stack** explicitly: estimate worst-case call depth plus deepest ISR nesting, and guard it with an MPU region or a watermark pattern, because with no MMU an overflow is silent corruption, not a clean fault.\n\n```bash\n# Read the budget straight from the binary\narm-none-eabi-size --format=berkeley app.elf\n#   text    data     bss     dec     hex filename\n#  18324     112    4096   22532    5804 app.elf\n```",
+      "items": [
+        {
+          "id": "bootloaders-firmware-update-1-fc-1",
+          "type": "flashcard",
+          "front": "Where do you read the authoritative flash/RAM usage of a firmware build, and what does each region include?",
+          "back": "The linker map file (and the size summary from arm-none-eabi-size). Flash = .text + .rodata; RAM = .data + .bss + stack + (any) heap. The .map gives per-symbol detail to find the largest contributors.",
+          "hint": "The linker emits it; one tool summarizes, the other itemizes."
+        },
+        {
+          "id": "bootloaders-firmware-update-1-fc-2",
+          "type": "flashcard",
+          "front": "Why is a full printf so expensive on a small MCU, and what reduces its cost?",
+          "back": "It pulls in large formatting/parsing code plus float support (often 8-20 KB flash and significant stack). Reduce it by linking newlib-nano (--specs=nano.specs), gating float with -u _printf_float, or using a tiny integer-only/custom formatter.",
+          "hint": "Think libc variant and the float specifier."
+        },
+        {
+          "id": "bootloaders-firmware-update-1-fc-3",
+          "type": "flashcard",
+          "front": "Give three reasons dynamic allocation (malloc/free) is discouraged on bare metal.",
+          "back": "1) Non-deterministic timing; 2) fragmentation of a tiny heap leading to unpredictable late failures; 3) usually not ISR-safe and no sane recovery when it returns NULL in the field.",
+          "hint": "Timing, fragmentation, safety/recovery."
+        },
+        {
+          "id": "bootloaders-firmware-update-1-fc-4",
+          "type": "flashcard",
+          "front": "What static patterns replace the heap for buffers and streaming I/O?",
+          "back": "Statically sized buffers, fixed-size object pools (pre-allocated slots handed out/returned), and ring (circular) buffers for streaming producer/consumer I/O. All sized at compile time and visible in the map file.",
+          "hint": "Pools and a circular buffer."
+        },
+        {
+          "id": "bootloaders-firmware-update-1-fc-5",
+          "type": "flashcard",
+          "front": "How do you size the stack on bare metal, and why is getting it wrong dangerous?",
+          "back": "Estimate worst-case call depth plus deepest ISR nesting (and FPU/large frames). Wrong sizing overflows silently because there is no MMU to fault it; the stack overwrites adjacent RAM, surfacing as corruption far from the cause. Guard with an MPU region or watermark.",
+          "hint": "No MMU means no clean crash."
+        },
+        {
+          "id": "bootloaders-firmware-update-1-mcq-1",
+          "type": "mcq",
+          "prompt": "Your image is 2 KB over the flash limit and you log with full printf including %f. What is the highest-leverage first cut?",
+          "choices": [
+            "Switch all variables from int to char to save RAM",
+            "Link newlib-nano and drop float printf support (or use a tiny integer formatter)",
+            "Increase the compiler optimization to -O0",
+            "Move the stack into flash"
+          ],
+          "answerIndex": 1,
+          "explanation": "Full printf with float pulls in the largest, most expendable code. newlib-nano plus integer-only formatting typically recovers many kilobytes of flash immediately, far more than micro-optimizing variable types. -O0 grows code, and the stack cannot live in flash."
+        },
+        {
+          "id": "bootloaders-firmware-update-1-mcq-2",
+          "type": "mcq",
+          "prompt": "A device runs fine for hours then occasionally fails a sensor read after heavy logging traffic. Heap is used for log buffers. Most likely root cause?",
+          "choices": [
+            "Flash wear-out after a few hours",
+            "Heap fragmentation: a malloc eventually fails or returns a too-small block unpredictably",
+            "The CPU clock drifts over time",
+            "newlib-nano is too small to hold the data"
+          ],
+          "answerIndex": 1,
+          "explanation": "Intermittent, load-dependent, time-to-failure behavior with heap-backed buffers is the classic fragmentation signature: free space exists but not contiguously, so an allocation fails or is undersized unpredictably. Static pools/ring buffers remove the failure mode."
+        },
+        {
+          "id": "bootloaders-firmware-update-1-mcq-3",
+          "type": "mcq",
+          "prompt": "You add `-u _printf_float` to your link flags. What did you just do?",
+          "choices": [
+            "Disabled all floating-point math in the program",
+            "Forced the smaller integer-only printf to be used",
+            "Pulled in the float-formatting code for printf, increasing flash usage",
+            "Enabled the hardware FPU"
+          ],
+          "answerIndex": 2,
+          "explanation": "With newlib-nano, printf defaults to integer-only to save space; -u _printf_float undefines that symbol so the float-capable formatter is linked in. It does not touch the FPU or your math, only printf's formatting code size."
+        },
+        {
+          "id": "bootloaders-firmware-update-1-mcq-4",
+          "type": "mcq",
+          "prompt": "On a Cortex-M0 (no FPU), which constant choice avoids accidental double-precision software math?",
+          "choices": [
+            "Writing `area = 3.14159 * r * r;`",
+            "Writing `area = 3.14159f * r * r;` with r as float",
+            "Declaring r as double",
+            "Using `long double` for all literals"
+          ],
+          "answerIndex": 1,
+          "explanation": "Unsuffixed floating literals are double; mixing them in promotes the whole expression to double, which on a no-FPU part is large, slow software emulation. The f suffix and float operands keep it single precision."
+        },
+        {
+          "id": "bootloaders-firmware-update-1-fc-6",
+          "type": "flashcard",
+          "front": "What is the practical workflow to cut a firmware image that is over budget?",
+          "back": "Read the map/size output to find the biggest sections and symbols, then attack the largest: swap full printf for newlib-nano or a tiny formatter, remove the heap, drop double for float, and trim unused features (gc-sections). Re-measure from the map after each change.",
+          "hint": "Measure, cut the biggest hog, re-measure."
+        }
+      ]
+    },
+    {
+      "id": "bootloaders-firmware-update-lesson-2",
+      "title": "Flash Characteristics & the Bootloader Jump",
+      "order": 2,
+      "difficulty": 2,
+      "content": "Before you can update firmware you must respect how flash physically behaves. Flash is **erase-before-write**: a programmed bit can only go 1->0 by writing; to set bits back to 1 you must **erase**, and erase works at a coarse **page/sector** granularity (often 2-128 KB), not per byte. You cannot rewrite a word in place; you erase its whole page first. Flash also has finite **endurance** (often ~10k-100k erase cycles per sector), so frequently-changing data needs **wear leveling** or EEPROM emulation rather than hammering one page. Many parts also forbid **read-while-write**: code cannot execute from the same flash bank you are erasing/programming, which is exactly why update code often runs from RAM or a second bank.\n\nA **bootloader** is a small program that runs first and decides what to launch. The boot flow is layered: the on-chip **ROM bootloader** (mask ROM) runs at reset, optionally enters a vendor download mode, then hands control to *your* bootloader in flash, which validates and launches the **application**.\n\nThe jump to the app is the part people get wrong and brick boards. The app is built to a higher flash offset with its own vector table, so the bootloader must, in order: (1) **set the Vector Table Offset Register (VTOR)** to the app's vector table so interrupts dispatch into the app; (2) load the app's **initial stack pointer** from word 0 of its vector table into MSP; (3) load the **reset handler address** from word 1; (4) jump (branch) to it. Skipping VTOR or the SP load is the classic anti-pattern in the pitfalls list.\n\n```c\n#define APP_BASE 0x08008000u\nvoid jump_to_app(void) {\n    uint32_t sp   = *(volatile uint32_t *)(APP_BASE + 0);\n    uint32_t rst  = *(volatile uint32_t *)(APP_BASE + 4);\n    __disable_irq();\n    SCB->VTOR = APP_BASE;            /* relocate vector table */\n    __set_MSP(sp);                  /* set stack pointer     */\n    __DSB(); __ISB();\n    ((void (*)(void))rst)();        /* set PC: jump to app   */\n}\n```",
+      "items": [
+        {
+          "id": "bootloaders-firmware-update-2-img-1",
+          "type": "flashcard",
+          "front": "Study this diagram.",
+          "back": "Flash layout showing an immutable bootloader at the low address, an active Slot A application with a header containing magic, size, CRC and signature, an inactive Slot B staging region for new images, and a swap status trailer.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-1.svg"
+        },
+        {
+          "id": "bootloaders-firmware-update-2-fc-1",
+          "type": "flashcard",
+          "front": "What does 'erase-before-write' mean for flash, and at what granularity does erase happen?",
+          "back": "Programming can only clear bits (1->0); to set bits back to 1 you must erase, which operates on a whole page/sector (often 2-128 KB), not a single byte. So you cannot rewrite a word in place--you erase its entire page first.",
+          "hint": "Bits only go one way until you erase a whole sector."
+        },
+        {
+          "id": "bootloaders-firmware-update-2-fc-2",
+          "type": "flashcard",
+          "front": "What is flash endurance, and how do you protect frequently-updated data like config/calibration?",
+          "back": "Endurance is the limited number of erase cycles per sector (often ~10k-100k). Protect hot data with wear leveling or EEPROM emulation--spreading writes across many slots/pages rather than repeatedly erasing one page.",
+          "hint": "Spread the writes; don't hammer one page."
+        },
+        {
+          "id": "bootloaders-firmware-update-2-fc-3",
+          "type": "flashcard",
+          "front": "Why does read-while-write limitation matter for a flash-resident updater?",
+          "back": "On many parts the CPU cannot fetch instructions from the same flash bank being erased/programmed. So the update routine must run from RAM (or from a different bank), or the core stalls/faults trying to execute from flash mid-program.",
+          "hint": "You can't execute from the bank you're erasing."
+        },
+        {
+          "id": "bootloaders-firmware-update-2-fc-4",
+          "type": "flashcard",
+          "front": "List the boot flow layers from reset to the application.",
+          "back": "On-chip ROM bootloader (mask ROM) runs at reset and may offer a vendor download mode -> your bootloader in flash, which validates the image -> the application. Each stage hands control to the next.",
+          "hint": "ROM -> your bootloader -> app."
+        },
+        {
+          "id": "bootloaders-firmware-update-2-fc-5",
+          "type": "flashcard",
+          "front": "State the safe four-step sequence a bootloader uses to jump to an application at a higher flash offset.",
+          "back": "1) Set VTOR to the app's vector table (relocate vectors); 2) load the app's initial SP from vector-table word 0 into MSP; 3) read the reset-handler address from word 1; 4) branch to it (set PC). Disable IRQs and add DSB/ISB barriers around the switch.",
+          "hint": "VTOR, MSP, reset addr, jump."
+        },
+        {
+          "id": "bootloaders-firmware-update-2-mcq-1",
+          "type": "mcq",
+          "prompt": "A bootloader jumps to an app by calling the app's reset handler but never sets VTOR. The app runs until its first interrupt, then crashes. Why?",
+          "choices": [
+            "The app's code was not erased correctly",
+            "Interrupts still dispatch through the bootloader's vector table, so the wrong (or stale) handler addresses are used",
+            "The stack pointer is automatically wrong without VTOR",
+            "VTOR controls the CPU clock needed for interrupts"
+          ],
+          "answerIndex": 1,
+          "explanation": "VTOR tells the core where the active vector table lives. Without relocating it, an interrupt fetches its handler from the bootloader's table--pointing at bootloader code or garbage relative to the running app--so the first IRQ faults. The SP load is a separate step."
+        },
+        {
+          "id": "bootloaders-firmware-update-2-mcq-2",
+          "type": "mcq",
+          "prompt": "You must reprogram a 4 KB region but only one 64 KB sector covers it. What is the correct procedure?",
+          "choices": [
+            "Write the new 4 KB directly over the old bytes",
+            "Read-modify the bytes in place one word at a time",
+            "Read out the whole sector, erase the sector, then program back the merged 64 KB with the 4 KB changed",
+            "Erase only the 4 KB sub-region, then write it"
+          ],
+          "answerIndex": 2,
+          "explanation": "Erase granularity is the whole 64 KB sector, and you cannot set bits without erasing. The safe pattern is read sector to RAM, modify, erase sector, reprogram. You cannot erase a 4 KB sub-region or write over programmed bytes directly."
+        },
+        {
+          "id": "bootloaders-firmware-update-2-mcq-3",
+          "type": "mcq",
+          "prompt": "An app is linked to base 0x08008000. The bootloader reads which words to find the app's initial SP and entry point?",
+          "choices": [
+            "0x08008000 holds the SP; 0x08008004 holds the reset handler address",
+            "0x08008000 holds main()'s address; 0x08008004 holds the SP",
+            "Both are stored in RAM at 0x20000000",
+            "The SP and PC are read from the bootloader's own vector table"
+          ],
+          "answerIndex": 0,
+          "explanation": "On Cortex-M the vector table begins with the initial stack pointer at offset 0 and the reset-handler (entry) address at offset 4. So at the app base, word 0 is the SP to load into MSP and word 4 is the entry to branch to."
+        },
+        {
+          "id": "bootloaders-firmware-update-2-mcq-4",
+          "type": "mcq",
+          "prompt": "Why do many bootloaders copy the flash erase/program routine into RAM before running an update?",
+          "choices": [
+            "RAM is faster so the update finishes sooner",
+            "Some parts cannot execute code from a flash bank while that bank is being erased/programmed (no read-while-write)",
+            "Flash routines are encrypted and must be decrypted into RAM",
+            "It saves flash endurance on the routine itself"
+          ],
+          "answerIndex": 1,
+          "explanation": "The read-while-write restriction means the CPU may stall or fault fetching instructions from a bank under erase/program. Running the routine from RAM (or a separate bank) avoids executing out of the bank being modified."
+        }
+      ]
+    },
+    {
+      "id": "bootloaders-firmware-update-lesson-3",
+      "title": "Firmware Update (FOTA/DFU): Validate, Swap, Roll Back",
+      "order": 3,
+      "difficulty": 3,
+      "content": "A field firmware update is a transaction that must be **atomic** and **recoverable**: power can fail at any instant and the device must still boot. The robust pattern is built on the A/B (dual-bank) layout: an immutable bootloader plus a currently-running **active** slot and an **inactive** slot for staging.\n\nThe flow has four phases. **(1) Receive** the new image over a transport--UART, USB (often USB-DFU), or an OTA radio link--writing it into the *inactive* bank while the active app keeps running. **(2) Validate** before trusting it: check a **CRC** for integrity against corruption, and a cryptographic **signature** against a baked-in public key for authenticity (the heart of **secure boot** and the chain of trust). Reject and erase on any mismatch--never jump to an unverified image. **(3) Swap atomically**: set a small persistent flag/trailer to 'pending', reset, and let the bootloader make the inactive bank active. Because the *active* image is never overwritten in place, a power loss mid-update leaves the old working image intact--this is the anti-brick guarantee. **(4) Confirm or roll back**: the new image must run a self-test and explicitly **confirm** (set 'confirmed'); if it crashes or a boot-counter/watchdog expires before confirming, the bootloader **reverts** to the previous slot on the next reset.\n\nYou rarely write all this from scratch. **MCUboot** is the standard open bootloader (used by Zephyr) implementing signed images, swap/overwrite, and confirm/revert; **ESP-IDF OTA** provides `esp_ota_*` APIs over its `ota_0`/`ota_1` partitions with a rollback option; ST and others ship built-in DFU/secure-boot stacks. **Versioning** (monotonic version + anti-rollback counter) prevents downgrade attacks and accidental loops.\n\n```c\nif (!crc_ok(slotB) || !sig_verify(slotB, pubkey)) {\n    flash_erase(slotB);          /* reject: keep running A */\n} else {\n    set_update_flag(PENDING);    /* bootloader swaps on reset */\n    NVIC_SystemReset();\n}\n/* New image, once healthy: confirm; else watchdog -> revert to A */\n```",
+      "items": [
+        {
+          "id": "bootloaders-firmware-update-3-img-1",
+          "type": "flashcard",
+          "front": "Study this diagram.",
+          "back": "Flowchart of an OTA update: receive image into Slot B, validate CRC and signature, on failure reject and keep running A, on success mark pending and reset, the bootloader swaps and boots the new image which must self-test and confirm, and if no confirm a watchdog or boot counter triggers a revert to A.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-2.svg"
+        },
+        {
+          "id": "bootloaders-firmware-update-3-fc-1",
+          "type": "flashcard",
+          "front": "What two properties make a firmware update safe against power loss, and how does the A/B scheme provide them?",
+          "back": "Atomicity and recoverability. The new image is written to the INACTIVE bank while the active one keeps running and is never overwritten in place; a persistent flag plus bootloader swap makes the changeover all-or-nothing, so a mid-update power loss leaves the old working image bootable.",
+          "hint": "Never overwrite the running image in place."
+        },
+        {
+          "id": "bootloaders-firmware-update-3-fc-2",
+          "type": "flashcard",
+          "front": "What is the difference between a CRC check and a signature check on a received image?",
+          "back": "A CRC verifies INTEGRITY (the bits arrived uncorrupted) but anyone can compute it. A signature verifies AUTHENTICITY/integrity against a baked-in public key, proving the image came from a trusted signer--the basis of secure boot. You want both.",
+          "hint": "One catches corruption, the other catches forgery."
+        },
+        {
+          "id": "bootloaders-firmware-update-3-fc-3",
+          "type": "flashcard",
+          "front": "Name the four phases of a robust A/B firmware update.",
+          "back": "1) Receive the image into the inactive bank over UART/USB-DFU/OTA; 2) Validate with CRC + signature (reject+erase on mismatch); 3) Swap atomically via a persistent pending flag + reset; 4) Confirm after self-test, or roll back (revert) if it fails to confirm.",
+          "hint": "Receive, validate, swap, confirm/rollback."
+        },
+        {
+          "id": "bootloaders-firmware-update-3-fc-4",
+          "type": "flashcard",
+          "front": "How does the confirm/rollback mechanism prevent a bad update from permanently bricking the device?",
+          "back": "After swap, the new image is only 'pending'; it must run a self-test and explicitly confirm. If it crashes or a boot-counter/watchdog expires before confirming, the bootloader reverts to the previous (known-good) slot on the next reset.",
+          "hint": "Pending until proven healthy; watchdog reverts."
+        },
+        {
+          "id": "bootloaders-firmware-update-3-fc-5",
+          "type": "flashcard",
+          "front": "What do MCUboot and ESP-IDF OTA provide so you don't write update logic from scratch?",
+          "back": "MCUboot (used by Zephyr) is an open bootloader with signed images, swap/overwrite strategies, and confirm/revert. ESP-IDF OTA gives esp_ota_* APIs over ota_0/ota_1 partitions with rollback. Both implement validate-swap-confirm with secure boot support.",
+          "hint": "One is the Zephyr standard; one is Espressif's."
+        },
+        {
+          "id": "bootloaders-firmware-update-3-fc-6",
+          "type": "flashcard",
+          "front": "Why include a monotonic version and anti-rollback counter in firmware images?",
+          "back": "To prevent downgrade attacks (re-flashing an older, vulnerable but validly-signed image) and to avoid accidental update loops. The bootloader refuses images whose version is below the stored anti-rollback counter.",
+          "hint": "Stops attackers from re-installing old signed firmware."
+        },
+        {
+          "id": "bootloaders-firmware-update-3-mcq-1",
+          "type": "mcq",
+          "prompt": "Power is lost exactly while the device is writing the new image into the inactive bank. After reboot, what should happen in a correct A/B design?",
+          "choices": [
+            "The device is bricked because the image is half-written",
+            "The bootloader runs the half-written inactive image and crashes",
+            "The pending flag is not set/confirmed, so the bootloader boots the untouched active image as before",
+            "The bootloader erases both banks and waits for a new image"
+          ],
+          "answerIndex": 2,
+          "explanation": "The active image was never touched, and the swap only happens after a fully-written image is validated and the pending flag is committed. An interrupted download leaves the active slot bootable; the device simply restarts the old firmware, which can retry the update."
+        },
+        {
+          "id": "bootloaders-firmware-update-3-mcq-2",
+          "type": "mcq",
+          "prompt": "A new image passes its CRC but its signature does not verify against the device's public key. The correct action is to:",
+          "choices": [
+            "Boot it anyway since the CRC proves it is intact",
+            "Reject and erase it; keep running the current image",
+            "Store it and ask the user to confirm",
+            "Boot it but disable interrupts as a precaution"
+          ],
+          "answerIndex": 1,
+          "explanation": "A valid CRC only proves the bits are uncorrupted, not that they came from a trusted source. A failed signature means the image is unauthenticated (possibly malicious or wrong-key); secure boot must reject it, erase the staging slot, and continue running the trusted image."
+        },
+        {
+          "id": "bootloaders-firmware-update-3-mcq-3",
+          "type": "mcq",
+          "prompt": "After an atomic swap, the new firmware boots but hangs in early init and never calls confirm. With a boot counter + watchdog, what is the safe outcome?",
+          "choices": [
+            "The device stays hung forever in the new image",
+            "The bootloader, seeing no confirmation, reverts to the previous slot on the next reset",
+            "The bootloader re-downloads the image automatically",
+            "Both slots are erased to recover space"
+          ],
+          "answerIndex": 1,
+          "explanation": "The new image is only pending until it confirms. A watchdog reset (or exceeding the boot-attempt counter) without a confirmation tells the bootloader the update is unhealthy, so it reverts to the known-good previous slot--the anti-brick rollback."
+        },
+        {
+          "id": "bootloaders-firmware-update-3-mcq-4",
+          "type": "mcq",
+          "prompt": "Why is writing the incoming image into the INACTIVE bank (rather than over the running app) essential?",
+          "choices": [
+            "The inactive bank is faster to program",
+            "It lets the device keep running the current app during download and guarantees a known-good image remains if anything fails",
+            "Signatures only validate against the inactive bank",
+            "The active bank cannot be erased at all"
+          ],
+          "answerIndex": 1,
+          "explanation": "Staging in the inactive bank means the running app is untouched throughout receive and validation, so a failure or power loss at any point leaves a complete, bootable image. Overwriting the active app in place would leave the device with a partial, unbootable image on interruption."
+        }
+      ]
+    }
+  ]
+}

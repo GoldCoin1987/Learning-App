@@ -1,0 +1,275 @@
+{
+  "id": "bare-metal-memory-map",
+  "title": "The Bare-Metal Mindset & the Memory Map",
+  "order": 1,
+  "lessons": [
+    {
+      "id": "bare-metal-memory-map-lesson-1",
+      "title": "Memory Is Silicon, Not an Array",
+      "order": 1,
+      "difficulty": 1,
+      "content": "On a hosted machine, memory feels like one flat, uniform array of bytes that a runtime hands you. On a microcontroller (MCU), that abstraction is gone. The CPU drives a single linear **address space** (4 GB on a 32-bit Cortex-M), but different *ranges* of that space are wired to physically different things.\n\nThree regions dominate:\n\n- **Flash** — non-volatile, read/execute. Your code (`.text`), constants (`.rodata`), and the reset vectors live here. It survives power-off. You cannot casually store to it; writing flash means erase-then-program a whole page.\n- **SRAM** — volatile read/write. Your variables (`.data`, `.bss`), the stack, and any heap live here. Fast, but small (often kilobytes) and gone at reset.\n- **Peripheral region** — addresses that are not memory at all. They are *control and status registers* hard-wired into devices (GPIO, timers, UART).\n\nThe load-bearing reframe for a software dev: an address is not a slot that just holds a value. The *same* `STR` (store) instruction that writes a struct field can, at a different address, physically toggle a pin or launch a DMA transfer. Where the address points decides what the bus does.\n\n```c\n/* All three are just stores -- the address decides the effect. */\nuint32_t x;\nx = 1;                       /* writes SRAM, no side effect */\n*(volatile uint32_t *)0x40020018 = 1; /* writes a GPIO register: a pin goes high */\n```\n\nYou studied this exact bus in your digital course; here it is the silicon under your C.",
+      "items": [
+        {
+          "id": "bare-metal-memory-map-1-fc-1",
+          "type": "flashcard",
+          "front": "Name the three dominant regions of a Cortex-M address space and what each is for.",
+          "back": "Flash: non-volatile read/execute -- code, constants, vectors. SRAM: volatile read/write -- variables, stack, heap. Peripheral region: addresses that ARE device registers (GPIO, timers, UART), not storage.",
+          "hint": "One survives power-off, one is fast scratch, one isn't memory at all.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bare-metal-memory-map-1.svg"
+        },
+        {
+          "id": "bare-metal-memory-map-1-fc-2",
+          "type": "flashcard",
+          "front": "Why is 'memory is a flat array of objects' a misleading model on an MCU?",
+          "back": "Because the address space is heterogeneous: ranges map to physically different hardware -- flash, SRAM, or peripheral registers. The effect of a store depends on WHERE it targets, not just the value written.",
+          "hint": "Think about what a store does at a peripheral address."
+        },
+        {
+          "id": "bare-metal-memory-map-1-fc-3",
+          "type": "flashcard",
+          "front": "On an MCU, where do global/static variables (.data and .bss) physically live at run time?",
+          "back": "In SRAM. (.data is initialized from a copy stored in flash; .bss is zeroed. Both reside in SRAM once running.)",
+          "hint": "Volatile, fast, read/write, lost at reset."
+        },
+        {
+          "id": "bare-metal-memory-map-1-fc-4",
+          "type": "flashcard",
+          "front": "Why can't you treat flash like ordinary RAM and just store individual bytes to it?",
+          "back": "Flash is non-volatile and must be erased a whole page/sector at a time before re-programming; it has limited write endurance. It is read/execute in normal operation, not arbitrarily byte-writable.",
+          "hint": "Erase-before-write granularity."
+        },
+        {
+          "id": "bare-metal-memory-map-1-mcq-1",
+          "type": "mcq",
+          "prompt": "A 32-bit Cortex-M executes `*(volatile uint32_t *)0x40020018 = 1;`. The pin wired to that bit goes high. What does this demonstrate?",
+          "choices": [
+            "The compiler special-cased the address into a GPIO intrinsic",
+            "A plain store instruction to a peripheral address has a physical side effect because the address is a hardware register",
+            "Writing to flash toggled the pin",
+            "The value 1 is interpreted as a voltage by the CPU core"
+          ],
+          "answerIndex": 1,
+          "explanation": "The store is an ordinary STR; the address falls in the peripheral region where that location is a GPIO output register, so the bus write physically drives the pin."
+        },
+        {
+          "id": "bare-metal-memory-map-1-mcq-2",
+          "type": "mcq",
+          "prompt": "After a power cycle, which contents are guaranteed to be lost?",
+          "choices": [
+            "The contents of flash (.text and .rodata)",
+            "The reset vector",
+            "The contents of SRAM (variables, stack, heap)",
+            "Nothing; an MCU retains all memory across power cycles"
+          ],
+          "answerIndex": 2,
+          "explanation": "SRAM is volatile and loses its contents at power-off; flash is non-volatile and persists, which is why code and constants live there."
+        },
+        {
+          "id": "bare-metal-memory-map-1-mcq-3",
+          "type": "mcq",
+          "prompt": "Which statement best captures the 'bare-metal mindset' shift from application programming?",
+          "choices": [
+            "Pointers no longer hold addresses",
+            "Memory is a managed abstraction provided by a runtime",
+            "Memory is a physical address space where the target address determines whether you touch RAM, flash, or a live device register",
+            "All memory accesses are equally fast and side-effect free"
+          ],
+          "answerIndex": 2,
+          "explanation": "The core reframe is that the address space is physical and heterogeneous; the address decides what the access actually does."
+        },
+        {
+          "id": "bare-metal-memory-map-1-mcq-4",
+          "type": "mcq",
+          "prompt": "Why does code typically execute directly from flash on a small MCU rather than being copied to RAM first?",
+          "choices": [
+            "Flash is faster than SRAM for execution",
+            "SRAM is usually tiny and non-persistent, while flash is non-volatile, larger, and execute-in-place capable",
+            "The CPU cannot fetch instructions from SRAM",
+            "Flash cannot store data, only instructions"
+          ],
+          "answerIndex": 1,
+          "explanation": "MCUs have far more flash than SRAM and flash retains code across resets, so execute-in-place from flash is the norm; SRAM is reserved for the small, mutable working set."
+        }
+      ]
+    },
+    {
+      "id": "bare-metal-memory-map-lesson-2",
+      "title": "Memory-Mapped I/O, Word Size, Alignment & Endianness",
+      "order": 2,
+      "difficulty": 2,
+      "content": "In the peripheral region, **memory-mapped I/O (MMIO)** means a load or store *is* the device transaction. This breaks two assumptions a desktop C programmer leans on.\n\n**Writes have side effects.** Storing to a GPIO set/reset register drives pins; storing to a UART data register launches a byte on the wire. The value you wrote may not even be readable back.\n\n**Reads have side effects too.** Reading a status register can clear a flag. A classic UART pattern: reading the data register clears the RXNE 'data ready' bit. So a stray, optimizer-inserted, or duplicated read can *eat* an event. This is exactly why register accesses must be `volatile` -- the compiler must perform every access you wrote, no more and no fewer, and must not cache or reorder them.\n\n**Word size & alignment.** Cortex-M is a 32-bit machine: the natural word is 4 bytes. Registers are accessed at their natural width and natural alignment. A 32-bit access to an address not divisible by 4 can raise a **UsageFault** (unaligned access), and many peripherals *only* accept word-width access. Packed protocol structs that misalign fields are a frequent fault source.\n\n```c\n/* uint32_t access must be 4-byte aligned */\nvolatile uint32_t *reg = (volatile uint32_t *)0x40020014;\nuint32_t status = *reg;   /* one real bus read -- may clear a flag */\n```\n\n**Endianness.** Most Cortex-M parts are **little-endian**: the least-significant byte sits at the lowest address. It is invisible within the chip but bites the moment you serialize multi-byte values for a protocol or parse a big-endian network/sensor frame. Always byte-pack explicitly rather than casting a struct over a buffer.",
+      "items": [
+        {
+          "id": "bare-metal-memory-map-2-fc-1",
+          "type": "flashcard",
+          "front": "In memory-mapped I/O, what surprising thing can a simple READ of a register do?",
+          "back": "It can have a side effect -- e.g. reading a data register clears the 'data ready' / RXNE flag. A spurious or duplicated read can therefore lose an event, which is why such accesses must be volatile.",
+          "hint": "Status flags and read-to-clear."
+        },
+        {
+          "id": "bare-metal-memory-map-2-fc-2",
+          "type": "flashcard",
+          "front": "What does `volatile` on a register pointer force the compiler to do?",
+          "back": "Perform exactly the accesses written in source -- no caching the value in a CPU register, no eliding 'redundant' reads/writes, and no reordering volatile accesses relative to each other.",
+          "hint": "Every access in source becomes one real bus access."
+        },
+        {
+          "id": "bare-metal-memory-map-2-fc-3",
+          "type": "flashcard",
+          "front": "What is the natural word size of a Cortex-M, and what happens on a misaligned 32-bit access?",
+          "back": "32 bits (4 bytes). A 32-bit access to an address not divisible by 4 can raise a UsageFault (unaligned access); many peripherals also require word-width access only.",
+          "hint": "Divisible by 4."
+        },
+        {
+          "id": "bare-metal-memory-map-2-fc-4",
+          "type": "flashcard",
+          "front": "Most Cortex-M cores are little-endian. Where does endianness actually bite you?",
+          "back": "In serialization/protocol code: when packing multi-byte values onto a wire or parsing a big-endian frame. Inside the chip it's invisible; across a link it corrupts data if you cast a struct over a byte buffer instead of packing explicitly.",
+          "hint": "Crossing the chip boundary."
+        },
+        {
+          "id": "bare-metal-memory-map-2-mcq-1",
+          "type": "mcq",
+          "prompt": "A UART driver reads the data register twice 'to be safe.' Bytes go missing. Why?",
+          "choices": [
+            "The second read corrupts the alignment of the buffer",
+            "Reading the data register clears RXNE, so the second read consumes/discards a fresh byte's state",
+            "Two reads cause an unaligned access fault",
+            "The compiler merged both reads into one"
+          ],
+          "answerIndex": 1,
+          "explanation": "Reads of MMIO registers can have side effects; reading the data register clears the data-ready flag, so an extra read mis-handles the receive state and effectively eats data."
+        },
+        {
+          "id": "bare-metal-memory-map-2-mcq-2",
+          "type": "mcq",
+          "prompt": "Which is a guarantee `volatile` does NOT provide?",
+          "choices": [
+            "Each source-level access becomes a real memory access",
+            "Volatile accesses are not cached in CPU registers",
+            "Atomicity and a full CPU memory barrier across all accesses",
+            "Volatile accesses are not reordered relative to each other"
+          ],
+          "answerIndex": 2,
+          "explanation": "volatile controls that accesses happen and are not elided or reordered among themselves, but it does not provide atomicity or ordering against non-volatile accesses; for that you need atomics or barriers (DMB/DSB/ISB)."
+        },
+        {
+          "id": "bare-metal-memory-map-2-mcq-3",
+          "type": "mcq",
+          "prompt": "On a little-endian Cortex-M, the 32-bit value 0x11223344 is stored at address A. Which byte is at address A (the lowest)?",
+          "choices": [
+            "0x11",
+            "0x22",
+            "0x33",
+            "0x44"
+          ],
+          "answerIndex": 3,
+          "explanation": "Little-endian places the least-significant byte at the lowest address, so 0x44 is at A and 0x11 at A+3."
+        },
+        {
+          "id": "bare-metal-memory-map-2-mcq-4",
+          "type": "mcq",
+          "prompt": "A peripheral register block is overlaid with a packed struct, and one 32-bit field lands at an offset of 2 bytes. A word read of it faults. The root cause is:",
+          "choices": [
+            "The register is read-only",
+            "Endianness mismatch between host and target",
+            "A 32-bit access to a non-4-byte-aligned address violated natural alignment",
+            "volatile was missing from the struct"
+          ],
+          "answerIndex": 2,
+          "explanation": "A 32-bit access must be 4-byte aligned on Cortex-M; an offset of 2 is misaligned and can raise a UsageFault. Packed structs that misalign word fields are a common cause."
+        }
+      ]
+    },
+    {
+      "id": "bare-metal-memory-map-lesson-3",
+      "title": "Stack vs Heap With No OS, and the Path to main()",
+      "order": 3,
+      "difficulty": 3,
+      "content": "With no operating system, there is no process, no virtual memory, and no allocator handed to you. SRAM is a single physical region you partition yourself via the **linker script**. Typically `.data`/`.bss` sit at the bottom, the **heap** (if any) grows upward, and the **stack** grows downward from the top of SRAM. Nothing checks the gap between them.\n\nThis is why a stack overflow on bare metal is *silent corruption*, not a clean crash: with no MMU, the stack simply overwrites whatever sits below it (your variables, or the heap), and the bug surfaces far away. You size the stack by analysis (worst-case call depth, ISR nesting) and ideally guard it with an MPU region or a watermark pattern.\n\n**Why dynamic allocation is discouraged:** `malloc`/`free` on an MCU is non-deterministic (variable time), fragments a tiny heap until an allocation fails unpredictably, is usually not safe to call from an ISR, and has no recovery path when it returns NULL in the field. The embedded discipline is static allocation: fixed pools, ring buffers, and statically sized buffers whose footprint you can read off the map file.\n\n**There is no `main()` until you write the path to it.** At reset the CPU loads the initial stack pointer from the first vector-table word and the reset handler address from the second, then begins executing the **reset handler / startup code**. That code copies `.data` from its flash load image into SRAM, zeroes `.bss`, optionally sets up the heap and runs C-library/constructor init, and only *then* calls `main`.\n\n```c\nvoid Reset_Handler(void) {\n    /* copy .data flash->SRAM, zero .bss, ... */\n    extern int main(void);\n    main();           /* main() is just another function we chose to call */\n    for (;;) { }      /* main must never return on bare metal */\n}\n```\n\nNo runtime did this for you; the startup code and linker script *are* the runtime, and they are yours to understand.",
+      "items": [
+        {
+          "id": "bare-metal-memory-map-3-fc-1",
+          "type": "flashcard",
+          "front": "On a typical MCU, which direction do the stack and heap grow within SRAM, and what guards the gap between them?",
+          "back": "The stack grows downward from the top of SRAM; the heap grows upward from above .bss. Nothing inherently guards the gap -- with no MMU, a stack overflow silently corrupts whatever is below it.",
+          "hint": "They grow toward each other; collision = silent corruption."
+        },
+        {
+          "id": "bare-metal-memory-map-3-fc-2",
+          "type": "flashcard",
+          "front": "Why is a stack overflow on bare metal especially dangerous compared to a hosted OS?",
+          "back": "There is no MMU/guard page to trap it, so it doesn't fault cleanly -- it silently overwrites adjacent SRAM (variables or heap), and the symptom appears far from the cause.",
+          "hint": "No MMU, no guard page."
+        },
+        {
+          "id": "bare-metal-memory-map-3-fc-3",
+          "type": "flashcard",
+          "front": "List the main reasons dynamic allocation (malloc/free) is discouraged in bare-metal firmware.",
+          "back": "Non-deterministic timing, heap fragmentation in tiny RAM leading to unpredictable allocation failure, usually not ISR-safe, and no sane recovery when it returns NULL in the field. Prefer static allocation: fixed pools, ring buffers, sized buffers.",
+          "hint": "Determinism, fragmentation, ISR-safety, recovery."
+        },
+        {
+          "id": "bare-metal-memory-map-3-fc-4",
+          "type": "flashcard",
+          "front": "What does the reset/startup code do before it ever calls main()?",
+          "back": "It sets the initial stack pointer (from the first vector-table word), copies .data from its flash load image into SRAM, zeroes .bss, optionally inits the heap and runs C-lib/constructor init, then calls main. main must never return.",
+          "hint": "Copy .data, zero .bss, set SP, then main."
+        },
+        {
+          "id": "bare-metal-memory-map-3-mcq-1",
+          "type": "mcq",
+          "prompt": "What does 'there is no main() until you write the path to it' mean on a Cortex-M?",
+          "choices": [
+            "main() is forbidden in embedded C",
+            "The reset handler and linker script -- not a hidden runtime -- are what initialize memory and reach main(); main is just a function the startup code calls",
+            "main() must be written in assembly",
+            "The CPU jumps directly to main() at reset with no setup"
+          ],
+          "answerIndex": 1,
+          "explanation": "At reset the CPU runs the reset handler from the vector table; that startup code initializes .data/.bss and then calls main. There is no implicit runtime -- the startup code and linker script are the runtime you own."
+        },
+        {
+          "id": "bare-metal-memory-map-3-mcq-2",
+          "type": "mcq",
+          "prompt": "At reset on a Cortex-M, the very first two words of the vector table provide:",
+          "choices": [
+            "The heap base and heap limit",
+            "The initial stack pointer and the reset handler address",
+            "The clock frequency and flash wait states",
+            "The addresses of main() and exit()"
+          ],
+          "answerIndex": 1,
+          "explanation": "Word 0 is the initial MSP value loaded into the stack pointer; word 1 is the reset handler address the CPU jumps to. Other vectors follow."
+        },
+        {
+          "id": "bare-metal-memory-map-3-mcq-3",
+          "type": "mcq",
+          "prompt": "Why must .data be copied from flash to SRAM at startup, while .bss is merely zeroed?",
+          "choices": [
+            ".data holds initialized variables whose initial values are stored in flash but must live in writable SRAM; .bss is zero-initialized so only needs clearing",
+            ".bss is read-only and stays in flash",
+            ".data executes and .bss does not",
+            "There is no difference; both are copied identically"
+          ],
+          "answerIndex": 0,
+          "explanation": ".data variables have nonzero initial values kept as a load image in flash and must be copied into their writable SRAM home; .bss variables start at zero, so the startup code just zeroes that SRAM range."
+        },
+        {
+          "id": "bare-metal-memory-map-3-mcq-4",
+          "type": "mcq",
+          "prompt": "A firmware engineer wants deterministic, fragmentation-free buffers. Which approach best fits the bare-metal discipline?",
+          "choices": [
+            "Call malloc() in each ISR and free() in main",
+            "Use a global recursive allocator with garbage collection",
+            "Statically allocate fixed-size pools and ring buffers whose footprint is visible in the map file",
+            "Grow the stack dynamically as needed"
+          ],
+          "answerIndex": 2,
+          "explanation": "Static allocation -- fixed pools, ring buffers, sized buffers -- gives deterministic timing and a known, map-file-visible memory footprint, avoiding heap fragmentation and ISR-unsafe allocation."
+        }
+      ]
+    }
+  ]
+}

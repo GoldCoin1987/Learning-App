@@ -1,0 +1,363 @@
+{
+  "id": "interrupts-nvic",
+  "title": "Interrupts & the NVIC",
+  "order": 6,
+  "lessons": [
+    {
+      "id": "interrupts-nvic-l1",
+      "title": "The NVIC: Vector Table, IRQ Numbers, and Enable/Pending/Active",
+      "order": 1,
+      "difficulty": "easy",
+      "content": "An interrupt is an asynchronous hardware event that yanks the CPU away from `main` to run a handler. On Cortex-M the hardware that arbitrates this is the **NVIC** (Nested Vectored Interrupt Controller), and it is *part of the core* — every Cortex-M has one, configured through registers in the System Control Space.\n\nThe **vector table** is an array of function pointers at the start of flash (or wherever `VTOR` points). Entry 0 is the initial stack pointer; entry 1 is the reset handler; the rest are exception and IRQ handlers in a fixed order. When IRQ number *n* asserts, the core fetches the address at the matching slot and branches there — \"vectored\" means the hardware does the dispatch, not a software demux. As a radar tech you can think of it like a patch panel that routes a triggered line straight to the right service routine.\n\nEach peripheral interrupt has an **IRQ number** (e.g. `EXTI0_IRQn`, `TIM2_IRQn`). For each one the NVIC tracks three state bits you must understand:\n\n- **Enable** (`ISER`/`ICER`): is this IRQ allowed to reach the CPU at all? Set it once during init.\n- **Pending** (`ISPR`/`ICPR`): the event happened and is waiting to be serviced. It is set by hardware and cleared when the handler runs (or by you).\n- **Active**: the handler is currently executing (possibly preempted).\n\n```c\nNVIC_SetPriority(EXTI0_IRQn, 2);\nNVIC_EnableIRQ(EXTI0_IRQn);   /* sets the ISER bit */\n```\n\nA classic confusion: the *peripheral* flag (e.g. an EXTI line) and the *NVIC pending* bit are separate. If your handler does not clear the peripheral flag, it re-asserts and you re-enter forever.",
+      "items": [
+        {
+          "id": "interrupts-nvic-l1-i1",
+          "type": "flashcard",
+          "front": "What does the acronym NVIC stand for, and where does it physically live?",
+          "back": "Nested Vectored Interrupt Controller. It is part of the Cortex-M core itself (in the System Control Space), not a separate vendor peripheral, so every Cortex-M has one.",
+          "hint": "Three words; it is inside the CPU."
+        },
+        {
+          "id": "interrupts-nvic-l1-i2",
+          "type": "flashcard",
+          "front": "What is stored at vector table entry 0 and entry 1 on a Cortex-M?",
+          "back": "Entry 0 is the initial Main Stack Pointer (MSP) value loaded on reset. Entry 1 is the address of the reset handler.",
+          "hint": "One is not even a handler."
+        },
+        {
+          "id": "interrupts-nvic-l1-i3",
+          "type": "flashcard",
+          "front": "Name the three NVIC per-interrupt state concepts you configure or observe.",
+          "back": "Enable (ISER/ICER), Pending (ISPR/ICPR), and Active. Enable allows it through; Pending means it is waiting; Active means its handler is currently running.",
+          "hint": "One you set at init, one is set by the event, one means 'running now'."
+        },
+        {
+          "id": "interrupts-nvic-l1-i4",
+          "type": "flashcard",
+          "front": "Why does 'vectored' interrupt dispatch matter for latency?",
+          "back": "The hardware reads the handler address straight from the vector table slot for that IRQ and branches there. There is no software loop polling which interrupt fired, so entry is fast and deterministic.",
+          "hint": "Contrast with a software demultiplexer."
+        },
+        {
+          "id": "interrupts-nvic-l1-i5",
+          "type": "mcq",
+          "prompt": "An EXTI interrupt fires once, your ISR runs, but the handler is immediately re-entered in an endless loop. What is the most likely cause?",
+          "choices": [
+            "The NVIC enable bit was never set",
+            "The ISR did not clear the peripheral's interrupt flag (the source), so it keeps re-asserting",
+            "The vector table is missing entry 0",
+            "Priority grouping was configured incorrectly"
+          ],
+          "answerIndex": 1,
+          "explanation": "The NVIC pending bit is cleared by hardware on entry, but the peripheral source flag (e.g. the EXTI pending register) is separate. If you do not clear it in the ISR, it immediately re-pends the IRQ and you loop forever."
+        },
+        {
+          "id": "interrupts-nvic-l1-i6",
+          "type": "mcq",
+          "prompt": "What does setting a bit in the NVIC ISPR (Interrupt Set-Pending Register) do?",
+          "choices": [
+            "Permanently disables that interrupt",
+            "Marks that interrupt as pending in software, as if the hardware event had occurred",
+            "Clears the active state of the interrupt",
+            "Raises the interrupt's priority"
+          ],
+          "answerIndex": 1,
+          "explanation": "ISPR lets software set an IRQ pending, which is useful for self-triggering deferred work or for testing a handler without the real hardware event. ICPR clears the pending state."
+        },
+        {
+          "id": "interrupts-nvic-l1-i7",
+          "type": "mcq",
+          "prompt": "Where does the Cortex-M find the address of the handler to run when IRQ n asserts?",
+          "choices": [
+            "In a fixed ROM lookup defined by ARM",
+            "In the vector table slot for IRQ n, at the base address held in VTOR",
+            "In the PRIMASK register",
+            "Wherever the linker placed main()"
+          ],
+          "answerIndex": 1,
+          "explanation": "The vector table is an array of function pointers; the table base is given by VTOR (Vector Table Offset Register). The core indexes the slot for the active exception/IRQ and branches to that address."
+        },
+        {
+          "id": "interrupts-nvic-l1-i8",
+          "type": "mcq",
+          "prompt": "Which statement about the difference between the peripheral flag and the NVIC pending bit is correct?",
+          "choices": [
+            "They are the same bit viewed at two addresses",
+            "Clearing the NVIC pending bit automatically clears the peripheral flag",
+            "They are distinct; you typically clear the peripheral flag in the ISR while the NVIC pending bit is managed by hardware on entry",
+            "Only the NVIC pending bit exists on Cortex-M"
+          ],
+          "answerIndex": 2,
+          "explanation": "These are two layers. The peripheral (e.g. EXTI, timer) latches its own status flag; the NVIC latches a pending bit derived from it. Hardware clears NVIC pending on handler entry, but you must clear the peripheral source flag yourself."
+        }
+      ]
+    },
+    {
+      "id": "interrupts-nvic-l2",
+      "title": "Priority, Preemption, and the Priority-Bits Gotcha",
+      "order": 2,
+      "difficulty": "medium",
+      "content": "When two interrupts compete, the NVIC picks the one with the higher priority — and here is the rule that trips up everyone: **lower numeric value means higher priority**. Priority 0 beats priority 5. This is opposite to the everyday \"priority 1 task\" intuition.\n\nWorse, **Cortex-M implements priority in the *high* bits of an 8-bit field**. A given chip implements only some bits (commonly 4 on STM32, giving 16 levels). If you write `0x01` expecting \"priority 1\" but the chip uses the top 4 bits, your value is really `0x00` after the unused low bits are ignored — or `0x10` if you forgot to shift. CMSIS `NVIC_SetPriority()` handles the shift for you; raw register writes do not. This is the single most common NVIC misconfiguration.\n\n```c\n/* CMSIS does the left-shift into the implemented high bits for you */\nNVIC_SetPriority(TIM2_IRQn, 2);   /* logical level 2 */\nNVIC_SetPriority(EXTI0_IRQn, 0);  /* level 0 = highest, preempts TIM2 */\n```\n\nPriority splits into **preemption priority** and **subpriority** via **priority grouping** (`SCB->AIRCR`, the `PRIGROUP` field). Only the preemption field decides nesting: a higher-preemption interrupt can interrupt a lower one already running. Subpriority only breaks ties among simultaneously pending IRQs of equal preemption level — it does *not* cause preemption.\n\n```c\nNVIC_SetPriorityGrouping(3);  /* e.g. split preempt vs sub fields */\n```\n\nSo if you want TIM2 to be interruptible by a button, give the button a smaller preemption-priority number *and* ensure your grouping actually assigns bits to the preemption field. Mis-set the grouping and everything lands in subpriority — nothing preempts anything.",
+      "items": [
+        {
+          "id": "interrupts-nvic-l2-i1",
+          "type": "flashcard",
+          "front": "On Cortex-M, does a higher or lower numeric priority value win?",
+          "back": "Lower numeric value = higher priority. Priority 0 preempts priority 5. This is the reverse of casual 'priority 1 is top' language.",
+          "hint": "Think of it as a ranking: number 1 finisher beats number 5."
+        },
+        {
+          "id": "interrupts-nvic-l2-i2",
+          "type": "flashcard",
+          "front": "Why can writing 0x01 into a priority register give the wrong result on a Cortex-M?",
+          "back": "Priority is stored in the HIGH bits of an 8-bit field, and a chip implements only some of them (e.g. top 4). The unused low bits are ignored, so a raw 0x01 is effectively 0 (no shift). You must shift into the implemented high bits — or use NVIC_SetPriority(), which shifts for you.",
+          "hint": "Which end of the byte holds the priority?"
+        },
+        {
+          "id": "interrupts-nvic-l2-i3",
+          "type": "flashcard",
+          "front": "What is the difference between preemption priority and subpriority?",
+          "back": "Preemption priority decides whether one interrupt can interrupt (nest within) another already running. Subpriority only orders interrupts of equal preemption priority that are pending at the same time; it never causes preemption.",
+          "hint": "Only one of them controls nesting."
+        },
+        {
+          "id": "interrupts-nvic-l2-i4",
+          "type": "flashcard",
+          "front": "What register field controls how the priority value is split into preemption vs subpriority?",
+          "back": "The PRIGROUP field in SCB->AIRCR, configured via NVIC_SetPriorityGrouping(). It sets the binary point dividing the priority bits into the preemption group and the subpriority group.",
+          "hint": "It lives in a System Control Block register, set by a CMSIS grouping call."
+        },
+        {
+          "id": "interrupts-nvic-l2-i5",
+          "type": "mcq",
+          "prompt": "You want a button IRQ to preempt a running timer IRQ. Which assignment achieves this (assuming grouping gives bits to the preemption field)?",
+          "choices": [
+            "Button preemption priority 5, timer preemption priority 2",
+            "Button preemption priority 2, timer preemption priority 5",
+            "Both at preemption priority 3 with the button at higher subpriority",
+            "Both at preemption priority 0"
+          ],
+          "answerIndex": 1,
+          "explanation": "Lower number = higher priority, and only preemption priority causes nesting. The button needs a smaller preemption value (2) than the timer (5) to interrupt it. Equal preemption with differing subpriority would not preempt."
+        },
+        {
+          "id": "interrupts-nvic-l2-i6",
+          "type": "mcq",
+          "prompt": "An STM32 implements 4 priority bits. You want logical level 3. What value lands in the 8-bit priority register?",
+          "choices": [
+            "0x03",
+            "0x30 (level shifted into the high 4 bits)",
+            "0xC0",
+            "0x0C"
+          ],
+          "answerIndex": 1,
+          "explanation": "With 4 implemented bits in the high nibble, logical level 3 (binary 0011) shifts left by 4 to 0x30. NVIC_SetPriority() performs this shift automatically; a raw register write must do it explicitly."
+        },
+        {
+          "id": "interrupts-nvic-l2-i7",
+          "type": "mcq",
+          "prompt": "After init, none of your interrupts ever preempt each other even though you set different priority numbers. What is a likely cause?",
+          "choices": [
+            "PRIMASK is permanently set",
+            "Priority grouping assigned all bits to subpriority, leaving no preemption-priority bits",
+            "The vector table is in RAM",
+            "You used NVIC_EnableIRQ instead of NVIC_SetPriority"
+          ],
+          "answerIndex": 1,
+          "explanation": "If the PRIGROUP setting puts the binary point such that all bits are subpriority, every interrupt has the same (zero) preemption priority. Subpriority only orders simultaneous pending IRQs and never preempts, so nesting never happens."
+        },
+        {
+          "id": "interrupts-nvic-l2-i8",
+          "type": "mcq",
+          "prompt": "Two IRQs with equal preemption priority become pending at exactly the same moment. What decides which runs first?",
+          "choices": [
+            "Their subpriority (lower number first), then IRQ number as a final tiebreak",
+            "Whichever has the higher IRQ number",
+            "Always the one enabled most recently",
+            "It is undefined and random"
+          ],
+          "answerIndex": 0,
+          "explanation": "Among equal preemption priority, the lower subpriority value is serviced first; if subpriority also ties, the lower IRQ (exception) number wins. Neither preempts the other once one is running."
+        }
+      ]
+    },
+    {
+      "id": "interrupts-nvic-l3",
+      "title": "Latency, Tail-Chaining, and Writing a Minimal ISR",
+      "order": 3,
+      "difficulty": "medium",
+      "content": "Cortex-M exception entry is **deterministic**: on entry the core automatically stacks eight registers (R0-R3, R12, LR, PC, xPSR) onto the current stack, taking a fixed number of cycles (~12 on M3/M4 with zero wait states). Your handler then runs; on exit those registers are unstacked. Because the hardware stacks the caller-saved registers, an ISR can be a plain C function — no special prologue needed.\n\nTwo optimizations cut latency when interrupts come back-to-back:\n\n- **Tail-chaining**: if a second interrupt is pending when one finishes, the core skips the unstack-then-restack dance and jumps directly to the next handler (~6 cycles instead of two full stack operations).\n- **Late arrival**: if a higher-priority interrupt asserts *during* the stacking of a lower one, the core redirects to the higher handler first, reusing the stacking already in progress.\n\nThe diagram below shows preemption (B nests inside A), then C tail-chaining after A without a full unstack.\n\n**The ISR discipline**: keep it short. The recipe is *clear the source flag, do the minimum, defer the rest*.\n\n```c\nvolatile uint32_t g_ticks;\nvoid TIM2_IRQHandler(void) {\n    if (TIM2->SR & TIM_SR_UIF) {\n        TIM2->SR &= ~TIM_SR_UIF;  /* clear source flag first */\n        g_ticks++;                /* minimal work */\n        flag_work_pending = 1;    /* defer heavy work to main */\n    }\n}\n```\n\nNever call `printf`, `malloc`, or other non-reentrant/blocking code in an ISR: they are slow, may not be reentrant, and wreck your latency budget. A long ISR raises the worst-case latency of every lower-priority interrupt behind it.",
+      "items": [
+        {
+          "id": "interrupts-nvic-l3-i1",
+          "type": "flashcard",
+          "front": "Which registers does Cortex-M hardware automatically stack on exception entry, and why does it matter for ISRs?",
+          "back": "R0-R3, R12, LR, PC, and xPSR (eight words). Because the hardware saves the caller-saved registers, an ISR can be written as an ordinary C function with no special attribute or prologue.",
+          "hint": "Eight words; the caller-saved set plus return state."
+        },
+        {
+          "id": "interrupts-nvic-l3-i2",
+          "type": "flashcard",
+          "front": "What is tail-chaining and roughly how much does it save?",
+          "back": "When an interrupt finishes and another is already pending, the core skips unstacking and re-stacking and jumps straight to the next handler. It costs roughly 6 cycles instead of two full ~12-cycle stack operations.",
+          "hint": "Back-to-back interrupts skipping the pop-then-push."
+        },
+        {
+          "id": "interrupts-nvic-l3-i3",
+          "type": "flashcard",
+          "front": "What is 'late arrival' on Cortex-M exception entry?",
+          "back": "If a higher-priority interrupt asserts while the core is still stacking for a lower-priority one, the core redirects to the higher-priority handler first, reusing the stacking already in progress instead of restarting it.",
+          "hint": "A higher-prio IRQ shows up mid-stacking."
+        },
+        {
+          "id": "interrupts-nvic-l3-i4",
+          "type": "flashcard",
+          "front": "State the three-step discipline for a minimal correct ISR.",
+          "back": "1) Clear the interrupt source flag. 2) Do the minimum necessary work. 3) Defer heavy work to main or a lower-priority context (set a flag, post to a queue). Keep the handler short to protect latency.",
+          "hint": "Clear, minimal, defer."
+        },
+        {
+          "id": "interrupts-nvic-l3-i5",
+          "type": "mcq",
+          "prompt": "Why is calling printf() inside an ISR a bad idea?",
+          "choices": [
+            "printf cannot be linked into firmware at all",
+            "It is slow and often non-reentrant/blocking, ballooning ISR execution time and worst-case latency for other interrupts",
+            "The compiler refuses to emit it in handler context",
+            "It automatically disables the NVIC"
+          ],
+          "answerIndex": 1,
+          "explanation": "printf is large, slow, frequently non-reentrant, and may block on a UART. Running it in an ISR inflates the handler's execution time, which directly raises the worst-case latency of every lower-priority interrupt and breaks real-time guarantees."
+        },
+        {
+          "id": "interrupts-nvic-l3-i6",
+          "type": "mcq",
+          "prompt": "On a zero-wait-state Cortex-M4, exception entry takes a fixed ~12 cycles to stack 8 registers. Why is 'fixed' the important word for real-time work?",
+          "choices": [
+            "It means interrupts are faster than function calls",
+            "Deterministic, bounded entry time lets you compute a guaranteed worst-case interrupt latency",
+            "It means tail-chaining is disabled",
+            "It guarantees no interrupt is ever dropped"
+          ],
+          "answerIndex": 1,
+          "explanation": "Real-time design needs bounded worst-case behavior, not just fast average behavior. A deterministic entry cost is a known term in the latency budget, so you can prove a deadline is met rather than hoping."
+        },
+        {
+          "id": "interrupts-nvic-l3-i7",
+          "type": "mcq",
+          "prompt": "In the order of operations inside an ISR, when should you clear the peripheral source flag relative to the rest of the work?",
+          "choices": [
+            "Last, after all deferred work completes",
+            "Early, typically first, so a fresh event after this point can re-pend correctly",
+            "Never; hardware always clears it",
+            "Only if PRIMASK is set"
+          ],
+          "answerIndex": 1,
+          "explanation": "Clearing the source flag early (after reading any needed status) ensures a new event arriving during the handler is latched and re-pends rather than being lost, and avoids accidental immediate re-entry from a stale flag."
+        },
+        {
+          "id": "interrupts-nvic-l3-i8",
+          "type": "mcq",
+          "prompt": "A low-priority IRQ misses its deadline. Investigation shows a high-priority ISR runs a long CRC over a large buffer. What is the cleanest fix consistent with ISR discipline?",
+          "choices": [
+            "Raise the low-priority IRQ above the high one and leave the CRC in the ISR",
+            "Move the CRC out of the ISR: have the ISR set a flag/queue an item and run the CRC in main or a lower-priority context",
+            "Disable tail-chaining",
+            "Call the CRC via printf so it yields"
+          ],
+          "answerIndex": 1,
+          "explanation": "The ISR is doing too much. The deferred-work pattern keeps the handler short (set a flag or post to a queue) and runs the heavy CRC in a bottom half, restoring latency for lower-priority interrupts."
+        }
+      ]
+    },
+    {
+      "id": "interrupts-nvic-l4",
+      "title": "Sharing Data with main: volatile, Atomicity, Masking, and Top/Bottom Halves",
+      "order": 4,
+      "difficulty": "hard",
+      "content": "An ISR and `main` share an address space but run at different times, so shared variables are a concurrency problem. Two distinct hazards:\n\n**1. The compiler caches the variable.** Without `volatile`, the optimizer may hoist a read of a flag into a register and never re-read it, so `main` spins forever even after the ISR sets it. `volatile` forces every source access to be a real memory access. But `volatile` does **not** give atomicity or ordering relative to non-volatile accesses.\n\n**2. The access is not atomic.** A 32-bit aligned load/store is atomic on Cortex-M, so a single `uint32_t` flag is safe. But a read-modify-write (`count++`), a multi-word value (a 64-bit timestamp, a struct, a `float` pair), or a multi-step update can be torn if the ISR fires mid-sequence.\n\n```c\nvolatile uint32_t shared;\nvoid read_consistent(void) {\n    uint32_t primask = __get_PRIMASK();\n    __disable_irq();              /* critical section */\n    uint64_t snap = g_timestamp;  /* multi-word: must be atomic */\n    __set_PRIMASK(primask);       /* restore, do not blindly enable */\n}\n```\n\nTo make a multi-step access atomic, use a **critical section**. `PRIMASK` (`__disable_irq()`/`__enable_irq()`) masks *all* maskable interrupts — simple but blunt. `BASEPRI` masks only interrupts at or below a chosen priority, so your highest-priority handlers still run. Keep critical sections tiny; they raise everyone's latency. Save/restore the mask rather than unconditionally enabling, so you do not clobber an outer critical section.\n\nThis is the **top-half / bottom-half** split: the ISR (top half) does the urgent, atomic minimum; `main` or a task (bottom half) does the heavy work on the shared data, guarding any multi-step access. EXTI lines, by the way, are configured for rising/falling/both edges — choose the edge deliberately, since a wrong edge or a bouncing input can flood you with spurious interrupts.",
+      "items": [
+        {
+          "id": "interrupts-nvic-l4-i1",
+          "type": "flashcard",
+          "front": "Exactly what does volatile guarantee for an ISR-shared variable, and what does it NOT?",
+          "back": "Guarantees: every access in the source becomes a real memory access (no caching in a register, no eliding, no reordering of volatile accesses relative to each other). Does NOT guarantee: atomicity, or ordering relative to non-volatile accesses, or a memory barrier.",
+          "hint": "It forces real accesses; it says nothing about indivisibility."
+        },
+        {
+          "id": "interrupts-nvic-l4-i2",
+          "type": "flashcard",
+          "front": "Why can a plain `count++` shared between an ISR and main be corrupted even if count is volatile?",
+          "back": "count++ is a read-modify-write: load, increment, store. If the ISR fires between the load and the store (or vice versa) and also updates count, one update is lost. volatile makes each access real but does not make the sequence atomic.",
+          "hint": "Three machine steps, not one."
+        },
+        {
+          "id": "interrupts-nvic-l4-i3",
+          "type": "flashcard",
+          "front": "Difference between PRIMASK and BASEPRI for critical sections on Cortex-M.",
+          "back": "PRIMASK masks ALL maskable interrupts (except NMI/HardFault) - blunt but simple, via __disable_irq()/__enable_irq(). BASEPRI masks only interrupts at or below a chosen priority level, letting your highest-priority handlers keep running.",
+          "hint": "One is all-or-nothing; one is a threshold."
+        },
+        {
+          "id": "interrupts-nvic-l4-i4",
+          "type": "flashcard",
+          "front": "What is the top-half / bottom-half pattern?",
+          "back": "The top half is the ISR: it does the urgent, atomic minimum (clear flag, grab data, set a signal). The bottom half runs in main or a task at lower priority and does the heavy processing, guarding any multi-step access to shared state.",
+          "hint": "Urgent now vs deferred work later."
+        },
+        {
+          "id": "interrupts-nvic-l4-i5",
+          "type": "mcq",
+          "prompt": "main polls `while (!flag) {}` where flag is set by an ISR. At -O2 the loop never exits even though the ISR runs. Best fix?",
+          "choices": [
+            "Wrap the loop body in __disable_irq()",
+            "Declare flag as volatile so each loop iteration re-reads it from memory",
+            "Make flag a 64-bit type",
+            "Call printf inside the loop to slow it down"
+          ],
+          "answerIndex": 1,
+          "explanation": "Without volatile the optimizer caches flag in a register and the loop tests a stale value forever. volatile forces a real memory read each iteration so the ISR's write is observed. (volatile, not masking, is the issue here.)"
+        },
+        {
+          "id": "interrupts-nvic-l4-i6",
+          "type": "mcq",
+          "prompt": "main must atomically read a 64-bit timestamp updated by a high-frequency ISR. Which approach is correct on a 32-bit Cortex-M?",
+          "choices": [
+            "Just declare it volatile; 64-bit reads are atomic on Cortex-M",
+            "Disable interrupts (or mask via BASEPRI) around the read, keeping the critical section tiny",
+            "Read it twice and average the values",
+            "Use a plain non-volatile read since main has higher priority"
+          ],
+          "answerIndex": 1,
+          "explanation": "A 64-bit value takes two 32-bit accesses on a 32-bit core, so the ISR can update it between them and tear the read. A short critical section (PRIMASK or BASEPRI) makes the two-word read indivisible. volatile alone does not provide atomicity."
+        },
+        {
+          "id": "interrupts-nvic-l4-i7",
+          "type": "mcq",
+          "prompt": "Why save and restore PRIMASK (e.g. via __get_PRIMASK/__set_PRIMASK) instead of just calling __disable_irq() then __enable_irq()?",
+          "choices": [
+            "__enable_irq() is deprecated",
+            "If this code runs inside an outer critical section, unconditionally enabling would prematurely re-enable interrupts and break the outer guard",
+            "It is faster on every core",
+            "PRIMASK cannot be set directly"
+          ],
+          "answerIndex": 1,
+          "explanation": "Blindly enabling interrupts on exit clobbers any outer critical section that had them disabled. Saving the prior PRIMASK and restoring it makes the critical section nestable and safe to call from contexts that already masked interrupts."
+        },
+        {
+          "id": "interrupts-nvic-l4-i8",
+          "type": "mcq",
+          "prompt": "A button on an EXTI line generates a storm of interrupts on each press. Which two factors are the most likely culprits?",
+          "choices": [
+            "Wrong VTOR address and unset enable bit",
+            "Contact bounce plus an edge configuration that triggers on every transition (e.g. both edges) without debouncing",
+            "Priority grouping and tail-chaining",
+            "Using volatile on the shared flag"
+          ],
+          "answerIndex": 1,
+          "explanation": "Mechanical contact bounce produces many fast edges; if the EXTI line is set for the triggering edge(s) without hardware or software debouncing, each bounce fires the IRQ. Choosing a single deliberate edge and debouncing tames the storm."
+        }
+      ]
+    }
+  ]
+}

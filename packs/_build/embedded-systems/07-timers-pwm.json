@@ -1,0 +1,260 @@
+{
+  "id": "timers-pwm",
+  "title": "Timers, Counters & PWM",
+  "order": 7,
+  "lessons": [
+    {
+      "id": "timers-pwm-l1-fundamentals",
+      "title": "Counter Fundamentals: Clock, Prescaler, Auto-Reload",
+      "order": 1,
+      "difficulty": 1,
+      "content": "At its core a hardware timer is a free-running **counter register** (`CNT`) that increments (or decrements) on each tick of a clock. Three knobs turn that raw clock into a useful time base.\n\n**Clock source.** The counter is driven by a timer clock $f_{clk}$ derived from the bus clock (APB on STM32). Note the APB-timer-clock doubling quirk: if an APB prescaler $>1$ is set, the timer clock is *twice* the bus clock.\n\n**Prescaler (`PSC`).** A 16-bit divider that slows the input clock. The counter advances at\n\n$$f_{cnt} = \\frac{f_{clk}}{PSC + 1}$$\n\nThe $+1$ matters: writing `PSC=0` divides by 1, not 0.\n\n**Auto-reload (`ARR`).** The counter counts $0 \\to ARR$, then an **update event** reloads it to 0 (up-counting). So the overflow/period frequency is\n\n$$f_{period} = \\frac{f_{clk}}{(PSC+1)(ARR+1)}$$\n\nFor a 84 MHz timer clock, `PSC=83`, `ARR=999` gives $84\\times10^6 / (84 \\cdot 1000) = 1\\text{ kHz}$.\n\n**Resolution vs range.** `ARR` sets how many ticks make a period — that is your duty/timing *resolution*. The prescaler trades resolution for *range*: a big `PSC` lets you reach slow periods but coarsens each tick. As an ex-radar tech you will recognize this as the same range-bin vs unambiguous-range tradeoff. Pick the smallest `PSC` that still lets `ARR` fit in its register (16- or 32-bit) for the longest period you need.",
+      "items": [
+        {
+          "id": "timers-pwm-l1-fc-period",
+          "type": "flashcard",
+          "front": "Write the timer period (overflow) frequency in terms of f_clk, PSC, and ARR.",
+          "back": "f_period = f_clk / ((PSC+1)(ARR+1)). Both registers are off-by-one dividers, hence the +1 on each."
+        },
+        {
+          "id": "timers-pwm-l1-fc-psc-plus1",
+          "type": "flashcard",
+          "front": "Why is there a +1 on the prescaler value in the frequency formula?",
+          "back": "The prescaler divides by (PSC+1), so PSC=0 divides by 1. The register holds 'divisor minus one' to allow a divide-by-1 and to use the full 16-bit range (1..65536).",
+          "hint": "Think about what PSC=0 should mean."
+        },
+        {
+          "id": "timers-pwm-l1-fc-arr-role",
+          "type": "flashcard",
+          "front": "What event happens when the up-counter reaches ARR, and what is it called?",
+          "back": "On reaching ARR the next tick generates an Update Event (UEV): the counter reloads to 0, shadow registers (ARR/CCR/PSC) are latched, and the update interrupt/DMA request can fire."
+        },
+        {
+          "id": "timers-pwm-l1-fc-res-range",
+          "type": "flashcard",
+          "front": "How do PSC and ARR each affect resolution vs range of a time base?",
+          "back": "ARR sets the number of ticks per period = timing/duty resolution. PSC slows each tick to extend the achievable period (range) but coarsens resolution. Minimize PSC so ARR carries the count."
+        },
+        {
+          "id": "timers-pwm-l1-fc-clk-quirk",
+          "type": "flashcard",
+          "front": "On STM32, what happens to the timer clock relative to the APB bus clock when the APB prescaler is > 1?",
+          "back": "The timer kernel clock is DOUBLED: f_timer = 2 x f_APB when the APB prescaler is not 1. A classic 2x frequency-off bug if you forget it."
+        },
+        {
+          "id": "timers-pwm-l1-mcq-compute",
+          "type": "mcq",
+          "prompt": "Timer clock is 72 MHz. You set PSC=71 and ARR=999. What is the update (period) frequency?",
+          "choices": ["1 kHz", "1 MHz", "100 Hz", "72 kHz"],
+          "answerIndex": 0,
+          "explanation": "f = 72e6 / ((71+1)(999+1)) = 72e6 / (72 x 1000) = 1000 Hz = 1 kHz."
+        },
+        {
+          "id": "timers-pwm-l1-mcq-psc-for-1mhz",
+          "type": "mcq",
+          "prompt": "From an 84 MHz timer clock you want the counter to tick at exactly 1 MHz (1 us per tick). What PSC value achieves this?",
+          "choices": ["83", "84", "1000000", "42"],
+          "answerIndex": 0,
+          "explanation": "f_cnt = f_clk/(PSC+1). For 1 MHz: PSC+1 = 84e6/1e6 = 84, so PSC = 83."
+        },
+        {
+          "id": "timers-pwm-l1-mcq-resolution",
+          "type": "mcq",
+          "prompt": "You need a 50 Hz PWM with the finest possible duty resolution from an 84 MHz clock using a 16-bit ARR. Which approach is best?",
+          "choices": [
+            "Use the smallest PSC such that ARR still fits in 16 bits (largest ARR)",
+            "Use the largest possible PSC to keep ARR small",
+            "Set PSC=ARR for symmetry",
+            "Set ARR=49 so the number matches the frequency"
+          ],
+          "answerIndex": 0,
+          "explanation": "Resolution = number of ticks per period = ARR+1. Maximize ARR (minimize PSC) while ARR <= 65535. 84e6/50 = 1,680,000 ticks; with PSC=25 -> ARR=64615, which fits and gives ~16-bit duty resolution."
+        },
+        {
+          "id": "timers-pwm-l1-mcq-direction",
+          "type": "mcq",
+          "prompt": "In center-aligned (up-down) counting mode versus edge-aligned (up only), the effective period for the same ARR is:",
+          "choices": [
+            "Roughly doubled, because the counter ramps up then back down",
+            "Halved",
+            "Identical",
+            "Determined only by PSC"
+          ],
+          "answerIndex": 0,
+          "explanation": "Center-aligned counts 0->ARR then ARR->0, so it traverses ~2xARR ticks per period, roughly doubling the period (and halving the PWM frequency) compared to edge-aligned."
+        }
+      ]
+    },
+    {
+      "id": "timers-pwm-l2-pwm-capture",
+      "title": "PWM Generation and Input Capture",
+      "order": 2,
+      "difficulty": 3,
+      "content": "With a time base running, the **capture/compare** channels turn a timer into an actuator or a measurement instrument.\n\n**Output compare / PWM.** Each channel has a compare register `CCR`. In edge-aligned PWM the output is high while `CNT < CCR` and low otherwise (PWM mode 1), so\n\n$$\\text{duty} = \\frac{CCR}{ARR + 1}$$\n\nWrite `CCR` to set duty without touching frequency. See the diagram for the ramp-vs-output relationship.\n\n**Alignment.** *Edge-aligned* (sawtooth) is simplest. *Center-aligned* (up/down) keeps the pulse centered in the period, which lowers harmonic content and is preferred for motor/inverter drive.\n\n**Dead-time.** Complementary outputs (`OCx` / `OCxN`) drive a half-bridge. A programmable **dead-time** delays the turn-on of one transistor after the other turns off, preventing shoot-through (both FETs conducting and shorting the rail). Advanced-control timers (TIM1/TIM8) provide this plus a break input for fault shutdown.\n\n**Input capture.** Configure a channel to latch `CNT` into `CCR` on a selected edge. Capturing successive rising edges gives the period in ticks; frequency is\n\n$$f_{in} = \\frac{f_{clk}}{(PSC+1)\\,\\Delta CNT}$$\n\nwhere $\\Delta CNT$ is the tick count between captures (handle wrap with the update-overflow count). **PWM-input mode** wires two channels to one pin to measure period and high-time (duty) simultaneously — exactly how you would time an ultrasonic echo or tachometer pulse.",
+      "items": [
+        {
+          "id": "timers-pwm-l2-fc-duty",
+          "type": "flashcard",
+          "front": "In edge-aligned PWM mode 1, give the duty cycle in terms of CCR and ARR.",
+          "back": "duty = CCR / (ARR+1). The output is high while CNT < CCR. Changing CCR adjusts duty without changing the period set by ARR/PSC.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-1.svg"
+        },
+        {
+          "id": "timers-pwm-l2-fc-deadtime",
+          "type": "flashcard",
+          "front": "What is dead-time in complementary PWM and what failure does it prevent?",
+          "back": "A short delay inserted between turning one half-bridge transistor off and the complementary one on. It prevents shoot-through (both FETs conducting simultaneously, shorting the supply rail)."
+        },
+        {
+          "id": "timers-pwm-l2-fc-alignment",
+          "type": "flashcard",
+          "front": "Why prefer center-aligned PWM over edge-aligned for motor/inverter drive?",
+          "back": "Center-aligned keeps pulses symmetric within the period, reducing harmonic content/EMI and giving cleaner current waveforms. Edge-aligned is simpler and fine for LED dimming or servos."
+        },
+        {
+          "id": "timers-pwm-l2-fc-capture",
+          "type": "flashcard",
+          "front": "How does input capture measure an external signal's period?",
+          "back": "On the selected edge the hardware latches CNT into CCR. The difference between two successive captures (delta CNT, accounting for overflows) is the period in timer ticks; convert with the tick rate.",
+          "hint": "What does the channel copy on each edge?"
+        },
+        {
+          "id": "timers-pwm-l2-fc-pwm-input",
+          "type": "flashcard",
+          "front": "What does PWM-input mode give you that single-edge capture does not?",
+          "back": "It routes one input pin to two capture channels triggering on opposite edges, so one channel measures the full period and the other measures the high-time, yielding frequency AND duty cycle in one pass."
+        },
+        {
+          "id": "timers-pwm-l2-mcq-set-duty",
+          "type": "mcq",
+          "prompt": "A PWM has ARR=999. You want 25% duty. What CCR value do you write (edge-aligned mode 1)?",
+          "choices": ["250", "25", "750", "999"],
+          "answerIndex": 0,
+          "explanation": "duty = CCR/(ARR+1) = CCR/1000. For 25%, CCR = 0.25 x 1000 = 250."
+        },
+        {
+          "id": "timers-pwm-l2-mcq-capture-freq",
+          "type": "mcq",
+          "prompt": "Timer ticks at 1 MHz (1 us/tick). Two successive rising-edge captures read 1200 and 1700 ticks. What is the input frequency?",
+          "choices": ["2 kHz", "500 Hz", "1.7 kHz", "5 kHz"],
+          "answerIndex": 0,
+          "explanation": "Period = (1700-1200) = 500 ticks x 1 us = 500 us. f = 1/500us = 2000 Hz = 2 kHz."
+        },
+        {
+          "id": "timers-pwm-l2-mcq-overflow",
+          "type": "mcq",
+          "prompt": "When measuring a slow signal whose period exceeds the 16-bit counter range, what must input-capture code account for?",
+          "choices": [
+            "Counter overflow/update events between captures, adding ARR+1 per wrap",
+            "Nothing; CCR is 32-bit so it cannot wrap",
+            "The prescaler automatically extends the count",
+            "Dead-time insertion"
+          ],
+          "answerIndex": 0,
+          "explanation": "If the period exceeds (ARR+1) ticks the counter wraps. You must count update (overflow) interrupts and add (ARR+1) per overflow to the captured delta, or the measured period will be too short."
+        },
+        {
+          "id": "timers-pwm-l2-mcq-shoot-through",
+          "type": "mcq",
+          "prompt": "Which timer feature, in addition to dead-time, protects a motor half-bridge by forcing outputs to a safe state on an over-current or fault signal?",
+          "choices": ["The break (BRK) input", "The prescaler", "Center alignment", "The repetition counter"],
+          "answerIndex": 0,
+          "explanation": "Advanced-control timers (TIM1/TIM8) have a break input that asynchronously disables PWM outputs on a fault (e.g., over-current comparator), driving them to a programmed safe level."
+        }
+      ]
+    },
+    {
+      "id": "timers-pwm-l3-systems",
+      "title": "Timer-Triggered Peripherals, Watchdogs, and Time Bases",
+      "order": 3,
+      "difficulty": 5,
+      "content": "Timers do more than wiggle pins; they are the synchronization backbone of a deterministic system.\n\n**One-shot vs continuous.** In continuous mode the counter auto-reloads forever. In **one-pulse / one-shot mode** the timer counts a single period then stops (sets `OPM`), useful for a precise single delay or a one-off trigger pulse.\n\n**Timer-triggered ADC/DMA.** A timer's update or compare event can be routed as a **trigger output (TRGO)** to start an ADC conversion at an exact rate, and the ADC's end-of-conversion can request **DMA** to move the sample to RAM — all with zero CPU involvement. This peripheral-to-peripheral chaining is how you get jitter-free, evenly-sampled buffers, the literal front end of a radar/DSP acquisition pipeline (Module 15).\n\n**Watchdogs.** An **independent watchdog (IWDG)** runs from its own low-speed RC oscillator and resets the MCU unless periodically *kicked*; it survives a hung main clock. A **window watchdog (WWDG)** additionally faults if you kick too *early*, catching code that runs too fast or skips steps. Kick from a sane place, never blindly from a timer ISR.\n\n**SysTick and time bases.** The Cortex-M core's **SysTick** is a 24-bit down-counter that generates the canonical periodic tick (often 1 kHz) for `millis()` and RTOS scheduling. Build `millis()` by incrementing a `volatile uint32_t` in the SysTick handler; build `micros()` by combining that count with the live counter:\n\n$$\\text{micros} = ms \\times 1000 + \\frac{LOAD - VAL}{f_{clk}/10^6}$$\n\nRead `ms` then `VAL`, and re-check for a tick that fired in between to avoid a race at the rollover boundary.",
+      "items": [
+        {
+          "id": "timers-pwm-l3-fc-oneshot",
+          "type": "flashcard",
+          "front": "What distinguishes one-pulse (one-shot) mode from continuous timer mode?",
+          "back": "In one-pulse mode (OPM set) the counter runs through a single period and stops automatically; continuous mode auto-reloads and keeps counting. One-shot is for a single precise delay or trigger pulse."
+        },
+        {
+          "id": "timers-pwm-l3-fc-trgo",
+          "type": "flashcard",
+          "front": "How can a timer trigger an ADC conversion at a precise rate without the CPU?",
+          "back": "The timer's update or compare event is routed as a Trigger Output (TRGO) to the ADC's external trigger input. The ADC samples on each event; its EOC then requests DMA to store the sample. CPU is uninvolved."
+        },
+        {
+          "id": "timers-pwm-l3-fc-iwdg-wwdg",
+          "type": "flashcard",
+          "front": "Contrast the independent watchdog (IWDG) and the window watchdog (WWDG).",
+          "back": "IWDG runs from its own LSI RC clock, surviving a stalled main clock; it resets if not kicked in time. WWDG runs on the APB clock and faults if kicked too EARLY (outside its window) as well as too late, catching code running too fast / skipping logic."
+        },
+        {
+          "id": "timers-pwm-l3-fc-systick",
+          "type": "flashcard",
+          "front": "What is SysTick and why is it the canonical RTOS/OS tick?",
+          "back": "A 24-bit core down-counter in every Cortex-M, independent of vendor timers. It reloads from LOAD and fires an exception at a fixed rate (e.g. 1 kHz), driving millis() and the RTOS scheduler tick portably across parts."
+        },
+        {
+          "id": "timers-pwm-l3-fc-micros",
+          "type": "flashcard",
+          "front": "Why must reading millis() and the live SysTick VAL be done carefully when building micros()?",
+          "back": "A SysTick rollover can occur between reading the ms counter and reading VAL, causing the fractional part to span a tick boundary. Read ms, read VAL, then re-read ms / check the COUNTFLAG and retry if a tick fired in between.",
+          "hint": "Two reads, a tick can land between them."
+        },
+        {
+          "id": "timers-pwm-l3-fc-iwdg-kick",
+          "type": "flashcard",
+          "front": "Why is it bad practice to kick (refresh) the watchdog from inside a timer interrupt?",
+          "back": "The timer ISR keeps running even if the main application has hung in a loop, so the watchdog never trips and the very fault it exists to catch goes undetected. Kick from the main control flow that exercises real work."
+        },
+        {
+          "id": "timers-pwm-l3-mcq-determinism",
+          "type": "mcq",
+          "prompt": "Why is timer->TRGO->ADC->DMA chaining preferred over a SysTick ISR that calls an ADC read for evenly-sampled acquisition?",
+          "choices": [
+            "Hardware triggering removes software/interrupt-latency jitter, giving sample timing fixed by the timer clock",
+            "It uses less flash",
+            "DMA is slower so it averages noise",
+            "SysTick cannot generate interrupts"
+          ],
+          "answerIndex": 0,
+          "explanation": "Software-initiated sampling inherits interrupt latency and code-path jitter. A hardware trigger fires the conversion on the exact timer event, so sample spacing is determined by the timer clock, not CPU timing - essential for clean FFTs."
+        },
+        {
+          "id": "timers-pwm-l3-mcq-systick-load",
+          "type": "mcq",
+          "prompt": "Core/SysTick clock is 168 MHz. What LOAD (reload) value gives a 1 ms tick?",
+          "choices": ["167999", "168000", "168", "1000"],
+          "answerIndex": 0,
+          "explanation": "SysTick counts down LOAD+1 cycles per tick. For 1 ms at 168 MHz you need 168000 cycles, so LOAD = 168000 - 1 = 167999."
+        },
+        {
+          "id": "timers-pwm-l3-mcq-wwdg-window",
+          "type": "mcq",
+          "prompt": "A WWDG is configured with a window. The firmware refreshes it correctly when on time, but a buggy build refreshes it twice as fast. What happens?",
+          "choices": [
+            "The WWDG triggers a reset because the early refresh falls outside (before) the window",
+            "Nothing; refreshing early is always safe",
+            "The MCU enters low-power mode",
+            "The watchdog disables itself"
+          ],
+          "answerIndex": 0,
+          "explanation": "Unlike a plain watchdog, the WWDG resets if refreshed BEFORE the down-counter reaches the window value. Refreshing too early (running too fast / skipping work) is treated as a fault, exactly its purpose."
+        },
+        {
+          "id": "timers-pwm-l3-mcq-micros-race",
+          "type": "mcq",
+          "prompt": "A micros() routine reads the millis counter, then reads SysTick VAL, and combines them. Occasionally micros() jumps backward by ~1000 us. The most likely cause is:",
+          "choices": [
+            "A SysTick reload occurred between the two reads, so the fractional part belongs to the next ms but was added to the old ms",
+            "The timer prescaler is wrong",
+            "DMA corrupted the counter",
+            "The FPU is disabled"
+          ],
+          "answerIndex": 0,
+          "explanation": "Classic read-tear at the rollover: if VAL wraps between reading ms and VAL, the small VAL-derived fraction is paired with the stale (smaller) ms, producing a backward jump. Re-read ms / check COUNTFLAG and retry to make the read atomic."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,386 @@
+{
+  "id": "toolchain",
+  "title": "Toolchain: Cross-Compiler, Linker, Startup & Debug",
+  "order": 4,
+  "lessons": [
+    {
+      "id": "toolchain-lesson-cross-compile",
+      "title": "Cross-Compilation & the Freestanding Pipeline",
+      "order": 1,
+      "difficulty": "easy",
+      "content": "You already build native software, where `gcc` targets the same machine it runs on. Embedded work is **cross-compilation**: the *host* (your x86-64 laptop) builds code for a different *target* (an ARM Cortex-M). The compiler is named for the **target triple** it emits: `arm-none-eabi-gcc` means architecture `arm`, vendor `none`, and ABI `eabi` (the ARM Embedded ABI). The empty middle field is the giveaway that there is **no operating system**.\n\nThat \"no OS\" fact is what *freestanding* means. A **hosted** environment assumes a full libc and an OS underneath (`fopen`, `malloc` backed by `brk`, a `main` that `_start` calls for you). A **freestanding** environment provides only the language plus headers like `<stdint.h>`, `<stddef.h>`, and `<stdbool.h>` — no guaranteed `printf`, no filesystem, no process. You supply the path to `main` yourself (the startup code, lesson 3).\n\nThe classic flags reflect this:\n\n```\narm-none-eabi-gcc -mcpu=cortex-m4 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 \\\n    -ffreestanding -nostartfiles -Os -g3 -c main.c -o main.o\n```\n\n`-mthumb` selects the Thumb-2 instruction set (all Cortex-M is Thumb-only). `-ffreestanding` tells the compiler not to assume hosted-library semantics, and `-nostartfiles` says \"do not link the default `crt0`/`_start` — I provide my own.\" The toolchain ships matching multilib copies of `libc`/`libgcc` built for each `-mcpu`/`-mfloat-abi` combination, so the linker picks the variant that matches your flags. Mismatch them and you get cryptic link errors or a hard fault on the first float.",
+      "items": [
+        {
+          "id": "toolchain-fc-triple",
+          "type": "flashcard",
+          "front": "Decode the target triple in `arm-none-eabi-gcc`.",
+          "back": "arm = architecture (ARM, Thumb on Cortex-M); none = vendor/OS (no operating system); eabi = the ARM Embedded ABI for calling conventions and object layout. The empty 'none' field signals a bare-metal/freestanding target.",
+          "hint": "Three fields: arch, vendor/OS, ABI."
+        },
+        {
+          "id": "toolchain-fc-freestanding",
+          "type": "flashcard",
+          "front": "What does a *freestanding* C environment provide vs a *hosted* one?",
+          "back": "Freestanding guarantees only the language and a few headers (stdint.h, stddef.h, stdbool.h, limits.h, float.h) and no OS/process startup. Hosted assumes a full libc, an OS, and that _start runs init then calls main for you. On bare metal you write the startup path to main yourself.",
+          "hint": "Think about what runs before main()."
+        },
+        {
+          "id": "toolchain-fc-thumb",
+          "type": "flashcard",
+          "front": "Why does every Cortex-M build pass `-mthumb`?",
+          "back": "Cortex-M cores execute ONLY the Thumb-2 instruction set; they have no ARM (A32) state. Omitting -mthumb (or linking A32 code) produces instructions the core cannot run, faulting immediately.",
+          "hint": "Cortex-M has no A32 state."
+        },
+        {
+          "id": "toolchain-fc-nostartfiles",
+          "type": "flashcard",
+          "front": "What does `-nostartfiles` do, and why use it on an MCU?",
+          "back": "It tells the linker not to pull in the default crt0/_start objects. On bare metal you supply your own Reset_Handler/startup that sets the stack pointer, initializes .data/.bss, and calls main, so the hosted _start would be wrong or absent.",
+          "hint": "You provide the entry path yourself."
+        },
+        {
+          "id": "toolchain-mcq-float-abi",
+          "type": "mcq",
+          "prompt": "You compile some objects with `-mfloat-abi=hard` and others (a prebuilt lib) with `-mfloat-abi=soft`. What happens?",
+          "choices": [
+            "Nothing; the float ABI is purely cosmetic",
+            "Link or runtime failure because the two halves pass float arguments differently (FPU registers vs core registers)",
+            "The linker silently recompiles the soft objects to hard",
+            "The code runs but floats are always rounded to integers"
+          ],
+          "answerIndex": 1,
+          "explanation": "The float ABI is a calling convention. 'hard' passes floats in FPU (s0/d0) registers; 'soft' passes them in core registers via library calls. Mixing them means a callee reads arguments from the wrong place, so the linker rejects the mismatch (it tags objects) or you get garbage/faults. All objects and libs must share the same -mfloat-abi/-mfpu."
+        },
+        {
+          "id": "toolchain-mcq-triple-purpose",
+          "type": "mcq",
+          "prompt": "Why is the compiler named `arm-none-eabi-gcc` rather than just `gcc`?",
+          "choices": [
+            "It is a marketing alias for the same native compiler",
+            "It is a cross-compiler whose name encodes the target triple it generates code for, distinct from the host it runs on",
+            "It only works on ARM host machines",
+            "The prefix selects the editor integration"
+          ],
+          "answerIndex": 1,
+          "explanation": "It is a cross-compiler: it runs on your host (often x86-64) but emits code for the ARM/none/eabi target. The triple prefix lets multiple cross toolchains coexist and makes the target unambiguous to build systems."
+        },
+        {
+          "id": "toolchain-mcq-headers",
+          "type": "mcq",
+          "prompt": "Which header is guaranteed available in a freestanding C environment?",
+          "choices": [
+            "<stdio.h>",
+            "<stdlib.h>",
+            "<stdint.h>",
+            "<unistd.h>"
+          ],
+          "answerIndex": 2,
+          "explanation": "The C standard guarantees a small set of headers in freestanding mode (stddef.h, stdint.h, stdbool.h, limits.h, float.h, iso646.h, stdalign.h, stdnoreturn.h, etc.). stdio/stdlib/unistd assume a hosted library and OS and may be absent or non-functional without supplying syscall stubs."
+        },
+        {
+          "id": "toolchain-fc-cpp-stages",
+          "type": "flashcard",
+          "front": "Name the four classic stages of the build pipeline and their outputs.",
+          "back": "Preprocess (cpp): expand #includes/macros -> translation unit. Compile (cc1): C -> assembly (.s). Assemble (as): assembly -> object (.o). Link (ld): combine .o + libraries, resolve symbols, place sections -> .elf.",
+          "hint": "cpp, cc1, as, ld."
+        },
+        {
+          "id": "toolchain-mcq-os-flag-meaning",
+          "type": "mcq",
+          "prompt": "What practical consequence follows from the 'none' (no-OS) field for `malloc`?",
+          "choices": [
+            "malloc is impossible on bare metal",
+            "malloc works but ultimately calls a `_sbrk`/`_brk` stub you must provide to grow the heap, since there is no OS to do it",
+            "malloc is always lock-free and reentrant",
+            "malloc allocates from flash"
+          ],
+          "answerIndex": 1,
+          "explanation": "With no OS, the libc heap allocator has nothing to ask for more memory. newlib calls _sbrk to extend the program break; you must supply that stub (typically carving from a RAM region between the heap start and the stack). Many bare-metal designs avoid malloc entirely for determinism."
+        }
+      ]
+    },
+    {
+      "id": "toolchain-lesson-sections-linker",
+      "title": "Sections & the Linker Script: MEMORY, SECTIONS, LMA vs VMA",
+      "order": 2,
+      "difficulty": "medium",
+      "content": "Every object file is divided into **sections** by purpose. `.text` is executable code (and usually the vector table); `.rodata` is read-only constants (string literals, `const` tables); `.data` is initialized read/write globals; `.bss` is zero-initialized read/write globals (it occupies no space in the image — just a size). `.stack` and `.heap` are reserved RAM regions. The linker's job is to gather like-named input sections from all `.o` files and place each output section at a real address.\n\nThat placement is what the **linker script** (`.ld`) describes. It has two key blocks. `MEMORY` names the physical regions:\n\n```\nMEMORY {\n  FLASH (rx)  : ORIGIN = 0x08000000, LENGTH = 512K\n  RAM   (rwx) : ORIGIN = 0x20000000, LENGTH = 128K\n}\n```\n\n`SECTIONS` maps output sections into those regions and is where the crucial **LMA vs VMA** distinction lives. The **VMA** (virtual/run address) is where a section *executes or is read* from at run time; the **LMA** (load address) is where it *physically lives in the image*. For code and constants the two are equal — they run from FLASH. But `.data` is special: it must *run* from RAM (VMA in RAM) yet its initial values must be *stored* in FLASH (LMA in FLASH), because RAM is volatile. The `AT>` operator sets the LMA:\n\n```\n.text : { KEEP(*(.isr_vector)) *(.text*) *(.rodata*) } > FLASH\n.data : {\n  _sdata = .;\n  *(.data*)\n  _edata = .;\n} > RAM AT> FLASH\n_sidata = LOADADDR(.data);  /* LMA of .data, used by startup */\n.bss : { _sbss = .; *(.bss*) *(COMMON); _ebss = .; } > RAM\n```\n\n`KEEP(*(.isr_vector))` forces the **vector table** to the very start of FLASH (`0x08000000` on STM32), because the CPU fetches the initial SP and reset PC from there on reset. The exported symbols (`_sdata`, `_edata`, `_sidata`, `_sbss`, `_ebss`, `_estack`) are the handles the startup code uses next.",
+      "items": [
+        {
+          "id": "toolchain-fc-sections",
+          "type": "flashcard",
+          "front": "What goes in .text, .rodata, .data, and .bss?",
+          "back": ".text = executable code (+ vector table). .rodata = read-only constants (string literals, const tables). .data = initialized read/write globals (nonzero init values). .bss = zero-initialized read/write globals (no bytes in the image, only a size).",
+          "hint": "Code, constants, init'd RW, zeroed RW."
+        },
+        {
+          "id": "toolchain-fc-lma-vma",
+          "type": "flashcard",
+          "front": "Define LMA vs VMA and give the section where they differ.",
+          "back": "VMA (virtual/run address) is where a section is accessed at run time; LMA (load address) is where its bytes are stored in the image. They differ for .data: VMA is in RAM (it must be writable) but LMA is in FLASH (init values must survive power-off). Startup copies LMA->VMA.",
+          "hint": "Where it runs vs where it is stored."
+        },
+        {
+          "id": "toolchain-fc-bss-noimage",
+          "type": "flashcard",
+          "front": "Why does .bss occupy no space in the .bin image but does occupy RAM?",
+          "back": "All .bss bytes are zero, so storing them in flash would be wasteful and redundant. The linker records only the .bss size and its RAM addresses (_sbss.._ebss); the startup code zeroes that RAM range at boot. So it costs RAM at run time but zero flash.",
+          "hint": "Zeros need no storage, only a size."
+        },
+        {
+          "id": "toolchain-mcq-at-operator",
+          "type": "mcq",
+          "prompt": "In `.data : { ... } > RAM AT> FLASH`, what does `AT> FLASH` accomplish?",
+          "choices": [
+            "Runs .data code directly from flash to save RAM",
+            "Sets the section's LMA to FLASH while its VMA stays in RAM, so init values are stored in flash but accessed in RAM",
+            "Copies .bss into flash",
+            "Disables the .data section entirely"
+          ],
+          "answerIndex": 1,
+          "explanation": "AT> sets the load region (LMA) independently of the run region (VMA, set by the '> RAM' placement). The result: .data's initial bytes are programmed into flash, but all symbol addresses resolve to RAM. Startup then copies the bytes from LOADADDR(.data) to _sdata."
+        },
+        {
+          "id": "toolchain-mcq-vector-placement",
+          "type": "mcq",
+          "prompt": "Why is `KEEP(*(.isr_vector))` placed first in the FLASH output section?",
+          "choices": [
+            "It makes the binary smaller",
+            "On reset the Cortex-M core reads the initial stack pointer and reset vector from the base of the boot memory, so the vector table must sit at that fixed address",
+            "Interrupts are faster if the table is first",
+            "KEEP enables compression of the table"
+          ],
+          "answerIndex": 1,
+          "explanation": "At reset the core loads MSP from address 0x0 of the boot region and PC from the next word (the Reset vector). On STM32 flash that maps to 0x08000000. The table must be at the region base, and KEEP prevents the linker from garbage-collecting it since nothing 'calls' it directly."
+        },
+        {
+          "id": "toolchain-mcq-keep-gc",
+          "type": "mcq",
+          "prompt": "With `--gc-sections` enabled, why might the vector table vanish without `KEEP(...)`?",
+          "choices": [
+            "KEEP marks the section as referenced so the garbage collector will not discard it, even though no code explicitly calls it",
+            "KEEP compresses the section",
+            "Without KEEP the table moves to RAM",
+            "KEEP is only a comment"
+          ],
+          "answerIndex": 0,
+          "explanation": "Section garbage collection removes input sections with no references. The vector table is reached only by hardware (the core reads it at reset), not by a call/jump the linker can see, so it looks unused. KEEP() forces the linker to retain it."
+        },
+        {
+          "id": "toolchain-fc-memory-block",
+          "type": "flashcard",
+          "front": "What does the MEMORY block in a linker script declare?",
+          "back": "Named physical address regions with their ORIGIN, LENGTH, and access attributes (e.g. FLASH (rx) at 0x08000000, RAM (rwx) at 0x20000000). SECTIONS then assigns output sections into these regions; the linker errors if a region overflows.",
+          "hint": "ORIGIN + LENGTH + attributes per region."
+        },
+        {
+          "id": "toolchain-fc-linker-symbols",
+          "type": "flashcard",
+          "front": "What are `_sdata`, `_edata`, `_sidata`, `_sbss`, `_ebss` used for?",
+          "back": "They are linker-defined address symbols the startup code reads: _sidata = LMA of .data in flash; _sdata/_edata = start/end of .data in RAM (copy target); _sbss/_ebss = start/end of .bss in RAM (zero range). Startup uses them to copy .data and clear .bss before main.",
+          "hint": "Handles startup uses to init RAM.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/toolchain-1.svg"
+        }
+      ]
+    },
+    {
+      "id": "toolchain-lesson-startup-crt0",
+      "title": "Startup / crt0: Making main() Reachable",
+      "order": 3,
+      "difficulty": "medium",
+      "content": "The linker placed everything; now something must run between reset and your first C statement. That is the **startup code** (the bare-metal analogue of `crt0`). Its centerpiece is the **Reset_Handler**, and it does exactly four jobs, using the symbols the linker exported:\n\n1. **Set the stack pointer.** On Cortex-M the hardware actually does this for you: the first word of the vector table is the initial MSP (`_estack`), loaded automatically at reset. Other architectures set SP explicitly first thing.\n2. **Copy `.data` from FLASH (LMA) to RAM (VMA).** Initialized globals have values stored in flash but live in RAM; without this copy they would read garbage.\n3. **Zero `.bss`.** All zero-initialized globals must be cleared, or `static int count;` is not actually zero.\n4. **Run C-runtime init, then call `main`.** `__libc_init_array()` runs C++ static constructors and `__attribute__((constructor))` functions; then it branches to `main`.\n\n```c\nvoid Reset_Handler(void) {\n  extern uint32_t _sidata, _sdata, _edata, _sbss, _ebss;\n  uint32_t *src = &_sidata, *dst = &_sdata;\n  while (dst < &_edata) *dst++ = *src++;   /* copy .data: FLASH -> RAM */\n  for (dst = &_sbss; dst < &_ebss; ) *dst++ = 0;  /* zero .bss */\n  __libc_init_array();                     /* C++ ctors / init */\n  main();                                  /* finally! */\n  while (1) {}                             /* main must not return */\n}\n```\n\nThe **vector table** sits above it as an array whose `[0]` is `_estack` and `[1]` is `Reset_Handler`:\n\n```c\n__attribute__((section(\".isr_vector\")))\nvoid (* const vectors[])(void) = { (void*)&_estack, Reset_Handler, NMI_Handler, HardFault_Handler, /* ... */ };\n```\n\nThis is the whole demystification: there is no magic that calls `main`. The **linker script** says *where* `.data`'s init image and the `.bss` range are; the **startup code** uses those symbols to make RAM consistent, then jumps in. Library glue (**newlib-nano**, a size-optimized newlib) and **semihosting** stubs (`_write`, `_sbrk`) get linked here too — semihosting routes `printf` over the debug probe to your host console, convenient for bring-up but slow and blocking.",
+      "items": [
+        {
+          "id": "toolchain-fc-four-jobs",
+          "type": "flashcard",
+          "front": "List the four jobs the Reset_Handler performs before main().",
+          "back": "1) Ensure the stack pointer is set (Cortex-M hardware loads MSP from vector[0]). 2) Copy .data from its flash LMA to its RAM VMA. 3) Zero the .bss range. 4) Run __libc_init_array (C++ ctors/init), then call main().",
+          "hint": "SP, copy .data, zero .bss, init+main."
+        },
+        {
+          "id": "toolchain-mcq-sp-set",
+          "type": "mcq",
+          "prompt": "On Cortex-M, how is the initial stack pointer established at reset?",
+          "choices": [
+            "The Reset_Handler must load SP from a constant before anything else",
+            "Hardware loads MSP from the first word of the vector table automatically, before the Reset_Handler runs",
+            "The linker writes SP into a CPU fuse",
+            "SP is left undefined until main sets it"
+          ],
+          "answerIndex": 1,
+          "explanation": "Cortex-M is unusual: at reset the core reads vector[0] as the initial MSP and vector[1] as the reset address, loading both in hardware. That is why vectors[0] is set to &_estack. On many other cores the startup code must set SP manually as its first instruction."
+        },
+        {
+          "id": "toolchain-mcq-skip-data-copy",
+          "type": "mcq",
+          "prompt": "If the startup code skips the `.data` copy step, what symptom appears?",
+          "choices": [
+            "Compilation fails",
+            "Zero-initialized globals become nonzero",
+            "Initialized globals (e.g. `int baud = 115200;`) read uninitialized/garbage values at run time",
+            "The vector table moves to RAM"
+          ],
+          "answerIndex": 2,
+          "explanation": "Initialized globals have their values stored at the flash LMA and addresses in RAM (VMA). Without the copy, the RAM holds whatever was there at power-on, so 'baud' is garbage. This is a classic 'works in debugger that auto-loads, fails standalone' bug."
+        },
+        {
+          "id": "toolchain-mcq-skip-bss",
+          "type": "mcq",
+          "prompt": "What breaks if `.bss` is never zeroed at startup?",
+          "choices": [
+            "Nothing; the C runtime always zeroes RAM",
+            "All `static`/global zero-initialized variables start with random RAM contents instead of 0",
+            "The stack pointer is wrong",
+            "Constants in .rodata get corrupted"
+          ],
+          "answerIndex": 1,
+          "explanation": "The C standard requires objects with static storage duration and no explicit initializer to be zero. Those live in .bss, which has no stored bytes; only the startup loop makes them zero. Skip it and 'static int count;' holds garbage, breaking counters, flags, and pointers assumed NULL."
+        },
+        {
+          "id": "toolchain-fc-vector0-1",
+          "type": "flashcard",
+          "front": "What are entries [0] and [1] of the Cortex-M vector table?",
+          "back": "[0] = initial Main Stack Pointer value (typically &_estack, top of RAM). [1] = address of the Reset_Handler (initial PC). The core loads these at reset. Subsequent entries are NMI, HardFault, and the rest of the exception/IRQ handlers.",
+          "hint": "Initial SP, then reset PC."
+        },
+        {
+          "id": "toolchain-fc-libc-init-array",
+          "type": "flashcard",
+          "front": "What does `__libc_init_array()` do, and why call it before main?",
+          "back": "It walks the .init_array/.preinit_array tables and runs each registered initializer: C++ global/static constructors and functions marked __attribute__((constructor)). Calling it before main ensures global objects are constructed before any code uses them.",
+          "hint": "Runs C++ ctors / constructor attributes."
+        },
+        {
+          "id": "toolchain-fc-newlib-nano",
+          "type": "flashcard",
+          "front": "What is newlib-nano and when do you choose it?",
+          "back": "A size-optimized build of newlib (the common bare-metal libc) with a smaller printf/scanf, reduced reentrancy structures, and a lighter malloc. You select it with --specs=nano.specs to shrink flash/RAM on memory-constrained MCUs, accepting reduced features (e.g. no %f in printf unless you re-enable it).",
+          "hint": "Smaller libc via nano.specs."
+        },
+        {
+          "id": "toolchain-mcq-semihosting",
+          "type": "mcq",
+          "prompt": "What is semihosting and its main drawback?",
+          "choices": [
+            "A way to run two OSes; it doubles RAM use",
+            "A mechanism where the target traps to the attached debug host to perform I/O (e.g. printf to the host console); it is slow and blocking, and halts if no debugger is attached",
+            "A flash compression scheme; it corrupts .data",
+            "A JTAG-only feature that disables SWD"
+          ],
+          "answerIndex": 1,
+          "explanation": "Semihosting uses a special instruction (BKPT 0xAB) to ask the debugger to service syscalls like _write, so printf appears on the host. It is great for bring-up but each call stalls the core waiting on the host, badly distorts timing, and hangs if no debugger services the trap. RTT/defmt are the low-overhead alternatives."
+        },
+        {
+          "id": "toolchain-fc-why-no-magic",
+          "type": "flashcard",
+          "front": "Explain how the linker script and startup together make main() reachable.",
+          "back": "The linker script defines memory regions, places code/constants in flash, assigns .data a RAM VMA with a flash LMA, sizes .bss, and exports symbols (_sidata,_sdata,_edata,_sbss,_ebss,_estack). The startup/Reset_Handler reads those symbols to copy .data flash->RAM, zero .bss, run init, and branch to main. No hidden runtime does it for you.",
+          "hint": "Linker places + exports symbols; startup uses them.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/toolchain-2.svg"
+        }
+      ]
+    },
+    {
+      "id": "toolchain-lesson-flash-debug",
+      "title": "Flashing, Debug Probes & the Modern Rust Toolchain",
+      "order": 4,
+      "difficulty": "hard",
+      "content": "With an `.elf` built, you need it on-chip and a way to inspect a running core. The build emits three artifacts: the **`.elf`** carries sections, symbols, and debug info (what GDB loads); **`objcopy -O binary`** strips it to a raw **`.bin`** (just the bytes, you supply the base address); **`-O ihex`** makes an **`.hex`** (Intel HEX, addresses embedded as ASCII records). Flashers consume `.bin`/`.hex`; debuggers want the `.elf`.\n\nOn-chip debug uses one of two transports. **JTAG** is the classic 4-5 pin boundary-scan chain (TCK/TMS/TDI/TDO/TRST), able to daisy-chain many devices. **SWD** (Serial Wire Debug) is the ARM 2-pin replacement (SWCLK + SWDIO) carrying the same Debug Access Port over fewer pins — the default on Cortex-M and what frees up the JTAG pins for I/O. Both are driven by a **probe**: ST-Link (on Nucleo/Discovery), SEGGER J-Link, or open CMSIS-DAP designs like the RP2040 **Picoprobe**.\n\nTwo software stacks bridge probe to GDB. **OpenOCD** speaks to the probe and exposes a GDB server; **probe-rs** is the modern Rust-native replacement that also serves GDB and powers `cargo-embed`/`cargo flash`. A GDB session connects, loads, sets **breakpoints/watchpoints**, and examines memory. Crucially, a **CMSIS-SVD** file describes every peripheral register by name, so register-aware debuggers (`svd` in probe-rs, GDB plugins) show `GPIOA->ODR` symbolically instead of as a raw address.\n\nThe **modern Rust** path collapses much of this:\n\n```\nrustup target add thumbv7em-none-eabihf   # Cortex-M4F\ncargo embed --release                      # build + flash + RTT console\n```\n\nThe `thumbv7em-none-eabihf` triple mirrors `arm-none-eabi`: `thumb` ISA, `v7em` = Cortex-M4/M7, `none` = no OS, `eabihf` = hard-float ABI. `cortex-m-rt` provides the linker script glue and `#[entry]` (the Rust startup). For logging, **defmt** + **RTT** beat semihosting decisively: the device writes compact deferred-format tokens into a RAM ring buffer that the probe drains over the existing debug link — microsecond-scale, non-blocking, and the formatting strings stay on the host, so almost nothing lands in flash.",
+      "items": [
+        {
+          "id": "toolchain-fc-elf-bin-hex",
+          "type": "flashcard",
+          "front": "Contrast .elf, .bin, and .hex.",
+          "back": ".elf: full object with sections, symbols, debug info — loaded by GDB. .bin: raw contiguous bytes with no address metadata — you must tell the flasher the base address. .hex (Intel HEX): ASCII records that embed addresses, so it is self-locating for flashers. Make .bin/.hex with objcopy -O binary / -O ihex.",
+          "hint": "Symbols vs raw bytes vs addressed-ASCII."
+        },
+        {
+          "id": "toolchain-mcq-jtag-swd",
+          "type": "mcq",
+          "prompt": "What is the primary practical advantage of SWD over JTAG on a Cortex-M?",
+          "choices": [
+            "SWD is faster in every case and supports more devices in a chain",
+            "SWD uses only two pins (SWCLK + SWDIO) to reach the same Debug Access Port, freeing the other JTAG pins for application I/O",
+            "SWD does not need a probe",
+            "SWD can flash without a debugger"
+          ],
+          "answerIndex": 1,
+          "explanation": "SWD is ARM's 2-wire alternative to JTAG's 4-5 wires, accessing the same Debug Access Port. The win is pin count: it frees TDI/TDO/etc. for GPIO/alternate functions. JTAG keeps the edge of multi-device boundary-scan chains, but for a single Cortex-M, SWD is the usual choice."
+        },
+        {
+          "id": "toolchain-fc-probes",
+          "type": "flashcard",
+          "front": "Name three common debug probes and what category each is.",
+          "back": "ST-Link: ST's probe, built onto Nucleo/Discovery boards. SEGGER J-Link: commercial, fast, broad target support (RTT/Ozone). CMSIS-DAP: ARM's open standard, e.g. the RP2040 Picoprobe or DAPLink boards. All present a SWD/JTAG interface that OpenOCD or probe-rs can drive.",
+          "hint": "Vendor, commercial, open-standard."
+        },
+        {
+          "id": "toolchain-mcq-openocd-probers",
+          "type": "mcq",
+          "prompt": "What role do OpenOCD and probe-rs play in a debug session?",
+          "choices": [
+            "They are compilers that replace arm-none-eabi-gcc",
+            "They talk to the debug probe and expose a GDB server (probe-rs also powers cargo-embed/cargo-flash), bridging GDB to the target",
+            "They are oscilloscope front-ends",
+            "They convert .elf to .hex"
+          ],
+          "answerIndex": 1,
+          "explanation": "OpenOCD and probe-rs are the host-side daemons that drive the probe's SWD/JTAG and present a GDB remote server, plus flashing. probe-rs is the Rust-native modern option underpinning cargo-embed/cargo-flash and supporting RTT and SVD. Neither compiles code or rewrites artifacts."
+        },
+        {
+          "id": "toolchain-fc-svd",
+          "type": "flashcard",
+          "front": "What is an SVD file and what does it enable during debug?",
+          "back": "CMSIS-SVD (System View Description) is a vendor XML describing every peripheral, register, bitfield, and address for a device. Register-aware debuggers load it so you can read/write peripherals by name (e.g. GPIOA.ODR, USART1.SR.TXE) instead of decoding raw addresses and bit positions.",
+          "hint": "Vendor XML mapping registers by name."
+        },
+        {
+          "id": "toolchain-mcq-thumbv7em",
+          "type": "mcq",
+          "prompt": "Decode the Rust target `thumbv7em-none-eabihf`.",
+          "choices": [
+            "Thumb ISA, ARMv7E-M (Cortex-M4/M7), no OS, hard-float ABI",
+            "Thumb ISA, ARMv6-M (Cortex-M0), Linux, soft-float",
+            "ARM (A32) ISA, ARMv7-A, no OS, hard-float",
+            "RISC-V ISA, no OS, soft-float"
+          ],
+          "answerIndex": 0,
+          "explanation": "thumb = Thumb instruction set; v7em = ARMv7E-M (the M4/M7 DSP-capable profile); none = bare metal/no OS; eabihf = EABI with hardware float (FPU registers for floats). It is the Rust mirror of arm-none-eabihf for Cortex-M4F. Cortex-M0 would be thumbv6m-none-eabi."
+        },
+        {
+          "id": "toolchain-mcq-defmt-rtt",
+          "type": "mcq",
+          "prompt": "Why are defmt + RTT preferred over semihosting for logging?",
+          "choices": [
+            "They print in color",
+            "RTT writes compact tokens into a RAM ring buffer drained by the probe over the existing debug link — non-blocking and microsecond-scale — while defmt keeps format strings on the host so little lands in flash",
+            "They require no probe at all",
+            "They disable interrupts to guarantee ordering"
+          ],
+          "answerIndex": 1,
+          "explanation": "Semihosting stalls the core on each call waiting for the host and hangs with no debugger attached. RTT (Real-Time Transfer) just appends to a RAM ring buffer the probe reads asynchronously, so it barely perturbs timing. defmt sends interned indices + raw args, deferring formatting to the host, minimizing both CPU and flash cost."
+        },
+        {
+          "id": "toolchain-fc-cortex-m-rt",
+          "type": "flashcard",
+          "front": "In the Rust embedded toolchain, what does `cortex-m-rt` provide?",
+          "back": "The runtime/startup crate: it supplies the linker-script glue (link.x via memory.x), the reset entry that initializes .data/.bss, the vector table, and the #[entry] attribute that marks your main. It is the Rust equivalent of the hand-written startup + crt0 you would otherwise author.",
+          "hint": "Rust's startup + #[entry] + linker glue."
+        },
+        {
+          "id": "toolchain-mcq-watchpoint",
+          "type": "mcq",
+          "prompt": "You want GDB to stop the instant a variable's memory is modified, without single-stepping. What do you use?",
+          "choices": [
+            "A software breakpoint on main",
+            "A hardware watchpoint (data watchpoint) on the variable's address",
+            "Semihosting",
+            "An SVD file"
+          ],
+          "answerIndex": 1,
+          "explanation": "A hardware watchpoint (Cortex-M DWT comparators) traps on read/write to a target address with zero runtime overhead until it triggers. It is the right tool to catch unexpected writes (e.g. memory corruption) without slow single-stepping. Cortex-M has a limited number, so use them sparingly."
+        }
+      ]
+    }
+  ]
+}

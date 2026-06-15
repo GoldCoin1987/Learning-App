@@ -1,0 +1,316 @@
+{
+  "id": "dma",
+  "title": "DMA: Moving Data Without the CPU",
+  "order": 10,
+  "lessons": [
+    {
+      "id": "dma-what-and-why",
+      "title": "What DMA Is and Why It Exists",
+      "order": 1,
+      "difficulty": 1,
+      "content": "A **DMA (Direct Memory Access) controller** is a small bus master that moves data between addresses without the CPU executing a load/store for each word. The motivation is throughput and determinism. Consider servicing a UART at 1 Mbaud: an RX interrupt per byte costs you exception entry/exit, register stacking, and the handler body — easily hundreds of cycles per byte, all stolen from your real work, with jitter that grows under load. DMA collapses that to *one* setup and *one* completion event for the whole block.\n\nFor a radar/DSP front-end the payoff is sharper: you want an evenly-sampled buffer with the CPU not babysitting each conversion, because per-sample CPU involvement is exactly what introduces sample-to-sample timing jitter. DMA lets a timer trigger the ADC and the ADC trigger the DMA, so a clean buffer materializes in RAM while the core sleeps or does other work.\n\nMechanically, the DMA controller sits on the **bus matrix** (Module 3) as an alternate master alongside the CPU. When a transfer is armed, the controller arbitrates for the bus, performs the read and write itself, decrements a counter, and signals completion via an interrupt. The CPU is involved only at the edges: *configure*, then *handle completion*.\n\nThe mental reframe for a software developer: DMA is a second agent writing your RAM concurrently with the CPU. Everything subtle about DMA — `volatile`, alignment, cache coherency, ordering — flows from that one fact. It is the practical reason the bus-matrix and memory-hazard material earlier in this module mattered.",
+      "items": [
+        {
+          "id": "dma-what-and-why-001",
+          "type": "flashcard",
+          "front": "In one sentence, what does a DMA controller do?",
+          "back": "It is a bus master that transfers data between addresses (memory or peripheral) on its own, so the CPU does not execute a load/store per word — the core is involved only at configure time and at completion.",
+          "hint": "Who moves the bytes?"
+        },
+        {
+          "id": "dma-what-and-why-002",
+          "type": "flashcard",
+          "front": "Why does DMA improve determinism, not just CPU load?",
+          "back": "Per-byte or per-sample CPU servicing adds variable interrupt latency and jitter. DMA produces one completion event per block, so acquisition timing is set by the trigger (e.g. a timer) rather than by how busy the CPU is.",
+          "hint": "Think jitter on an evenly-sampled buffer."
+        },
+        {
+          "id": "dma-what-and-why-003",
+          "type": "flashcard",
+          "front": "Where does the DMA controller sit in the system, architecturally?",
+          "back": "On the bus matrix (AHB) as an additional bus master alongside the CPU. It arbitrates for the bus, does the read and write itself, and competes with the core for bandwidth.",
+          "hint": "It is not part of the CPU pipeline."
+        },
+        {
+          "id": "dma-what-and-why-004",
+          "type": "flashcard",
+          "front": "Name the two points at which the CPU is involved in a DMA transfer.",
+          "back": "Configuration (set source/destination, count, modes, then enable) and completion handling (the transfer-complete, and optionally half-transfer, interrupt). In between, the controller runs autonomously.",
+          "hint": "The edges, not the middle."
+        },
+        {
+          "id": "dma-what-and-why-005",
+          "type": "flashcard",
+          "front": "Why is DMA the enabler for an ADC-to-FFT pipeline?",
+          "back": "It captures a contiguous, evenly-sampled block into RAM without dropping samples or adding per-sample jitter, so a DSP task can run a windowed FFT on a clean buffer in real time. Without it, high sample rates overrun the CPU.",
+          "hint": "Module 15 / radar front-end."
+        },
+        {
+          "id": "dma-what-and-why-006",
+          "type": "mcq",
+          "prompt": "At 1 Mbaud, why is per-byte UART RX interrupt servicing problematic compared to DMA?",
+          "choices": [
+            "DMA is slower per byte but uses less RAM",
+            "Each byte costs full exception entry/exit overhead and adds jitter, stealing cycles from real work",
+            "Interrupts cannot keep up with any UART above 9600 baud",
+            "Per-byte interrupts corrupt the data unless parity is enabled"
+          ],
+          "answerIndex": 1,
+          "explanation": "An interrupt per byte pays exception entry/exit, register stacking, and handler cost hundreds of cycles each, with load-dependent jitter. DMA reduces this to one setup and one completion event per block."
+        },
+        {
+          "id": "dma-what-and-why-007",
+          "type": "mcq",
+          "prompt": "The DMA controller competes with the CPU for what shared resource?",
+          "choices": [
+            "The register file (R0-R12)",
+            "The NVIC priority levels",
+            "The bus matrix / memory bus bandwidth",
+            "The floating-point unit"
+          ],
+          "answerIndex": 2,
+          "explanation": "DMA is a separate bus master. It and the CPU arbitrate for access to the AHB bus matrix and the memory it targets; heavy DMA traffic can stall CPU accesses, and vice versa."
+        },
+        {
+          "id": "dma-what-and-why-008",
+          "type": "mcq",
+          "prompt": "Which statement best captures the core reframe DMA demands of a software developer?",
+          "choices": [
+            "DMA is just a faster memcpy that always blocks until done",
+            "DMA is a second concurrent agent writing your RAM, so coherency and ordering rules apply",
+            "DMA replaces the need for interrupts entirely",
+            "DMA only works for memory-to-memory copies"
+          ],
+          "answerIndex": 1,
+          "explanation": "DMA writes memory concurrently with the CPU. Every subtle DMA hazard (volatile, alignment, cache coherency, ordering) follows from treating it as a concurrent writer, not a synchronous copy."
+        },
+        {
+          "id": "dma-what-and-why-009",
+          "type": "mcq",
+          "prompt": "A timer triggers the ADC and the ADC triggers DMA. What sets the sample timing?",
+          "choices": [
+            "The DMA arbitration priority",
+            "The CPU interrupt latency",
+            "The timer's hardware trigger rate, independent of CPU load",
+            "The UART baud rate"
+          ],
+          "answerIndex": 2,
+          "explanation": "With hardware triggering, the timer defines the exact, jitter-free sample instant. The CPU's busyness no longer affects when samples are taken — only when buffers are processed."
+        }
+      ]
+    },
+    {
+      "id": "dma-controller-model",
+      "title": "The Controller Model: Channels, Directions, and Triggers",
+      "order": 2,
+      "difficulty": 2,
+      "content": "A DMA transfer is described by a handful of fields you program into the controller. The **channel** (STM32 F4/F7 calls the data path a *stream* with a selectable *channel/request*; many parts just say *channel*) is the independent transfer engine. Each channel carries a **source address**, a **destination address**, a **transfer count** (number of items), an **item width** (byte/half-word/word), and **increment modes** that say whether the source and/or destination pointer advances after each item. Memory pointers usually increment; a peripheral data register usually does not. When several channels want the bus at once, **arbitration/priority** decides order.\n\nThree direction archetypes cover almost everything. **Memory-to-memory** is a hardware `memcpy` (both pointers increment). **Peripheral-to-memory** drains a peripheral (e.g. ADC data register, fixed) into a growing buffer (incrementing). **Memory-to-peripheral** does the reverse — e.g. streaming a waveform table to a DAC or bytes to a UART TX register.\n\nCrucially, most useful DMA is **peripheral-triggered**, not free-running. The peripheral raises a *DMA request* on an event — ADC conversion complete, UART RX-not-empty, timer update — and the controller performs exactly one item transfer per request. This is what couples acquisition rate to hardware timing rather than to a software loop. Memory-to-memory, by contrast, runs as fast as the bus allows.\n\nA recurring pitfall: width and increment must match the data. Reading a 12-bit ADC into a `uint8_t` buffer, or forgetting to disable destination increment when targeting a single register, silently produces garbage with no fault. Get item width, increment flags, and count right before anything else.",
+      "items": [
+        {
+          "id": "dma-controller-model-001",
+          "type": "flashcard",
+          "front": "List the core fields that define a single DMA transfer.",
+          "back": "Source address, destination address, transfer count (items), item width (byte/half-word/word), source and destination increment modes, and a priority used for arbitration. Plus the trigger source for peripheral-driven transfers.",
+          "hint": "From, to, how many, how wide, who moves the pointer."
+        },
+        {
+          "id": "dma-controller-model-002",
+          "type": "flashcard",
+          "front": "What is a DMA channel (or 'stream') and why have several?",
+          "back": "An independent transfer engine with its own configuration. Multiple channels let different peripherals run concurrent transfers; when more than one is ready, arbitration/priority decides which gets the bus next.",
+          "hint": "One per concurrent data path."
+        },
+        {
+          "id": "dma-controller-model-003",
+          "type": "flashcard",
+          "front": "For peripheral-to-memory ADC capture, which pointers increment?",
+          "back": "The memory (destination) pointer increments so successive samples land in successive buffer slots. The peripheral (source) address is fixed on the ADC data register, so its increment is OFF.",
+          "hint": "The register stays put; the buffer fills."
+        },
+        {
+          "id": "dma-controller-model-004",
+          "type": "flashcard",
+          "front": "What does 'peripheral-triggered DMA' mean operationally?",
+          "back": "The peripheral asserts a DMA request on an event (conversion complete, RX byte ready, timer update); the controller moves exactly one item per request. Transfer pacing is set by the peripheral, not a CPU loop.",
+          "hint": "One request, one item."
+        },
+        {
+          "id": "dma-controller-model-005",
+          "type": "flashcard",
+          "front": "Name the three DMA direction archetypes with an example each.",
+          "back": "Memory-to-memory (hardware memcpy, both increment); peripheral-to-memory (ADC data reg to RAM buffer); memory-to-peripheral (waveform table to DAC, or TX buffer to UART data register).",
+          "hint": "Copy, drain, feed."
+        },
+        {
+          "id": "dma-controller-model-006",
+          "type": "mcq",
+          "prompt": "You DMA a 12-bit ADC result into a buffer but set the item width to byte (8-bit). What happens?",
+          "choices": [
+            "A bus fault is raised immediately",
+            "The DMA truncates correctly to 8 bits with a warning flag",
+            "Data is silently misaligned/garbled with no error reported",
+            "The transfer count automatically doubles to compensate"
+          ],
+          "answerIndex": 2,
+          "explanation": "DMA width/increment mismatches do not fault. A 12-bit result needs half-word width; using byte width misreads the data register and corrupts the buffer silently. Width and increment must match the data."
+        },
+        {
+          "id": "dma-controller-model-007",
+          "type": "mcq",
+          "prompt": "When targeting a single peripheral register (e.g. DAC data register) from memory, the destination increment should be:",
+          "choices": [
+            "Enabled, so the pointer walks the peripheral block",
+            "Disabled, so every item writes the same fixed register address",
+            "Set to half the item width",
+            "Irrelevant for memory-to-peripheral transfers"
+          ],
+          "answerIndex": 1,
+          "explanation": "The destination is one fixed register, so its increment must be OFF while the memory source increments through the waveform/buffer. Enabling it would write past the register into neighboring peripheral addresses."
+        },
+        {
+          "id": "dma-controller-model-008",
+          "type": "mcq",
+          "prompt": "Two DMA channels are simultaneously ready to move data. What resolves the contention?",
+          "choices": [
+            "The NVIC interrupt priority of each peripheral",
+            "The DMA channel arbitration/priority setting",
+            "Whichever channel was configured first always wins",
+            "The CPU must manually alternate them in software"
+          ],
+          "answerIndex": 1,
+          "explanation": "Each channel has a programmable priority; the DMA controller's arbiter uses it (with a fixed tie-break, often lowest channel number) to decide bus access order. This is distinct from NVIC interrupt priority."
+        },
+        {
+          "id": "dma-controller-model-009",
+          "type": "mcq",
+          "prompt": "Which transfer typically runs 'as fast as the bus allows' rather than being event-paced?",
+          "choices": [
+            "Peripheral-to-memory ADC capture",
+            "Memory-to-peripheral UART TX",
+            "Memory-to-memory copy",
+            "Timer-triggered DAC playback"
+          ],
+          "answerIndex": 2,
+          "explanation": "Memory-to-memory has no external request source, so the controller bursts items back-to-back limited only by bus availability. The other three are gated by a peripheral or timer event."
+        }
+      ]
+    },
+    {
+      "id": "dma-streaming-and-coherency",
+      "title": "Streaming, Ping-Pong, and the Cache/Coherency Traps",
+      "order": 3,
+      "difficulty": 3,
+      "content": "Continuous acquisition needs a buffer scheme that never stalls. **Circular mode** wraps the DMA pointer back to the buffer start automatically at the end of the count, so the stream runs forever. The standard processing pattern is **double-buffering (ping-pong)**: treat the buffer as two halves and use the controller's **half-transfer (HT)** and **transfer-complete (TC)** interrupts. On HT, the first half is full and stable while DMA fills the second; on TC, the second is full while DMA wraps into the first. The CPU always processes the half the DMA is *not* writing — no torn reads, no lost samples.\n\nThe real rust-knocker is **coherency**. DMA writes RAM behind the CPU's back, so two things can lie to you. First, the compiler: a DMA buffer (and any flag the ISR sets) must be treated as **`volatile`** / accessed through a barrier, or the compiler may cache a stale value in a register and never re-read the RAM the DMA updated. `volatile` alone gives no atomicity and no ordering versus non-volatile accesses — add `__DMB()` where ordering matters.\n\nSecond, and worse, **the data cache on Cortex-M7**. The DMA writes SRAM, but the CPU may read a *stale cache line* and never see the new data; symmetrically, on a TX buffer the CPU's writes may sit in the cache and never reach SRAM before DMA reads it. The fixes: before the CPU reads a DMA-filled buffer, **invalidate** that region; before DMA reads a CPU-filled buffer, **clean** (flush) it; or place the buffer in an **MPU non-cacheable region**. Both cache ops operate on whole cache lines, so the buffer must be **cache-line aligned** (typically 32 bytes) and sized in line multiples — otherwise an invalidate can clobber an adjacent variable sharing the line. Finally, watch **bus bandwidth**: a fast DMA stream and the CPU share the matrix, so a heavy transfer can stall the core and inflate worst-case timing.",
+      "items": [
+        {
+          "id": "dma-streaming-and-coherency-001",
+          "type": "flashcard",
+          "front": "What does DMA circular mode do?",
+          "back": "At the end of the transfer count, the controller automatically reloads and wraps the pointer to the buffer start, so the stream runs continuously without CPU re-arming. It is the basis for never-stopping acquisition.",
+          "hint": "The pointer loops."
+        },
+        {
+          "id": "dma-streaming-and-coherency-002",
+          "type": "flashcard",
+          "front": "Explain the ping-pong (double-buffer) pattern using HT and TC interrupts.",
+          "back": "Split the circular buffer in two halves. The half-transfer (HT) IRQ fires when the first half is full (DMA now filling the second); the transfer-complete (TC) IRQ fires when the second is full (DMA wrapping to the first). The CPU processes the half DMA is not writing.",
+          "hint": "Process one half while the other fills."
+        },
+        {
+          "id": "dma-streaming-and-coherency-003",
+          "type": "flashcard",
+          "front": "Why must a DMA buffer (and its done-flag) be volatile?",
+          "back": "DMA updates the RAM independently of the CPU. Without volatile/barriers the compiler may keep a stale copy in a register and never re-read the memory the DMA changed, so the CPU misses the new data or the completion flag.",
+          "hint": "Stop the compiler from caching in a register."
+        },
+        {
+          "id": "dma-streaming-and-coherency-004",
+          "type": "flashcard",
+          "front": "Does volatile solve the Cortex-M7 data-cache coherency problem?",
+          "back": "No. Volatile stops the *compiler* caching in registers, but the hardware data cache still holds stale lines. You additionally need cache maintenance (invalidate before read, clean before DMA reads your writes) or a non-cacheable MPU region.",
+          "hint": "Two different layers: compiler vs hardware cache."
+        },
+        {
+          "id": "dma-streaming-and-coherency-005",
+          "type": "flashcard",
+          "front": "On Cortex-M7, which cache op before reading a DMA-filled RX buffer, and which before a DMA reads your TX buffer?",
+          "back": "Before the CPU reads a DMA-filled buffer: INVALIDATE that region (discard stale cache lines, force re-read from SRAM). Before DMA reads a CPU-written buffer: CLEAN/flush it (push the CPU's cached writes out to SRAM).",
+          "hint": "Invalidate for RX, clean for TX."
+        },
+        {
+          "id": "dma-streaming-and-coherency-006",
+          "type": "flashcard",
+          "front": "Why must DMA buffers be cache-line aligned and line-sized on M7?",
+          "back": "Cache maintenance operates on whole lines (typically 32 bytes). If a buffer shares a line with another variable, invalidating the buffer can discard that neighbor's freshly written value (or vice versa), corrupting it. Align to and pad to the line size.",
+          "hint": "Invalidate hits the whole line, including the neighbor."
+        },
+        {
+          "id": "dma-streaming-and-coherency-007",
+          "type": "mcq",
+          "prompt": "On a Cortex-M7, a DMA fills an RX buffer in SRAM but the CPU keeps reading the old contents. The most likely cause is:",
+          "choices": [
+            "The buffer was not declared const",
+            "The CPU read a stale data-cache line; the region was not invalidated before reading",
+            "The DMA priority was set too low",
+            "Circular mode was disabled"
+          ],
+          "answerIndex": 1,
+          "explanation": "DMA writes SRAM directly, but the CPU's D-cache may still hold the old line. You must invalidate the buffer's cache lines (or mark it non-cacheable) before reading so the CPU fetches the DMA-updated data from SRAM."
+        },
+        {
+          "id": "dma-streaming-and-coherency-008",
+          "type": "mcq",
+          "prompt": "You invalidate a 12-byte DMA buffer that happens to share a 32-byte cache line with an unrelated counter the CPU just wrote. What is the risk?",
+          "choices": [
+            "Nothing; invalidate only affects the named buffer",
+            "The counter's freshly written value is discarded because invalidate acts on the whole line",
+            "The DMA transfer count is reset to zero",
+            "The MPU raises a fault on the partial line"
+          ],
+          "answerIndex": 1,
+          "explanation": "Cache maintenance works per line. Invalidating discards the entire line including the neighboring counter's not-yet-flushed value, corrupting it. Align and pad DMA buffers to whole cache lines so nothing else shares them."
+        },
+        {
+          "id": "dma-streaming-and-coherency-009",
+          "type": "mcq",
+          "prompt": "In ADC ping-pong, the half-transfer (HT) interrupt signals that:",
+          "choices": [
+            "The DMA has stopped and must be re-armed",
+            "The first half of the buffer is full and stable to process while DMA fills the second half",
+            "Exactly one sample has been transferred",
+            "A bus error occurred mid-transfer"
+          ],
+          "answerIndex": 1,
+          "explanation": "HT fires at the midpoint: the first half is complete and not being touched, so the CPU can process it while DMA continues into the second half. TC then signals the second half is ready."
+        },
+        {
+          "id": "dma-streaming-and-coherency-010",
+          "type": "mcq",
+          "prompt": "An alternative to per-transfer cache maintenance for DMA buffers on Cortex-M7 is to:",
+          "choices": [
+            "Disable all interrupts during the transfer",
+            "Place the buffer in an MPU-configured non-cacheable memory region",
+            "Use byte-width transfers only",
+            "Increase the DMA channel priority to maximum"
+          ],
+          "answerIndex": 1,
+          "explanation": "Configuring the buffer's region as non-cacheable via the MPU means the CPU always goes to SRAM, so no clean/invalidate is needed. The trade-off is slower CPU access to that region; explicit maintenance keeps the cache benefit."
+        },
+        {
+          "id": "dma-streaming-and-coherency-011",
+          "type": "mcq",
+          "prompt": "A high-rate DMA stream coincides with a tight CPU deadline and the worst-case latency grows. The mechanism is:",
+          "choices": [
+            "DMA raises the CPU clock frequency",
+            "Bus-matrix contention: DMA and CPU share bandwidth, so heavy DMA stalls CPU accesses",
+            "DMA disables the NVIC during transfers",
+            "The cache is flushed automatically on every DMA cycle"
+          ],
+          "answerIndex": 1,
+          "explanation": "DMA is a competing bus master. When it saturates the matrix or the targeted memory, the CPU's loads/stores wait, inflating worst-case execution time. Bus bandwidth and arbitration must be budgeted in real-time analysis.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/dma-1.svg"
+        }
+      ]
+    }
+  ]
+}

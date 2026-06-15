@@ -1,0 +1,288 @@
+{
+  "id": "debugging-instrumentation",
+  "title": "Debugging & Instrumentation",
+  "order": 13,
+  "lessons": [
+    {
+      "id": "debugging-instrumentation-l1-instruments",
+      "title": "Seeing the Bus: Logic Analyzer vs Oscilloscope",
+      "order": 1,
+      "difficulty": "easy",
+      "content": "As a radar tech you already know the rule: pick the instrument that matches the question. The same split governs embedded debugging, and it is the first reflex to rebuild.\n\nA **logic analyzer** samples many channels as 1/0 against a threshold and, crucially, **decodes protocols** in software (UART, SPI, I2C, CAN). It is the right tool when the question is *digital and relational*: \"Did the master actually send address 0x76? Did the slave ACK or NACK? Is CPOL/CPHA correct? Which byte is wrong?\" With 8+ channels you watch SCL, SDA, CS, and an MCU GPIO marker together and read out the transaction as bytes. You give up vertical detail — it only sees \"above or below threshold.\"\n\nAn **oscilloscope** measures a few channels as *continuous voltage over time*. Reach for it when the question is *analog or about signal integrity*: ringing, slow rise times from missing I2C pull-ups, ground bounce, an undershooting reset line, a runt/glitch pulse too narrow to clock in cleanly, or a metastable edge. The scope shows you *why* a level was misread; the logic analyzer shows you *that* it was.\n\nIn practice they are complementary. A flaky I2C read: the logic analyzer tells you the NACK is real and on which byte; the scope tells you SDA never reaches a clean logic high because the rise time is too slow for the bus capacitance. Many modern bench tools (and the Saleae) do both: analog capture plus protocol decode.\n\nMental model: **logic analyzer for \"what bytes,\" scope for \"what shape.\"** When a bus misbehaves, start with the analyzer to localize the failing transaction, then bring the scope to the suspect line only if the bytes look impossible.",
+      "items": [
+        {
+          "id": "debugging-instrumentation-l1-fc-protocoldecode",
+          "type": "flashcard",
+          "front": "What single capability makes a logic analyzer the default tool for debugging UART/SPI/I2C/CAN?",
+          "back": "Protocol decode: it samples many digital channels and reconstructs the bus traffic as decoded frames/bytes (addresses, ACK/NACK, data), so you read the actual transaction instead of guessing from edges.",
+          "hint": "It is not about voltage accuracy."
+        },
+        {
+          "id": "debugging-instrumentation-l1-fc-scopewhen",
+          "type": "flashcard",
+          "front": "When do you reach for an oscilloscope instead of a logic analyzer?",
+          "back": "When the question is analog or about signal integrity: rise/fall times, ringing, ground bounce, glitches/runt pulses, slow edges from missing pull-ups, metastability — anything where 'above/below threshold' hides the real cause.",
+          "hint": "Shape, not bytes."
+        },
+        {
+          "id": "debugging-instrumentation-l1-fc-complementary",
+          "type": "flashcard",
+          "front": "How do the logic analyzer and scope divide a flaky I2C read between them?",
+          "back": "Logic analyzer: confirms which byte NACKs / whether the address is right (the 'what bytes' layer). Scope: shows whether SDA actually reaches a clean high or has slow/ringing edges from bus capacitance or weak pull-ups (the 'what shape' layer).",
+          "hint": "What vs why."
+        },
+        {
+          "id": "debugging-instrumentation-l1-fc-channels",
+          "type": "flashcard",
+          "front": "Why does a logic analyzer typically offer 8+ channels while a scope offers 2-4?",
+          "back": "A logic analyzer only stores 1 bit per sample per channel (a threshold comparison), so wide channel counts are cheap; a scope digitizes full-resolution voltage at high rate, which is expensive per channel.",
+          "hint": "Bits per sample."
+        },
+        {
+          "id": "debugging-instrumentation-l1-mcq-glitch",
+          "type": "mcq",
+          "prompt": "Your SPI sensor occasionally returns garbage. The logic analyzer decode looks byte-perfect at every capture, yet the fault recurs. What is the smart next move?",
+          "choices": [
+            "Add more printf calls in the driver",
+            "Put a scope on SCK and MISO to look for ringing/overshoot or marginal edges the analyzer's threshold hides",
+            "Increase the analyzer sample rate and recapture indefinitely",
+            "Replace the sensor immediately"
+          ],
+          "answerIndex": 1,
+          "explanation": "The analyzer only reports above/below threshold, so clean-looking decodes can still ride on a marginal analog edge (ringing, overshoot, slow rise). The scope reveals the signal-integrity problem the digital view masks."
+        },
+        {
+          "id": "debugging-instrumentation-l1-mcq-firsttool",
+          "type": "mcq",
+          "prompt": "An I2C device intermittently fails to ACK. Which instrument do you grab FIRST and why?",
+          "choices": [
+            "Scope, because I2C is analog at heart",
+            "Logic analyzer, to localize which byte/address the NACK lands on before investigating signal shape",
+            "A voltmeter on VDD",
+            "Neither; just retry in software with delays"
+          ],
+          "answerIndex": 1,
+          "explanation": "Start with the analyzer to localize the failing transaction (is it the address? a data byte? a missing ACK?). Only then, if the bytes look impossible, bring the scope to the suspect line."
+        },
+        {
+          "id": "debugging-instrumentation-l1-mcq-pullup",
+          "type": "mcq",
+          "prompt": "On a scope, SDA rises slowly and rounded toward VDD and the device sometimes misreads. What is the most likely cause?",
+          "choices": [
+            "The MCU clock is too fast",
+            "RC time constant too large: pull-up resistance too high for the bus capacitance (or missing pull-ups), so the open-drain line can't rise fast enough",
+            "The logic analyzer is loading the bus",
+            "Wrong SPI mode"
+          ],
+          "answerIndex": 1,
+          "explanation": "I2C is open-drain: lines are pulled high by resistors. Rounded slow rises mean the RC constant is too large (pull-ups too weak or absent for the trace/bus capacitance), so SDA misses the logic-high window."
+        },
+        {
+          "id": "debugging-instrumentation-l1-mcq-tradeoff",
+          "type": "mcq",
+          "prompt": "What does a logic analyzer fundamentally give up compared to an oscilloscope?",
+          "choices": [
+            "The ability to decode protocols",
+            "Channel count",
+            "Vertical (voltage) detail: it sees only above/below a threshold, not the continuous waveform shape",
+            "Triggering on edges"
+          ],
+          "answerIndex": 2,
+          "explanation": "By storing one threshold-compared bit per sample, the analyzer trades away vertical resolution. That is exactly why it can't diagnose ringing, overshoot, or marginal edges the way a scope can."
+        }
+      ]
+    },
+    {
+      "id": "debugging-instrumentation-l2-tracing",
+      "title": "Stop Lying with printf: SWO/ITM, SEGGER RTT, and defmt",
+      "order": 2,
+      "difficulty": "medium",
+      "content": "The biggest debugging-mindset upgrade is to stop trusting `printf`. On bare metal `printf` is a trap: it formats on the target, then **blocks** pushing bytes out a slow UART (a 115200-baud line moves ~11.5 KB/s; a single line can cost milliseconds). That latency sits inside whatever code you instrumented, so it *changes the timing of the very bug you're chasing* and stalls ISRs. It also drags in heavyweight libc formatting.\n\nThree lower-overhead paths, in increasing modernity:\n\n**SWO/ITM trace.** The Cortex-M ITM has 32 stimulus ports; writing a word to a port emits it over the single-wire SWO pin to the debug probe. The CPU does a register store and moves on — no UART, no blocking. Good for `printf`-style strings and event markers, but SWO bandwidth and probe support vary.\n\n**SEGGER RTT (Real-Time Transfer).** RTT puts ring buffers in target RAM; firmware writes a few words into RAM (near-zero overhead, no peripheral), and the debug probe reads that RAM out-of-band over SWD/JTAG while the core runs. Throughput is high and it works even where SWO doesn't. This is the workhorse for fast, non-intrusive logging.\n\n**(MODERN) defmt + RTT (Rust).** `defmt` does **deferred formatting**: the target transmits only a format-string *id* plus raw argument bytes; the *host* does the actual string formatting against the ELF's symbol table. So `defmt::info!(\"x={}\", x)` sends a couple of bytes, not a rendered string — even smaller and faster than RTT alone, and it costs almost no flash for format strings.\n\nReflex: instrument with RTT/defmt, not blind `printf`. If you must keep `printf`, route it over RTT rather than UART.",
+      "items": [
+        {
+          "id": "debugging-instrumentation-l2-fc-printfcost",
+          "type": "flashcard",
+          "front": "Name the three concrete costs of a blocking UART printf on bare metal.",
+          "back": "1) Latency: it blocks while shoving bytes out a slow UART (ms per line at 115200). 2) Timing distortion: that delay sits inside instrumented code/ISRs and alters the bug's timing. 3) Code size: heavyweight libc formatting pulled into flash.",
+          "hint": "Time, timing, and size."
+        },
+        {
+          "id": "debugging-instrumentation-l2-fc-itm",
+          "type": "flashcard",
+          "front": "How does ITM/SWO trace logging avoid the printf bottleneck?",
+          "back": "The Cortex-M ITM has 32 stimulus ports; firmware writes a word to a port register and the data is emitted over the single SWO pin to the probe. The CPU just does a store — no UART transmit loop, no blocking.",
+          "hint": "Single-wire output, register store."
+        },
+        {
+          "id": "debugging-instrumentation-l2-fc-rtt",
+          "type": "flashcard",
+          "front": "What makes SEGGER RTT near-zero-overhead?",
+          "back": "RTT places ring buffers in target RAM. Firmware just writes a few words into RAM (no peripheral, no blocking); the debug probe reads those buffers out-of-band over SWD/JTAG while the core keeps running.",
+          "hint": "Ring buffers in RAM, probe reads them."
+        },
+        {
+          "id": "debugging-instrumentation-l2-fc-defmt",
+          "type": "flashcard",
+          "front": "What is 'deferred formatting' in defmt and why is it so cheap?",
+          "back": "The target sends only a format-string id plus the raw argument bytes; the host reconstructs the full string using symbols from the ELF. The MCU never builds the string, so transmit size and flash usage (no stored format strings) both shrink dramatically.",
+          "hint": "Format on the host, not the target."
+        },
+        {
+          "id": "debugging-instrumentation-l2-mcq-heisen",
+          "type": "mcq",
+          "prompt": "A race only appears in the release build. You add a printf in the suspect ISR and the bug disappears. What happened?",
+          "choices": [
+            "The printf fixed the race",
+            "The printf's blocking delay changed the timing, masking the race (a Heisenbug); use RTT/GPIO toggle instead",
+            "The compiler optimized the race away",
+            "The UART hardware corrected it"
+          ],
+          "answerIndex": 1,
+          "explanation": "Blocking printf adds milliseconds of delay that perturb the timing you're measuring. The race is still there; you've just hidden it. Low-overhead RTT or a GPIO toggle observes without disturbing."
+        },
+        {
+          "id": "debugging-instrumentation-l2-mcq-pickrtt",
+          "type": "mcq",
+          "prompt": "You need high-throughput logging on a board whose probe doesn't support SWO well, while the firmware keeps meeting hard deadlines. Best choice?",
+          "choices": [
+            "Crank UART to 921600 and keep using printf",
+            "SEGGER RTT: write to RAM ring buffers, probe reads them over SWD with near-zero target overhead",
+            "Add more breakpoints",
+            "Disable interrupts while printing"
+          ],
+          "answerIndex": 1,
+          "explanation": "RTT needs no SWO pin and no peripheral; the target only writes RAM. It delivers high throughput while leaving timing essentially undisturbed, unlike blocking UART printf."
+        },
+        {
+          "id": "debugging-instrumentation-l2-mcq-defmtwire",
+          "type": "mcq",
+          "prompt": "With defmt over RTT, what actually travels across the wire for defmt::info!(\"temp={}\", t)?",
+          "choices": [
+            "The fully rendered ASCII string 'temp=23'",
+            "A format-string id plus the raw bytes of t, formatted into text later on the host",
+            "Nothing until the buffer is full",
+            "The entire format string every call"
+          ],
+          "answerIndex": 1,
+          "explanation": "defmt defers formatting: only an interned id and raw argument bytes are sent; the host turns them into text using the ELF symbol table. That is why it beats even plain RTT on size and speed."
+        },
+        {
+          "id": "debugging-instrumentation-l2-mcq-keepprintf",
+          "type": "mcq",
+          "prompt": "Your codebase is full of printf calls you can't rewrite right now, but UART blocking is wrecking timing. Pragmatic fix?",
+          "choices": [
+            "Remove all logging",
+            "Retarget the printf/_write backend to push bytes into an RTT buffer instead of the UART",
+            "Lower the baud rate",
+            "Call printf only from the idle loop"
+          ],
+          "answerIndex": 1,
+          "explanation": "You can keep the printf call sites but redirect the low-level output (_write/putchar) to RTT. Same source, but the bytes now go to a RAM ring buffer the probe drains, eliminating the blocking UART cost."
+        }
+      ]
+    },
+    {
+      "id": "debugging-instrumentation-l3-faults",
+      "title": "Turning a HardFault into a Source Line",
+      "order": 3,
+      "difficulty": "hard",
+      "content": "The payoff skill: convert a mysterious crash into an exact instruction, and time code without disturbing it.\n\n**GPIO-toggle profiling.** The cheapest, most honest timing probe is a free pin. Set it high at the start of an ISR or critical section and clear it at the end; watch the pulse on a scope/logic analyzer. A single store costs nanoseconds, so unlike printf it doesn't move the thing you measure — ideal for measuring ISR latency and jitter (Modules 6/12).\n\n**Decoding faults.** Cortex-M exceptions you'll meet: **HardFault** (the catch-all / escalation), **MemManage** (MPU violation), **BusFault** (bad bus transaction, e.g. bad pointer/peripheral), **UsageFault** (undefined instruction, unaligned access, div-by-zero if enabled). On exception entry the core auto-stacks 8 words: R0-R3, R12, **LR, PC, xPSR** (see diagram). The stacked **PC is the faulting instruction's address** — `addr2line` or your map turns it into a source line. To find which stack holds the frame, check EXC_RETURN bit 2 (MSP vs PSP). Then read the **CFSR** (Configurable Fault Status Register at 0xE000ED28): its MMFSR/BFSR/UFSR sub-fields tell you *why* — e.g. BFSR.PRECISERR with a valid **BFAR** address pinpoints a precise bus fault and the offending address. Many HardFaults are escalated config faults; enabling the individual fault handlers (SHCSR) gives sharper diagnosis.\n\n**Assertions under budget.** `static_assert` (compile-time) is free — use it liberally for sizes/alignment. Runtime `assert` costs flash and cycles, so in tight builds make it lightweight: capture file/line (or just the PC) and trap, rather than pulling in printf.\n\nReflex to keep: a crash is not a mystery. Read stacked PC -> source line, read CFSR -> cause, read BFAR/MMFAR -> address. Three registers, and the fault becomes a bug report.",
+      "items": [
+        {
+          "id": "debugging-instrumentation-l3-img-stackframe",
+          "type": "flashcard",
+          "front": "Study this diagram.",
+          "back": "Cortex-M exception stack frame: the eight words (R0-R3, R12, LR, PC, xPSR) auto-pushed on exception entry, with the stacked PC highlighted as the faulting instruction and a note to select MSP/PSP via EXC_RETURN and cross-check the CFSR.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/debugging-instrumentation-1.svg"
+        },
+        {
+          "id": "debugging-instrumentation-l3-fc-stackedpc",
+          "type": "flashcard",
+          "front": "After a HardFault, which stacked register points at the source line, and how do you find which stack it's on?",
+          "back": "The stacked PC (offset +0x18 in the 8-word frame). Use addr2line / the map to map it to a source line. Determine MSP vs PSP from EXC_RETURN bit 2 (in LR on entry) to know which stack pointer holds the frame.",
+          "hint": "+0x18, and EXC_RETURN bit 2."
+        },
+        {
+          "id": "debugging-instrumentation-l3-fc-cfsr",
+          "type": "flashcard",
+          "front": "What does the CFSR (0xE000ED28) tell you, and what are its three sub-registers?",
+          "back": "It tells you WHY the fault happened. Sub-fields: MMFSR (MemManage), BFSR (BusFault), UFSR (UsageFault). Bits flag causes like unaligned access, div-by-zero, precise/imprecise bus error, MPU violation.",
+          "hint": "Three byte/halfword sub-fields, one per fault class."
+        },
+        {
+          "id": "debugging-instrumentation-l3-fc-bfar",
+          "type": "flashcard",
+          "front": "When does BFAR (or MMFAR) give you a usable address, and what does it contain?",
+          "back": "When the corresponding 'address valid' bit is set (e.g. BFSR.BFARVALID for a precise bus fault). It then holds the faulting memory address — the bad pointer/peripheral address that caused the access fault.",
+          "hint": "Only valid for precise faults; check the valid bit."
+        },
+        {
+          "id": "debugging-instrumentation-l3-fc-gpioprofile",
+          "type": "flashcard",
+          "front": "Why is a GPIO toggle a better timing probe than printf for ISR latency?",
+          "back": "Setting/clearing a pin is a single ~ns store with no blocking, so it doesn't perturb the timing you're measuring. You read the high-pulse width directly on a scope/logic analyzer — accurate latency and jitter without a Heisenbug.",
+          "hint": "Cost is one store; printf costs milliseconds."
+        },
+        {
+          "id": "debugging-instrumentation-l3-fc-staticassert",
+          "type": "flashcard",
+          "front": "Why prefer static_assert over runtime assert in a flash-constrained build?",
+          "back": "static_assert is evaluated at compile time: zero flash, zero cycles, and the build fails instead of the device. Runtime assert costs code/cycles and (naively) drags in printf, so reserve it for things only knowable at runtime and keep it lightweight (trap + capture PC/line).",
+          "hint": "Compile-time checks are free."
+        },
+        {
+          "id": "debugging-instrumentation-l3-mcq-workflow",
+          "type": "mcq",
+          "prompt": "You hit a HardFault. What is the correct first sequence to localize it?",
+          "choices": [
+            "Add printf everywhere and rerun",
+            "Read the stacked PC to get the faulting instruction/source line, then read CFSR for the cause and BFAR/MMFAR for the address",
+            "Mass-comment code until it stops crashing",
+            "Increase the stack size and hope"
+          ],
+          "answerIndex": 1,
+          "explanation": "The deterministic recipe: stacked PC -> source line, CFSR -> why, BFAR/MMFAR -> which address. Three registers turn the crash into a precise bug report; printf-bisection is slow and can perturb timing."
+        },
+        {
+          "id": "debugging-instrumentation-l3-mcq-escalated",
+          "type": "mcq",
+          "prompt": "Your fault handler is the HardFault handler, but CFSR's UsageFault/BusFault bits are set. What does this indicate, and how do you get sharper diagnosis?",
+          "choices": [
+            "CFSR is irrelevant inside HardFault",
+            "A configurable fault escalated to HardFault because its specific handler was disabled; enable the individual fault handlers via SHCSR to catch them directly",
+            "The CPU is broken",
+            "You must clear CFSR before reading PC"
+          ],
+          "answerIndex": 1,
+          "explanation": "If MemManage/Bus/Usage handlers aren't enabled (SHCSR), those faults escalate to HardFault — but CFSR still records the real cause. Enabling the dedicated handlers lets you trap each class directly for finer diagnosis."
+        },
+        {
+          "id": "debugging-instrumentation-l3-mcq-cause",
+          "type": "mcq",
+          "prompt": "CFSR shows UFSR.UNALIGNED set. What kind of code most likely caused it?",
+          "choices": [
+            "A division by zero",
+            "A multi-byte access (e.g. a 32-bit load) to a non-word-aligned address, often via a misaligned packed-struct/pointer cast",
+            "Writing to flash without unlocking it",
+            "An infinite recursion"
+          ],
+          "answerIndex": 1,
+          "explanation": "UFSR.UNALIGNED flags an unaligned word/halfword access that the core (with alignment trap enabled) refuses. Typical sources are packed structs, casting an odd address to a uint32_t*, or deserializing a protocol buffer in place."
+        },
+        {
+          "id": "debugging-instrumentation-l3-mcq-imprecise",
+          "type": "mcq",
+          "prompt": "BFSR indicates an IMPRECISE bus fault and BFARVALID is 0. Why might the address be unavailable, and what's a practical mitigation?",
+          "choices": [
+            "The fault never happened",
+            "Write buffering let the CPU advance before the bus error surfaced, so the exact PC/address is lost; add a DSB/memory barrier after suspect writes to force precise faults while debugging",
+            "BFAR is only for MemManage faults",
+            "You must reset to read BFAR"
+          ],
+          "answerIndex": 1,
+          "explanation": "Imprecise faults arise from buffered writes completing after the core moved on, so PC/BFAR don't pin the cause. Inserting a DSB (or disabling write buffering) after suspect stores forces the fault to be precise, restoring a usable address."
+        }
+      ]
+    }
+  ]
+}
