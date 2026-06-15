@@ -12,7 +12,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -177,7 +177,7 @@ private fun CardView(card: StudyCard, position: Int, total: Int, onGrade: (Int) 
 
     Column(modifier = Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("$position / $total · ${item.topic} · tier ${item.difficulty}", style = MaterialTheme.typography.labelMedium)
-        Divider()
+        HorizontalDivider()
 
         if (item.type == ItemType.FLASHCARD) {
             Text(item.front.orEmpty(), style = MaterialTheme.typography.titleLarge)
