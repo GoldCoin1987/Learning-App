@@ -54,6 +54,16 @@ Shared: `id` (unique within pack), `type` (`"flashcard"` | `"mcq"`).
 Flashcard: `front` (req), `back` (req), `hint` (opt).
 MCQ: `prompt` (req), `choices` (req, 2+), `answerIndex` (req, 0-based), `explanation` (opt).
 
+Optional images (any item): `image` (absolute URL, shown with the front/prompt) and `backImage`
+(shown with a flashcard's answer). PNG/JPG/**SVG** supported; host alongside the pack, e.g.
+`packs/<topic>/images/foo.svg`, and reference by its raw URL. Images are disk-cached (offline
+after first view).
+
+**LaTeX math:** any text field (`front`, `back`, `prompt`, `choices`, `explanation`, `hint`) may
+contain LaTeX — inline `$...$` or block `$$...$$` — rendered via Markwon/JLatexMath. Basic
+markdown (e.g. `**bold**`) also works. In JSON, every LaTeX backslash must be escaped: write
+`$$e^{j\\theta} = \\cos\\theta + j\\sin\\theta$$`. Plain-text items still render fine.
+
 ## Example
 
 ```json
