@@ -1,0 +1,421 @@
+{
+  "id": "systemd",
+  "title": "systemd: Units, Services & journald",
+  "order": 6,
+  "lessons": [
+    {
+      "id": "systemd-intro",
+      "title": "Why systemd, and the unit model",
+      "order": 1,
+      "difficulty": 1,
+      "content": "## From SysV scripts to a service manager\n\nFor decades, init was **PID 1** running serial shell scripts in `/etc/rc.d/`. Each `init` script started the next, in a fixed order, with no real knowledge of *what* it was starting. Boot was slow (strictly sequential), dependencies were encoded by hand as numeric prefixes (`S20`, `K80`), and once a daemon was launched init forgot about it — no supervision, no restart, no idea which processes belonged to which service.\n\n**systemd** replaced this. It is PID 1 and the system/service manager on essentially every modern non-embedded Linux. Its wins:\n\n- **Parallelism** — independent units start concurrently, not one-at-a-time.\n- **Declarative dependencies** — you state relationships in unit files; systemd computes the order.\n- **Socket/D-Bus activation** — start a service on first connection, not at boot.\n- **cgroup-based supervision** — every process a service spawns lives in a cgroup, so systemd tracks and kills the *whole* tree reliably (no orphaned children).\n- **Unified logging** — `journald` captures everything a service writes to stdout/stderr.\n\nEverything systemd manages is a **unit**, identified by `name.type`:\n\n```ini\nsshd.service      # a daemon\nsshd.socket       # a listening socket (activation)\nmulti-user.target # a grouping / sync point (like a runlevel)\nbackup.timer      # a scheduled trigger (cron replacement)\ndata.mount        # a filesystem mount point\nsystem.slice      # a cgroup resource group\n```\n\nThe unit *type* is the suffix; the most common is `.service`. Targets are not things that \"do work\" — they are named groups used as boot milestones and dependency anchors.",
+      "items": [
+        {
+          "id": "systemd-l1-fc-01",
+          "type": "flashcard",
+          "front": "What process is systemd, and what two roles does it play?",
+          "back": "systemd runs as PID 1 (the first userspace process the kernel starts) and acts as both the init system and the system/service manager for the whole machine.",
+          "hint": "PID 1."
+        },
+        {
+          "id": "systemd-l1-fc-02",
+          "type": "flashcard",
+          "front": "Name four concrete capabilities systemd has that SysV-init scripts lacked.",
+          "back": "Parallel startup, declarative dependency resolution, on-demand socket/D-Bus activation, cgroup-based process supervision (track & kill the whole tree), and unified logging via journald.",
+          "hint": "Parallelism, deps, activation, cgroups, logs."
+        },
+        {
+          "id": "systemd-l1-fc-03",
+          "type": "flashcard",
+          "front": "How does systemd reliably kill every process a service spawned, including double-forked children?",
+          "back": "Each service's processes are placed in their own cgroup. systemd tracks membership by cgroup, not by parsing PIDs, so it can stop or kill the entire process tree even when children re-parent to PID 1.",
+          "hint": "It is not done by PID tracking."
+        },
+        {
+          "id": "systemd-l1-fc-04",
+          "type": "flashcard",
+          "front": "How is a systemd unit named, and what does the suffix mean?",
+          "back": "A unit is named `name.type`, e.g. `sshd.service`. The suffix after the final dot is the unit *type* and tells systemd what kind of object it is (service, socket, target, timer, mount, slice, etc.).",
+          "hint": "Look after the last dot.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/systemd-1.svg"
+        },
+        {
+          "id": "systemd-l1-fc-05",
+          "type": "flashcard",
+          "front": "What is a `.target` unit, conceptually?",
+          "back": "A grouping/synchronization unit that pulls in a set of other units and acts as a named milestone. It does no work itself; it is the systemd analogue of a SysV runlevel (e.g. multi-user.target, graphical.target).",
+          "hint": "Like a runlevel."
+        },
+        {
+          "id": "systemd-l1-fc-06",
+          "type": "flashcard",
+          "front": "Match the use case to the unit type: schedule a nightly job; listen on a port and start a daemon lazily; group CPU/memory limits for a set of services.",
+          "back": "Nightly job -> `.timer`. Lazy port-triggered daemon -> `.socket` (socket activation). Resource grouping -> `.slice` (a cgroup hierarchy node).",
+          "hint": "timer, socket, slice."
+        },
+        {
+          "id": "systemd-l1-mcq-07",
+          "type": "mcq",
+          "prompt": "A junior engineer says \"systemd boots faster than SysV mainly because it skips running scripts.\" What is the more accurate primary reason?",
+          "choices": [
+            "It starts independent units in parallel and computes order from declared dependencies, instead of running everything strictly sequentially",
+            "It is written in C instead of shell, so the same sequential steps run faster",
+            "It caches the previous boot and replays it",
+            "It disables logging during boot to save time"
+          ],
+          "answerIndex": 0,
+          "explanation": "The big win is parallelism plus dependency resolution: only truly ordered units wait on each other, the rest start concurrently. Language and caching are not the mechanism, and logging stays on."
+        },
+        {
+          "id": "systemd-l1-mcq-08",
+          "type": "mcq",
+          "prompt": "Which statement about `.target` units is correct?",
+          "choices": [
+            "A target is a daemon process that supervises other daemons",
+            "A target is a grouping/milestone unit that pulls in other units and runs no work of its own",
+            "A target replaces cgroups for resource control",
+            "A target is the only unit type that can have dependencies"
+          ],
+          "answerIndex": 1,
+          "explanation": "Targets are synchronization points / groupings (e.g. multi-user.target), the modern replacement for runlevels. They start no processes themselves; many unit types can carry dependencies."
+        },
+        {
+          "id": "systemd-l1-mcq-09",
+          "type": "mcq",
+          "prompt": "You see units named `home.mount`, `tmp.mount`, and `dev-sda2.swap`. What generated these?",
+          "choices": [
+            "Someone hand-wrote them; they must be deleted",
+            "systemd auto-generates mount/swap units from /etc/fstab and the running mount table",
+            "They are leftover SysV scripts",
+            "The kernel writes them directly to /etc"
+          ],
+          "answerIndex": 1,
+          "explanation": "systemd generators translate /etc/fstab entries (and active mounts) into transient `.mount`/`.swap` units so the filesystem layer participates in the dependency graph. They are normal, not hand-written."
+        }
+      ]
+    },
+    {
+      "id": "systemd-unit-files",
+      "title": "Unit file anatomy: [Unit], [Service], [Install]",
+      "order": 2,
+      "difficulty": 2,
+      "content": "## Anatomy of a `.service` unit\n\nA unit file is an INI-style file with sections. A typical service:\n\n```ini\n[Unit]\nDescription=My App API\nDocumentation=https://example.com/docs\nAfter=network-online.target postgresql.service\nWants=network-online.target\nRequires=postgresql.service\n\n[Service]\nType=simple\nExecStart=/usr/bin/myapp --config /etc/myapp.conf\nExecReload=/bin/kill -HUP $MAINPID\nRestart=on-failure\nRestartSec=5\nUser=myapp\nGroup=myapp\nWorkingDirectory=/var/lib/myapp\nEnvironment=LOG_LEVEL=info\n\n[Install]\nWantedBy=multi-user.target\n```\n\n**`[Unit]`** holds metadata and dependencies. The two that confuse people:\n\n- `After=` / `Before=` set **ordering only** — *when* relative to another unit.\n- `Wants=` / `Requires=` set **requirement** — *whether the dependency is pulled in*. `Wants=` is soft (start it too, but ignore its failure); `Requires=` is hard (if it fails to start, we fail too). **These are orthogonal to ordering** — `Requires=foo` without `After=foo` will start both at once, which is almost never what you want.\n\n**`[Service]`** defines the runtime: `ExecStart=` (the command), `Restart=` policy, and identity (`User=`/`Group=`). `Type=` is critical and covered next.\n\n**`[Install]`** is read only by `systemctl enable`. `WantedBy=multi-user.target` means \"when I'm enabled, create a symlink so multi-user.target wants me at boot.\" A unit with no `[Install]` section can be started manually but **cannot be enabled** — there is nothing telling systemd where to hook it in.",
+      "items": [
+        {
+          "id": "systemd-l2-fc-01",
+          "type": "flashcard",
+          "front": "What is the difference between `After=` and `Requires=`?",
+          "back": "`After=` controls ORDERING only (start this after that unit). `Requires=` controls REQUIREMENT (pull that unit in, and fail if it fails). They are orthogonal: you usually need BOTH together to get \"start B after A, and only if A is up.\"",
+          "hint": "Order vs. existence."
+        },
+        {
+          "id": "systemd-l2-fc-02",
+          "type": "flashcard",
+          "front": "Wants= vs Requires= — what happens to your service if the dependency fails to start?",
+          "back": "With `Wants=` (soft): your service still starts; the dependency failure is ignored. With `Requires=` (hard): if the dependency fails or is stopped, your service is also stopped/fails. Prefer `Wants=` unless the dependency is truly mandatory.",
+          "hint": "Soft = start anyway; hard = die with it."
+        },
+        {
+          "id": "systemd-l2-fc-03",
+          "type": "flashcard",
+          "front": "What does the `[Install]` section do, and who reads it?",
+          "back": "`[Install]` (e.g. `WantedBy=multi-user.target`) is read only by `systemctl enable`/`disable`. enable creates a symlink in the target's `.wants/` dir so the unit auto-starts at boot. It has no effect on a one-shot `systemctl start`.",
+          "hint": "Only enable cares."
+        },
+        {
+          "id": "systemd-l2-fc-04",
+          "type": "flashcard",
+          "front": "A unit file has no `[Install]` section. What can and cannot you do with it?",
+          "back": "You can `systemctl start`/`stop`/`status` it manually, and other units can depend on it. You CANNOT `systemctl enable` it — there is no WantedBy/RequiredBy telling systemd where to wire it into the boot graph.",
+          "hint": "Start yes, enable no."
+        },
+        {
+          "id": "systemd-l2-fc-05",
+          "type": "flashcard",
+          "front": "What does `WantedBy=multi-user.target` accomplish on enable?",
+          "back": "It tells `systemctl enable` to create a symlink in `multi-user.target.wants/` pointing at your unit, so that reaching multi-user.target at boot pulls your service in (a soft Wants relationship).",
+          "hint": "Creates a .wants/ symlink."
+        },
+        {
+          "id": "systemd-l2-fc-06",
+          "type": "flashcard",
+          "front": "What is `Restart=on-failure` plus `RestartSec=5`, and why use `User=`?",
+          "back": "`Restart=on-failure` restarts the service only on a nonzero exit/signal (not on clean exit); `RestartSec=5` waits 5s between attempts. `User=myapp` runs the daemon as an unprivileged account instead of root, limiting blast radius if it is compromised.",
+          "hint": "Restart on crash; drop privileges."
+        },
+        {
+          "id": "systemd-l2-mcq-07",
+          "type": "mcq",
+          "prompt": "Your service writes `Requires=postgresql.service` but omits `After=`. Postgres and your app are slow to start. What is the likely bug?",
+          "choices": [
+            "Nothing — Requires implies After automatically",
+            "Both start in parallel, so your app may connect before Postgres is ready and crash",
+            "Postgres will never start because Requires blocks it",
+            "systemd will refuse to load the unit"
+          ],
+          "answerIndex": 1,
+          "explanation": "Requires pulls Postgres in but does NOT order startup. Without `After=postgresql.service`, both launch simultaneously and your app can race ahead of a not-yet-listening database. Requirement and ordering are independent."
+        },
+        {
+          "id": "systemd-l2-mcq-08",
+          "type": "mcq",
+          "prompt": "You run `systemctl enable myapp` and get \"The unit files have no installation config (WantedBy=, RequiredBy=, Also=, Alias= settings ...).\" Why?",
+          "choices": [
+            "The unit is corrupt",
+            "The unit has no [Install] section, so enable has nowhere to wire it into the boot graph",
+            "You must run daemon-reload first",
+            "Only root-owned units can be enabled"
+          ],
+          "answerIndex": 1,
+          "explanation": "enable needs an [Install] section (typically WantedBy=) to know which target should pull the unit in at boot. Add `[Install]` with `WantedBy=multi-user.target` and re-enable."
+        },
+        {
+          "id": "systemd-l2-mcq-09",
+          "type": "mcq",
+          "prompt": "Which directive belongs in the [Service] section, not [Unit]?",
+          "choices": [
+            "After=",
+            "Requires=",
+            "ExecStart=",
+            "Description="
+          ],
+          "answerIndex": 2,
+          "explanation": "ExecStart= (the command to run) is runtime behavior and lives in [Service]. After=, Requires=, and Description= are metadata/dependencies and belong in [Unit]."
+        },
+        {
+          "id": "systemd-l2-mcq-10",
+          "type": "mcq",
+          "prompt": "What is the safest default restart policy for a long-running daemon you do NOT want restarted after a clean shutdown?",
+          "choices": [
+            "Restart=always",
+            "Restart=on-failure",
+            "Restart=no with a cron retry",
+            "Restart=on-success"
+          ],
+          "answerIndex": 1,
+          "explanation": "`Restart=on-failure` restarts only on abnormal exit (nonzero code/signal/timeout) but respects a clean `systemctl stop` or exit 0. `Restart=always` would fight an intentional stop."
+        }
+      ]
+    },
+    {
+      "id": "systemd-types-precedence",
+      "title": "Type=, file precedence, drop-ins & systemctl verbs",
+      "order": 3,
+      "difficulty": 3,
+      "content": "## Type=, file precedence, and managing units\n\n**`Type=`** tells systemd *how to decide the service is \"up\"* so it can start dependents at the right moment. Getting it wrong is a classic failure.\n\n- `Type=simple` (default): the process started by `ExecStart` **is** the daemon and stays in the foreground. systemd considers it active immediately.\n- `Type=exec`: like simple, but \"active\" waits until the binary is actually `execve`'d.\n- `Type=forking`: `ExecStart` **forks and the parent exits**; the child is the daemon. Pair with `PIDFile=`. Use only for old daemons that daemonize themselves. If you mark a foreground program `forking`, systemd waits for a parent exit that never comes and times out.\n- `Type=oneshot`: runs to completion then exits; use `RemainAfterExit=yes` to stay \"active.\" Good for setup tasks.\n- `Type=notify`: the daemon calls `sd_notify(READY=1)` when truly ready — the most accurate signal.\n\n### Where units live (precedence)\n\n```text\n/etc/systemd/system/        # admin overrides  -- HIGHEST precedence\n/run/systemd/system/        # runtime, transient\n/usr/lib/systemd/system/    # packaged/vendor defaults -- LOWEST\n```\n\n**Never edit vendor files in `/usr/lib`** — a package update overwrites them. Instead use **drop-ins**:\n\n```bash\nsudo systemctl edit myapp.service     # creates .../myapp.service.d/override.conf\n```\n\nA drop-in only sets the keys you change; it merges over the vendor file and survives upgrades. After editing any unit file by hand you must run:\n\n```bash\nsudo systemctl daemon-reload          # re-read unit files from disk\nsudo systemctl restart myapp.service  # apply to the running process\n```\n\n`daemon-reload` reloads systemd's view of the *files*; `restart` applies them to the *running* service. `enable` wires boot autostart; `start` runs it now — different verbs, different effects.",
+      "items": [
+        {
+          "id": "systemd-l3-fc-01",
+          "type": "flashcard",
+          "front": "What does `Type=` actually control?",
+          "back": "How systemd determines that the service has finished starting up (reached \"active\"), so it knows when to launch units that ordered themselves After= this one. It does not change how the program runs, only how readiness is detected.",
+          "hint": "Readiness detection."
+        },
+        {
+          "id": "systemd-l3-fc-02",
+          "type": "flashcard",
+          "front": "When should you use `Type=forking`, and what's the danger of misusing it?",
+          "back": "Use `Type=forking` only for legacy daemons that double-fork and let the parent exit (pair with PIDFile=). If you set forking on a foreground program, systemd waits for a parent exit that never happens and the start times out / is marked failed.",
+          "hint": "Only for self-daemonizing programs."
+        },
+        {
+          "id": "systemd-l3-fc-03",
+          "type": "flashcard",
+          "front": "What does `Type=notify` require of the program, and why is it the most accurate?",
+          "back": "The program must call `sd_notify(\"READY=1\")` (libsystemd) when it is genuinely ready to serve. systemd holds dependents until that signal, so there is no race window like with Type=simple, which is \"ready\" the instant the process exists.",
+          "hint": "sd_notify READY=1."
+        },
+        {
+          "id": "systemd-l3-fc-04",
+          "type": "flashcard",
+          "front": "What is `Type=oneshot` for, and what does `RemainAfterExit=yes` add?",
+          "back": "`Type=oneshot` runs a command to completion then exits (good for setup/migration steps); systemd waits for it to finish before continuing. `RemainAfterExit=yes` keeps the unit reported as \"active\" after the process exits, so it counts as satisfied.",
+          "hint": "Run once; optionally stay active."
+        },
+        {
+          "id": "systemd-l3-fc-05",
+          "type": "flashcard",
+          "front": "Rank the unit search paths by precedence and say which you should edit.",
+          "back": "Highest to lowest: /etc/systemd/system > /run/systemd/system > /usr/lib/systemd/system. Edit /etc (via drop-ins) — never /usr/lib, since package updates overwrite vendor files there.",
+          "hint": "/etc beats /usr/lib."
+        },
+        {
+          "id": "systemd-l3-fc-06",
+          "type": "flashcard",
+          "front": "What does `systemctl edit myapp.service` create, and why prefer it over editing the vendor file?",
+          "back": "It creates a drop-in `/etc/systemd/system/myapp.service.d/override.conf` that overrides only the keys you set and merges over the vendor unit. It survives package upgrades, whereas edits to /usr/lib/systemd/system get clobbered.",
+          "hint": "Drop-in in *.service.d/."
+        },
+        {
+          "id": "systemd-l3-fc-07",
+          "type": "flashcard",
+          "front": "Distinguish `daemon-reload`, `restart`, `enable`, and `start`.",
+          "back": "daemon-reload: re-read unit FILES from disk into systemd's memory. restart: apply files to the RUNNING process. enable: create boot-time autostart symlink ([Install]). start: run the service NOW. enable does not start; start does not enable.",
+          "hint": "files vs process; boot vs now."
+        },
+        {
+          "id": "systemd-l3-mcq-08",
+          "type": "mcq",
+          "prompt": "You enable a freshly written service and reboot — it runs. But `systemctl start` it now without rebooting did nothing earlier. Most likely cause?",
+          "choices": [
+            "enable and start are the same; you imagined it",
+            "You edited the unit file but never ran `systemctl daemon-reload`, so systemd used a stale/empty view",
+            "Services can only start at boot",
+            "The [Install] section blocks manual start"
+          ],
+          "answerIndex": 1,
+          "explanation": "After creating or editing a unit file, systemd must `daemon-reload` to pick it up. enable created the boot symlink (effective after reboot), but the live manager hadn't re-read the file, so an immediate start saw nothing to do."
+        },
+        {
+          "id": "systemd-l3-mcq-09",
+          "type": "mcq",
+          "prompt": "A daemon runs fine in the foreground but as a service it logs \"start operation timed out\" and is killed. The unit says `Type=forking`. Best fix?",
+          "choices": [
+            "Add Restart=always",
+            "Change to `Type=simple` (or `Type=notify` if it supports sd_notify)",
+            "Increase the CPU quota",
+            "Run it as root"
+          ],
+          "answerIndex": 1,
+          "explanation": "`Type=forking` makes systemd wait for the parent to exit. A foreground daemon never forks/exits, so the start times out. Use `Type=simple` for a foreground process, or `Type=notify` if it can signal readiness."
+        },
+        {
+          "id": "systemd-l3-mcq-10",
+          "type": "mcq",
+          "prompt": "You want to change one environment variable on a vendor-provided unit so it survives package updates. Best approach?",
+          "choices": [
+            "Edit /usr/lib/systemd/system/foo.service directly",
+            "Copy the file to /etc and edit the copy fully",
+            "Run `systemctl edit foo.service` and set only Environment= in the drop-in, then daemon-reload",
+            "Set the variable in /etc/environment"
+          ],
+          "answerIndex": 2,
+          "explanation": "`systemctl edit` writes a minimal drop-in in /etc/.../foo.service.d/ that overrides just that key and merges over the vendor file, surviving upgrades. Editing /usr/lib is clobbered on update; a full /etc copy can drift from upstream changes."
+        },
+        {
+          "id": "systemd-l3-mcq-11",
+          "type": "mcq",
+          "prompt": "Which command makes systemd re-read unit files after you hand-edited one in /etc?",
+          "choices": [
+            "systemctl reload-or-restart",
+            "systemctl daemon-reload",
+            "systemctl reset-failed",
+            "systemctl revert"
+          ],
+          "answerIndex": 1,
+          "explanation": "`systemctl daemon-reload` reloads the manager's view of unit files from disk. (reload-or-restart acts on the service process; reset-failed clears failed state; revert removes overrides.)"
+        }
+      ]
+    },
+    {
+      "id": "systemd-timers-hardening-journald",
+      "title": "Timers, socket activation, hardening & journald",
+      "order": 4,
+      "difficulty": 4,
+      "content": "## Timers, socket activation, hardening, and journald\n\n### Timers (the cron replacement)\nA `.timer` triggers a same-named `.service`. Unlike cron, timers integrate with the dependency graph, log to journald, and can catch up missed runs.\n\n```ini\n# backup.timer\n[Unit]\nDescription=Nightly backup\n[Timer]\nOnCalendar=*-*-* 02:30:00\nPersistent=true\n[Install]\nWantedBy=timers.target\n```\n\n`OnCalendar=` uses systemd's calendar syntax (test with `systemd-analyze calendar`). `Persistent=true` runs the job after boot if the machine was off at the scheduled time. `OnBootSec=`/`OnUnitActiveSec=` give monotonic schedules. List active timers with `systemctl list-timers`.\n\n### Socket activation\nA `.socket` unit owns the listening socket; systemd starts the matching service on first connection, enabling lazy start and zero-downtime restarts.\n\n```ini\n# myapp.socket\n[Socket]\nListenStream=8080\n[Install]\nWantedBy=sockets.target\n```\n\n### Hardening (cheap, high-value)\n```ini\n[Service]\nProtectSystem=strict      # / mounted read-only to the service\nPrivateTmp=true           # private /tmp, /var/tmp\nNoNewPrivileges=true      # cannot gain privs via setuid/exec\nProtectHome=true\n```\nCheck a unit's exposure with `systemd-analyze security myapp.service`.\n\n### journald / journalctl\njournald stores **structured, indexed binary** logs (set `Storage=persistent` in `journald.conf` to keep them across reboots). Query them:\n\n```bash\njournalctl -u myapp.service     # this unit only\njournalctl -u myapp -f          # follow (like tail -f)\njournalctl -u myapp --since \"1 hour ago\"\njournalctl -b                   # current boot;  -b -1 = previous boot\njournalctl -p err               # priority err and worse\njournalctl -k                   # kernel ring buffer (dmesg)\n```",
+      "items": [
+        {
+          "id": "systemd-l4-fc-01",
+          "type": "flashcard",
+          "front": "Name three advantages a systemd `.timer` has over a crontab entry.",
+          "back": "Timers integrate with the dependency graph (can wait on other units), log to journald with full service output, support Persistent=true to catch up missed runs after downtime, and reuse all service features (User=, hardening, Type=). Cron has none of these.",
+          "hint": "Deps, journald, catch-up."
+        },
+        {
+          "id": "systemd-l4-fc-02",
+          "type": "flashcard",
+          "front": "In a timer, what do `OnCalendar=` and `Persistent=true` do?",
+          "back": "`OnCalendar=*-*-* 02:30:00` sets a wall-clock schedule (here daily at 02:30). `Persistent=true` makes systemd run the job immediately after boot if the scheduled time was missed while the machine was off.",
+          "hint": "Wall-clock + catch-up."
+        },
+        {
+          "id": "systemd-l4-fc-03",
+          "type": "flashcard",
+          "front": "How does a .timer know which service to run, and how do you list timers?",
+          "back": "By default a timer triggers the service with the same base name (backup.timer -> backup.service); override with Unit= in [Timer]. List all active timers and their next/last run with `systemctl list-timers`.",
+          "hint": "Same name; list-timers."
+        },
+        {
+          "id": "systemd-l4-fc-04",
+          "type": "flashcard",
+          "front": "What problem does socket activation solve?",
+          "back": "A `.socket` unit holds the listening socket itself; systemd starts the service only on first connection (lazy start, faster boot) and can hand the same socket to a restarted service, enabling near-zero-downtime restarts since connections queue in the kernel.",
+          "hint": "systemd owns the port."
+        },
+        {
+          "id": "systemd-l4-fc-05",
+          "type": "flashcard",
+          "front": "What do ProtectSystem=strict, PrivateTmp=true, and NoNewPrivileges=true each do?",
+          "back": "ProtectSystem=strict: mounts the whole filesystem read-only to the service (writable only where you allow). PrivateTmp=true: gives the service its own /tmp and /var/tmp. NoNewPrivileges=true: forbids gaining new privileges via setuid binaries/exec, blocking privilege escalation.",
+          "hint": "RO fs; private tmp; no setuid gain."
+        },
+        {
+          "id": "systemd-l4-fc-06",
+          "type": "flashcard",
+          "front": "How do you make journald logs persist across reboots, and how is data stored?",
+          "back": "journald stores logs as structured, indexed binary records. Set `Storage=persistent` in /etc/systemd/journald.conf (and create /var/log/journal) so logs survive reboots; otherwise they default to volatile in /run and are lost on reboot.",
+          "hint": "Storage=persistent + /var/log/journal."
+        },
+        {
+          "id": "systemd-l4-fc-07",
+          "type": "flashcard",
+          "front": "Give the journalctl flags to: show only one unit, follow live, show the previous boot, filter to errors, show kernel messages, and limit by time.",
+          "back": "`-u NAME` (one unit), `-f` (follow), `-b -1` (previous boot; `-b` = current), `-p err` (priority error and worse), `-k` (kernel/dmesg), `--since \"1 hour ago\"` / `--until` (time window).",
+          "hint": "-u -f -b -p -k --since."
+        },
+        {
+          "id": "systemd-l4-mcq-08",
+          "type": "mcq",
+          "prompt": "A nightly cleanup must still run even if the server was powered off at the scheduled time and only booted at 09:00. Which timer setting handles this?",
+          "choices": [
+            "OnBootSec=0",
+            "Persistent=true",
+            "AccuracySec=1us",
+            "RandomizedDelaySec=600"
+          ],
+          "answerIndex": 1,
+          "explanation": "`Persistent=true` records the last run and, if a scheduled OnCalendar time was missed while off, runs the job shortly after the next boot. The others affect boot-relative timing, accuracy, or jitter — not missed-run catch-up."
+        },
+        {
+          "id": "systemd-l4-mcq-09",
+          "type": "mcq",
+          "prompt": "You run `journalctl -u myapp -f -p warning`. What do you see?",
+          "choices": [
+            "All historical logs for every unit",
+            "A live-following stream of myapp's messages at priority warning and more severe",
+            "Only kernel messages",
+            "Logs from the previous boot only"
+          ],
+          "answerIndex": 1,
+          "explanation": "`-u myapp` scopes to that unit, `-f` follows new entries live (tail -f style), and `-p warning` filters to warning and worse. Kernel-only is `-k`; previous boot is `-b -1`."
+        },
+        {
+          "id": "systemd-l4-mcq-10",
+          "type": "mcq",
+          "prompt": "Which command quickly estimates how exposed a service is, scoring its sandboxing directives?",
+          "choices": [
+            "systemd-analyze security myapp.service",
+            "systemctl is-active myapp.service",
+            "journalctl -u myapp.service",
+            "systemctl cat myapp.service"
+          ],
+          "answerIndex": 0,
+          "explanation": "`systemd-analyze security UNIT` produces an exposure score and lists which hardening directives (ProtectSystem, PrivateTmp, NoNewPrivileges, etc.) are set or missing. is-active/journalctl/cat report status, logs, and the merged file, not a security score."
+        },
+        {
+          "id": "systemd-l4-mcq-11",
+          "type": "mcq",
+          "prompt": "With socket activation, why can a service restart cause (almost) no dropped client connections?",
+          "choices": [
+            "systemd buffers all application data in RAM",
+            "The .socket unit keeps the listening socket open, so new connections queue in the kernel while the service process restarts",
+            "Clients automatically retry forever",
+            "The service never actually stops"
+          ],
+          "answerIndex": 1,
+          "explanation": "Because systemd owns the listening socket, it stays open across a service restart. Incoming connections queue in the kernel backlog and are handed to the freshly started process, so clients see a brief delay rather than a connection refused."
+        }
+      ]
+    }
+  ]
+}

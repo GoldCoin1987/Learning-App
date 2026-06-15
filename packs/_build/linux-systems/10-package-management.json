@@ -1,0 +1,282 @@
+{
+  "id": "package-management",
+  "title": "Package Management & Software Installation",
+  "order": 10,
+  "lessons": [
+    {
+      "id": "package-management-dpkg-apt-basics",
+      "title": "Debian-Family: dpkg, APT, and the .deb",
+      "order": 1,
+      "difficulty": 1,
+      "content": "On Debian and Ubuntu there are **two layers**. `dpkg` is the low-level tool that unpacks and registers a single `.deb` file; it knows nothing about where packages come from and will not fetch dependencies. **APT** (`apt`, `apt-get`, `apt-cache`) is the high-level layer that talks to repositories, resolves dependencies, and then calls `dpkg` to do the actual install.\n\nA `.deb` is just an `ar` archive containing `control.tar` (metadata: name, version, `Depends:`, maintainer scripts) and `data.tar` (the files to install). You can crack one open without installing it:\n\n```bash\nar t mytool.deb              # list members\ndpkg-deb -I mytool.deb       # show control info\ndpkg-deb -c mytool.deb       # list files it would install\n```\n\nDay-to-day commands:\n\n```bash\nsudo apt update              # refresh the package index\nsudo apt install nginx       # resolve deps + install\napt-cache policy nginx       # candidate version + repo source\nsudo dpkg -i mytool.deb      # install a local .deb (no deps!)\nsudo apt install -f          # then fix missing deps\n```\n\nRepositories are configured in `/etc/apt/sources.list` and `/etc/apt/sources.list.d/*.list` (or the newer deb822 `.sources` format). Each line names a mirror URL, a suite (e.g. `bookworm`), and components (`main`, `contrib`). `apt update` downloads the **index** from each; `apt install` then knows what is available. The mental model that matters most: `apt` is online and dependency-aware, `dpkg` is local and dumb. Reach for `dpkg` only when you already have a `.deb` in hand or need to inspect the package database directly.",
+      "items": [
+        {
+          "id": "package-management-dpkg-apt-basics-fc-001",
+          "type": "flashcard",
+          "front": "What is the division of labor between `dpkg` and `apt`?",
+          "back": "`dpkg` is the low-level engine: it unpacks/configures a single local `.deb` and records it in the package database, but does not fetch dependencies. `apt` is the high-level front end: it talks to repositories, resolves dependencies, downloads packages, then invokes `dpkg` to install them.",
+          "hint": "One is online and dependency-aware; one is local and dumb."
+        },
+        {
+          "id": "package-management-dpkg-apt-basics-fc-002",
+          "type": "flashcard",
+          "front": "A `.deb` file is fundamentally what kind of archive, and what are its two main payload members?",
+          "back": "It is an `ar` archive. The two payloads are `control.tar.*` (metadata: package name, version, `Depends:`, maintainer scripts) and `data.tar.*` (the actual files to be installed onto the filesystem). A `debian-binary` member holds the format version.",
+          "hint": "Same `ar` format used for static libraries; metadata vs. files."
+        },
+        {
+          "id": "package-management-dpkg-apt-basics-fc-003",
+          "type": "flashcard",
+          "front": "After `sudo dpkg -i tool.deb` fails complaining about missing dependencies, what single command repairs it?",
+          "back": "`sudo apt install -f` (or `apt --fix-broken install`). `dpkg` installed the package but cannot fetch deps; `apt -f` reads the broken state, downloads the missing dependencies from the repos, and completes the configuration.",
+          "hint": "Let the online layer clean up after the dumb one."
+        },
+        {
+          "id": "package-management-dpkg-apt-basics-fc-004",
+          "type": "flashcard",
+          "front": "Where are APT repositories configured, and what three things does a sources entry specify?",
+          "back": "In `/etc/apt/sources.list` and `/etc/apt/sources.list.d/*.list` (or deb822 `.sources` files). Each entry specifies the mirror URL, the suite/distribution (e.g. `bookworm`), and the components (e.g. `main contrib non-free`).",
+          "hint": "URL + suite + components."
+        },
+        {
+          "id": "package-management-dpkg-apt-basics-mcq-001",
+          "type": "mcq",
+          "prompt": "You want to see every file a local `tool.deb` would install WITHOUT installing it. Which command?",
+          "choices": [
+            "dpkg -L tool.deb",
+            "dpkg-deb -c tool.deb",
+            "apt-cache show tool.deb",
+            "dpkg -i --dry-run tool.deb"
+          ],
+          "answerIndex": 1,
+          "explanation": "`dpkg-deb -c` lists the contents of a `.deb` file on disk. `dpkg -L` lists files of an already-INSTALLED package (and takes a package name, not a file). `apt-cache show` reads index metadata, not a local file's file list."
+        },
+        {
+          "id": "package-management-dpkg-apt-basics-mcq-002",
+          "type": "mcq",
+          "prompt": "What does `sudo apt update` actually do?",
+          "choices": [
+            "Upgrades all installed packages to their newest versions",
+            "Refreshes the local copy of the repositories' package indexes",
+            "Installs security patches only",
+            "Rebuilds the dpkg database from /var/lib/dpkg"
+          ],
+          "answerIndex": 1,
+          "explanation": "`apt update` only re-downloads and verifies the package INDEX from each configured repo, so APT knows what versions exist. Upgrading installed packages is `apt upgrade` / `apt full-upgrade` — a separate step."
+        },
+        {
+          "id": "package-management-dpkg-apt-basics-mcq-003",
+          "type": "mcq",
+          "prompt": "Which tool will fetch and install a package's dependencies automatically?",
+          "choices": [
+            "dpkg -i",
+            "dpkg-deb -x",
+            "apt install",
+            "ar x"
+          ],
+          "answerIndex": 2,
+          "explanation": "Only `apt install` resolves and downloads dependencies from repositories. `dpkg -i` installs one local file without fetching deps; `dpkg-deb -x` and `ar x` merely extract the archive."
+        },
+        {
+          "id": "package-management-dpkg-apt-basics-mcq-004",
+          "type": "mcq",
+          "prompt": "`apt-cache policy nginx` is most useful for answering which question?",
+          "choices": [
+            "Which files does nginx install?",
+            "Which package owns /usr/sbin/nginx?",
+            "What candidate version is available and from which repo?",
+            "What are nginx's reverse dependencies?"
+          ],
+          "answerIndex": 2,
+          "explanation": "`apt-cache policy` shows the installed version, the candidate (what would be installed), and the priority-ranked list of repositories/mirrors offering it. It is the go-to tool when you are unsure where a version is coming from."
+        }
+      ]
+    },
+    {
+      "id": "package-management-rpm-dnf-pacman-trust",
+      "title": "RPM/dnf, pacman, Signing, and Owning Files",
+      "order": 2,
+      "difficulty": 2,
+      "content": "The same two-layer idea reappears across families. **Red Hat/Fedora**: `rpm` is the low-level tool, `dnf` (formerly `yum`) is the dependency-resolving front end; repos live in `/etc/yum.repos.d/*.repo`. **Arch**: `pacman` is a single tool that does both, with repos in `/etc/pacman.conf` and the AUR for community builds. Translating between families is mostly vocabulary:\n\n```bash\n# Debian            # RHEL/Fedora          # Arch\napt install pkg     dnf install pkg        pacman -S pkg\napt remove pkg      dnf remove pkg         pacman -R pkg\napt update          dnf check-update       pacman -Sy\ndpkg -L pkg         rpm -ql pkg            pacman -Ql pkg\ndpkg -S /path/file  rpm -qf /path/file     pacman -Qo /path/file\n```\n\nTwo cross-cutting skills matter most in practice. **Which package owns a file?** When a stray binary or config appears, ask the database: `dpkg -S /usr/bin/curl`, `rpm -qf /usr/bin/curl`, or `pacman -Qo`. The inverse — list everything a package installed — is `dpkg -L`, `rpm -ql`, `pacman -Ql`.\n\n**Package signing and trust.** This is the security backbone. Every repo publishes a signed index; your machine holds the repo's public **GPG key**. APT verifies the signature on the `InRelease`/`Release` file, which in turn lists the cryptographic hashes of every package — so a tampered or man-in-the-middle package fails verification. RPM signs each package directly (`rpm --checksig`). The crucial mental model: **you trust a key, not a server.** A compromised mirror cannot forge a validly signed package. Modern Debian keeps third-party keys in `/etc/apt/keyrings/` and references them per-source with `signed-by=`, rather than the deprecated global `apt-key`, so one vendor's key cannot vouch for another's packages.",
+      "items": [
+        {
+          "id": "package-management-rpm-dnf-pacman-trust-fc-001",
+          "type": "flashcard",
+          "front": "Across Debian, RHEL, and Arch, what command answers \"which installed package owns this file?\"",
+          "back": "Debian: `dpkg -S /path/to/file`. RHEL/Fedora: `rpm -qf /path/to/file`. Arch: `pacman -Qo /path/to/file`. All query the local package database to map a file back to its owning package.",
+          "hint": "-S, -qf, -Qo."
+        },
+        {
+          "id": "package-management-rpm-dnf-pacman-trust-fc-002",
+          "type": "flashcard",
+          "front": "What command lists ALL files installed by an already-installed package on each family?",
+          "back": "Debian: `dpkg -L pkg`. RHEL/Fedora: `rpm -ql pkg`. Arch: `pacman -Ql pkg`. This is the inverse of the \"who owns this file?\" query.",
+          "hint": "-L, -ql, -Ql."
+        },
+        {
+          "id": "package-management-rpm-dnf-pacman-trust-fc-003",
+          "type": "flashcard",
+          "front": "In the package-signing security model, what exactly do you trust, and why does that defeat a malicious mirror?",
+          "back": "You trust a maintainer's/repo's GPG public key, not the server hosting the files. The signed index commits to the hash of every package, so any tampered package (even from a compromised mirror or MITM) fails signature/hash verification. A mirror cannot produce a validly signed index without the private key.",
+          "hint": "Trust the key, not the host."
+        },
+        {
+          "id": "package-management-rpm-dnf-pacman-trust-fc-004",
+          "type": "flashcard",
+          "front": "Why is modern APT's `signed-by=` keyring approach safer than the old global `apt-key`?",
+          "back": "With global `apt-key`, any key in the global trust set could vouch for ANY repository. With per-source `signed-by=/etc/apt/keyrings/vendor.gpg`, a given key only authorizes its own repo, so one third party's key cannot silently authenticate packages from another source. It scopes trust.",
+          "hint": "Scoping trust to one repo instead of all."
+        },
+        {
+          "id": "package-management-rpm-dnf-pacman-trust-mcq-001",
+          "type": "mcq",
+          "prompt": "A mysterious binary `/usr/bin/widget` appears on a Fedora box. Which command tells you which package put it there?",
+          "choices": [
+            "rpm -ql /usr/bin/widget",
+            "rpm -qf /usr/bin/widget",
+            "dnf list installed widget",
+            "rpm -V widget"
+          ],
+          "answerIndex": 1,
+          "explanation": "`rpm -qf FILE` (query-file) maps a file path to its owning package. `rpm -ql` is the inverse (list a package's files) and expects a package name. `rpm -V` verifies a package against its recorded metadata.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-1.svg"
+        },
+        {
+          "id": "package-management-rpm-dnf-pacman-trust-mcq-002",
+          "type": "mcq",
+          "prompt": "Why can a compromised package mirror NOT slip a backdoored package onto a correctly configured Debian system?",
+          "choices": [
+            "Because APT downloads everything over HTTPS only",
+            "Because the signed index commits to each package's hash, and the mirror lacks the private signing key",
+            "Because dpkg refuses to install anything from a mirror",
+            "Because /etc/apt/keyrings encrypts the downloaded packages"
+          ],
+          "answerIndex": 1,
+          "explanation": "Trust rests on the GPG signature of the repo index, which lists each package's hash. Without the private key the mirror cannot forge a valid signature, and an altered package won't match the signed hash. HTTPS alone does not provide this (mirrors are often plain HTTP); trust is in the key."
+        },
+        {
+          "id": "package-management-rpm-dnf-pacman-trust-mcq-003",
+          "type": "mcq",
+          "prompt": "Which mapping correctly translates `apt install pkg` to Arch?",
+          "choices": [
+            "pacman -R pkg",
+            "pacman -Qo pkg",
+            "pacman -S pkg",
+            "pacman -Sy pkg only"
+          ],
+          "answerIndex": 2,
+          "explanation": "`pacman -S pkg` syncs/installs a package (with dependencies) from the configured repos — the analogue of `apt install`. `-R` removes, `-Qo` queries the owner of a file, and `-Sy` alone just refreshes the database."
+        },
+        {
+          "id": "package-management-rpm-dnf-pacman-trust-mcq-004",
+          "type": "mcq",
+          "prompt": "On RHEL/Fedora, what is the relationship between `rpm` and `dnf`?",
+          "choices": [
+            "They are unrelated; dnf is for containers only",
+            "`rpm` resolves dependencies and `dnf` installs single files",
+            "`dnf` resolves dependencies from repos and drives `rpm` for the low-level install",
+            "`dnf` replaced `rpm` entirely and rpm no longer exists"
+          ],
+          "answerIndex": 2,
+          "explanation": "Just like dpkg/apt on Debian: `rpm` is the low-level package tool, while `dnf` (successor to yum) is the high-level resolver that pulls from repos and ultimately invokes the rpm machinery. Both still exist and have distinct roles."
+        }
+      ]
+    },
+    {
+      "id": "package-management-source-modern-security",
+      "title": "Source Builds, Flatpak/Snap/Nix, and Security Updates",
+      "order": 3,
+      "difficulty": 3,
+      "content": "Sometimes no package exists, so you build from source. The classic Autotools dance:\n\n```bash\n./configure --prefix=/usr/local   # probe system, generate Makefile\nmake -j$(nproc)                    # compile\nsudo make install                  # copy artifacts into --prefix\n```\n\nThe trap: `make install` scatters files with no database tracking them, so there is no clean uninstall and no dependency bookkeeping. That pain is *why packaging exists*. Prefer `--prefix=/usr/local` (or tools like `checkinstall`/`stow`) to keep hand-built software out of `/usr` where the package manager rules.\n\n**The system-vs-language tension.** Language managers — `pip`/`venv`, `npm`, `cargo` — install into their own ecosystems and ignore the OS database. Mixing `sudo pip install` with apt-managed Python is a classic way to break a system, because both fight over the same `/usr/lib/python*`. The discipline: keep language deps in **virtual environments** / project-local dirs (`venv`, `node_modules`, `~/.cargo`), and let the system manager own the system. This unresolved tension is a major motivation for **containers** (Module 14).\n\n**Modern universal formats** sidestep the conflict by bundling dependencies and sandboxing:\n- **Flatpak** — desktop apps, runtime + sandbox (Flathub), portals for access.\n- **Snap** — Canonical's confined packages with auto-update; uses squashfs.\n- **AppImage** — one self-contained executable file, no install step.\n- **Nix** — purely functional, content-addressed store (`/nix/store`) giving reproducible, atomically rollback-able environments.\n\n**Staying patched.** Apply security updates promptly: `apt upgrade` / `dnf upgrade`, and on Debian/Ubuntu enable `unattended-upgrades` for automatic security patches. Use **version pinning/holds** (`apt-mark hold pkg`, dnf `versionlock`, APT pin priorities) to freeze a known-good version, but audit held packages — a forgotten hold is a lingering vulnerability.",
+      "items": [
+        {
+          "id": "package-management-source-modern-security-fc-001",
+          "type": "flashcard",
+          "front": "What is the classic three-step Autotools build-from-source sequence, and what does each step do?",
+          "back": "`./configure` probes the system and generates a Makefile (set install location with `--prefix`); `make` compiles the sources; `sudo make install` copies the built artifacts into the prefix. The downside: nothing records the installed files, so there is no clean uninstall or dependency tracking.",
+          "hint": "configure, make, make install."
+        },
+        {
+          "id": "package-management-source-modern-security-fc-002",
+          "type": "flashcard",
+          "front": "Why is `sudo pip install <pkg>` system-wide considered risky on a modern distro?",
+          "back": "The system Python is managed by apt/dnf. A system-wide pip install writes into the same `/usr/lib/python*` paths, can overwrite or shadow distro-managed files, and creates a state the OS package manager doesn't know about — leading to breakage on upgrades. Use a `venv` / project-local install instead.",
+          "hint": "Two managers fighting over the same files."
+        },
+        {
+          "id": "package-management-source-modern-security-fc-003",
+          "type": "flashcard",
+          "front": "Contrast how Flatpak/Snap/AppImage handle dependencies versus a traditional .deb/.rpm.",
+          "back": "Traditional packages share libraries with the rest of the system and rely on the package manager to resolve dependencies. Flatpak/Snap/AppImage instead BUNDLE their dependencies (and typically run sandboxed/confined), trading larger size and duplicated libs for isolation, portability across distros, and freedom from the host's dependency state.",
+          "hint": "Bundle + sandbox vs. share + resolve."
+        },
+        {
+          "id": "package-management-source-modern-security-fc-004",
+          "type": "flashcard",
+          "front": "What makes Nix's approach to package management reproducible and rollback-friendly?",
+          "back": "Nix installs every build into a content-addressed, immutable store (`/nix/store/<hash>-name`). Because each package and its exact dependency closure has a unique path, multiple versions coexist without conflict, builds are reproducible, and switching/rolling back an environment is just repointing symlinks atomically.",
+          "hint": "Immutable hashed store + atomic profile switches."
+        },
+        {
+          "id": "package-management-source-modern-security-fc-005",
+          "type": "flashcard",
+          "front": "How do you freeze a Debian package at its current version, and what is the maintenance hazard?",
+          "back": "`sudo apt-mark hold <pkg>` (RHEL: dnf `versionlock`; APT also supports pin priorities in `/etc/apt/preferences.d/`). The hazard: a held package is excluded from upgrades including SECURITY updates, so a forgotten hold becomes a silent, lingering vulnerability. Audit holds periodically (`apt-mark showhold`).",
+          "hint": "hold/versionlock — but it also blocks security patches."
+        },
+        {
+          "id": "package-management-source-modern-security-mcq-001",
+          "type": "mcq",
+          "prompt": "What is the main reason `make install` is inferior to using a package for the same software?",
+          "choices": [
+            "It compiles slower than the package build",
+            "It cannot use compiler optimizations",
+            "It leaves untracked files with no clean uninstall or dependency management",
+            "It always installs into /opt"
+          ],
+          "answerIndex": 2,
+          "explanation": "`make install` just copies files into the prefix; no database records them, so removal is manual and error-prone and dependencies aren't tracked. Solving exactly this bookkeeping problem is why package managers exist."
+        },
+        {
+          "id": "package-management-source-modern-security-mcq-002",
+          "type": "mcq",
+          "prompt": "You need a Python data tool for one project without disturbing the apt-managed system Python. Best practice?",
+          "choices": [
+            "sudo pip install into the system site-packages",
+            "Create a venv and pip install into it",
+            "Replace /usr/bin/python3 with a newer build",
+            "apt remove python3 then reinstall via pip"
+          ],
+          "answerIndex": 1,
+          "explanation": "A virtual environment (`python -m venv .venv`) isolates the project's packages from the system Python entirely, avoiding the system-vs-language conflict. The other options corrupt or destabilize the OS-managed interpreter."
+        },
+        {
+          "id": "package-management-source-modern-security-mcq-003",
+          "type": "mcq",
+          "prompt": "Which universal package format is a single self-contained executable file that requires no installation step?",
+          "choices": [
+            "Flatpak",
+            "Snap",
+            "AppImage",
+            "Nix"
+          ],
+          "answerIndex": 2,
+          "explanation": "An AppImage bundles the app and its libraries into one executable file you can `chmod +x` and run anywhere. Flatpak and Snap install through their own daemons/runtimes; Nix uses a store under /nix."
+        },
+        {
+          "id": "package-management-source-modern-security-mcq-004",
+          "type": "mcq",
+          "prompt": "On Debian/Ubuntu, which mechanism automatically applies security updates without manual intervention?",
+          "choices": [
+            "apt-mark hold",
+            "unattended-upgrades",
+            "dpkg --configure -a",
+            "apt-cache policy"
+          ],
+          "answerIndex": 1,
+          "explanation": "`unattended-upgrades` is the package/service that periodically installs security (and optionally other) updates automatically. `apt-mark hold` does the opposite (freezes a package); the others inspect or reconfigure state."
+        }
+      ]
+    }
+  ]
+}

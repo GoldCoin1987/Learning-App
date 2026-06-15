@@ -1,0 +1,404 @@
+{
+  "id": "shell-coreutils",
+  "title": "Shell Fundamentals & Coreutils",
+  "order": 1,
+  "lessons": [
+    {
+      "id": "shell-coreutils-lesson-1",
+      "title": "What the Shell Is & How It Reads a Command",
+      "order": 1,
+      "difficulty": 1,
+      "content": "A shell is a program that reads a line of text, expands and parses it, then executes commands on your behalf. Think of it as a read-eval loop sitting between you and the kernel. The dominant interactive shell is **bash**; **zsh** is now the macOS default; **dash** is a fast POSIX `sh` used for system scripts. Knowing which you run matters because bash-isms (arrays, `[[ ]]`) silently break under dash.\n\nShells run in three modes. A **login** shell sources profile files (`/etc/profile`, `~/.bash_profile`) and is what you get on console or SSH login. An **interactive non-login** shell (a new terminal tab) sources `~/.bashrc`. A **non-interactive** shell runs a script and sources neither unless told to. This explains the classic \"works in my terminal, fails in cron\" bug: cron's shell is non-interactive with a minimal environment.\n\nWhen you press Enter, the shell splits the line into **words**, then resolves the first word as one of four things, checked in order: an **alias**, a shell **function**, a shell **builtin** (like `cd`, which must run in-process), or an external **command** found on `PATH`. Use `type` to see which wins.\n\n```bash\ntype cd        # cd is a shell builtin\ntype ls        # ls is /usr/bin/ls (or an alias)\ntype -a echo   # show ALL matches, in priority order\necho $0        # often the name of the current shell\n```\n\nThe takeaway: before you debug *what* a command did, confirm *which* thing actually ran.",
+      "items": [
+        {
+          "id": "shell-coreutils-1-fc-1",
+          "type": "flashcard",
+          "front": "What are the three invocation modes of a shell, and which startup files does each read?",
+          "back": "Login shell: reads /etc/profile and ~/.bash_profile (or ~/.profile). Interactive non-login: reads ~/.bashrc. Non-interactive (script): reads neither by default.",
+          "hint": "Think console/SSH vs new terminal tab vs running a script."
+        },
+        {
+          "id": "shell-coreutils-1-fc-2",
+          "type": "flashcard",
+          "front": "In what order does bash resolve the first word of a command line?",
+          "back": "Alias, then shell function, then builtin, then external command found on PATH.",
+          "hint": "Four categories; `type -a` reveals them."
+        },
+        {
+          "id": "shell-coreutils-1-fc-3",
+          "type": "flashcard",
+          "front": "Why must `cd` be a shell builtin rather than an external program?",
+          "back": "Changing directory mutates the calling shell's own process state. An external program runs in a child process; its cwd change would vanish when it exits, leaving the parent shell unchanged.",
+          "hint": "Child processes cannot modify the parent's working directory."
+        },
+        {
+          "id": "shell-coreutils-1-fc-4",
+          "type": "flashcard",
+          "front": "How is dash (POSIX sh) different from bash in practice?",
+          "back": "dash is a smaller, faster, strictly POSIX shell used for non-interactive system scripts. It lacks bash extensions like arrays, [[ ]], and ${var/old/new}, so bash-isms fail under it.",
+          "hint": "On Debian, /bin/sh is symlinked to it."
+        },
+        {
+          "id": "shell-coreutils-1-mcq-1",
+          "type": "mcq",
+          "prompt": "A command works when you type it in your terminal but fails when run from a cron job with \"command not found\". What is the most likely cause?",
+          "choices": [
+            "The cron daemon is not running",
+            "Cron runs a non-interactive shell with a minimal PATH that does not include the command's directory",
+            "The command was uninstalled",
+            "Cron only supports builtins, not external commands"
+          ],
+          "answerIndex": 1,
+          "explanation": "Cron jobs run in a non-interactive shell that does not source ~/.bashrc and has a bare-bones PATH. The fix is to use an absolute path or export PATH inside the job."
+        },
+        {
+          "id": "shell-coreutils-1-mcq-2",
+          "type": "mcq",
+          "prompt": "Which command tells you whether `ll` is an alias, a function, a builtin, or an external binary?",
+          "choices": [
+            "which ll",
+            "type ll",
+            "ls -l ll",
+            "echo $ll"
+          ],
+          "answerIndex": 1,
+          "explanation": "`type` understands the full shell resolution chain, so it reports aliases, functions, and builtins. `which` only searches PATH for external executables and misses aliases/functions/builtins."
+        },
+        {
+          "id": "shell-coreutils-1-mcq-3",
+          "type": "mcq",
+          "prompt": "What does the read-eval loop of a shell do on each line you enter?",
+          "choices": [
+            "Compiles the line to machine code before running it",
+            "Sends the raw line directly to the kernel as a syscall",
+            "Performs expansions and word splitting, resolves the command, then executes it",
+            "Stores the line in history and does nothing else until logout"
+          ],
+          "answerIndex": 2,
+          "explanation": "The shell reads the line, applies expansions (variable, glob, command substitution, etc.) and word splitting, resolves the first word, then executes the resulting command."
+        },
+        {
+          "id": "shell-coreutils-1-mcq-4",
+          "type": "mcq",
+          "prompt": "You wrote a script using bash arrays but it errors out when run via `sh script.sh` on Debian. Why?",
+          "choices": [
+            "Arrays require root privileges",
+            "/bin/sh is dash, which does not support bash array syntax",
+            "The script needs to be compiled first",
+            "sh runs scripts in a read-only mode"
+          ],
+          "answerIndex": 1,
+          "explanation": "On Debian/Ubuntu /bin/sh is dash, a minimal POSIX shell without bash extensions. Run it with bash, or add a #!/usr/bin/env bash shebang and execute it directly."
+        }
+      ]
+    },
+    {
+      "id": "shell-coreutils-lesson-2",
+      "title": "Quoting, Globbing & Expansions",
+      "order": 2,
+      "difficulty": 2,
+      "content": "Before a command runs, the shell rewrites your line through several **expansions**. Knowing the order and the quoting rules is what lets you predict the result before pressing Enter, instead of debugging by trial and error.\n\n**Quoting** controls expansion. Single quotes `'...'` are literal: nothing inside is expanded. Double quotes `\"...\"` allow `$variable`, `$(command)`, and `` `...` `` but suppress globbing and word splitting. `$'...'` interprets C-style escapes like `\\n` and `\\t`.\n\n```bash\necho '$HOME and *'      # literal: $HOME and *\necho \"$HOME and *\"      # /home/you and *   (var expands, glob does not)\necho $'line1\\nline2'    # two lines\n```\n\n**Globbing (filename expansion)** happens against existing files: `*` matches any run of characters, `?` one character, `[abc]` a class, and with `shopt -s globstar` enabled, `**` recurses into subdirectories. If a glob matches nothing it is passed through unchanged (unless `nullglob` is set).\n\n**Brace expansion** is pure text and runs *before* globbing, so it does not need matching files: `{a,b,c}` and `{1..5}` generate lists. **Tilde expansion** turns `~` into `$HOME` and `~user` into that user's home.\n\n```bash\nmkdir -p project/{src,test,docs}   # brace: three dirs\ntouch file{1..3}.txt               # file1.txt file2.txt file3.txt\nls **/*.c                          # globstar: all .c recursively\n```\n\nThe number-one scripting bug is forgetting to quote a variable that contains spaces. Always write `\"$var\"` unless you specifically want word splitting.",
+      "items": [
+        {
+          "id": "shell-coreutils-2-fc-1",
+          "type": "flashcard",
+          "front": "What is the difference between single quotes and double quotes in bash?",
+          "back": "Single quotes are fully literal (no expansion at all). Double quotes allow $variable, $(...) command substitution, and backticks, but suppress globbing and word splitting.",
+          "hint": "One blocks everything; the other blocks only globbing/splitting."
+        },
+        {
+          "id": "shell-coreutils-2-fc-2",
+          "type": "flashcard",
+          "front": "Does brace expansion {a,b,c} require matching files to exist? Why or why not?",
+          "back": "No. Brace expansion is pure text generation performed before globbing, so it produces the strings regardless of the filesystem. Globbing (* ? []) is the one that matches existing files.",
+          "hint": "Brace runs early and is filesystem-independent."
+        },
+        {
+          "id": "shell-coreutils-2-fc-3",
+          "type": "flashcard",
+          "front": "What does the globstar `**` match, and how do you enable it in bash?",
+          "back": "With `shopt -s globstar`, ** matches files and directories recursively across subdirectory levels (e.g. **/*.c finds .c files at any depth). Without globstar, ** behaves like a single *.",
+          "hint": "shopt -s ..."
+        },
+        {
+          "id": "shell-coreutils-2-fc-4",
+          "type": "flashcard",
+          "front": "What does `$'...'` quoting do that single quotes do not?",
+          "back": "$'...' interprets ANSI C escape sequences such as \\n (newline), \\t (tab), and \\x41. Plain single quotes treat those characters literally.",
+          "hint": "C-style escape interpretation."
+        },
+        {
+          "id": "shell-coreutils-2-mcq-1",
+          "type": "mcq",
+          "prompt": "A file is named `my report.txt` (with a space). Which command correctly removes it?",
+          "choices": [
+            "rm my report.txt",
+            "rm \"my report.txt\"",
+            "rm my\\ report\\.txt only after disabling globbing",
+            "rm 'my' 'report.txt'"
+          ],
+          "answerIndex": 1,
+          "explanation": "Without quoting, the shell word-splits on the space and rm sees two arguments: my and report.txt. Quoting the whole name keeps it as one argument."
+        },
+        {
+          "id": "shell-coreutils-2-mcq-2",
+          "type": "mcq",
+          "prompt": "What does `echo \"$HOME/*.txt\"` print versus `echo $HOME/*.txt`?",
+          "choices": [
+            "Both expand the glob to matching files",
+            "Neither expands anything",
+            "The quoted form prints the literal pattern (e.g. /home/you/*.txt); the unquoted form expands the glob to matching files",
+            "The quoted form errors out"
+          ],
+          "answerIndex": 2,
+          "explanation": "Double quotes allow the variable to expand but suppress globbing, so the literal *.txt is printed. Unquoted, the variable expands and then the glob matches actual files."
+        },
+        {
+          "id": "shell-coreutils-2-mcq-3",
+          "type": "mcq",
+          "prompt": "Which expansion runs first, allowing `cp file.{txt,bak}` to work even when file.bak does not yet exist?",
+          "choices": [
+            "Glob expansion",
+            "Brace expansion",
+            "Command substitution",
+            "Tilde expansion"
+          ],
+          "answerIndex": 1,
+          "explanation": "Brace expansion is textual and happens before globbing, producing `cp file.txt file.bak` regardless of whether the files exist. A glob, by contrast, would match nothing."
+        },
+        {
+          "id": "shell-coreutils-2-mcq-4",
+          "type": "mcq",
+          "prompt": "Why is `for f in $(ls)` considered a bug for iterating over filenames?",
+          "choices": [
+            "ls is too slow for loops",
+            "The output of ls undergoes word splitting and globbing, breaking on filenames with spaces or special characters",
+            "$(...) is not valid inside a for loop",
+            "ls cannot be used in scripts at all"
+          ],
+          "answerIndex": 1,
+          "explanation": "The unquoted command substitution splits on IFS whitespace and re-globs, so a file named 'my report.txt' becomes two iterations. Use `for f in *` (a glob) instead, which preserves each name as one word."
+        }
+      ]
+    },
+    {
+      "id": "shell-coreutils-lesson-3",
+      "title": "Variables, Redirection, Pipes & Exit Codes",
+      "order": 3,
+      "difficulty": 2,
+      "content": "Variables hold strings. A plain assignment is shell-local; **`export`** promotes it into the **environment** so child processes inherit it. `set` shows shell variables, `env` shows the environment, and `PATH` is the colon-separated search list for commands.\n\n```bash\nGREETING=hello        # shell-local only\nexport EDITOR=vim     # inherited by children\necho \"$PATH\"\n```\n\nSpecial parameters are worth memorizing: `$?` is the last exit status, `$$` the current PID, `$!` the last background PID, `$#` the argument count, and the subtle pair `\"$@\"` (each arg as its own quoted word) versus `\"$*\"` (all args joined into one). Use `$(...)` for **command substitution** and `$((...))` for **arithmetic**.\n\n**Redirection** rewires file descriptors: fd 0 stdin, fd 1 stdout, fd 2 stderr. `>` truncates, `>>` appends, `<` feeds input, `2>` redirects stderr, `&>` (and `> file 2>&1`) sends both streams, and `<<EOF` / `<<<\"text\"` are here-docs and here-strings. `/dev/null` discards. Order matters: `2>&1 >file` differs from `>file 2>&1`.\n\n```bash\nmake 2>&1 | tee build.log     # both streams to screen AND file\ngrep -r TODO . 2>/dev/null    # discard permission-denied noise\n```\n\n**Pipes** connect one command's stdout to the next command's stdin, running them concurrently. Chain exit logic with `&&` (run next only on success, exit 0), `||` (run next only on failure), and `;` (always). Exit code 0 means success; non-zero means failure.\n\n```bash\nmkdir build && cd build || echo \"setup failed\"\n```",
+      "items": [
+        {
+          "id": "shell-coreutils-3-fc-1",
+          "type": "flashcard",
+          "front": "What is the difference between a plain variable assignment and `export VAR=value`?",
+          "back": "A plain assignment creates a shell-local variable visible only to the current shell. export places it in the environment so child processes (and their children) inherit it.",
+          "hint": "Inheritance by child processes is the dividing line."
+        },
+        {
+          "id": "shell-coreutils-3-fc-2",
+          "type": "flashcard",
+          "front": "What is the difference between \"$@\" and \"$*\" when quoted?",
+          "back": "\"$@\" expands to each positional parameter as a separate, individually quoted word. \"$*\" joins all positional parameters into a single word separated by the first character of IFS (usually a space).",
+          "hint": "One preserves argument boundaries; one flattens them."
+        },
+        {
+          "id": "shell-coreutils-3-fc-3",
+          "type": "flashcard",
+          "front": "Which file descriptors are stdin, stdout, and stderr, and how do you redirect stderr to a file?",
+          "back": "stdin = fd 0, stdout = fd 1, stderr = fd 2. Redirect stderr with `2> file`. Merge stderr into stdout with `2>&1` (placed after the stdout redirect).",
+          "hint": "0/1/2."
+        },
+        {
+          "id": "shell-coreutils-3-fc-4",
+          "type": "flashcard",
+          "front": "What does the special parameter $? hold, and what value signals success?",
+          "back": "$? holds the exit status of the most recently executed foreground command. 0 means success; any non-zero value (1-255) means failure.",
+          "hint": "Zero is good news in shell-land."
+        },
+        {
+          "id": "shell-coreutils-3-fc-5",
+          "type": "flashcard",
+          "front": "What does `cmd1 && cmd2 || cmd3` do?",
+          "back": "Runs cmd1; if it succeeds (exit 0), runs cmd2; if either cmd1 fails or cmd2 fails, runs cmd3. && and || short-circuit based on exit status.",
+          "hint": "AND on success, OR on failure."
+        },
+        {
+          "id": "shell-coreutils-3-mcq-1",
+          "type": "mcq",
+          "prompt": "Which command sends BOTH stdout and stderr of `make` to the screen and to build.log simultaneously?",
+          "choices": [
+            "make > build.log",
+            "make 2>&1 | tee build.log",
+            "make | tee build.log 2>/dev/null",
+            "make >> build.log 2>&1 &"
+          ],
+          "answerIndex": 1,
+          "explanation": "2>&1 merges stderr into stdout, and tee writes the combined stream both to the terminal and to the file. The other options either drop stderr or write only to the file."
+        },
+        {
+          "id": "shell-coreutils-3-mcq-2",
+          "type": "mcq",
+          "prompt": "After running `grep pattern file.txt`, what does $? equal if grep finds no matching lines?",
+          "choices": [
+            "0",
+            "1",
+            "2",
+            "It does not set $? at all"
+          ],
+          "answerIndex": 1,
+          "explanation": "grep exits 0 when at least one line matches, 1 when no lines match, and 2 on an actual error (e.g. unreadable file). 'No match' is a normal non-error result reported as exit 1."
+        },
+        {
+          "id": "shell-coreutils-3-mcq-3",
+          "type": "mcq",
+          "prompt": "What is the key behavioral feature of a pipe `cmd1 | cmd2`?",
+          "choices": [
+            "cmd2 runs only after cmd1 fully finishes and writes a temp file",
+            "cmd1's stdout is connected to cmd2's stdin and both run concurrently",
+            "Both commands share the same stderr by default to the file",
+            "cmd1's exit code is automatically passed to cmd2 as an argument"
+          ],
+          "answerIndex": 1,
+          "explanation": "A pipe wires cmd1's stdout into cmd2's stdin via a kernel buffer, and the commands execute concurrently rather than sequentially. This is what makes streaming pipelines efficient."
+        },
+        {
+          "id": "shell-coreutils-3-mcq-4",
+          "type": "mcq",
+          "prompt": "Which captures the output of `date` into a variable named NOW?",
+          "choices": [
+            "NOW = date",
+            "NOW=$((date))",
+            "NOW=$(date)",
+            "NOW=<date>"
+          ],
+          "answerIndex": 2,
+          "explanation": "$(...) is command substitution: it runs the command and substitutes its stdout. $((...)) is arithmetic expansion, spaces around = break assignment, and <date> is meaningless here."
+        },
+        {
+          "id": "shell-coreutils-3-mcq-5",
+          "type": "mcq",
+          "prompt": "Why is `for f in *` safer than `for f in $(ls)` for iterating filenames, with respect to special characters?",
+          "choices": [
+            "Globs are faster than ls",
+            "A glob expands to each filename as a single word even if it contains spaces or newlines, while ls output is word-split",
+            "ls cannot list hidden files",
+            "Globs automatically sort the files numerically"
+          ],
+          "answerIndex": 1,
+          "explanation": "The glob * is expanded by the shell into properly separated filename words, preserving spaces and newlines within each name. Command-substituting ls re-splits on whitespace and breaks such names."
+        }
+      ]
+    },
+    {
+      "id": "shell-coreutils-lesson-4",
+      "title": "Coreutils Survey, Pipelines & Getting Help",
+      "order": 4,
+      "difficulty": 3,
+      "content": "The **coreutils** are the small, composable programs that, joined by pipes, do real work. File ops: `ls`, `cp`, `mv`, `rm`, `mkdir`, `ln`. Viewing: `cat`, `head`, `tail`, `less`. Inspecting: `wc`, `stat`, `file`, `du`, `df`. Text streams: `sort`, `uniq`, `cut`, `tr`. Finding and fan-out: `find` with `xargs`. Output: `echo` vs `printf` (prefer `printf` for portability and format control), plus `seq`, `date`, `tee`.\n\nTwo distinctions worth nailing down. **Hard vs symbolic links**: a hard link (`ln target name`) is another directory entry pointing to the *same inode*, so it shares link count and survives deletion of the original; a symlink (`ln -s target name`) is a tiny file holding a *path*, can cross filesystems, and dangles if the target moves. Confirm with `stat`. **`uniq` only deduplicates adjacent lines**, so you almost always `sort` first.\n\nThe canonical analysis pipeline counts and ranks:\n\n```bash\n# top 10 client IPs in an access log\ncut -d' ' -f1 access.log | sort | uniq -c | sort -rn | head\n\n# 10 largest files under /var, NUL-safe against weird names\nfind /var -type f -print0 | xargs -0 du -h | sort -rh | head\n```\n\nUse `-print0` with `xargs -0` so filenames with spaces or newlines survive.\n\n**Getting help**: `man cmd` (sections 1 user, 2 syscalls, 5 file formats, 8 admin; e.g. `man 5 crontab`), `cmd --help` for a quick summary, `apropos keyword` to search descriptions, `info` for GNU manuals, and the modern `tldr cmd` for example-driven snippets.",
+      "items": [
+        {
+          "id": "shell-coreutils-4-fc-1",
+          "type": "flashcard",
+          "front": "What is the difference between a hard link and a symbolic link?",
+          "back": "A hard link is another directory entry pointing to the same inode; it shares the inode/link count and survives deletion of the original name, but cannot cross filesystems. A symlink is a small file containing a path to the target; it can cross filesystems and dangles if the target is removed.",
+          "hint": "Same inode vs a stored path.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/shell-coreutils-1.svg"
+        },
+        {
+          "id": "shell-coreutils-4-fc-2",
+          "type": "flashcard",
+          "front": "Why must you usually run `sort` before `uniq`?",
+          "back": "uniq only collapses consecutive (adjacent) duplicate lines. Sorting groups identical lines together so uniq can detect them. uniq -c then prefixes each group with its count.",
+          "hint": "uniq looks only at neighbors."
+        },
+        {
+          "id": "shell-coreutils-4-fc-3",
+          "type": "flashcard",
+          "front": "Why pair `find ... -print0` with `xargs -0`?",
+          "back": "-print0 separates filenames with NUL bytes instead of newlines/spaces, and xargs -0 splits on NUL. Since NUL cannot appear in a filename, this safely handles names containing spaces, newlines, or quotes.",
+          "hint": "NUL is the one byte a filename cannot contain."
+        },
+        {
+          "id": "shell-coreutils-4-fc-4",
+          "type": "flashcard",
+          "front": "What do man-page sections 1, 2, 5, and 8 cover, and how do you request a specific one?",
+          "back": "1 = user commands, 2 = system calls, 5 = file formats/config, 8 = system administration. Request a section with `man <section> <name>`, e.g. `man 5 crontab` for the file format rather than `man 1 crontab` the command.",
+          "hint": "man 5 crontab vs man 1 crontab."
+        },
+        {
+          "id": "shell-coreutils-4-fc-5",
+          "type": "flashcard",
+          "front": "When should you prefer printf over echo?",
+          "back": "printf for portable, predictable output: echo's handling of escape sequences and flags varies across shells/systems, while printf takes an explicit format string (e.g. printf '%s\\n' \"$x\") and behaves consistently.",
+          "hint": "Format strings and portability."
+        },
+        {
+          "id": "shell-coreutils-4-mcq-1",
+          "type": "mcq",
+          "prompt": "Which pipeline prints the 10 most frequent client IPs (first field) in access.log?",
+          "choices": [
+            "cut -d' ' -f1 access.log | uniq -c | head",
+            "cut -d' ' -f1 access.log | sort | uniq -c | sort -rn | head",
+            "sort access.log | cut -f1 | head -n 10",
+            "cut -d' ' -f1 access.log | sort -rn | uniq | tail"
+          ],
+          "answerIndex": 1,
+          "explanation": "Extract the IP field, sort so duplicates are adjacent, uniq -c to count, sort -rn to rank by count descending, then head for the top 10. Skipping the first sort makes uniq miss non-adjacent duplicates."
+        },
+        {
+          "id": "shell-coreutils-4-mcq-2",
+          "type": "mcq",
+          "prompt": "You delete the original file that a symbolic link points to. What happens to the symlink?",
+          "choices": [
+            "The symlink still works because it holds a copy of the data",
+            "The symlink becomes dangling/broken because it only stored the now-invalid path",
+            "The symlink is automatically deleted too",
+            "The file's inode is preserved by the symlink's link count"
+          ],
+          "answerIndex": 1,
+          "explanation": "A symlink stores only a path string. Removing the target leaves the symlink pointing at a nonexistent path (a dangling link). A hard link, by contrast, would keep the inode alive via its link count."
+        },
+        {
+          "id": "shell-coreutils-4-mcq-3",
+          "type": "mcq",
+          "prompt": "Which command searches the short descriptions of all man pages for a keyword like \"compress\"?",
+          "choices": [
+            "man compress",
+            "apropos compress",
+            "info compress",
+            "which compress"
+          ],
+          "answerIndex": 1,
+          "explanation": "apropos (equivalent to man -k) searches the man-page name/description database for a keyword, useful when you do not know the exact command name. man opens a specific page, info opens GNU manuals, and which finds an executable."
+        },
+        {
+          "id": "shell-coreutils-4-mcq-4",
+          "type": "mcq",
+          "prompt": "Which tool gives concise, example-first usage snippets for a command (a MODERN alternative to wading through man)?",
+          "choices": [
+            "apropos",
+            "tldr",
+            "stat",
+            "file"
+          ],
+          "answerIndex": 1,
+          "explanation": "tldr shows community-maintained, example-driven cheat sheets for common commands. apropos searches descriptions, stat shows inode metadata, and file identifies a file's type."
+        },
+        {
+          "id": "shell-coreutils-4-mcq-5",
+          "type": "mcq",
+          "prompt": "Which command reports the type/content of a file regardless of its extension (e.g. identifying a PNG named data.bin)?",
+          "choices": [
+            "stat data.bin",
+            "file data.bin",
+            "wc data.bin",
+            "du data.bin"
+          ],
+          "answerIndex": 1,
+          "explanation": "file inspects magic bytes and content to report the type, ignoring the extension. stat shows inode metadata, wc counts lines/words/bytes, and du reports disk usage."
+        }
+      ]
+    }
+  ]
+}

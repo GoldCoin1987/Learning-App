@@ -1,0 +1,309 @@
+{
+  "id": "boot-chain",
+  "title": "The Boot Chain: Firmware to Init",
+  "order": 5,
+  "lessons": [
+    {
+      "id": "boot-chain-l1-firmware",
+      "title": "Firmware: BIOS/MBR vs UEFI/GPT",
+      "order": 1,
+      "difficulty": 1,
+      "content": "When you press the power button, no kernel exists in RAM yet — firmware baked into the motherboard runs first. Its job is to initialize hardware (POST: power-on self-test), then find and run the first stage of software that will eventually load Linux.\n\n**Legacy BIOS** is the old way. After POST, BIOS reads the very first 512-byte sector of the boot disk — the **Master Boot Record (MBR)**. The MBR holds a tiny boot-strap code stub plus a 4-entry partition table. Because 512 bytes is almost nothing, that stub just chain-loads a real bootloader. MBR also caps disks at ~2 TiB and 4 primary partitions.\n\n**UEFI** is the modern replacement (treat it as the default today). Instead of executing raw sectors, UEFI understands a filesystem. It reads a **GPT** (GUID Partition Table) disk, finds the **EFI System Partition (ESP)** — a small FAT32 partition mounted at `/boot/efi` — and executes a `.efi` application directly (e.g. `grubx64.efi`, `systemd-bootx64.efi`). UEFI keeps a list of boot entries in NVRAM, which you inspect and edit with `efibootmgr`.\n\n**Secure Boot** is a UEFI feature: firmware verifies each `.efi` binary's cryptographic signature against keys in NVRAM before running it, blocking unsigned/tampered bootloaders.\n\n```bash\n# Is this machine booted via UEFI? If this dir exists, yes.\nls /sys/firmware/efi\n\n# List UEFI boot entries and their order\nefibootmgr -v\n```\n\nKnow the pairing: BIOS goes with MBR; UEFI goes with GPT + ESP + Secure Boot.",
+      "items": [
+        {
+          "id": "boot-chain-l1-fc1",
+          "type": "flashcard",
+          "front": "What does firmware (BIOS/UEFI) do before any bootloader runs?",
+          "back": "Runs POST (power-on self-test) to initialize and check hardware, then locates and executes the first-stage boot software — either MBR boot code (BIOS) or a .efi application on the ESP (UEFI).",
+          "hint": "Power-on self-test, then hand off."
+        },
+        {
+          "id": "boot-chain-l1-fc2",
+          "type": "flashcard",
+          "front": "How big is the MBR and what does it contain?",
+          "back": "512 bytes: the first disk sector. It holds a tiny bootstrap code stub plus a 4-entry primary partition table. Too small to hold a real bootloader, so it chain-loads one.",
+          "hint": "One sector."
+        },
+        {
+          "id": "boot-chain-l1-fc3",
+          "type": "flashcard",
+          "front": "What is the EFI System Partition (ESP) and how is it formatted?",
+          "back": "A small FAT32 partition (commonly mounted at /boot/efi) on a GPT disk where UEFI firmware finds and executes .efi bootloader applications like grubx64.efi or systemd-bootx64.efi.",
+          "hint": "FAT32, holds .efi files."
+        },
+        {
+          "id": "boot-chain-l1-fc4",
+          "type": "flashcard",
+          "front": "What does `efibootmgr` do?",
+          "back": "Reads and modifies the UEFI boot entries stored in firmware NVRAM — listing entries, their .efi targets, and the boot order; you can add, delete, and reorder entries.",
+          "hint": "Manages NVRAM boot entries."
+        },
+        {
+          "id": "boot-chain-l1-fc5",
+          "type": "flashcard",
+          "front": "What does Secure Boot enforce?",
+          "back": "Before executing each .efi binary, UEFI verifies its cryptographic signature against keys held in NVRAM, refusing to run unsigned or tampered bootloaders/kernels.",
+          "hint": "Signature check in firmware."
+        },
+        {
+          "id": "boot-chain-l1-mc1",
+          "type": "mcq",
+          "prompt": "Which set of technologies forms the modern UEFI pairing (as opposed to legacy BIOS)?",
+          "choices": [
+            "MBR + 512-byte boot sector + chain-loading",
+            "GPT + EFI System Partition + Secure Boot",
+            "initramfs + pivot_root + runlevels",
+            "U-Boot + device tree + TFTP"
+          ],
+          "answerIndex": 1,
+          "explanation": "UEFI reads a GPT disk, finds the FAT32 EFI System Partition, executes a .efi application, and can verify it with Secure Boot. MBR + 512-byte sector is the legacy BIOS pairing."
+        },
+        {
+          "id": "boot-chain-l1-mc2",
+          "type": "mcq",
+          "prompt": "On a running Linux box, how can you quickly tell it was booted in UEFI mode rather than legacy BIOS?",
+          "choices": [
+            "Check whether /proc/cmdline is non-empty",
+            "Check whether the directory /sys/firmware/efi exists",
+            "Run `lsmod | grep bios`",
+            "Look for a 512-byte file at /boot/mbr"
+          ],
+          "answerIndex": 1,
+          "explanation": "The kernel only populates /sys/firmware/efi when it was booted via UEFI. /proc/cmdline always has content, and there is no /boot/mbr file."
+        },
+        {
+          "id": "boot-chain-l1-mc3",
+          "type": "mcq",
+          "prompt": "Why does the MBR boot code almost always 'chain-load' a separate bootloader instead of booting the kernel directly?",
+          "choices": [
+            "Because the kernel refuses to be loaded by firmware",
+            "Because 512 bytes is far too small to hold logic that can read a filesystem and load a kernel",
+            "Because Secure Boot requires a second stage",
+            "Because GPT disks cannot store a kernel"
+          ],
+          "answerIndex": 1,
+          "explanation": "The MBR is a single 512-byte sector shared with the partition table, leaving only a tiny stub — nowhere near enough to parse filesystems and load a multi-megabyte kernel, so it hands off to a real bootloader."
+        },
+        {
+          "id": "boot-chain-l1-fc6",
+          "type": "flashcard",
+          "front": "What practical limits does the MBR partition scheme impose that GPT removes?",
+          "back": "MBR caps usable disk size at ~2 TiB and allows only 4 primary partitions. GPT supports far larger disks and many partitions (typically 128).",
+          "hint": "~2 TiB, 4 primary partitions."
+        }
+      ]
+    },
+    {
+      "id": "boot-chain-l2-bootloader-kernel",
+      "title": "Bootloader to Kernel: GRUB2, initramfs, and the cmdline",
+      "order": 2,
+      "difficulty": 2,
+      "content": "Firmware hands off to a **bootloader**, whose job is to load the kernel image and an initial RAM filesystem into memory, pass the kernel its command line, and jump into it.\n\n**GRUB2** is the dominant desktop/server bootloader. Its menu and behavior come from `grub.cfg`, which you don't hand-edit — you set values in `/etc/default/grub` and `/etc/grub.d/`, then regenerate with `grub-mkconfig -o /boot/grub/grub.cfg` (Debian: `update-grub`). Embedded systems use **U-Boot** (the ARM SoC workhorse, scriptable via its `bootcmd` environment); minimal UEFI setups often use **systemd-boot**, which is just a thin menu over `.efi` stubs on the ESP.\n\nThe bootloader loads two things from `/boot`:\n\n- **`vmlinuz`** — the compressed kernel image (a `bzImage` on x86).\n- **`initramfs`** (a.k.a. initrd) — a compressed cpio archive containing a minimal root filesystem with `/init` and just enough kernel modules.\n\n**Why initramfs exists:** the real root filesystem might live on LVM, LUKS-encrypted volumes, RAID, or an NVMe/USB device whose driver isn't built into the kernel. The kernel can't mount a disk it can't talk to. So the bootloader loads a small RAM-based root that contains those drivers; that early userspace probes hardware, loads modules, assembles/unlocks the real root, then pivots to it.\n\n```bash\n# The exact command line the running kernel was given\ncat /proc/cmdline\n# e.g. BOOT_IMAGE=/vmlinuz root=UUID=... ro quiet console=ttyS0\n\n# Peek inside the initramfs to see its bundled tools/modules\nlsinitramfs /boot/initrd.img-$(uname -r) | head\n```\n\nKey **kernel command-line** tokens: `root=` (which device/UUID is the real root), `ro` (mount it read-only first, fsck-safe), `console=` (where early kernel output goes — e.g. `ttyS0` serial for embedded), and `init=` (override which program becomes PID 1).",
+      "items": [
+        {
+          "id": "boot-chain-l2-fc1",
+          "type": "flashcard",
+          "front": "What two files does the bootloader load from /boot, and what is each?",
+          "back": "vmlinuz — the compressed kernel image (bzImage on x86). initramfs/initrd — a compressed cpio archive holding a minimal root FS with /init and early kernel modules.",
+          "hint": "Kernel + temporary RAM root."
+        },
+        {
+          "id": "boot-chain-l2-fc2",
+          "type": "flashcard",
+          "front": "Why does an initramfs exist at all? (the key 'aha')",
+          "back": "The real root may sit on LVM/LUKS/RAID/NVMe/USB whose drivers aren't built into the kernel. The kernel can't mount a device it can't drive, so initramfs supplies those modules in a RAM root, sets the real root up, then pivots to it.",
+          "hint": "Drivers needed to mount the real root."
+        },
+        {
+          "id": "boot-chain-l2-fc3",
+          "type": "flashcard",
+          "front": "How do you correctly change GRUB2's configuration?",
+          "back": "Don't hand-edit grub.cfg. Edit /etc/default/grub and scripts in /etc/grub.d/, then regenerate: grub-mkconfig -o /boot/grub/grub.cfg (or update-grub on Debian).",
+          "hint": "Edit defaults, then regenerate."
+        },
+        {
+          "id": "boot-chain-l2-fc4",
+          "type": "flashcard",
+          "front": "Name three bootloaders and where each is typically used.",
+          "back": "GRUB2 — mainstream desktop/server. U-Boot — embedded ARM SoCs (scriptable bootcmd). systemd-boot — minimal UEFI-only setups, a thin menu over .efi stubs on the ESP.",
+          "hint": "Desktop, embedded, minimal-UEFI."
+        },
+        {
+          "id": "boot-chain-l2-fc5",
+          "type": "flashcard",
+          "front": "What is the format of an initramfs archive and how do you inspect it?",
+          "back": "It's a compressed cpio archive of a minimal root filesystem. Inspect with lsinitramfs (or unmkinitramfs to extract) on Debian-family systems.",
+          "hint": "Compressed cpio; lsinitramfs."
+        },
+        {
+          "id": "boot-chain-l2-mc1",
+          "type": "mcq",
+          "prompt": "What does the `root=` kernel command-line parameter specify?",
+          "choices": [
+            "The user account that becomes PID 1",
+            "The device or UUID holding the real root filesystem to pivot to",
+            "The path to the GRUB configuration file",
+            "Which TTY shows the login prompt"
+          ],
+          "answerIndex": 1,
+          "explanation": "root= tells the kernel/initramfs which block device (often by UUID) contains the real root filesystem that will replace the initramfs."
+        },
+        {
+          "id": "boot-chain-l2-mc2",
+          "type": "mcq",
+          "prompt": "Why is `ro` commonly passed on the kernel command line for the initial root mount?",
+          "choices": [
+            "It disables Secure Boot for faster booting",
+            "It mounts root read-only first so fsck can safely check the filesystem before it is remounted read-write",
+            "It forces the kernel to use the initramfs permanently",
+            "It tells GRUB to skip the menu"
+          ],
+          "answerIndex": 1,
+          "explanation": "Mounting read-only first lets a filesystem check run safely; init later remounts the root read-write once it's clean."
+        },
+        {
+          "id": "boot-chain-l2-mc3",
+          "type": "mcq",
+          "prompt": "On an embedded board with no display, which cmdline token routes early kernel messages to the serial port?",
+          "choices": [
+            "init=/bin/sh",
+            "quiet",
+            "console=ttyS0",
+            "root=UUID=..."
+          ],
+          "answerIndex": 2,
+          "explanation": "console=ttyS0 (often with a baud rate, e.g. ttyS0,115200) directs kernel console output to the first serial UART — standard practice on headless embedded targets."
+        },
+        {
+          "id": "boot-chain-l2-mc4",
+          "type": "mcq",
+          "prompt": "Where does the kernel record the exact command line it was booted with?",
+          "choices": [
+            "/etc/default/grub",
+            "/proc/cmdline",
+            "/boot/grub/grub.cfg",
+            "/sys/firmware/efi/cmdline"
+          ],
+          "answerIndex": 1,
+          "explanation": "/proc/cmdline is the read-only view of the actual command line the running kernel received — useful for confirming what root=, ro, console=, etc. were really passed."
+        },
+        {
+          "id": "boot-chain-l2-img1",
+          "type": "flashcard",
+          "front": "Study this diagram.",
+          "back": "Review the diagram above.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/boot-chain-1.svg"
+        }
+      ]
+    },
+    {
+      "id": "boot-chain-l3-init-handoff",
+      "title": "Kernel Handoff to PID 1: init, targets, and diagnostics",
+      "order": 3,
+      "difficulty": 3,
+      "content": "Once the kernel has decompressed, probed hardware, and — via the initramfs — assembled and mounted the **real root filesystem**, it performs the userspace handoff: it `execve()`s the program at `/sbin/init` (overridable with `init=`), which becomes **PID 1**. This is the boundary where kernel-space booting ends and userspace begins. PID 1 is special: it never exits, it adopts and reaps orphaned processes, and it owns service startup.\n\nThe pivot itself is precise: early userspace in the initramfs runs `switch_root` (modern) to swap the RAM root for the real root and re-exec the real `init`, freeing the initramfs memory.\n\n**Historically**, PID 1 was **SysV init**, which drove **runlevels** (0=halt, 1=single-user, 3=multi-user text, 5=graphical, 6=reboot) via numbered `/etc/rc?.d/` scripts run serially. **Modern systems** use **systemd**, which replaces runlevels with **targets** — dependency-graphed unit groups started in parallel. The rough mapping: `multi-user.target` ≈ runlevel 3, `graphical.target` ≈ runlevel 5, plus `rescue.target` and `emergency.target` for recovery. systemd brings up the target's dependencies, ending at a login prompt.\n\n```bash\n# What target is the system in / set the default\nsystemctl get-default\n\n# Boot diagnostics: kernel ring buffer, this-boot's journal, timing\ndmesg | less                 # kernel messages since power-on\njournalctl -b                # all logs from the current boot\njournalctl -k -b             # kernel messages only, current boot\nsystemd-analyze              # total firmware/loader/kernel/userspace time\nsystemd-analyze blame        # slowest units\nsystemd-analyze critical-chain  # the dependency path that gated boot\n```\n\n**Full narration, power button to login:** firmware POSTs and finds the ESP/MBR → bootloader (GRUB2/U-Boot) loads `vmlinuz` + `initramfs` and passes the cmdline → kernel decompresses, probes hardware, mounts the initramfs → initramfs loads drivers, assembles/unlocks the real root, `switch_root`s into it → kernel `execve`s `/sbin/init` as PID 1 → systemd reaches the default target → getty/display-manager shows the login prompt.",
+      "items": [
+        {
+          "id": "boot-chain-l3-fc1",
+          "type": "flashcard",
+          "front": "What exact action marks the kernel-to-userspace handoff at the end of boot?",
+          "back": "The kernel execve()s /sbin/init (overridable via init=), and that program becomes PID 1. Everything before is kernel-space booting; everything after is userspace.",
+          "hint": "execve of PID 1."
+        },
+        {
+          "id": "boot-chain-l3-fc2",
+          "type": "flashcard",
+          "front": "What makes PID 1 special compared to ordinary processes?",
+          "back": "It is started directly by the kernel, must never exit while the system runs, adopts and reaps orphaned/zombie processes, and is responsible for bringing up all other services.",
+          "hint": "Never exits; reaps orphans."
+        },
+        {
+          "id": "boot-chain-l3-fc3",
+          "type": "flashcard",
+          "front": "How does early userspace swap the initramfs for the real root before running the real init?",
+          "back": "It calls switch_root (the modern replacement for pivot_root + chroot), which makes the mounted real root the new / , re-execs the real /sbin/init, and frees the initramfs RAM.",
+          "hint": "switch_root."
+        },
+        {
+          "id": "boot-chain-l3-fc4",
+          "type": "flashcard",
+          "front": "Map the common SysV runlevels to systemd targets.",
+          "back": "runlevel 3 (multi-user text) ≈ multi-user.target; runlevel 5 (graphical) ≈ graphical.target; runlevel 1 (single-user) ≈ rescue.target; plus emergency.target for the most minimal recovery shell.",
+          "hint": "3=multi-user, 5=graphical."
+        },
+        {
+          "id": "boot-chain-l3-fc5",
+          "type": "flashcard",
+          "front": "What is the core architectural difference between SysV runlevels and systemd targets?",
+          "back": "SysV ran numbered rc scripts serially per runlevel. systemd targets are dependency-graphed groups of units started in parallel, tracking ordering (After/Requires) explicitly — faster and more predictable.",
+          "hint": "Serial scripts vs parallel dependency graph."
+        },
+        {
+          "id": "boot-chain-l3-mc1",
+          "type": "mcq",
+          "prompt": "Which command shows only kernel messages from the current boot via the journal?",
+          "choices": [
+            "journalctl -u kernel",
+            "journalctl -k -b",
+            "systemd-analyze blame",
+            "dmesg --previous"
+          ],
+          "answerIndex": 1,
+          "explanation": "journalctl -k limits output to kernel (ring-buffer) messages, and -b restricts it to the current boot. dmesg shows the same kernel buffer but isn't a journal query."
+        },
+        {
+          "id": "boot-chain-l3-mc2",
+          "type": "mcq",
+          "prompt": "You want to find which single chain of dependencies most delayed boot. Which command is designed for that?",
+          "choices": [
+            "systemd-analyze blame",
+            "systemd-analyze critical-chain",
+            "journalctl -b -p err",
+            "systemctl list-units"
+          ],
+          "answerIndex": 1,
+          "explanation": "blame lists units by individual init time, but critical-chain shows the time-ordered dependency path that actually gated reaching the target — the real critical path."
+        },
+        {
+          "id": "boot-chain-l3-mc3",
+          "type": "mcq",
+          "prompt": "A system boots but you only get a minimal recovery shell with most services down. Which target was most likely reached?",
+          "choices": [
+            "graphical.target",
+            "multi-user.target",
+            "emergency.target",
+            "reboot.target"
+          ],
+          "answerIndex": 2,
+          "explanation": "emergency.target gives the most minimal environment (root shell, root FS often read-only, almost nothing else started) — typically reached when boot fails badly, e.g. a bad /etc/fstab entry."
+        },
+        {
+          "id": "boot-chain-l3-mc4",
+          "type": "mcq",
+          "prompt": "In the full power-button-to-login narration, which ordering is correct?",
+          "choices": [
+            "Bootloader → firmware POST → kernel → initramfs → PID 1",
+            "Firmware POST → bootloader loads vmlinuz+initramfs → kernel mounts initramfs → switch_root to real root → execve PID 1 → target → login",
+            "Firmware POST → kernel → bootloader → real root → PID 1 → initramfs",
+            "Kernel → firmware → initramfs → bootloader → login"
+          ],
+          "answerIndex": 1,
+          "explanation": "Firmware runs first (POST, find boot device), the bootloader loads the kernel + initramfs and the cmdline, the kernel mounts the initramfs which sets up and switch_roots into the real root, the kernel execs PID 1 (systemd), which reaches the default target ending at the login prompt."
+        },
+        {
+          "id": "boot-chain-l3-mc5",
+          "type": "mcq",
+          "prompt": "What does `init=/bin/sh` on the kernel command line accomplish?",
+          "choices": [
+            "Disables systemd permanently on disk",
+            "Tells the kernel to execve /bin/sh as PID 1 instead of the normal init — useful for emergency recovery",
+            "Forces the system into graphical.target",
+            "Rebuilds the initramfs at boot"
+          ],
+          "answerIndex": 1,
+          "explanation": "init= overrides which program the kernel execs as PID 1. Pointing it at /bin/sh drops you to a raw shell as PID 1 (no service manager) — a classic password-reset/recovery trick."
+        }
+      ]
+    }
+  ]
+}

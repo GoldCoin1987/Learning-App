@@ -1,0 +1,309 @@
+{
+  "id": "infra-tooling",
+  "title": "Infrastructure Tooling & Production",
+  "order": 19,
+  "lessons": [
+    {
+      "id": "infra-tooling-l1-iac-ansible",
+      "title": "Infrastructure as Code: The Declarative Mindset & Ansible",
+      "order": 1,
+      "difficulty": 1,
+      "content": "Configuring one box by hand is fine. Configuring fifty the same way, repeatably, after someone reboots or rebuilds them, is the modern job. The shift is from *remembered commands* to a **committed artifact** that describes the desired end state. That artifact is **Infrastructure as Code (IaC)**.\n\nThe key word is **declarative**: you say *what* the machine should look like (\"package nginx installed, this config present, this service running\"), not *how* to get there step by step. The tool figures out the diff and only changes what's wrong. That makes runs **idempotent** — run it once or ten times, the end state is identical and re-runs after the first are mostly no-ops.\n\n**Ansible** is the most accessible and widely demanded tool here, and the one to learn first. It is **agentless**: nothing is installed on the targets — it connects over plain **SSH** and runs Python. You describe state in **playbooks** (YAML), targeting hosts listed in an **inventory**.\n\n```yaml\n# site.yml — run with: ansible-playbook -i inventory site.yml\n- hosts: webservers\n  become: true            # use sudo\n  tasks:\n    - name: Install nginx\n      ansible.builtin.package:\n        name: nginx\n        state: present\n    - name: Ensure nginx is enabled and running\n      ansible.builtin.service:\n        name: nginx\n        state: started\n        enabled: true\n```\n\nThink of each task as an assertion of state, not a script line. **Terraform** is its sibling, but for a different layer: it *provisions* cloud infrastructure (VMs, networks, DNS) rather than configuring the inside of an OS. Ansible configures; Terraform provisions.",
+      "items": [
+        {
+          "id": "infra-tooling-l1-fc1",
+          "type": "flashcard",
+          "front": "What does \"declarative\" mean in the context of configuration management?",
+          "back": "You describe the desired end state (what the machine should look like) rather than the step-by-step procedure to get there. The tool computes the difference and changes only what's out of state.",
+          "hint": "What, not how."
+        },
+        {
+          "id": "infra-tooling-l1-fc2",
+          "type": "flashcard",
+          "front": "What does it mean for a playbook to be idempotent, and why does it matter?",
+          "back": "Running it once or many times converges the host to the same end state; after the first run, subsequent runs are mostly no-ops. It means the artifact — not your memory of commands — is the reliable source of truth and is safe to re-run anytime.",
+          "hint": "Re-runnable, same result."
+        },
+        {
+          "id": "infra-tooling-l1-fc3",
+          "type": "flashcard",
+          "front": "Why is Ansible described as \"agentless,\" and what does it use to reach targets?",
+          "back": "Nothing needs to be installed on the managed nodes. Ansible connects over standard SSH from a control node and runs Python on the target, then collects results. This makes adoption easy — if you can SSH in, you can manage it.",
+          "hint": "SSH + Python, no daemon."
+        },
+        {
+          "id": "infra-tooling-l1-fc4",
+          "type": "flashcard",
+          "front": "In Ansible, what is a playbook vs an inventory?",
+          "back": "A playbook is a YAML file describing the desired state as a list of tasks/plays. An inventory is the list of target hosts (and groups like 'webservers'), with optional per-host/per-group variables, that the playbook runs against.",
+          "hint": "What to do vs where to do it."
+        },
+        {
+          "id": "infra-tooling-l1-fc5",
+          "type": "flashcard",
+          "front": "Ansible vs Terraform: what layer does each operate at?",
+          "back": "Terraform provisions infrastructure — it creates cloud resources (VMs, networks, DNS, load balancers). Ansible configures the inside of those machines (packages, files, services). Provision with Terraform, then configure with Ansible.",
+          "hint": "Create the box vs set up the box."
+        },
+        {
+          "id": "infra-tooling-l1-mc1",
+          "type": "mcq",
+          "prompt": "You run an Ansible playbook that asserts nginx is installed and running. The package is already installed and the service is already up. What happens on this run?",
+          "choices": [
+            "It errors because the package is already present",
+            "It reinstalls nginx and restarts the service to be safe",
+            "It reports the tasks as 'ok' (no change), because the desired state already holds",
+            "It uninstalls and reinstalls to guarantee a clean state"
+          ],
+          "answerIndex": 2,
+          "explanation": "Idempotent, declarative tasks check current state against desired state and only act on a difference. Since the state already matches, the tasks report 'ok'/changed=0 — a no-op."
+        },
+        {
+          "id": "infra-tooling-l1-mc2",
+          "type": "mcq",
+          "prompt": "Which statement best captures the core value of Infrastructure as Code over manual setup?",
+          "choices": [
+            "It runs commands faster than typing them by hand",
+            "It expresses a host's setup as a committed, re-runnable artifact that can be reviewed, versioned, and reproduced",
+            "It eliminates the need for SSH access to machines",
+            "It removes the need to understand the underlying Linux tools"
+          ],
+          "answerIndex": 1,
+          "explanation": "IaC turns 'set this machine up like this' into a versioned artifact you can review and re-run, rather than a list of remembered commands. Speed is incidental; you still need SSH and Linux knowledge underneath."
+        },
+        {
+          "id": "infra-tooling-l1-mc3",
+          "type": "mcq",
+          "prompt": "In the Ansible task `state: present` on a package, what is `present` describing?",
+          "choices": [
+            "The order in which tasks execute",
+            "A shell command to run on the target",
+            "The desired end state of the resource (installed), which Ansible enforces",
+            "The SSH connection mode"
+          ],
+          "answerIndex": 2,
+          "explanation": "`state: present` declares the desired condition of the resource — the package should be installed. Ansible compares against current state and installs only if it isn't already there. It is a state assertion, not a command."
+        },
+        {
+          "id": "infra-tooling-l1-mc4",
+          "type": "mcq",
+          "prompt": "A teammate says \"just SSH in and rerun the setup script we wrote.\" Why is a declarative Ansible playbook preferable for fleet management?",
+          "choices": [
+            "Shell scripts cannot install packages",
+            "An imperative script may not be safely re-runnable (it can double-apply or fail on partial state), while a declarative playbook converges to the same state every run",
+            "Ansible runs without any network access",
+            "Playbooks execute instantly regardless of fleet size"
+          ],
+          "answerIndex": 1,
+          "explanation": "A hand-written imperative script often isn't idempotent — re-running can duplicate edits or fail when the box is partially configured. A declarative playbook checks and converges to the declared state safely on every run."
+        }
+      ]
+    },
+    {
+      "id": "infra-tooling-l2-access-secrets-scheduling",
+      "title": "Remote Access at Scale, Secrets, and Scheduling",
+      "order": 2,
+      "difficulty": 2,
+      "content": "Managing a fleet means reaching machines that aren't directly on your network and doing it without typing passwords or leaking credentials.\n\n**SSH config & jump hosts.** Internal hosts usually sit behind a **bastion** (jump host) — the one box exposed to the internet. Rather than chaining `ssh` commands, encode it once in `~/.ssh/config` so `ssh web-01` transparently hops through the bastion:\n\n```\nHost bastion\n    HostName bastion.example.com\n    User deploy\nHost web-* db-*\n    User deploy\n    ProxyJump bastion       # tunnel through the bastion automatically\n```\n\n**Key management.** Use SSH **keys**, not passwords — generate `ssh-ed25519`, push the public key to targets (`ssh-copy-id`), and protect the private key with a passphrase loaded into `ssh-agent`. Harden `sshd` to disable password auth entirely. Keys are also how Ansible authenticates non-interactively.\n\n**Secrets: don't commit them.** Your playbooks live in git — so API tokens, DB passwords, and private keys must **never** be checked in as plaintext. Use a **vault**: Ansible Vault encrypts variable files at rest; teams often centralize on **HashiCorp Vault** or a cloud secrets manager that issues short-lived credentials. The rule: code in git, secrets in a vault, injected at run time.\n\n**Scheduling: cron vs systemd timers.** Classic **cron** (`crontab -e`) still works for simple recurring jobs. Modern systems increasingly prefer **systemd timers** (Module 6): a `.timer` triggers a `.service`. Timers give you journald logging, dependency ordering, `Persistent=true` to catch missed runs after downtime, randomized delays, and resource control — things bare cron lacks.",
+      "items": [
+        {
+          "id": "infra-tooling-l2-fc1",
+          "type": "flashcard",
+          "front": "What is a bastion / jump host, and what does ProxyJump do?",
+          "back": "A bastion is the single hardened host exposed to the outside that you hop through to reach internal machines. `ProxyJump bastion` (in ~/.ssh/config or `ssh -J`) tells SSH to transparently tunnel the connection to the target through the bastion in one command.",
+          "hint": "One door into the internal network."
+        },
+        {
+          "id": "infra-tooling-l2-fc2",
+          "type": "flashcard",
+          "front": "Why use SSH keys over passwords for fleet access, and what protects the private key?",
+          "back": "Keys enable non-interactive, scriptable auth (needed by tools like Ansible) and are far stronger than passwords. The private key stays on your machine, protected by a passphrase that ssh-agent caches in memory so you type it once per session.",
+          "hint": "Keypair + agent + passphrase."
+        },
+        {
+          "id": "infra-tooling-l2-fc3",
+          "type": "flashcard",
+          "front": "What is the cardinal rule about secrets and version control?",
+          "back": "Never commit plaintext secrets (passwords, tokens, private keys) to git. Code lives in the repo; secrets live in a vault (Ansible Vault, HashiCorp Vault, or a cloud secrets manager) and are decrypted/injected only at run time.",
+          "hint": "Code in git, secrets in a vault."
+        },
+        {
+          "id": "infra-tooling-l2-fc4",
+          "type": "flashcard",
+          "front": "Name two capabilities systemd timers offer that classic cron does not.",
+          "back": "Among others: integrated journald logging of the job, dependency ordering against other units, `Persistent=true` to run missed jobs after downtime, randomized delays (RandomizedDelaySec) to avoid thundering herds, and cgroup resource limits.",
+          "hint": "Logging, persistence, ordering, limits."
+        },
+        {
+          "id": "infra-tooling-l2-fc5",
+          "type": "flashcard",
+          "front": "What does a vault that issues short-lived (dynamic) credentials buy you over a static password?",
+          "back": "Credentials are generated on demand and expire quickly, so a leaked secret has a small blast radius and limited lifetime. There's no long-lived password sitting in config to be stolen, rotated by hand, or accidentally committed.",
+          "hint": "Short TTL = small blast radius."
+        },
+        {
+          "id": "infra-tooling-l2-mc1",
+          "type": "mcq",
+          "prompt": "You need to ssh to web-01, which is only reachable from inside the network behind bastion.example.com. What's the cleanest standing solution?",
+          "choices": [
+            "Give web-01 a public IP and open SSH to the world",
+            "Add a `ProxyJump bastion` entry for web-* in ~/.ssh/config so `ssh web-01` tunnels through automatically",
+            "Copy your private key onto the bastion and ssh from there",
+            "Disable the firewall on web-01 during your session"
+          ],
+          "answerIndex": 1,
+          "explanation": "ProxyJump in ssh_config makes `ssh web-01` hop through the bastion transparently with one command, keeping web-01 off the public internet and your private key on your own machine (never copied to the bastion)."
+        },
+        {
+          "id": "infra-tooling-l2-mc2",
+          "type": "mcq",
+          "prompt": "A backup job must still run after a server was powered off during its scheduled time. Which scheduling choice handles this most cleanly?",
+          "choices": [
+            "A cron entry, which automatically replays missed jobs",
+            "A systemd timer with `Persistent=true`, which runs the job at next boot if the trigger was missed",
+            "Neither can recover a missed run",
+            "An @reboot cron line, which runs the backup on every boot regardless"
+          ],
+          "answerIndex": 1,
+          "explanation": "Classic cron simply skips runs that occur while the machine is off. A systemd timer with `Persistent=true` records the last run and fires the missed job once at next boot — exactly the recovery behavior wanted."
+        },
+        {
+          "id": "infra-tooling-l2-mc3",
+          "type": "mcq",
+          "prompt": "Your Ansible repo needs a database password to configure an app. What is the correct way to handle it?",
+          "choices": [
+            "Hard-code it in the playbook so the run is self-contained",
+            "Store it in a vars file committed to git but in a private repo",
+            "Keep it in an encrypted vault (e.g. Ansible Vault) and inject it at run time, never committing plaintext",
+            "Pass it on the command line in shell history every time"
+          ],
+          "answerIndex": 2,
+          "explanation": "Even a private repo can leak; plaintext secrets in git are the classic mistake. Encrypt with a vault and inject at run time so the repo holds only ciphertext, and access is controlled separately from the code."
+        },
+        {
+          "id": "infra-tooling-l2-mc4",
+          "type": "mcq",
+          "prompt": "Why does Ansible's agentless model depend heavily on good SSH key management?",
+          "choices": [
+            "Because Ansible encrypts playbooks with SSH keys",
+            "Because Ansible authenticates to every target over SSH and runs non-interactively, so it needs key-based (passwordless) auth that ssh-agent or a service key can provide",
+            "Because SSH keys replace the need for an inventory file",
+            "Because keys make playbooks idempotent"
+          ],
+          "answerIndex": 1,
+          "explanation": "Ansible logs into each node over SSH and must do so without a human typing a password. Key-based auth (with an agent or a dedicated automation key) provides the non-interactive, auditable access this requires."
+        }
+      ]
+    },
+    {
+      "id": "infra-tooling-l3-observability-immutable-cicd",
+      "title": "Observability, Immutable Infrastructure & the Production Horizon",
+      "order": 3,
+      "difficulty": 3,
+      "content": "Provisioning a fleet is only half the job — in production you must *see* it and *ship to* it safely.\n\n**The observability stack.** Logs start local in **journald** (Module 6), then get shipped off-box to an **aggregator** (Loki, Elasticsearch, or a hosted service) so you can query across all hosts at once — you don't SSH to ten boxes to grep. Metrics follow a different path: **Prometheus** *scrapes* numeric time-series (CPU, request rate, queue depth) from exporters running on each host, stores them, and **Grafana** dashboards and alerts on them. For the deepest layer — \"what syscalls/files is this process actually touching?\" — **eBPF** tooling (bpftrace/bcc, Module 17) instruments the live kernel with near-zero overhead. Roughly: journald/Loki = logs, Prometheus/Grafana = metrics, eBPF = deep kernel-level tracing.\n\n**Immutable infrastructure.** Instead of patching long-lived \"pet\" servers in place (which drift into unique, un-reproducible states), you bake a known-good image and **replace** the whole instance to change it — servers become disposable \"cattle.\" Containers (Module 14) are the natural unit; a registry holds versioned images.\n\n**Kubernetes** is the scale-out horizon: a declarative orchestrator that schedules containers across many hosts, restarts failures, and rolls out new versions — IaC's philosophy applied to a whole cluster.\n\n**CI/CD touches Linux** at every step: a pipeline checks out code, **builds and tests inside containers** for reproducibility, produces an image, and deploys it (often via the same Ansible/Terraform/k8s tooling).\n\n```bash\n# Each pipeline stage is just Linux in a container\ndocker build -t app:$GIT_SHA .\ndocker run --rm app:$GIT_SHA pytest   # test in a clean, reproducible env\n```\n\n**Honest scope:** this module is orientation. The goal is that the *vocabulary and landscape* are familiar in interviews and on the job — not mastery of each tool.",
+      "items": [
+        {
+          "id": "infra-tooling-l3-fc1",
+          "type": "flashcard",
+          "front": "Trace the path of a log line in a fleet observability stack.",
+          "back": "It's written locally to journald on the host, then shipped/forwarded to a central aggregator (Loki, Elasticsearch, or a hosted log service) where you can search across all hosts at once instead of SSHing into each box to grep.",
+          "hint": "journald, then ship to a central store."
+        },
+        {
+          "id": "infra-tooling-l3-fc2",
+          "type": "flashcard",
+          "front": "How do Prometheus and Grafana divide responsibility for metrics?",
+          "back": "Prometheus scrapes and stores numeric time-series metrics from exporters on each host and evaluates alerting rules. Grafana queries Prometheus to render dashboards and visualize/alert on those metrics. Prometheus = collect/store, Grafana = visualize.",
+          "hint": "Scrape/store vs dashboard."
+        },
+        {
+          "id": "infra-tooling-l3-fc3",
+          "type": "flashcard",
+          "front": "Where does eBPF fit relative to logs and metrics in observability?",
+          "back": "It's the deepest layer: eBPF (via bpftrace/bcc) instruments the running kernel to answer 'what syscalls, files, or network events is this process actually doing right now?' with near-zero overhead — detail that pre-emitted logs and metrics can't provide.",
+          "hint": "Live kernel-level tracing."
+        },
+        {
+          "id": "infra-tooling-l3-fc4",
+          "type": "flashcard",
+          "front": "What is immutable infrastructure (and the pets-vs-cattle idea)?",
+          "back": "Rather than patching long-lived 'pet' servers in place (which drift into unique, un-reproducible states), you bake a versioned known-good image and replace the whole instance to change it. Servers become disposable, interchangeable 'cattle.'",
+          "hint": "Replace, don't patch in place."
+        },
+        {
+          "id": "infra-tooling-l3-fc5",
+          "type": "flashcard",
+          "front": "What role does Kubernetes play in the infrastructure landscape?",
+          "back": "It's a declarative container orchestrator: you declare desired state (N replicas of this image) and it schedules containers across a cluster of hosts, restarts failures, and rolls out updates. It's the scale-out endpoint of the same declarative/IaC philosophy.",
+          "hint": "Declarative orchestration across many hosts."
+        },
+        {
+          "id": "infra-tooling-l3-fc6",
+          "type": "flashcard",
+          "front": "Why do CI/CD pipelines build and test inside containers?",
+          "back": "Containers give a clean, pinned, reproducible environment so a build/test behaves identically on every run and on every machine (your laptop, the CI runner, production). It eliminates 'works on my machine' drift and produces a versioned artifact to deploy.",
+          "hint": "Reproducible, isolated build environment."
+        },
+        {
+          "id": "infra-tooling-l3-mc1",
+          "type": "mcq",
+          "prompt": "You need to know exactly which files and syscalls a misbehaving production process is touching, live, without restarting it. Which tool layer fits?",
+          "choices": [
+            "Grafana dashboards over Prometheus metrics",
+            "Centralized log search in Loki/Elasticsearch",
+            "eBPF tracing (bpftrace/bcc) attached to the running kernel",
+            "Re-reading the Ansible playbook that configured it"
+          ],
+          "answerIndex": 2,
+          "explanation": "Metrics and logs only show what was pre-instrumented or emitted. eBPF attaches to the live kernel to observe actual syscalls, file access, and network events with low overhead — exactly this 'what is it really doing right now' question."
+        },
+        {
+          "id": "infra-tooling-l3-mc2",
+          "type": "mcq",
+          "prompt": "A server has been hand-patched for two years and no one can reproduce its exact state. Which philosophy directly prevents this problem?",
+          "choices": [
+            "Immutable infrastructure — bake a versioned image and replace instances instead of patching in place",
+            "Adding more Prometheus exporters to the host",
+            "Switching from cron to systemd timers",
+            "Giving the server a public IP for easier access"
+          ],
+          "answerIndex": 0,
+          "explanation": "The drift comes from mutating a long-lived 'pet' in place. Immutable infrastructure builds a known-good image and replaces the whole instance on change, so the running state always matches a versioned, reproducible artifact."
+        },
+        {
+          "id": "infra-tooling-l3-mc3",
+          "type": "mcq",
+          "prompt": "Why is querying a central log aggregator preferable to SSHing into each host to grep journald?",
+          "choices": [
+            "journald cannot be read with journalctl",
+            "It lets you search and correlate logs across the whole fleet at once, which doesn't scale by hand per-host",
+            "Aggregators replace the need for metrics entirely",
+            "It makes the logs immutable on each host"
+          ],
+          "answerIndex": 1,
+          "explanation": "Per-host grepping doesn't scale and can't correlate events across machines. Shipping journald logs to a central aggregator lets you query and correlate the entire fleet from one place — the point of log aggregation."
+        },
+        {
+          "id": "infra-tooling-l3-mc4",
+          "type": "mcq",
+          "prompt": "How does Kubernetes extend the declarative/idempotent idea you saw with Ansible?",
+          "choices": [
+            "It replaces SSH with a faster custom protocol",
+            "You declare desired cluster state (e.g. 3 replicas of an image) and it continuously reconciles reality to match — restarting and rescheduling as needed",
+            "It is an imperative tool where you run each container by hand",
+            "It only manages a single host, like a local container runtime"
+          ],
+          "answerIndex": 1,
+          "explanation": "Kubernetes is declarative at cluster scale: you state the desired end state and a control loop continuously reconciles actual state to match (restarting failures, rescheduling, rolling out updates) — the same 'declare and converge' philosophy as a playbook, applied across many hosts."
+        },
+        {
+          "id": "infra-tooling-l3-img",
+          "type": "flashcard",
+          "front": "Study this diagram.",
+          "back": "Review the diagram above.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/infra-tooling-1.svg"
+        }
+      ]
+    }
+  ]
+}

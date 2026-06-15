@@ -1,0 +1,359 @@
+{
+  "id": "embedded-linux",
+  "title": "Embedded Linux: Yocto/Buildroot, Device Tree & SBCs",
+  "order": 18,
+  "lessons": [
+    {
+      "id": "embedded-linux-lesson-1",
+      "title": "What Makes Embedded Linux Different",
+      "order": 1,
+      "difficulty": 1,
+      "content": "Desktop and server Linux assume abundant RAM/flash, a self-describing bus (PCIe/USB enumeration, ACPI tables on x86), and a package manager you run *on the box*. Embedded Linux throws most of that away. You are running on an ARM (or RISC-V) **SoC** with maybe 128 MB-1 GB of RAM and a few GB of flash, bringing up **custom hardware** whose peripherals cannot announce themselves to the kernel.\n\nFour things define the embedded workflow:\n\n- **Constrained resources.** You strip the kernel and userspace down to what the product needs. BusyBox replaces dozens of GNU tools with one multicall binary; you may have no shell at all in production.\n- **Cross-compilation (Module 13).** You build on a fast x86 host *for* the target ARM. The target never compiles its own code, so there is usually **no package manager on the device** — the whole image is built and flashed as a unit.\n- **Custom hardware.** A vendor or you designed the board. Non-discoverable peripherals (I2C sensors, SPI flash, GPIO LEDs) must be described to the kernel via the **device tree**, not probed.\n- **Robust, often read-only rootfs.** A device in the field cannot run `apt upgrade` after a power cut corrupts the filesystem. Embedded images favor a **read-only root** (squashfs) with a small writable overlay, atomic A/B update schemes, and long support lifecycles measured in years.\n\nFor you this is familiar ground inverted: instead of soldering and probing radar boards, you describe that hardware to software and bring it up. Your EE instincts about clocks, buses, and signal integrity transfer directly.",
+      "items": [
+        {
+          "id": "embedded-linux-1-fc-1",
+          "type": "flashcard",
+          "front": "Name the four properties that distinguish embedded Linux from desktop/server Linux.",
+          "back": "Constrained resources (small RAM/flash), cross-compilation on a host for the target, custom non-discoverable hardware, and a robust/read-only rootfs with long support lifecycles. Usually no package manager runs on the device.",
+          "hint": "Think small, built elsewhere, custom board, can't apt-upgrade in the field."
+        },
+        {
+          "id": "embedded-linux-1-fc-2",
+          "type": "flashcard",
+          "front": "Why is there usually no package manager on an embedded target?",
+          "back": "The entire image is cross-compiled on a host and flashed as a unit. The device has no toolchain, limited storage, and needs reproducible/atomic images, so software is added at build time (via Buildroot/Yocto), not installed on-device.",
+          "hint": "It is built elsewhere and flashed whole."
+        },
+        {
+          "id": "embedded-linux-1-fc-3",
+          "type": "flashcard",
+          "front": "What is BusyBox and why is it ubiquitous in embedded Linux?",
+          "back": "BusyBox is a single multicall binary that implements stripped-down versions of many common Unix utilities (sh, ls, cp, init, etc.) selected by the name it is invoked as. It saves enormous space versus shipping full GNU coreutils on a constrained device.",
+          "hint": "One binary, many symlinked tool names."
+        },
+        {
+          "id": "embedded-linux-1-fc-4",
+          "type": "flashcard",
+          "front": "Why do embedded products favor a read-only root filesystem?",
+          "back": "A read-only rootfs (e.g., squashfs) survives sudden power loss without corruption, can be integrity-checked, and prevents field drift. Writable state is confined to a small overlay or separate data partition, often with atomic A/B image updates.",
+          "hint": "Power can be yanked at any instant in the field."
+        },
+        {
+          "id": "embedded-linux-1-mcq-1",
+          "type": "mcq",
+          "prompt": "On an x86 server, the kernel learns about onboard devices largely from ACPI tables provided by firmware. What plays the analogous role on a typical ARM embedded board?",
+          "choices": [
+            "The device tree, a separate data structure describing non-discoverable hardware",
+            "The PCIe configuration space, scanned at boot",
+            "The /etc/fstab file read by systemd",
+            "USB enumeration performed by the boot ROM"
+          ],
+          "answerIndex": 0,
+          "explanation": "Most ARM SoC peripherals are not self-describing and there is no ACPI. The device tree is a separate binary blob (DTB) passed to the kernel that enumerates the hardware so drivers can bind."
+        },
+        {
+          "id": "embedded-linux-1-mcq-2",
+          "type": "mcq",
+          "prompt": "Which statement about cross-compilation in embedded Linux is correct?",
+          "choices": [
+            "You compile on the ARM target because only it has the right headers",
+            "You compile on a fast x86 host using a toolchain that emits ARM binaries",
+            "Cross-compilation is only needed for the kernel, not userspace",
+            "It is identical to native compilation but with a -static flag"
+          ],
+          "answerIndex": 1,
+          "explanation": "Embedded development cross-compiles on a powerful host (x86) using a toolchain (e.g., aarch64-linux-gnu-gcc) that targets the device architecture. The target is too slow/small to build its own image."
+        },
+        {
+          "id": "embedded-linux-1-mcq-3",
+          "type": "mcq",
+          "prompt": "A field device loses power mid-write and afterward boots fine with no filesystem corruption. Which design choice most directly enabled this?",
+          "choices": [
+            "Running fsck on every boot",
+            "A read-only squashfs root with a separate writable overlay/data area",
+            "Using systemd instead of BusyBox init",
+            "Compiling the kernel with -O3"
+          ],
+          "answerIndex": 1,
+          "explanation": "A read-only root cannot be corrupted by an interrupted write. Mutable state is isolated to an overlay or data partition, often combined with journaling or atomic updates, so the core system is always consistent."
+        },
+        {
+          "id": "embedded-linux-1-fc-5",
+          "type": "flashcard",
+          "front": "How does the 'long support lifecycle' of embedded products affect kernel/toolchain choices?",
+          "back": "Products must be maintained for years (sometimes a decade), so teams pin a long-term-support (LTS) kernel, a fixed toolchain, and reproducible build configs, rather than tracking the latest rolling release the way a desktop might.",
+          "hint": "Defense and industrial gear can't chase the newest release every six months."
+        }
+      ]
+    },
+    {
+      "id": "embedded-linux-lesson-2",
+      "title": "The ARM Boot Chain & U-Boot",
+      "order": 2,
+      "difficulty": 2,
+      "content": "On x86 you learned: UEFI firmware -> GRUB (from the ESP) -> kernel + initramfs -> systemd. The ARM embedded chain looks different at every stage, and there is **no BIOS/UEFI**.\n\n1. **SoC boot ROM.** Masked silicon inside the chip runs first. It reads a fixed boot-source order (eMMC/SD, SPI-NOR, USB, UART) and loads a tiny first-stage loader into on-chip SRAM, because DRAM is not configured yet.\n2. **SPL** (Secondary Program Loader, sometimes `MLO`). A size-limited first stage whose job is to **initialize DRAM and clocks**, then load the full bootloader into RAM.\n3. **U-Boot.** The workhorse. It has an interactive prompt, a persistent **environment** (key=value pairs in flash), and a script variable **`bootcmd`** that runs automatically after a countdown. U-Boot loads the **kernel image and the DTB** (and optionally an initramfs) from MMC, flash, or the network, then jumps into the kernel passing it the DTB pointer.\n4. **Kernel** parses the DTB, brings up drivers, mounts the root filesystem (from the `bootargs`/kernel cmdline), and execs **init** (PID 1) — BusyBox init or systemd — which ends at a serial-console login.\n\nInterrupting U-Boot (hit a key during the countdown) is a core skill:\n\n```bash\n# at the U-Boot prompt\nprintenv bootcmd            # see the auto-boot script\nsetenv bootargs 'console=ttyS0,115200 root=/dev/mmcblk0p2 rw'\nfatload mmc 0:1 0x80008000 Image          # load kernel into RAM\nfatload mmc 0:1 0x84000000 board.dtb      # load device tree\nbooti 0x80008000 - 0x84000000             # boot kernel, no initrd, with DTB\nsaveenv                                   # persist changes to flash\n```\n\nFor development, U-Boot can pull the kernel over **TFTP** and mount root over **NFS**, so you reflash nothing while iterating.",
+      "items": [
+        {
+          "id": "embedded-linux-2-fc-1",
+          "type": "flashcard",
+          "front": "List the full ARM embedded boot chain in order.",
+          "back": "SoC boot ROM -> SPL (MLO) -> U-Boot -> kernel + DTB -> init (PID 1). The boot ROM is on-chip silicon; SPL sets up DRAM/clocks; U-Boot loads kernel+DTB; the kernel mounts root and execs init.",
+          "hint": "Five stages, starting inside the chip and ending at a login prompt."
+        },
+        {
+          "id": "embedded-linux-2-fc-2",
+          "type": "flashcard",
+          "front": "What is the SPL's primary job, and why can't U-Boot do it directly?",
+          "back": "SPL initializes DRAM controllers and clocks and then loads the full U-Boot into RAM. The boot ROM can only load a tiny image into on-chip SRAM before DRAM exists, so a small first stage must configure memory before the larger U-Boot can run.",
+          "hint": "DRAM isn't usable yet when the boot ROM runs."
+        },
+        {
+          "id": "embedded-linux-2-fc-3",
+          "type": "flashcard",
+          "front": "What are U-Boot's environment and bootcmd?",
+          "back": "The environment is a persistent set of key=value variables stored in flash (edited with setenv/saveenv). bootcmd is the variable holding the script U-Boot runs automatically after the boot-delay countdown, typically loading and booting the kernel + DTB.",
+          "hint": "printenv shows them; bootcmd auto-runs."
+        },
+        {
+          "id": "embedded-linux-2-fc-4",
+          "type": "flashcard",
+          "front": "In development, how can U-Boot avoid reflashing the device on every kernel change?",
+          "back": "U-Boot can fetch the kernel and DTB over TFTP into RAM, and the kernel can mount its root filesystem over NFS (root=/dev/nfs with nfsroot= in bootargs). You rebuild on the host and reboot; nothing is written to the device's flash.",
+          "hint": "Network boot: TFTP for the kernel, NFS for root."
+        },
+        {
+          "id": "embedded-linux-2-mcq-1",
+          "type": "mcq",
+          "prompt": "Which is the single biggest structural difference between the ARM embedded boot chain and the x86/UEFI chain?",
+          "choices": [
+            "ARM uses GRUB while x86 uses U-Boot",
+            "There is no BIOS/UEFI; an on-chip boot ROM plus SPL bootstraps U-Boot, and a device tree replaces ACPI hardware self-description",
+            "x86 has no kernel command line",
+            "ARM cannot load an initramfs"
+          ],
+          "answerIndex": 1,
+          "explanation": "ARM SoCs boot from masked on-chip ROM, not UEFI firmware, and chain through SPL to U-Boot. They lack ACPI, so the device tree describes the hardware. The first three options are factually wrong."
+        },
+        {
+          "id": "embedded-linux-2-mcq-2",
+          "type": "mcq",
+          "prompt": "At the U-Boot prompt you run printenv and want the kernel to use a serial console and an SD root partition. Which variable do you set?",
+          "choices": [
+            "bootcmd, because it holds the kernel command line",
+            "bootargs, which becomes the kernel command line passed at boot",
+            "loadaddr, which sets the console device",
+            "fdtaddr, which selects the root filesystem"
+          ],
+          "answerIndex": 1,
+          "explanation": "bootargs is passed to the kernel as its command line (console=, root=, etc.). bootcmd is the U-Boot script that boots; loadaddr/fdtaddr are RAM load addresses for the kernel and DTB."
+        },
+        {
+          "id": "embedded-linux-2-mcq-3",
+          "type": "mcq",
+          "prompt": "After U-Boot loads the kernel and DTB and jumps into the kernel, what is the last handoff before userspace begins?",
+          "choices": [
+            "The kernel calls saveenv to persist the environment",
+            "The kernel parses the DTB, mounts the root filesystem, and execs init as PID 1",
+            "U-Boot mounts the root filesystem and starts systemd",
+            "The boot ROM re-runs to verify the image"
+          ],
+          "answerIndex": 1,
+          "explanation": "The kernel uses the DTB to bring up drivers, mounts root per the cmdline, then execs /sbin/init (or init= override) as PID 1 — the kernel-to-userspace handoff. U-Boot is long gone by then."
+        },
+        {
+          "id": "embedded-linux-2-img-1",
+          "type": "flashcard",
+          "front": "The ARM embedded boot chain stage by stage: on-chip boot ROM -> SPL (DRAM/clock init) -> U-Boot (env, bootcmd, load kernel+DTB) -> kernel + DTB -> init, contrasted with the x86/UEFI path.",
+          "back": "Review the diagram above.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/embedded-linux-1.svg"
+        }
+      ]
+    },
+    {
+      "id": "embedded-linux-lesson-3",
+      "title": "The Device Tree: Describing Hardware to the Kernel",
+      "order": 3,
+      "difficulty": 3,
+      "content": "The **device tree (DT)** exists to solve one problem: most SoC peripherals are **not discoverable**. A USB or PCIe device can announce its vendor/product IDs, but an I2C temperature sensor wired to pins on your custom board cannot. Rather than hardcode every board into the kernel (the bad old ARM 'board files' era), Linux passes the kernel a **device tree blob (DTB)** describing the hardware as a tree of **nodes** and **properties**.\n\nYou write **`.dts`** source (and shared **`.dtsi`** include files for the SoC, included by board files) and compile it with the device-tree compiler **`dtc`** into a `.dtb`:\n\n```dts\n/dts-v1/;\n#include \"my-soc.dtsi\"\n\n&i2c1 {\n    status = \"okay\";\n    bmp280@76 {\n        compatible = \"bosch,bmp280\";\n        reg = <0x76>;        /* I2C address */\n    };\n};\n```\n\nThe load-bearing property is **`compatible`**. The kernel matches a node's `compatible` string against each driver's `of_device_id` table; on a match the driver's `probe()` runs and binds to that node (this is exactly the platform/OF device model from Module 9). **A typo in the `compatible` string means no match, no probe, and a silent non-working peripheral** — the single most common DT bug.\n\n```bash\ndtc -I dts -O dtb -o board.dtb board.dts   # compile source to blob\ndtc -I dtb -O dts -o out.dts board.dtb     # decompile to inspect\n```\n\n**Device-tree overlays** let you patch the base tree at runtime (e.g., enabling SPI or a GPIO LED on a Raspberry Pi) without recompiling the whole DTB — ideal for experimentation. Cardinal rule: edit the `.dts`, recompile, and redeploy the DTB. Never hand-edit the binary `.dtb`, and never forget to redeploy it after a change.",
+      "items": [
+        {
+          "id": "embedded-linux-3-fc-1",
+          "type": "flashcard",
+          "front": "Why does the Linux device tree exist?",
+          "back": "To describe non-discoverable hardware (I2C/SPI/GPIO peripherals, memory map, clocks) to the kernel without hardcoding board details into kernel C code. It replaced the unmaintainable per-board 'board file' approach on ARM.",
+          "hint": "Some buses can't enumerate their devices."
+        },
+        {
+          "id": "embedded-linux-3-fc-2",
+          "type": "flashcard",
+          "front": "What is the role of the compatible property in a device-tree node?",
+          "back": "compatible is a string (or list) the kernel matches against each driver's of_device_id table. On a match, the driver's probe() is called and it binds to that node. It is the link between hardware description and driver code.",
+          "hint": "It's how a DT node finds its driver."
+        },
+        {
+          "id": "embedded-linux-3-fc-3",
+          "type": "flashcard",
+          "front": "What is the difference between .dts, .dtsi, and .dtb?",
+          "back": ".dts is device-tree source for a specific board; .dtsi is a shared include (e.g., the SoC definition) pulled into board files; .dtb is the compiled binary blob handed to the kernel. dtc compiles .dts (+ .dtsi includes) into .dtb.",
+          "hint": "Source, shared-include source, compiled blob."
+        },
+        {
+          "id": "embedded-linux-3-fc-4",
+          "type": "flashcard",
+          "front": "What is a device-tree overlay and when is it useful?",
+          "back": "An overlay is a fragment that patches the base device tree (adding/enabling nodes) without recompiling the full DTB. Raspberry Pi uses them to enable I2C/SPI/GPIO peripherals at boot. Great for experimentation and optional hardware (HATs/capes).",
+          "hint": "A patch on top of the base tree, often loaded by the bootloader."
+        },
+        {
+          "id": "embedded-linux-3-fc-5",
+          "type": "flashcard",
+          "front": "What are the three cardinal mistakes when working with device trees?",
+          "back": "1) A wrong/typo compatible string so the driver never binds. 2) Editing the binary .dtb instead of the .dts source. 3) Forgetting to recompile (dtc) and redeploy the DTB to the device after changing the source.",
+          "hint": "Wrong string, edit the blob, forget to redeploy."
+        },
+        {
+          "id": "embedded-linux-3-mcq-1",
+          "type": "mcq",
+          "prompt": "You added an I2C sensor node to the device tree, but after boot dmesg shows the driver never ran and /sys has no entry. The driver is built in. What is the most likely cause?",
+          "choices": [
+            "The kernel was compiled with the wrong optimization level",
+            "The compatible string in the DT node does not match the driver's of_device_id table",
+            "U-Boot did not run saveenv",
+            "The rootfs is read-only"
+          ],
+          "answerIndex": 1,
+          "explanation": "Driver binding hinges on the compatible string matching the driver's of_device_id entry. A mismatch (typo, wrong vendor prefix) means no probe() call and a silently absent device — the classic DT bug."
+        },
+        {
+          "id": "embedded-linux-3-mcq-2",
+          "type": "mcq",
+          "prompt": "Which command compiles device-tree source into the binary blob the kernel consumes?",
+          "choices": [
+            "gcc -dtb board.dts",
+            "dtc -I dts -O dtb -o board.dtb board.dts",
+            "make menuconfig board.dts",
+            "objcopy -O dtb board.dts board.dtb"
+          ],
+          "answerIndex": 1,
+          "explanation": "dtc (device-tree compiler) converts between .dts and .dtb. Here -I dts -O dtb specifies input/output formats. gcc, menuconfig, and objcopy do not compile device trees."
+        },
+        {
+          "id": "embedded-linux-3-mcq-3",
+          "type": "mcq",
+          "prompt": "What is the cleanest way to enable an optional SPI peripheral on a Raspberry Pi without rebuilding the entire base device tree?",
+          "choices": [
+            "Hand-edit the binary .dtb with a hex editor",
+            "Load a device-tree overlay that patches the base tree at boot",
+            "Recompile the kernel with the device baked in",
+            "Set a U-Boot environment variable"
+          ],
+          "answerIndex": 1,
+          "explanation": "Overlays are designed exactly for this: a small fragment enabling/adding nodes is applied over the base DTB at boot, so optional hardware can be toggled without recompiling the full tree."
+        },
+        {
+          "id": "embedded-linux-3-img-1",
+          "type": "flashcard",
+          "front": "Device-tree binding: a node's compatible string ('bosch,bmp280') is matched against a driver's of_device_id table; on a match the driver's probe() runs and binds. A typo on either side means the driver never probes.",
+          "back": "Review the diagram above.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/embedded-linux-2.svg"
+        }
+      ]
+    },
+    {
+      "id": "embedded-linux-lesson-4",
+      "title": "Buildroot vs Yocto, BSPs, Filesystems & Booting an SBC",
+      "order": 4,
+      "difficulty": 4,
+      "content": "A **Board Support Package (BSP)** is the vendor-supplied bundle that makes a specific board boot: the bootloader (SPL+U-Boot), a kernel with the right drivers, and the board's device tree. You build a root filesystem on top of the BSP using one of two dominant systems.\n\n**Buildroot** is the simpler one: a big **Kconfig**/Makefile system (`make menuconfig`) that cross-compiles a toolchain, kernel, and a minimal rootfs into a single flashable image. It is fast to learn, fast to build, and ideal for small, fixed images — the recommended starting point.\n\n```bash\nmake raspberrypi3_defconfig   # start from a board defconfig\nmake menuconfig               # tweak packages\nmake -j$(nproc)               # produces output/images/sdcard.img\n```\n\n**Yocto / OpenEmbedded** is the industry standard for products. It is heavier and built around **layers** (`bblayers.conf`), **recipes** (`.bb` files describing how to fetch/build each component), the **BitBake** task engine, machine configs, and `local.conf`. It generates SDKs, handles licensing/SBOM, and scales to large product lines — at the cost of a steep learning curve and long first builds.\n\n**Rule of thumb:** Buildroot for simplicity and small/fixed images; Yocto when you need recipes, layering, package feeds, SBOM, and production-grade maintainability across many boards.\n\nEmbedded **filesystems** match the storage: **squashfs** (compressed, read-only root), **UBIFS/JFFS2** (for raw NAND/NOR flash with wear-leveling), and an **overlay** (overlayfs/tmpfs) for a writable layer over read-only base. The kernel itself is configured via `make menuconfig` from a **defconfig**, then you build the kernel image, **modules**, and **DTB**.\n\nFinally, you boot a real **SBC**. Flash the image to an SD card and **boot it**:\n\n```bash\nlsblk                                   # CONFIRM the device first!\nsudo dd if=output/images/sdcard.img of=/dev/sdX bs=4M conv=fsync status=progress\n```\n\nA wrong `of=` here can wipe your laptop disk — always check `lsblk` first. The **Raspberry Pi** is the most accessible board; the **BeagleBone Black** exposes **PRUs** (programmable real-time units), which are compelling for deterministic, radar-like real-time I/O alongside Linux.",
+      "items": [
+        {
+          "id": "embedded-linux-4-fc-1",
+          "type": "flashcard",
+          "front": "What is a Board Support Package (BSP)?",
+          "back": "The vendor-supplied bundle that boots a specific board: the bootloader (SPL + U-Boot), a kernel with the board's drivers, and its device tree. Build systems layer a root filesystem on top of the BSP.",
+          "hint": "Bootloader + kernel + drivers + device tree for one board."
+        },
+        {
+          "id": "embedded-linux-4-fc-2",
+          "type": "flashcard",
+          "front": "Contrast Buildroot and Yocto/OpenEmbedded.",
+          "back": "Buildroot: Kconfig/Makefile based, simple, fast, great for small/fixed images and learning. Yocto/OE: layers + recipes (.bb) + BitBake, machine configs, SDK and SBOM generation; heavier and slower but the production standard scaling across many boards. Pick Buildroot for simplicity, Yocto for maintainable products.",
+          "hint": "Simple menuconfig image vs layered recipe-based product system."
+        },
+        {
+          "id": "embedded-linux-4-fc-3",
+          "type": "flashcard",
+          "front": "Name Yocto's core building blocks.",
+          "back": "Layers (bblayers.conf) group recipes; recipes (.bb files) describe how to fetch and build each component; BitBake is the task scheduler/build engine; machine configs and local.conf select the target and settings. It can also generate an SDK and license/SBOM data.",
+          "hint": "Layers, recipes, BitBake, machine config."
+        },
+        {
+          "id": "embedded-linux-4-fc-4",
+          "type": "flashcard",
+          "front": "Match the embedded filesystem to its use: squashfs, UBIFS/JFFS2, overlayfs.",
+          "back": "squashfs: compressed read-only root. UBIFS/JFFS2: filesystems for raw NAND/NOR flash with wear-leveling. overlayfs (over tmpfs or a data partition): a writable layer stacked on a read-only base so the system can be modified at runtime without making root writable.",
+          "hint": "Read-only root, raw-flash FS, writable layer."
+        },
+        {
+          "id": "embedded-linux-4-fc-5",
+          "type": "flashcard",
+          "front": "What three kernel build outputs do you typically produce for an SBC, and how do you start the config?",
+          "back": "The kernel image (zImage/Image), the loadable modules, and the DTB(s). You start from a board defconfig (make <board>_defconfig) and adjust with make menuconfig, then build all three for the target architecture.",
+          "hint": "Image, modules, DTB — start from a defconfig."
+        },
+        {
+          "id": "embedded-linux-4-mcq-1",
+          "type": "mcq",
+          "prompt": "A small team needs a minimal, fixed Linux image for one Raspberry Pi product and wants to be productive quickly. Which build system fits best, and why?",
+          "choices": [
+            "Yocto, because BitBake recipes are required for any SD image",
+            "Buildroot, because its Kconfig/Makefile flow is simpler and fast for small fixed images",
+            "Yocto, because Buildroot cannot cross-compile a kernel",
+            "Neither; you must hand-assemble the rootfs with debootstrap"
+          ],
+          "answerIndex": 1,
+          "explanation": "Buildroot's menuconfig-driven flow produces a flashable image quickly and is ideal for small, fixed images. Yocto's power (layers, recipes, SBOM) is overkill here and slower to learn. Buildroot fully cross-compiles the kernel."
+        },
+        {
+          "id": "embedded-linux-4-mcq-2",
+          "type": "mcq",
+          "prompt": "Why is squashfs combined with an overlay a popular rootfs scheme for shipping devices?",
+          "choices": [
+            "squashfs is faster to write than ext4",
+            "The compressed read-only base resists corruption and saves flash, while the overlay supplies needed writability",
+            "It removes the need for a device tree",
+            "It lets the device run a package manager safely"
+          ],
+          "answerIndex": 1,
+          "explanation": "squashfs is compressed and read-only (corruption-resistant, space-saving); an overlay (over tmpfs or a data partition) provides the small amount of runtime writability needed without exposing the base to corruption."
+        },
+        {
+          "id": "embedded-linux-4-mcq-3",
+          "type": "mcq",
+          "prompt": "Which command is correct and safe for writing a built SD-card image to a card, and what is the critical precaution?",
+          "choices": [
+            "sudo dd if=sdcard.img of=/dev/sdX bs=4M conv=fsync — first confirm /dev/sdX with lsblk",
+            "sudo dd if=/dev/sdX of=sdcard.img bs=4M — the direction does not matter",
+            "cp sdcard.img /dev/sdX — dd is never needed",
+            "sudo mkfs.ext4 /dev/sdX then copy files — dd corrupts images"
+          ],
+          "answerIndex": 0,
+          "explanation": "dd writes the raw image to the block device; if/of direction matters and a wrong of= can destroy your host disk, so you must verify the target with lsblk first. cp to a raw device won't lay down the partition table/bootloader correctly."
+        },
+        {
+          "id": "embedded-linux-4-mcq-4",
+          "type": "mcq",
+          "prompt": "Why might an engineer with a radar/real-time background find the BeagleBone Black especially interesting versus a Raspberry Pi?",
+          "choices": [
+            "It runs Windows natively",
+            "It exposes PRUs (programmable real-time units) for deterministic real-time I/O alongside Linux",
+            "It has no device tree, simplifying bring-up",
+            "It cannot run Buildroot or Yocto"
+          ],
+          "answerIndex": 1,
+          "explanation": "The BeagleBone's PRUs are independent real-time cores for deterministic, low-jitter I/O — attractive for signal/real-time work that Linux's scheduler can't guarantee, which resonates with radar/real-time hardware experience."
+        }
+      ]
+    }
+  ]
+}

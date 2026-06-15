@@ -1,0 +1,309 @@
+{
+  "id": "build-cross-compilation",
+  "title": "Build Systems & Cross-Compilation",
+  "order": 13,
+  "lessons": [
+    {
+      "id": "build-cross-compilation-l1",
+      "title": "The Native Build Pipeline & Libraries",
+      "order": 1,
+      "difficulty": 1,
+      "content": "Turning `hello.c` into a runnable program is four stages, not one. `gcc` orchestrates them: the **preprocessor** (`cpp`) expands `#include`/`#define` into a single translation unit; the **compiler** (`cc1`) turns C into target assembly; the **assembler** (`as`) turns assembly into a relocatable object file (`.o`); the **linker** (`ld`) resolves symbols across objects and libraries into the final ELF executable. You can stop at any stage:\n\n```bash\ngcc -E hello.c -o hello.i   # preprocess only\ngcc -S hello.c -o hello.s   # compile to assembly\ngcc -c hello.c -o hello.o   # assemble to object\ngcc hello.o -o hello        # link\n```\n\nLibraries come in two flavors. A **static library** (`.a`) is just an archive of `.o` files; the linker copies the needed code *into* your binary at link time, so the result is self-contained but larger and frozen. A **shared library** (`.so`) is loaded at *run time* by the dynamic linker; many programs share one copy in memory, and you can patch the library without relinking. Build and link a shared lib:\n\n```bash\ngcc -fPIC -c mathutil.c -o mathutil.o\ngcc -shared mathutil.o -o libmathutil.so\ngcc main.c -L. -lmathutil -o app\n```\n\n`-fPIC` (position-independent code) is mandatory for shared objects because they can be mapped at any address. Inspect symbols with `nm` and `readelf`. The trade-off is the classic one: static = portability and no runtime dependency hunting; dynamic = smaller binaries, shared memory, and security updates without recompiling every consumer.",
+      "items": [
+        {
+          "id": "build-cross-compilation-l1-fc1",
+          "type": "flashcard",
+          "front": "Name the four stages of the native C build pipeline, in order.",
+          "back": "Preprocess (cpp) -> Compile (cc1, C to assembly) -> Assemble (as, assembly to .o object) -> Link (ld, resolve symbols into the final executable).",
+          "hint": "gcc -E, -S, -c, then link."
+        },
+        {
+          "id": "build-cross-compilation-l1-fc2",
+          "type": "flashcard",
+          "front": "What is the difference between a `.a` and a `.so` file?",
+          "back": "A `.a` is a static library: an archive of `.o` files whose code is copied into the binary at link time. A `.so` is a shared object: loaded at run time by the dynamic linker and shared among processes.",
+          "hint": "Link time vs run time."
+        },
+        {
+          "id": "build-cross-compilation-l1-fc3",
+          "type": "flashcard",
+          "front": "Why must shared library code be compiled with `-fPIC`?",
+          "back": "Position-Independent Code uses relative addressing so the `.so` can be mapped at any virtual address at load time, allowing it to be shared between processes without fixed-address relocation.",
+          "hint": "It can be mapped anywhere in memory."
+        },
+        {
+          "id": "build-cross-compilation-l1-fc4",
+          "type": "flashcard",
+          "front": "What does `gcc -c file.c` produce, and what does it skip?",
+          "back": "It produces a relocatable object file (`file.o`) by running preprocess + compile + assemble. It skips the link stage, so the result is not yet executable.",
+          "hint": "Stops just before ld."
+        },
+        {
+          "id": "build-cross-compilation-l1-fc5",
+          "type": "flashcard",
+          "front": "Give one advantage each for static and dynamic linking.",
+          "back": "Static: self-contained binary, no runtime dependency resolution, easy to ship. Dynamic: smaller binaries, one shared copy in RAM across processes, and library security patches without recompiling consumers.",
+          "hint": "Portability vs sharing/patchability."
+        },
+        {
+          "id": "build-cross-compilation-l1-mcq1",
+          "type": "mcq",
+          "prompt": "Which command stops the build after generating assembly but before assembling to an object file?",
+          "choices": [
+            "gcc -E hello.c",
+            "gcc -S hello.c",
+            "gcc -c hello.c",
+            "gcc -shared hello.c"
+          ],
+          "answerIndex": 1,
+          "explanation": "`-S` runs the preprocessor and compiler and emits a `.s` assembly file. `-E` stops after preprocessing; `-c` continues through assembly to a `.o`; `-shared` produces a shared library."
+        },
+        {
+          "id": "build-cross-compilation-l1-mcq2",
+          "type": "mcq",
+          "prompt": "In `gcc main.c -L. -lmathutil -o app`, what does `-lmathutil` tell the linker to find?",
+          "choices": [
+            "A header file named mathutil.h",
+            "A library file named libmathutil.so or libmathutil.a",
+            "An object file named mathutil.o only",
+            "A source file named mathutil.c to recompile"
+          ],
+          "answerIndex": 1,
+          "explanation": "The `-l<name>` flag expands to `lib<name>.so` (preferred) or `lib<name>.a`, searched in the paths given by `-L`. It does not pull in headers or source."
+        },
+        {
+          "id": "build-cross-compilation-l1-mcq3",
+          "type": "mcq",
+          "prompt": "A security flaw is found in a widely used library. Which linking model lets you fix every program that uses it WITHOUT recompiling them?",
+          "choices": [
+            "Static linking, by editing the .a archive",
+            "Dynamic linking, by replacing the .so",
+            "Neither; you must recompile everything",
+            "Both behave identically"
+          ],
+          "answerIndex": 1,
+          "explanation": "With dynamic linking the code lives in a shared `.so` loaded at runtime, so replacing that one file patches all consumers. Statically linked programs each baked in a copy and must be relinked/recompiled."
+        },
+        {
+          "id": "build-cross-compilation-l1-mcq4",
+          "type": "mcq",
+          "prompt": "Which tool would you use to list the symbols defined and referenced in an object file or library?",
+          "choices": [
+            "ldd",
+            "nm",
+            "make",
+            "cpp"
+          ],
+          "answerIndex": 1,
+          "explanation": "`nm` lists symbols (T = defined text, U = undefined/referenced). `ldd` lists shared-library dependencies of an executable, not its symbol table; `make` builds; `cpp` preprocesses."
+        }
+      ]
+    },
+    {
+      "id": "build-cross-compilation-l2",
+      "title": "Dynamic Linker, make, and Modern Build Systems",
+      "order": 2,
+      "difficulty": 2,
+      "content": "At run time the **dynamic linker/loader** (`ld.so` / `ld-linux.so`) maps every `.so` your program needs into memory and binds symbols. Use `ldd ./app` to list those dependencies and see which resolve to a path and which print `not found`. The search order is: paths baked into the binary's **rpath/runpath**, then the `LD_LIBRARY_PATH` environment variable, then the system cache `/etc/ld.so.cache` (rebuilt by `ldconfig` from `/etc/ld.so.conf` and `/usr/lib`). The classic 'library not found' bug:\n\n```bash\nldd ./app                 # libmathutil.so => not found\nexport LD_LIBRARY_PATH=.  # quick dev fix\n./app                     # now resolves\n```\n\n`LD_LIBRARY_PATH` is a development crutch, not a deployment fix; for shipping, bake an **rpath** (`gcc ... -Wl,-rpath,'$ORIGIN/lib'`) or install the library into a standard dir and run `ldconfig`.\n\n**Build orchestration** keeps you from retyping `gcc`. `make` reads a Makefile of targets, prerequisites, and recipes; it rebuilds a target only when a prerequisite is newer:\n\n```make\nCC ?= gcc\nCFLAGS = -Wall -O2\napp: main.o util.o\n\t$(CC) $(CFLAGS) $^ -o $@\n%.o: %.c\n\t$(CC) $(CFLAGS) -c $< -o $@\nclean:\n\trm -f *.o app\n```\n\nNote recipes must be **tab-indented**, and `$@`/`$^`/`$<` are the target, all prerequisites, and first prerequisite. Hand-written Makefiles don't scale, so modern projects use **CMake** (the de facto C/C++ standard) as a meta-build that *generates* Makefiles or **Ninja** files; **Meson** is a newer, fast alternative that also targets Ninja. You write `CMakeLists.txt` once and build portably with `cmake -G Ninja .. && ninja`.",
+      "items": [
+        {
+          "id": "build-cross-compilation-l2-fc1",
+          "type": "flashcard",
+          "front": "What does `ldd ./app` show you?",
+          "back": "The shared libraries (`.so`) the dynamic linker will load for that executable, and where each resolves to on disk -- or `not found` if it cannot be located.",
+          "hint": "Run-time dependency list."
+        },
+        {
+          "id": "build-cross-compilation-l2-fc2",
+          "type": "flashcard",
+          "front": "List the dynamic linker's library search order.",
+          "back": "1) rpath/runpath embedded in the binary, 2) LD_LIBRARY_PATH env var, 3) the system cache /etc/ld.so.cache (built by ldconfig from /etc/ld.so.conf and standard lib dirs).",
+          "hint": "rpath -> env -> ldconfig cache."
+        },
+        {
+          "id": "build-cross-compilation-l2-fc3",
+          "type": "flashcard",
+          "front": "What does `ldconfig` do?",
+          "back": "It scans the directories in /etc/ld.so.conf (and trusted defaults), updates the cache /etc/ld.so.cache, and refreshes the soname symlinks so the dynamic linker can find newly installed shared libraries.",
+          "hint": "Rebuilds /etc/ld.so.cache."
+        },
+        {
+          "id": "build-cross-compilation-l2-fc4",
+          "type": "flashcard",
+          "front": "Why is setting LD_LIBRARY_PATH a poor deployment fix, and what is better?",
+          "back": "It is environment-global, fragile, and can shadow system libraries; it leaks to child processes. Better: embed an rpath/runpath (e.g. $ORIGIN/lib) at link time, or install the lib to a standard dir and run ldconfig.",
+          "hint": "Prefer rpath or ldconfig."
+        },
+        {
+          "id": "build-cross-compilation-l2-fc5",
+          "type": "flashcard",
+          "front": "In a Makefile, what do the automatic variables $@, $^, and $< mean?",
+          "back": "$@ = the target being built; $^ = all prerequisites; $< = the first prerequisite. Recipe lines must also be indented with a real TAB, not spaces.",
+          "hint": "Target, all prereqs, first prereq."
+        },
+        {
+          "id": "build-cross-compilation-l2-mcq1",
+          "type": "mcq",
+          "prompt": "`ldd ./app` prints `libmathutil.so => not found`. Which is the cleanest production fix?",
+          "choices": [
+            "Permanently export LD_LIBRARY_PATH in everyone's shell profile",
+            "Install the .so to a standard lib dir and run ldconfig (or link with an rpath)",
+            "Recompile app as a static binary every time it runs",
+            "Delete /etc/ld.so.cache so the loader rescans"
+          ],
+          "answerIndex": 1,
+          "explanation": "Installing into a known directory plus `ldconfig`, or baking an rpath at link time, makes resolution deterministic. `LD_LIBRARY_PATH` is a dev crutch; deleting the cache breaks everything until rebuilt."
+        },
+        {
+          "id": "build-cross-compilation-l2-mcq2",
+          "type": "mcq",
+          "prompt": "What is the primary role of CMake?",
+          "choices": [
+            "It is a C compiler that replaces gcc",
+            "It is a meta-build system that generates Makefiles or Ninja build files from CMakeLists.txt",
+            "It is the runtime dynamic linker",
+            "It is a static-analysis linter for C++"
+          ],
+          "answerIndex": 1,
+          "explanation": "CMake is a generator: from a portable `CMakeLists.txt` it produces native build files (Unix Makefiles, Ninja, IDE projects). It does not compile code itself or load libraries at runtime."
+        },
+        {
+          "id": "build-cross-compilation-l2-mcq3",
+          "type": "mcq",
+          "prompt": "A Makefile recipe fails with 'missing separator'. The most common cause is:",
+          "choices": [
+            "The target has no prerequisites",
+            "The recipe line is indented with spaces instead of a TAB",
+            "CC is not exported",
+            "The file is named makefile instead of Makefile"
+          ],
+          "answerIndex": 1,
+          "explanation": "make requires recipe lines to begin with a literal tab character. Editors that convert tabs to spaces cause the classic 'missing separator' error."
+        },
+        {
+          "id": "build-cross-compilation-l2-mcq4",
+          "type": "mcq",
+          "prompt": "Both Meson and CMake are commonly configured to emit build files for which fast low-level build tool?",
+          "choices": [
+            "autoconf",
+            "Ninja",
+            "ld.so",
+            "bash"
+          ],
+          "answerIndex": 1,
+          "explanation": "Ninja is a minimal, fast build backend designed to be generated by higher-level tools. Both CMake (`-G Ninja`) and Meson target it. autoconf is legacy autotools; ld.so is the loader; bash is a shell."
+        }
+      ]
+    },
+    {
+      "id": "build-cross-compilation-l3",
+      "title": "Toolchains, Triplets & Cross-Compiling for ARM",
+      "order": 3,
+      "difficulty": 3,
+      "content": "A **toolchain** is the full set of tools that turns source into a runnable binary for some platform: the **compiler** (gcc/clang), **binutils** (`as`, `ld`, `ar`, `objcopy`...), the **C library** (glibc or musl), and the **kernel/userspace headers**. Each platform is named by a **triplet** (really up to four fields): `arch-vendor-os-abi`, e.g. `aarch64-linux-gnu` or `arm-linux-gnueabihf` (the `hf` = hard-float ABI). Three triplets matter: **build** (where you compile), **host** (where the binary runs), and **target** (what a compiler you build will itself emit for). When build == host you are compiling natively; when host differs, you are **cross-compiling**.\n\nCross-compiling for an ARM SBC on an x86_64 laptop uses a cross-toolchain whose tools are triplet-prefixed:\n\n```bash\nsudo apt install gcc-aarch64-linux-gnu\naarch64-linux-gnu-gcc hello.c -o hello-arm\nfile hello-arm   # ELF 64-bit LSB executable, ARM aarch64\n```\n\nFor anything linking real libraries you point the toolchain at a **sysroot** -- a tree holding the target's headers and `.so`/`.a` files -- with `--sysroot=`. Build systems take the toolchain via the `CC`/`CXX` variables or the kernel-style `CROSS_COMPILE=aarch64-linux-gnu-` prefix; CMake uses a toolchain file.\n\nYou can't run an ARM binary directly on x86, so you have three options: **cross-compile** then copy to real hardware; run it under **QEMU user-mode emulation** (`qemu-aarch64 ./hello-arm`) which translates instructions per-process; or do a slow **native build on the target** itself. Watch the **ABI/libc pitfall**: a binary linked against **glibc** will not run on a **musl**-based system (Alpine) and vice versa -- the dynamic loader path and symbol versions differ -- producing 'No such file or directory' on the loader or missing-symbol errors at runtime.",
+      "items": [
+        {
+          "id": "build-cross-compilation-l3-fc1",
+          "type": "flashcard",
+          "front": "What four components make up a toolchain?",
+          "back": "1) Compiler (gcc/clang), 2) binutils (as, ld, ar, objcopy, etc.), 3) C library (glibc or musl), 4) kernel/userspace headers. Together they turn source into a binary for a given platform.",
+          "hint": "Compiler + binutils + libc + headers."
+        },
+        {
+          "id": "build-cross-compilation-l3-fc2",
+          "type": "flashcard",
+          "front": "Define the build, host, and target triplets.",
+          "back": "Build = the machine you compile on. Host = the machine the produced binary runs on. Target = (for a compiler you are building) the platform that compiler will emit code for. build==host means native; build!=host means cross-compiling.",
+          "hint": "Compile-on / run-on / emit-for."
+        },
+        {
+          "id": "build-cross-compilation-l3-fc3",
+          "type": "flashcard",
+          "front": "Decode the triplet `arm-linux-gnueabihf`.",
+          "back": "arch = arm (32-bit ARM), os/kernel = linux, ABI = gnueabihf, i.e. the GNU EABI with hard-float (hf) -- floating point passed in FPU registers. (aarch64-linux-gnu is the 64-bit counterpart.)",
+          "hint": "hf = hard float."
+        },
+        {
+          "id": "build-cross-compilation-l3-fc4",
+          "type": "flashcard",
+          "front": "What is a sysroot in cross-compilation?",
+          "back": "A directory tree containing the TARGET system's headers and libraries (.so/.a). Passed via --sysroot=, it tells the cross-compiler/linker where to find target headers and libs instead of the host's.",
+          "hint": "Target's /usr/include and /usr/lib, relocated."
+        },
+        {
+          "id": "build-cross-compilation-l3-fc5",
+          "type": "flashcard",
+          "front": "What do the CC and CROSS_COMPILE variables do for a build?",
+          "back": "CC names the compiler binary a build system should invoke (e.g. CC=aarch64-linux-gnu-gcc). CROSS_COMPILE (kernel/Makefile convention) sets the tool prefix, so as/ld/gcc become CROSS_COMPILE+gcc, etc., e.g. CROSS_COMPILE=aarch64-linux-gnu-.",
+          "hint": "One names the compiler, one is a tool prefix."
+        },
+        {
+          "id": "build-cross-compilation-l3-fc6",
+          "type": "flashcard",
+          "front": "Why might a glibc-built binary fail on a musl (Alpine) system?",
+          "back": "They are different C libraries with different dynamic-loader paths and symbol versions. The glibc binary requests /lib64/ld-linux-x86-64.so.2 which musl lacks, often giving a confusing 'No such file or directory' on the loader, or missing/incompatible symbols.",
+          "hint": "Different libc, different loader/ABI."
+        },
+        {
+          "id": "build-cross-compilation-l3-mcq1",
+          "type": "mcq",
+          "prompt": "You compile on an x86_64 laptop to produce a binary that runs on an aarch64 SBC. What are the build and host?",
+          "choices": [
+            "build = aarch64, host = x86_64",
+            "build = x86_64, host = aarch64",
+            "build = host = x86_64",
+            "build = host = aarch64"
+          ],
+          "answerIndex": 1,
+          "explanation": "Build is where compilation happens (x86_64 laptop); host is where the resulting binary runs (aarch64 SBC). Because they differ, this is cross-compilation."
+        },
+        {
+          "id": "build-cross-compilation-l3-mcq2",
+          "type": "mcq",
+          "prompt": "Which command cross-compiles hello.c for 64-bit ARM using a standard Debian cross-toolchain?",
+          "choices": [
+            "gcc -march=aarch64 hello.c -o hello",
+            "aarch64-linux-gnu-gcc hello.c -o hello",
+            "qemu-aarch64 gcc hello.c -o hello",
+            "cmake --target aarch64 hello.c"
+          ],
+          "answerIndex": 1,
+          "explanation": "The cross-toolchain ships triplet-prefixed tools, so `aarch64-linux-gnu-gcc` is the cross compiler. Plain `gcc -march` still emits host (x86) code; qemu runs binaries, it is not a compiler; cmake is not invoked that way."
+        },
+        {
+          "id": "build-cross-compilation-l3-mcq3",
+          "type": "mcq",
+          "prompt": "You cross-built an aarch64 binary but have no ARM hardware handy. How can you run it on your x86_64 box?",
+          "choices": [
+            "Just run ./hello-arm directly; Linux translates it automatically",
+            "Run it under QEMU user-mode: qemu-aarch64 ./hello-arm",
+            "Re-link it with -m32 to make it x86",
+            "Set LD_LIBRARY_PATH to the ARM sysroot"
+          ],
+          "answerIndex": 1,
+          "explanation": "QEMU user-mode emulation translates the foreign ELF's instructions per-process so a non-native binary runs on the host. The kernel will not run a foreign-arch ELF unaided; -m32 and LD_LIBRARY_PATH do not change the instruction set."
+        },
+        {
+          "id": "build-cross-compilation-l3-mcq4",
+          "type": "mcq",
+          "prompt": "An aarch64 binary built against glibc fails on an Alpine (musl) target with a loader 'No such file or directory' error even though the file exists. The root cause is most likely:",
+          "choices": [
+            "The file permissions are wrong",
+            "A C library / ABI mismatch -- the requested glibc dynamic loader is absent on musl",
+            "The disk is full",
+            "The binary was compiled with -O2 instead of -O0"
+          ],
+          "answerIndex": 1,
+          "explanation": "The message refers to the missing dynamic loader the glibc binary names in its INTERP, not the binary itself -- a classic glibc-vs-musl ABI pitfall. Build against musl (or statically) for Alpine targets."
+        },
+        {
+          "id": "build-cross-compilation-l3-img1",
+          "type": "flashcard",
+          "front": "Cross-compilation: x86_64 host to aarch64 target",
+          "back": "Diagram showing an x86_64 host with a cross-toolchain (aarch64-linux-gnu-gcc) and a sysroot of target libc/headers emitting an ARM ELF binary that runs on an aarch64 SBC or under qemu-aarch64.",
+          "image": "https://raw.githubusercontent.com/studyforge/packs/main/linux-systems/images/build-cross-compilation-1.svg"
+        }
+      ]
+    }
+  ]
+}

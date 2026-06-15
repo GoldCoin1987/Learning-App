@@ -1,0 +1,386 @@
+{
+  "id": "bash-scripting",
+  "title": "Bash Scripting (and Python for Ops)",
+  "order": 12,
+  "lessons": [
+    {
+      "id": "structure-safety",
+      "title": "Script Structure, set -euo pipefail & IFS",
+      "order": 1,
+      "difficulty": 1,
+      "content": "Every robust bash script opens the same way, and as an ex-technician you can treat this as the pre-flight checklist that separates professional glue from a fragile hack.\n\nStart with a portable shebang: `#!/usr/bin/env bash` finds bash via `PATH` instead of hardcoding `/bin/bash`, which matters because bash lives in different places across distros and macOS.\n\nNext, the safety triad `set -euo pipefail`:\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\nIFS=$'\\n\\t'\n```\n\n- `-e` (errexit): abort the moment any command returns non-zero, instead of blindly charging ahead on a failed `cd`.\n- `-u` (nounset): treat use of an *unset* variable as an error, catching typos like `$flie` before they silently expand to empty.\n- `-o pipefail`: make a pipeline fail if *any* stage fails, not just the last. Without it, `false | true` reports success.\n\nSetting `IFS=$'\\n\\t'` (newline and tab only, dropping the default space) is the classic defense against word-splitting filenames that contain spaces.\n\nThese are not magic — `set -e` has well-known blind spots (it won't trigger inside `if`/`&&` tests, and a function's failure can be masked), which is exactly why you still write explicit checks and run ShellCheck. Think of `set -euo pipefail` as turning your script from \"keep going and hope\" into \"fail fast and loud,\" the same discipline as a built-in test that halts on the first out-of-spec reading rather than shipping the unit.",
+      "items": [
+        {
+          "id": "bash-scripting-structure-safety-001",
+          "type": "flashcard",
+          "front": "Why use `#!/usr/bin/env bash` instead of `#!/bin/bash`?",
+          "back": "`env` resolves `bash` through `PATH`, so the script runs against whichever bash is installed rather than assuming a fixed path. bash lives in different locations across distros and macOS (often a newer one under `/usr/local` or Homebrew), so the env form is more portable.",
+          "hint": "Where does bash actually live?"
+        },
+        {
+          "id": "bash-scripting-structure-safety-002",
+          "type": "flashcard",
+          "front": "Expand the three options in `set -euo pipefail`.",
+          "back": "`-e` (errexit): exit on any command failing. `-u` (nounset): error on referencing an unset variable. `-o pipefail`: a pipeline returns the first non-zero exit of any stage, not just the last command's status.",
+          "hint": "errexit, nounset, pipefail."
+        },
+        {
+          "id": "bash-scripting-structure-safety-003",
+          "type": "flashcard",
+          "front": "What problem does setting `IFS=$'\\n\\t'` solve?",
+          "back": "The default `IFS` includes the space, so unquoted expansions get word-split on spaces — breaking iteration over filenames like `my file.txt`. Restricting IFS to newline and tab stops space-splitting. (Still prefer quoting and `while read -r` / null-delimited iteration.)",
+          "hint": "Filenames with spaces."
+        },
+        {
+          "id": "bash-scripting-structure-safety-004",
+          "type": "flashcard",
+          "front": "Give one well-known blind spot of `set -e`.",
+          "back": "`set -e` does NOT trigger when a command runs as the condition of `if`, `while`, `until`, or on the left of `&&`/`||`. A failing command inside those contexts is treated as a normal boolean test, so errors there are silently tolerated.",
+          "hint": "Conditions and short-circuit operators."
+        },
+        {
+          "id": "bash-scripting-structure-safety-005",
+          "type": "mcq",
+          "prompt": "Without `pipefail`, what does `false | true` return as the pipeline's exit status?",
+          "choices": [
+            "1, because false failed",
+            "0, the status of the last command (true)",
+            "It is undefined / random",
+            "The script aborts immediately"
+          ],
+          "answerIndex": 1,
+          "explanation": "By default a pipeline's exit status is the status of its LAST command, so `false | true` reports 0 (success) and the upstream failure is hidden. `set -o pipefail` changes this so the pipeline reflects the first failing stage."
+        },
+        {
+          "id": "bash-scripting-structure-safety-006",
+          "type": "mcq",
+          "prompt": "With `set -u` active, what happens at `echo \"$undefined_var\"`?",
+          "choices": [
+            "It prints an empty line",
+            "It prints the literal text $undefined_var",
+            "Bash errors out: unbound variable",
+            "It prints 0"
+          ],
+          "answerIndex": 2,
+          "explanation": "`set -u` (nounset) makes referencing an unset variable a fatal error (\"unbound variable\"), catching typos. Use `${undefined_var:-}` to intentionally allow an empty default under nounset."
+        },
+        {
+          "id": "bash-scripting-structure-safety-007",
+          "type": "mcq",
+          "prompt": "Which line belongs at the very TOP of a robust bash script?",
+          "choices": [
+            "set +e to keep going on errors",
+            "#!/usr/bin/env bash followed by set -euo pipefail",
+            "export DEBUG=1",
+            "trap cleanup EXIT only"
+          ],
+          "answerIndex": 1,
+          "explanation": "The portable shebang `#!/usr/bin/env bash` must be the first line, immediately followed by `set -euo pipefail` to enable fail-fast behavior before any real work runs. `trap` comes after, once cleanup targets exist."
+        },
+        {
+          "id": "bash-scripting-structure-safety-008",
+          "type": "flashcard",
+          "front": "If `set -euo pipefail` is so good, why still run ShellCheck and write explicit tests?",
+          "back": "`set -e` has documented blind spots (conditions, command substitutions, functions called in tests) and can lull you into a false sense of safety. ShellCheck statically catches quoting, word-splitting, and logic bugs that runtime flags miss, so the two are complementary, not redundant.",
+          "hint": "Runtime flags vs. static analysis."
+        },
+        {
+          "id": "bash-scripting-structure-safety-009",
+          "type": "flashcard",
+          "front": "What is the difference between `set -e` and `set -x`?",
+          "back": "`set -e` controls error behavior (exit on failure). `set -x` is a *debugging* trace: it prints each command (with expansions) to stderr before running it. They are orthogonal — you often add `set -x` temporarily or run `bash -x script.sh`.",
+          "hint": "Error handling vs. tracing."
+        }
+      ]
+    },
+    {
+      "id": "expansion-arrays",
+      "title": "Parameter Expansion & Arrays",
+      "order": 2,
+      "difficulty": 2,
+      "content": "Parameter expansion is bash's built-in string toolkit — using it avoids spawning `sed`/`cut`/`basename` subprocesses and keeps scripts fast and quote-safe.\n\nDefaults and assertions:\n\n```bash\nname=${1:-world}        # use $1, or 'world' if unset/empty\n: \"${API_KEY:?must set API_KEY}\"  # abort with message if unset\nname=${name:=guest}     # assign default into the variable\n```\n\nTrimming with patterns (greedy doubles the symbol):\n\n```bash\npath=/var/log/app.log\n${path##*/}   # app.log   (strip longest leading */)\n${path%/*}    # /var/log  (strip shortest trailing /*)\n${path%.log}  # /var/log/app (strip suffix)\n```\n\nSubstitution and slicing:\n\n```bash\n${path/log/LOG}   # replace first match\n${path//\\//_}     # replace all '/' with '_'\n${path:5:3}       # substring: offset 5, length 3\n${#path}          # string length\n```\n\nArrays are essential for building argument lists safely — never store multiple arguments in a single space-separated string.\n\n```bash\nfiles=(report.txt \"my notes.md\" data.csv)\necho \"${files[@]}\"     # each element quoted separately\necho \"${#files[@]}\"    # element count\nfiles+=(extra.log)     # append\n```\n\nAssociative arrays (bash 4+, declare them):\n\n```bash\ndeclare -A age\nage[alice]=30; age[bob]=25\nfor k in \"${!age[@]}\"; do echo \"$k=${age[$k]}\"; done\n```\n\nThe golden rule: always expand with `\"${arr[@]}\"` (quoted, `@`, not `*`) so each element survives spaces intact — the array equivalent of the quoting discipline that keeps filenames safe.",
+      "items": [
+        {
+          "id": "bash-scripting-expansion-arrays-001",
+          "type": "flashcard",
+          "front": "What does `${var:-default}` do, and how does `${var:=default}` differ?",
+          "back": "`${var:-default}` expands to `default` if `var` is unset or empty but leaves `var` unchanged. `${var:=default}` does the same expansion AND assigns `default` into `var` as a side effect.",
+          "hint": "One assigns, one doesn't."
+        },
+        {
+          "id": "bash-scripting-expansion-arrays-002",
+          "type": "flashcard",
+          "front": "For `f=/var/log/app.log`, what do `${f##*/}` and `${f%/*}` produce?",
+          "back": "`${f##*/}` strips the longest leading match of `*/`, giving `app.log` (basename). `${f%/*}` strips the shortest trailing match of `/*`, giving `/var/log` (dirname). `#` trims from the front, `%` from the back; doubling makes it greedy.",
+          "hint": "# = front, % = back; double = greedy."
+        },
+        {
+          "id": "bash-scripting-expansion-arrays-003",
+          "type": "flashcard",
+          "front": "Difference between `${path/old/new}` and `${path//old/new}`?",
+          "back": "`${path/old/new}` replaces only the FIRST occurrence of `old`; `${path//old/new}` replaces ALL occurrences. Anchors: `${path/#old/new}` matches at the start, `${path/%old/new}` at the end.",
+          "hint": "Single vs. double slash."
+        },
+        {
+          "id": "bash-scripting-expansion-arrays-004",
+          "type": "flashcard",
+          "front": "How do you abort a script with a custom message if `API_KEY` is unset?",
+          "back": "Use the error expansion: `: \"${API_KEY:?must set API_KEY}\"`. If `API_KEY` is unset or empty, bash prints the message to stderr and exits non-zero. The leading `:` is a no-op command so the expansion is the only effect.",
+          "hint": "${var:?message}"
+        },
+        {
+          "id": "bash-scripting-expansion-arrays-005",
+          "type": "mcq",
+          "prompt": "Why expand an array as `\"${arr[@]}\"` rather than `${arr[*]}` or unquoted?",
+          "choices": [
+            "`*` is faster than `@`",
+            "`\"${arr[@]}\"` yields each element as a separate, intact word even with spaces",
+            "They are identical in all cases",
+            "`@` joins everything into one string"
+          ],
+          "answerIndex": 1,
+          "explanation": "Quoted `\"${arr[@]}\"` produces one shell word per element, preserving spaces inside elements — exactly what you want when passing an argument list. `\"${arr[*]}\"` joins all elements into one string (separated by the first IFS char), and unquoted forms word-split, breaking elements with spaces."
+        },
+        {
+          "id": "bash-scripting-expansion-arrays-006",
+          "type": "mcq",
+          "prompt": "You need a key/value map keyed by username. What declaration do you use?",
+          "choices": [
+            "arr=()",
+            "declare -a arr",
+            "declare -A arr",
+            "local arr"
+          ],
+          "answerIndex": 2,
+          "explanation": "`declare -A` creates an associative array (string-keyed map), available in bash 4+. `declare -a` (lowercase) makes an indexed array. Associative arrays MUST be declared with `-A` before use; you cannot create one implicitly."
+        },
+        {
+          "id": "bash-scripting-expansion-arrays-007",
+          "type": "mcq",
+          "prompt": "Given `s=hello`, what does `${s:1:3}` evaluate to?",
+          "choices": [
+            "hel",
+            "ell",
+            "llo",
+            "hello"
+          ],
+          "answerIndex": 1,
+          "explanation": "Substring expansion `${s:offset:length}` starts at offset 1 (the second char, 'e') and takes 3 characters: 'e', 'l', 'l' -> `ell`. `${#s}` would give the length, 5."
+        },
+        {
+          "id": "bash-scripting-expansion-arrays-008",
+          "type": "flashcard",
+          "front": "How do you iterate over the KEYS of an associative array `age`?",
+          "back": "Use the `!` (indirection) form: `for k in \"${!age[@]}\"; do echo \"$k -> ${age[$k]}\"; done`. `${!age[@]}` lists keys; `${age[@]}` lists values. The quoting keeps keys with spaces intact.",
+          "hint": "${!arr[@]} gives keys."
+        },
+        {
+          "id": "bash-scripting-expansion-arrays-009",
+          "type": "flashcard",
+          "front": "Why prefer parameter expansion over piping to `sed`/`basename` for simple string work?",
+          "back": "Parameter expansion is built into the shell, so it avoids forking a subprocess per operation (faster in loops) and sidesteps an extra layer of quoting/escaping. For trimming paths, defaults, and simple replacement it is cleaner and safer than external tools.",
+          "hint": "No fork, fewer quoting bugs."
+        }
+      ]
+    },
+    {
+      "id": "control-flow-functions",
+      "title": "Control Flow, Functions, getopts & Safe File Loops",
+      "order": 3,
+      "difficulty": 3,
+      "content": "With safety and strings handled, structure the logic. Use `[[ ]]` for tests, not the old `[ ]`/`test`:\n\n```bash\nif [[ -f $file && $count -gt 0 ]]; then ...; fi\n```\n\n`[[ ]]` is a bash keyword: it does no word-splitting or glob expansion on its operands (so unquoted `$file` is safe), supports `&&`/`||`/`==` pattern matching and `=~` regex. Plain `[ ]` is just the `test` command — it word-splits, needs every variable quoted, and is only worth it for strict POSIX sh. For integer math use the arithmetic context `(( ))`:\n\n```bash\nif (( count > 0 )); then ((total += count)); fi\n```\n\n`case` beats long if-chains for dispatch, and functions keep things tidy — always declare loop and temp variables `local`:\n\n```bash\nlog() { printf '%s\\n' \"$*\" >&2; }   # log to stderr\nbackup() {\n  local src=$1 dest=$2\n  cp -a -- \"$src\" \"$dest\"\n}\n```\n\nFunctions return an *exit code* (0-255) via `return`; emit real data on stdout and capture with `$(func)`.\n\nParse flags with `getopts` (POSIX, short options):\n\n```bash\nwhile getopts \":o:v\" opt; do\n  case $opt in\n    o) out=$OPTARG ;;\n    v) verbose=1 ;;\n    *) echo \"usage: ...\" >&2; exit 2 ;;\n  esac\ndone\nshift $((OPTIND - 1))\n```\n\nThe single most important loop idiom is safe filename iteration — never `for f in $(ls)`. Use `while read -r` with a null delimiter:\n\n```bash\nwhile IFS= read -r -d '' f; do\n  printf 'processing %s\\n' \"$f\"\ndone < <(find . -type f -print0)\n```\n\n`-r` keeps backslashes literal, `IFS=` preserves leading/trailing whitespace, `-d ''` splits on NUL so spaces and newlines in names are harmless.",
+      "items": [
+        {
+          "id": "bash-scripting-control-flow-functions-001",
+          "type": "flashcard",
+          "front": "Name two concrete advantages of `[[ ]]` over `[ ]` in bash.",
+          "back": "1) `[[ ]]` does no word-splitting or glob expansion on its operands, so unquoted `$var` is safe and empty values don't break the test. 2) It supports `&&`, `||`, `==` glob pattern matching and `=~` regex directly. `[ ]` is the external/builtin `test` and requires careful quoting.",
+          "hint": "Word-splitting and regex."
+        },
+        {
+          "id": "bash-scripting-control-flow-functions-002",
+          "type": "flashcard",
+          "front": "When would you still use `[ ]` instead of `[[ ]]`?",
+          "back": "When the script must be portable POSIX `sh` (e.g. `#!/bin/sh`, running under dash/busybox), since `[[ ]]` is a bash/ksh extension not in POSIX. In that case use `[ ]` and quote every variable.",
+          "hint": "POSIX portability."
+        },
+        {
+          "id": "bash-scripting-control-flow-functions-003",
+          "type": "flashcard",
+          "front": "Why declare variables `local` inside functions?",
+          "back": "Bash variables are global by default, so an unmarked assignment inside a function can clobber a caller's variable (especially loop counters like `i`). `local` scopes the variable to the function, preventing action-at-a-distance bugs.",
+          "hint": "Default scope is global."
+        },
+        {
+          "id": "bash-scripting-control-flow-functions-004",
+          "type": "flashcard",
+          "front": "How does a bash function return data vs. a status?",
+          "back": "`return N` sets the exit STATUS (0-255), used for success/failure, read via `$?`. To return DATA, print it to stdout and capture with command substitution: `result=$(myfunc)`. Conflating the two (e.g. `return $bignum`) truncates mod 256.",
+          "hint": "stdout for data, return for status."
+        },
+        {
+          "id": "bash-scripting-control-flow-functions-005",
+          "type": "mcq",
+          "prompt": "Why is `for f in $(ls)` an unsafe way to loop over files?",
+          "choices": [
+            "ls is deprecated",
+            "The unquoted command substitution word-splits on IFS and glob-expands, breaking on filenames with spaces, newlines, or shell metacharacters",
+            "It only lists hidden files",
+            "It is too slow"
+          ],
+          "answerIndex": 1,
+          "explanation": "`$(ls)` output is word-split on IFS (spaces, tabs, newlines) and then pathname-expanded, so any filename containing whitespace or glob chars is mangled or split into multiple iterations. Use `while IFS= read -r -d '' f; do ...; done < <(find . -print0)` or a plain glob `for f in *`."
+        },
+        {
+          "id": "bash-scripting-control-flow-functions-006",
+          "type": "mcq",
+          "prompt": "In the safe loop `while IFS= read -r -d '' f`, what does the `-r` flag do?",
+          "choices": [
+            "Reads in reverse",
+            "Prevents backslashes from being interpreted as escape characters",
+            "Reads recursively",
+            "Requires root"
+          ],
+          "answerIndex": 1,
+          "explanation": "`-r` (raw) tells `read` not to treat backslashes as escapes, so a filename like `a\\b` is read literally. `IFS=` preserves leading/trailing whitespace, and `-d ''` sets a NUL delimiter to match `find -print0`. You should essentially always use `read -r`."
+        },
+        {
+          "id": "bash-scripting-control-flow-functions-007",
+          "type": "mcq",
+          "prompt": "After a `getopts` parsing loop, why run `shift $((OPTIND - 1))`?",
+          "choices": [
+            "To reset getopts for reuse",
+            "To discard the parsed options so the remaining positional arguments start at $1",
+            "To sort the arguments",
+            "It is purely cosmetic"
+          ],
+          "answerIndex": 1,
+          "explanation": "`getopts` advances `OPTIND` past the options it consumed. `shift $((OPTIND - 1))` drops those, so `$1`, `$2`, ... and `$@` now refer to the non-option (positional) arguments — e.g. the file paths after the flags."
+        },
+        {
+          "id": "bash-scripting-control-flow-functions-008",
+          "type": "mcq",
+          "prompt": "Which construct is the right tool for integer comparison in bash?",
+          "choices": [
+            "[[ $a > $b ]]",
+            "[ $a -gt $b ] only",
+            "(( a > b ))",
+            "$a > $b"
+          ],
+          "answerIndex": 2,
+          "explanation": "The arithmetic context `(( a > b ))` does numeric comparison and lets you write `count`, `total += 1`, etc. naturally. Inside `[[ ]]`, `>` is a STRING (lexical) comparison, so `[[ 9 > 10 ]]` is true lexically — a classic bug. Use `(( ))` for math, `[[ ]]` for strings/files."
+        },
+        {
+          "id": "bash-scripting-control-flow-functions-009",
+          "type": "flashcard",
+          "front": "Why send log/diagnostic output to stderr (`>&2`) in a function meant to also return data?",
+          "back": "If the function's data is captured via `$(func)`, anything printed to stdout becomes part of the captured value. Routing logs to stderr (`printf ... >&2`) keeps them visible on the terminal / journald without polluting the captured result.",
+          "hint": "stdout is the return channel."
+        }
+      ]
+    },
+    {
+      "id": "robustness-python-boundary",
+      "title": "Traps, ShellCheck, Process Substitution & the Python Boundary",
+      "order": 4,
+      "difficulty": 3,
+      "content": "Production scripts clean up after themselves. `trap` registers a handler that runs on signals or pseudo-signals:\n\n```bash\ntmp=$(mktemp -d)\ncleanup() { rm -rf -- \"$tmp\"; }\ntrap cleanup EXIT          # runs on normal exit, error, or Ctrl-C\ntrap 'echo \"failed at line $LINENO\" >&2' ERR\n```\n\n`trap ... EXIT` is the workhorse: it fires no matter how the script ends (success, `set -e` abort, or signal), so a temp dir is always removed — the scripting analog of a `finally` block, and the same discipline as powering down a test rig cleanly.\n\nProcess substitution `<(...)` lets a command read another command's output as if it were a file, avoiding temp files and the subshell-variable-loss of pipes:\n\n```bash\ndiff <(sort a.txt) <(sort b.txt)\nwhile read -r line; do count=$line; done < <(wc -l < big.log)\n```\n\nBefore shipping, **run ShellCheck** (`shellcheck script.sh`) — it statically flags unquoted expansions, useless `cat`, missing `read -r`, and `set -e` gotchas; treat a clean ShellCheck pass as mandatory, like a clean lint. For runtime issues, `bash -x script.sh` or `set -x` traces execution.\n\nThe most important judgment call is **when to abandon bash for Python**. Reach for Python (`subprocess`, `pathlib`, `argparse`, `json`, `venv`) once a script: grows past ~50-100 lines; needs real data structures (lists of dicts, nested JSON); does HTTP/API calls or parses structured data; needs proper error handling, retries, or unit tests; or has quoting that keeps biting you. Bash excels at gluing CLI tools and short pipelines; Python excels at logic, data, and testability. Recognizing that boundary early is itself a senior skill.",
+      "items": [
+        {
+          "id": "bash-scripting-robustness-python-boundary-001",
+          "type": "flashcard",
+          "front": "Why is `trap cleanup EXIT` preferred over putting `rm -rf \"$tmp\"` at the end of the script?",
+          "back": "`EXIT` fires on EVERY exit path — normal completion, a `set -e` abort, an error, or a caught signal — so the temp dir is removed even when the script dies early. A cleanup line at the bottom is skipped on any premature exit. It is bash's `finally`.",
+          "hint": "What happens if the script aborts halfway?"
+        },
+        {
+          "id": "bash-scripting-robustness-python-boundary-002",
+          "type": "flashcard",
+          "front": "What does the `ERR` trap give you that `EXIT` does not?",
+          "back": "`trap '...' ERR` runs specifically when a command fails (returns non-zero) under `set -e`, letting you log context like `$LINENO` or the failing command before exiting. `EXIT` runs unconditionally and can't distinguish success from failure on its own (you check `$?`).",
+          "hint": "Failure-specific diagnostics."
+        },
+        {
+          "id": "bash-scripting-robustness-python-boundary-003",
+          "type": "flashcard",
+          "front": "What does process substitution `<(cmd)` provide?",
+          "back": "It runs `cmd` and exposes its output via a filename (a `/dev/fd/...` path or FIFO) so another command can read it as a file — e.g. `diff <(sort a) <(sort b)`. It also avoids the pipe pitfall where `cmd | while read` runs the loop in a subshell and loses variable changes.",
+          "hint": "Command output as a file."
+        },
+        {
+          "id": "bash-scripting-robustness-python-boundary-004",
+          "type": "flashcard",
+          "front": "What is ShellCheck and why run it on every script?",
+          "back": "ShellCheck is a static analyzer for shell scripts. It catches unquoted variables, missing `read -r`, useless `cat`, `set -e` blind spots, and dozens of common bugs before runtime. A clean ShellCheck pass is the shell equivalent of a clean lint and should be treated as mandatory.",
+          "hint": "Static analysis / linter for shell."
+        },
+        {
+          "id": "bash-scripting-robustness-python-boundary-005",
+          "type": "mcq",
+          "prompt": "Which is the STRONGEST signal that you should rewrite a bash script in Python?",
+          "choices": [
+            "It uses more than one pipe",
+            "It needs to parse and manipulate nested JSON / structured data with real error handling",
+            "It has a for loop",
+            "It calls `grep`"
+          ],
+          "answerIndex": 1,
+          "explanation": "Nested data structures, JSON/HTTP, real error handling, and testability are exactly where bash gets painful and Python (json, requests/urllib, dataclasses, try/except, unit tests) shines. Pipes, loops, and calling grep are bread-and-butter bash and not reasons to switch."
+        },
+        {
+          "id": "bash-scripting-robustness-python-boundary-006",
+          "type": "mcq",
+          "prompt": "Which Python standard-library trio replaces the typical 'shell out + manipulate paths + parse flags' job when porting a script?",
+          "choices": [
+            "os.system + glob + sys.argv",
+            "subprocess + pathlib + argparse",
+            "eval + open + getopt only",
+            "shutil + pickle + re"
+          ],
+          "answerIndex": 1,
+          "explanation": "`subprocess` (run external commands safely with argument lists, no shell quoting), `pathlib` (object-oriented path/file handling), and `argparse` (declarative flag parsing with help and validation) are the modern idiomatic replacements for shelling out, path munging, and getopts."
+        },
+        {
+          "id": "bash-scripting-robustness-python-boundary-007",
+          "type": "mcq",
+          "prompt": "How do you trace exactly which commands a script runs, with their expanded arguments?",
+          "choices": [
+            "shellcheck script.sh",
+            "bash -x script.sh (or set -x)",
+            "set -e",
+            "trap DEBUG only"
+          ],
+          "answerIndex": 1,
+          "explanation": "`bash -x script.sh` (or `set -x` within the script) prints each command to stderr after expansion, just before executing it — the go-to runtime trace. ShellCheck is static (no execution); `set -e` controls error behavior, not tracing."
+        },
+        {
+          "id": "bash-scripting-robustness-python-boundary-008",
+          "type": "mcq",
+          "prompt": "Why does `count=0; ... | while read x; do ((count++)); done; echo $count` print 0?",
+          "choices": [
+            "read resets count",
+            "The piped `while` runs in a SUBSHELL, so its `count` changes don't reach the parent",
+            "((count++)) is invalid",
+            "echo runs before the loop"
+          ],
+          "answerIndex": 1,
+          "explanation": "In a pipeline, each stage runs in a subshell, so the loop's `count` increments are lost when the subshell exits. Use process substitution `done < <(cmd)` (loop runs in the current shell) so the variable survives — a key reason `<(...)` exists."
+        },
+        {
+          "id": "bash-scripting-robustness-python-boundary-009",
+          "type": "flashcard",
+          "front": "Summarize the bash-vs-Python boundary heuristic in one sentence.",
+          "back": "Stay in bash for short scripts that glue CLI tools and pipelines together; switch to Python once you need data structures, HTTP/JSON, robust error handling/retries, unit tests, or you've passed roughly 50-100 lines and quoting keeps biting.",
+          "hint": "Glue vs. logic/data/tests."
+        },
+        {
+          "id": "bash-scripting-robustness-python-boundary-010",
+          "type": "flashcard",
+          "front": "Study this diagram.",
+          "back": "Decision diagram contrasting when to stay in bash (gluing CLI tools, short pipelines, always set -euo pipefail and ShellCheck) versus when to switch to Python (JSON/data structures, HTTP, error handling, testing, past ~50-100 lines).",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-1.svg"
+        }
+      ]
+    }
+  ]
+}

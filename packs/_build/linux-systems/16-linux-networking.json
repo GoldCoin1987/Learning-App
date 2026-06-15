@@ -1,0 +1,367 @@
+{
+  "id": "linux-networking",
+  "title": "Networking from the Linux Side",
+  "order": 16,
+  "lessons": [
+    {
+      "id": "linux-networking-1",
+      "title": "Inspecting the Stack with iproute2 and ss",
+      "order": 1,
+      "difficulty": 1,
+      "content": "Forget `ifconfig`, `route`, and `netstat` — they are deprecated, often not even installed on modern distros, and they hide things (e.g. multiple IPs per interface, policy routing). The `iproute2` suite is the single front door to the kernel's networking, and `ss` replaces `netstat` for sockets. Learn these four verbs reflexively.\n\n```bash\nip addr show          # IPs per interface (alias: ip a)\nip -br addr           # brief, one line per iface\nip link show          # L2 devices, MAC, MTU, up/down state\nip route show         # the routing table (default gw, subnets)\nip neigh show         # the ARP/ND cache (L2<->L3 mappings)\n```\n\nFor sockets and who owns them, `ss` is faster than `netstat` because it reads kernel structures directly:\n\n```bash\nss -tulpn             # TCP+UDP, listening, numeric, with PID/program\nss -tp state established   # active TCP connections + process\nlsof -i :8080         # which process holds port 8080\nlsof -i -nP           # all network files, no name/port resolution\n```\n\nThe mental model: `ip link` is layer 2 (the wire/MAC), `ip addr` is layer 3 (IP), `ip route` decides where a packet goes, and `ip neigh` is the cache that turns the next-hop IP into a MAC. `ss`/`lsof` answer \"what is talking, and which process is it.\" Coming from radar, this is your signal chain made inspectable: link state, address assignment, routing decision, and the active connections all visible from the command line.",
+      "items": [
+        {
+          "id": "linux-networking-1-fc-1",
+          "type": "flashcard",
+          "front": "Which modern command replaces all of `ifconfig`, `route`, and `arp`?",
+          "back": "The `ip` command from the `iproute2` suite: `ip addr` (was ifconfig), `ip route` (was route), `ip neigh` (was arp). `ifconfig`/`route`/`netstat` are deprecated and may be absent.",
+          "hint": "One binary, several subcommands."
+        },
+        {
+          "id": "linux-networking-1-fc-2",
+          "type": "flashcard",
+          "front": "What does `ss -tulpn` show, and why prefer it over `netstat`?",
+          "back": "TCP+UDP listening sockets, numeric addresses/ports, and the owning PID/program. `ss` reads kernel socket structures directly so it is faster and the modern replacement for `netstat`.",
+          "hint": "t=tcp, u=udp, l=listening, p=process, n=numeric."
+        },
+        {
+          "id": "linux-networking-1-fc-3",
+          "type": "flashcard",
+          "front": "What lives in `ip neigh`?",
+          "back": "The neighbor cache: IPv4 ARP and IPv6 NDP entries mapping next-hop IP addresses to MAC addresses on the local link — the L3-to-L2 lookup table.",
+          "hint": "It's the modern `arp -n`."
+        },
+        {
+          "id": "linux-networking-1-fc-4",
+          "type": "flashcard",
+          "front": "Which `ip` subcommand operates at layer 2 versus layer 3?",
+          "back": "`ip link` = layer 2 (device state, MAC, MTU). `ip addr` = layer 3 (IP address assignment). One interface can hold several addresses, which `ifconfig` hid.",
+          "hint": "link = wire, addr = IP."
+        },
+        {
+          "id": "linux-networking-1-fc-5",
+          "type": "flashcard",
+          "front": "How do you find which process is listening on TCP port 8080?",
+          "back": "`ss -tlpn 'sport = :8080'` or `lsof -i :8080`. Both map the socket to a PID/program; use `-nP` on lsof to skip name/port resolution.",
+          "hint": "ss with a filter, or lsof -i."
+        },
+        {
+          "id": "linux-networking-1-mcq-1",
+          "type": "mcq",
+          "prompt": "You run `ifconfig` on a fresh Debian/Ubuntu container and get 'command not found.' What is the correct response?",
+          "choices": [
+            "Install net-tools; ifconfig is the standard tool",
+            "Use `ip addr` / `ip link` — ifconfig is deprecated and net-tools is often not installed",
+            "The network stack is broken and must be reconfigured",
+            "Reboot, since networking failed to initialize"
+          ],
+          "answerIndex": 1,
+          "explanation": "`ifconfig` ships in the legacy `net-tools` package, which is deprecated and increasingly absent from minimal images. The supported tool is `ip` from iproute2; reach for it reflexively instead of reinstalling old tools."
+        },
+        {
+          "id": "linux-networking-1-mcq-2",
+          "type": "mcq",
+          "prompt": "Which command shows the default gateway the kernel will use for off-subnet traffic?",
+          "choices": [
+            "ip addr show",
+            "ip link show",
+            "ip route show",
+            "ip neigh show"
+          ],
+          "answerIndex": 2,
+          "explanation": "`ip route show` prints the routing table, including the `default via <gw>` entry. `addr` shows IPs, `link` shows L2 device state, and `neigh` shows the ARP/ND cache."
+        },
+        {
+          "id": "linux-networking-1-mcq-3",
+          "type": "mcq",
+          "prompt": "Why can `ip addr` show information that `ifconfig` simply could not?",
+          "choices": [
+            "ifconfig could not display IPv6 at all under any circumstances",
+            "ifconfig assumed one primary IP per interface and hid additional addresses and policy details",
+            "ifconfig required root while ip does not",
+            "ip queries a different kernel than ifconfig"
+          ],
+          "answerIndex": 1,
+          "explanation": "The legacy ifconfig model assumed a single primary address per interface and could not cleanly represent multiple addresses, scopes, and modern policy routing — a key reason iproute2 superseded it."
+        }
+      ]
+    },
+    {
+      "id": "linux-networking-2",
+      "title": "Configuration Layers and the DNS Resolution Path",
+      "order": 2,
+      "difficulty": 2,
+      "content": "`ip` commands are runtime and vanish on reboot. Persistent configuration is owned by one of several competing managers — know which one your box uses before editing files by hand:\n\n- **NetworkManager** (`nmcli`): desktops, laptops, many servers (RHEL family).\n- **systemd-networkd** (`networkctl`, `/etc/systemd/network/*.network`): minimal/server/container hosts.\n- **netplan** (`/etc/netplan/*.yaml`, `netplan apply`): Ubuntu's YAML front end that renders to networkd or NetworkManager.\n\n```bash\nnmcli device status            # NetworkManager view\nnetworkctl list                # systemd-networkd view\nnetplan get                    # Ubuntu's merged config\n```\n\nThe **DNS resolution path** is a separate, layered question — a name lookup walks `/etc/nsswitch.conf` (the `hosts:` line picks order, e.g. `files dns`), then `/etc/hosts` (static overrides), then the resolver in `/etc/resolv.conf`. On systemd-resolved hosts, `/etc/resolv.conf` is a symlink to a stub (`127.0.0.53`); query the real state with `resolvectl`:\n\n```bash\nresolvectl status              # per-link DNS servers + DNSSEC\nresolvectl query example.com   # use the system resolver path\ngetent hosts example.com       # honors nsswitch, not just DNS\n```\n\nThe trap: editing `/etc/resolv.conf` directly when it is a managed symlink — your change gets overwritten. Find the owning layer first. `getent hosts` is the honest test because it follows `nsswitch` exactly the way real programs do, whereas `dig`/`nslookup` talk straight to a DNS server and skip `/etc/hosts`.",
+      "items": [
+        {
+          "id": "linux-networking-2-fc-1",
+          "type": "flashcard",
+          "front": "Name the three competing modern network configuration layers and their CLIs.",
+          "back": "NetworkManager (`nmcli`), systemd-networkd (`networkctl`, .network files), and netplan (Ubuntu YAML, `netplan apply`) which renders to one of the other two.",
+          "hint": "Desktop, server/minimal, and Ubuntu's YAML wrapper."
+        },
+        {
+          "id": "linux-networking-2-fc-2",
+          "type": "flashcard",
+          "front": "What does `/etc/nsswitch.conf` control for name lookups?",
+          "back": "The source order for resolution. The `hosts:` line (e.g. `files dns`) tells glibc to check `/etc/hosts` first, then DNS — so it governs whether static entries win over the resolver.",
+          "hint": "Name Service Switch — ordering of sources."
+        },
+        {
+          "id": "linux-networking-2-fc-3",
+          "type": "flashcard",
+          "front": "On a systemd-resolved system, what is `/etc/resolv.conf` typically?",
+          "back": "A symlink to a stub file pointing at the local resolver `127.0.0.53`. Editing it directly is futile — it is regenerated. Use `resolvectl` to inspect/configure real per-link DNS.",
+          "hint": "127.0.0.53 stub listener."
+        },
+        {
+          "id": "linux-networking-2-fc-4",
+          "type": "flashcard",
+          "front": "Why use `getent hosts <name>` instead of `dig` to debug resolution?",
+          "back": "`getent hosts` follows `/etc/nsswitch.conf` exactly like real applications (files then DNS), so it reflects what programs actually see. `dig`/`nslookup` query a DNS server directly and ignore `/etc/hosts`.",
+          "hint": "Honors nsswitch and /etc/hosts."
+        },
+        {
+          "id": "linux-networking-2-fc-5",
+          "type": "flashcard",
+          "front": "Why is editing `/etc/resolv.conf` by hand often a mistake?",
+          "back": "It is frequently a managed symlink or auto-generated by systemd-resolved, NetworkManager, or DHCP, so manual edits get overwritten. Configure DNS at the owning layer instead.",
+          "hint": "Find who owns the file first."
+        },
+        {
+          "id": "linux-networking-2-mcq-1",
+          "type": "mcq",
+          "prompt": "On Ubuntu, you edit `/etc/netplan/01-netcfg.yaml`. What makes the change take effect?",
+          "choices": [
+            "Rebooting is the only way",
+            "`netplan apply`, which renders the YAML to the active backend (networkd or NetworkManager)",
+            "`systemctl restart resolv.conf`",
+            "`ip addr add`, since netplan is read-only"
+          ],
+          "answerIndex": 1,
+          "explanation": "netplan is a declarative front end. `netplan apply` generates the backend config (systemd-networkd or NetworkManager) and reloads it. No reboot is needed."
+        },
+        {
+          "id": "linux-networking-2-mcq-2",
+          "type": "mcq",
+          "prompt": "A name in `/etc/hosts` resolves but `dig` returns NXDOMAIN. Why?",
+          "choices": [
+            "`/etc/hosts` is corrupt",
+            "dig queries DNS directly and bypasses nsswitch/`/etc/hosts`",
+            "DNSSEC validation failed",
+            "The resolver cache is stale"
+          ],
+          "answerIndex": 1,
+          "explanation": "`dig` talks straight to a DNS server and does not consult `/etc/hosts` or nsswitch. Static host entries only show up through the glibc resolver path — use `getent hosts` to see them."
+        },
+        {
+          "id": "linux-networking-2-mcq-3",
+          "type": "mcq",
+          "prompt": "Which tool shows per-link DNS servers and DNSSEC status on a systemd-resolved host?",
+          "choices": [
+            "cat /etc/resolv.conf",
+            "resolvectl status",
+            "ip neigh show",
+            "nmcli device status"
+          ],
+          "answerIndex": 1,
+          "explanation": "`resolvectl status` reports the actual resolver state systemd-resolved is using per interface, including DNS servers and DNSSEC mode. The stub `/etc/resolv.conf` only shows 127.0.0.53."
+        }
+      ]
+    },
+    {
+      "id": "linux-networking-3",
+      "title": "Network Namespaces and veth Pairs — the Container Primitive",
+      "order": 3,
+      "difficulty": 2,
+      "content": "A **network namespace** is an isolated copy of the entire network stack: its own interfaces, routing table, ARP/ND cache, and firewall rules. This is the kernel mechanism containers use — a Docker/Podman container is (in part) just a process living in its own netns. A **veth pair** is a virtual cable: two linked interfaces where a packet entering one end exits the other. Put one end in each namespace and you have wired them together.\n\n```bash\nip netns add red\nip netns add blue\nip link add veth-r type veth peer name veth-b\nip link set veth-r netns red\nip link set veth-b netns blue\n# configure each end inside its namespace\nip -n red  addr add 10.0.0.1/24 dev veth-r\nip -n blue addr add 10.0.0.2/24 dev veth-b\nip -n red  link set veth-r up\nip -n blue link set veth-b up\nip netns exec red ping -c1 10.0.0.2   # ping across the pair\n```\n\n`ip -n red ...` is shorthand for `ip netns exec red ip ...`. To connect more than two namespaces, replace the point-to-point cable with a **Linux bridge** (`ip link add br0 type bridge`) and attach each veth's host end to it — which is exactly the `docker0` bridge model. This single exercise is the from-scratch version of container networking: namespaces for isolation, veth pairs for connectivity, a bridge for the shared LAN, and (next lesson) NAT to reach the outside. Build it once by hand and container networking stops being magic.",
+      "items": [
+        {
+          "id": "linux-networking-3-fc-1",
+          "type": "flashcard",
+          "front": "What does a Linux network namespace isolate?",
+          "back": "An entire independent network stack: its own interfaces, routing table, neighbor (ARP/ND) cache, and netfilter/firewall rules. It is the kernel primitive behind container networking.",
+          "hint": "A private copy of the whole stack."
+        },
+        {
+          "id": "linux-networking-3-fc-2",
+          "type": "flashcard",
+          "front": "What is a veth pair and how does it behave?",
+          "back": "A virtual Ethernet cable: two linked interfaces created together where a frame sent into one end emerges from the other. Used to connect a namespace (container) to the host or a bridge.",
+          "hint": "Created in pairs; a virtual patch cable."
+        },
+        {
+          "id": "linux-networking-3-fc-3",
+          "type": "flashcard",
+          "front": "What does `ip -n red <cmd>` do?",
+          "back": "Runs the `ip` command inside the `red` network namespace — shorthand for `ip netns exec red ip <cmd>`. Lets you configure/inspect a namespace's stack from the host.",
+          "hint": "-n is short for netns exec."
+        },
+        {
+          "id": "linux-networking-3-fc-4",
+          "type": "flashcard",
+          "front": "How is a Docker/Podman container related to network namespaces and veth?",
+          "back": "Each container runs in its own network namespace; one end of a veth pair lives inside it and the other attaches to a host bridge (e.g. docker0). That is the actual container networking model.",
+          "hint": "netns + veth + bridge = docker0."
+        },
+        {
+          "id": "linux-networking-3-fc-5",
+          "type": "flashcard",
+          "front": "How do you connect three or more namespaces on one shared LAN?",
+          "back": "Create a Linux bridge (`ip link add br0 type bridge`) and attach the host end of each namespace's veth to it. The bridge acts as a virtual switch — the docker0 pattern.",
+          "hint": "Replace the cable with a virtual switch."
+        },
+        {
+          "id": "linux-networking-3-fc-6",
+          "type": "flashcard",
+          "front": "How do you run a command, like ping, inside a network namespace called red?",
+          "back": "`ip netns exec red ping -c1 10.0.0.2`. `ip netns exec <name> <cmd>` enters the namespace and runs the command with that isolated stack.",
+          "hint": "ip netns exec <name> <cmd>",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/linux-networking-1.svg"
+        },
+        {
+          "id": "linux-networking-3-mcq-1",
+          "type": "mcq",
+          "prompt": "You create a veth pair and put each end in a separate namespace but ping fails. Most likely cause?",
+          "choices": [
+            "veth pairs cannot cross namespaces",
+            "The interfaces are still DOWN and/or have no IP assigned in their namespace",
+            "Namespaces block ICMP by default and cannot be changed",
+            "You must reboot to register a new veth"
+          ],
+          "answerIndex": 1,
+          "explanation": "Moving a veth end into a namespace does not bring it up or address it. You must `ip ... addr add` and `ip ... link set <dev> up` inside each namespace (and bring up `lo` if needed) before traffic flows."
+        },
+        {
+          "id": "linux-networking-3-mcq-2",
+          "type": "mcq",
+          "prompt": "Why are veth pairs central to container networking?",
+          "choices": [
+            "They encrypt container traffic by default",
+            "They provide a virtual cable linking a container's namespace to the host/bridge, giving the container connectivity",
+            "They replace the need for a routing table",
+            "They are required to share the host's IP directly"
+          ],
+          "answerIndex": 1,
+          "explanation": "A container lives in its own network namespace; a veth pair bridges that isolated stack to the host (typically via a bridge like docker0), which is how packets get in and out. veth + netns + bridge is the core model."
+        },
+        {
+          "id": "linux-networking-3-mcq-3",
+          "type": "mcq",
+          "prompt": "What does a Linux bridge act as when host ends of several veth pairs are attached to it?",
+          "choices": [
+            "A layer-3 router that NATs each namespace",
+            "A virtual layer-2 switch forwarding frames among the attached interfaces",
+            "A DNS resolver for the namespaces",
+            "A firewall that isolates each namespace"
+          ],
+          "answerIndex": 1,
+          "explanation": "A Linux bridge is a software L2 switch: it learns MACs and forwards frames between its ports. Attaching veth host ends to it puts those namespaces on one virtual LAN — the docker0 design."
+        }
+      ]
+    },
+    {
+      "id": "linux-networking-4",
+      "title": "Firewalling with nftables, Routing, and Diagnostics",
+      "order": 4,
+      "difficulty": 3,
+      "content": "Beneath every Linux firewall is **netfilter**, the kernel's packet-processing framework. `iptables` is the legacy front end; **nftables** (`nft`) is the modern replacement — one unified tool with explicit **tables -> chains -> rules**, better performance, and IPv4/IPv6 together. Higher-level wrappers (`ufw`, `firewalld`) generate rules for you, but knowing `nft` is expected.\n\n```bash\nnft add table inet filter\nnft 'add chain inet filter input { type filter hook input priority 0; policy drop; }'\nnft add rule inet filter input ct state established,related accept\nnft add rule inet filter input iif lo accept\nnft add rule inet filter input tcp dport 22 accept   # SSH only\nnft list ruleset                                      # show everything\n```\n\nThat is a basic **stateful** firewall: allow return traffic, allow loopback, allow SSH, drop the rest. **NAT** is just another chain with a `nat` hook (`masquerade` for outbound). To make the box a **router**, enable forwarding: `sysctl -w net.ipv4.ip_forward=1`. Related building blocks: **bridges** (virtual switch), **VLANs** (`ip link add link eth0 name eth0.10 type vlan id 10`), and **bonding/teaming** for link aggregation.\n\nDiagnostics, in order of depth:\n\n```bash\nping host            # reachability + RTT\nmtr host             # continuous traceroute + loss per hop\ntcpdump -ni eth0 port 53   # capture packets on the wire\nethtool eth0         # link speed, duplex, driver, offloads\n```\n\nHand-off to topic 06: Linux gives you the interfaces, sockets, routing table, and firewall; topic 06 explains TCP/IP, routing protocols, and what is actually on the wire that `tcpdump` shows you.",
+      "items": [
+        {
+          "id": "linux-networking-4-fc-1",
+          "type": "flashcard",
+          "front": "What framework sits beneath both iptables and nftables?",
+          "back": "netfilter — the kernel's packet-filtering/NAT framework with hooks in the network path. `iptables` (legacy) and `nftables` (modern `nft`) are both front ends that program netfilter.",
+          "hint": "The kernel layer, not the userspace tool."
+        },
+        {
+          "id": "linux-networking-4-fc-2",
+          "type": "flashcard",
+          "front": "Describe the nftables hierarchy.",
+          "back": "tables -> chains -> rules. A table (e.g. `inet filter`) holds chains; a chain is attached to a hook with a priority and policy; rules inside match traffic and take actions (accept/drop/etc.).",
+          "hint": "Three nested levels."
+        },
+        {
+          "id": "linux-networking-4-fc-3",
+          "type": "flashcard",
+          "front": "What makes a firewall rule 'stateful', and how is it expressed in nft?",
+          "back": "It tracks connection state via conntrack. `ct state established,related accept` admits return traffic for connections you initiated, so you only need to explicitly allow new inbound services.",
+          "hint": "ct state established,related."
+        },
+        {
+          "id": "linux-networking-4-fc-4",
+          "type": "flashcard",
+          "front": "What single sysctl turns a Linux box into a router?",
+          "back": "`net.ipv4.ip_forward=1` (and `net.ipv6.conf.all.forwarding=1` for IPv6). Set with `sysctl -w` at runtime or in `/etc/sysctl.d/` to persist. It lets the kernel forward packets between interfaces.",
+          "hint": "ip_forward."
+        },
+        {
+          "id": "linux-networking-4-fc-5",
+          "type": "flashcard",
+          "front": "How do nftables NAT and masquerade fit in?",
+          "back": "NAT is a chain attached to the `nat` hook. `masquerade` rewrites outbound source addresses to the egress interface's IP — the standard way a Linux router/container host shares one public IP.",
+          "hint": "A nat-hook chain; masquerade on egress."
+        },
+        {
+          "id": "linux-networking-4-fc-6",
+          "type": "flashcard",
+          "front": "What do `ufw` and `firewalld` actually do?",
+          "back": "They are higher-level front ends that generate underlying nftables/iptables rules from simpler commands or zones. Convenient, but the rules they emit are still netfilter — know `nft` underneath.",
+          "hint": "Wrappers that emit the real rules."
+        },
+        {
+          "id": "linux-networking-4-mcq-1",
+          "type": "mcq",
+          "prompt": "You want a firewall that allows SSH and drops all other new inbound traffic. Which chain setup is correct?",
+          "choices": [
+            "An input chain with policy accept and a single drop rule for port 22",
+            "An input chain with policy drop, plus accept rules for established/related, loopback, and tcp dport 22",
+            "A forward chain with masquerade on port 22",
+            "A nat chain that redirects all ports to 22"
+          ],
+          "answerIndex": 1,
+          "explanation": "Default-deny is the safe posture: set the input chain policy to drop, then explicitly accept established/related (return traffic), loopback, and new SSH (tcp dport 22). Everything else falls through to the drop policy."
+        },
+        {
+          "id": "linux-networking-4-mcq-2",
+          "type": "mcq",
+          "prompt": "A host has two NICs on different subnets but won't pass traffic between them even with correct routes. What is missing?",
+          "choices": [
+            "A VLAN tag on each interface",
+            "IP forwarding enabled (net.ipv4.ip_forward=1)",
+            "A bonding interface joining the NICs",
+            "systemd-resolved must be restarted"
+          ],
+          "answerIndex": 1,
+          "explanation": "By default the kernel does not forward packets between interfaces (it acts as a host, not a router). Setting net.ipv4.ip_forward=1 enables routing; correct routes and firewall forward rules must also be present."
+        },
+        {
+          "id": "linux-networking-4-mcq-3",
+          "type": "mcq",
+          "prompt": "You suspect intermittent packet loss to a remote host across several hops. Which tool best shows per-hop loss over time?",
+          "choices": [
+            "ping",
+            "ethtool",
+            "mtr",
+            "ss"
+          ],
+          "answerIndex": 2,
+          "explanation": "`mtr` combines traceroute and ping, continuously probing each hop and reporting loss and latency per hop — ideal for localizing intermittent loss. `ping` tests only the endpoint; `ethtool` reports local link state; `ss` shows sockets."
+        },
+        {
+          "id": "linux-networking-4-mcq-4",
+          "type": "mcq",
+          "prompt": "Which statement best captures the hand-off from this Linux topic to topic 06 (networking protocols)?",
+          "choices": [
+            "Topic 06 replaces iproute2 with protocol-specific tools",
+            "Linux provides the interfaces, sockets, routing table, and firewall; topic 06 explains TCP/IP, routing protocols, and what's on the wire",
+            "Topic 06 covers only wireless, so there is no overlap",
+            "The two topics are independent and share no concepts"
+          ],
+          "answerIndex": 1,
+          "explanation": "This module covers the Linux mechanisms — the interfaces, sockets, routing table, and firewall you manipulate with ip/ss/nft. Topic 06 covers the protocols themselves (TCP/IP, routing protocols, packet formats) that those mechanisms carry."
+        }
+      ]
+    }
+  ]
+}

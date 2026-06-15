@@ -1,0 +1,398 @@
+{
+  "id": "processes-signals",
+  "title": "Processes, Signals & Job Control",
+  "order": 3,
+  "lessons": [
+    {
+      "id": "processes-signals-lesson-model",
+      "title": "The Process Model: PIDs, Trees & Lifecycle",
+      "order": 1,
+      "difficulty": 1,
+      "content": "Every running program is a **process** identified by a numeric **PID**. Each process (except the very first) has a **parent**, recorded as its **PPID**, forming a tree you can view with `pstree`. The root of that tree is **PID 1** — historically `init`, today almost always `systemd`. PID 1 is special: it is started directly by the kernel, it cannot be killed by ordinary signals, and it has the unique duty of **adopting orphans** and reaping them.\n\nNew processes are born by **`fork()`**, which clones the caller, then usually **`exec()`**, which replaces the clone's program image while keeping the PID. The pair is the universal \"start a new program\" pattern on Linux. A process ends with **`exit()`**, and its parent collects the exit status with **`wait()`**.\n\n```bash\n# Show a process and its ancestry\nps -o pid,ppid,stat,comm -p $$\npstree -p $$        # this shell back up to PID 1\n\n# Watch fork/exec happen\nstrace -f -e trace=fork,clone,execve -- ls /tmp 2>&1 | head\n```\n\nIf a parent dies before its child, the child is **reparented** to PID 1, which becomes responsible for reaping it. This is why a well-behaved PID 1 (or container init) *must* call `wait()` in a loop — something an ordinary process is never obligated to do. Understanding this fork/exec/exit/wait cycle is the foundation for everything else in this module: signals, job control, and how `systemd` supervises services.",
+      "items": [
+        {
+          "id": "processes-signals-fc-pid",
+          "type": "flashcard",
+          "front": "What is a PID and a PPID?",
+          "back": "PID is the unique numeric identifier of a process. PPID is the PID of that process's parent — the process that fork()ed it (or PID 1 after reparenting).",
+          "hint": "One identifies the process, the other its creator."
+        },
+        {
+          "id": "processes-signals-fc-pid1",
+          "type": "flashcard",
+          "front": "What program is PID 1, and what makes it special?",
+          "back": "PID 1 is init — today usually systemd. The kernel starts it directly, it adopts orphaned processes, it must reap them with wait(), and it cannot be terminated by ordinary signals.",
+          "hint": "It sits at the root of the process tree."
+        },
+        {
+          "id": "processes-signals-fc-forkexec",
+          "type": "flashcard",
+          "front": "Describe the fork/exec pattern.",
+          "back": "fork() clones the calling process (same PID kept by parent, new PID for child). The child then calls exec() to replace its program image while keeping its PID. Together they launch a new program.",
+          "hint": "Clone first, then replace the image."
+        },
+        {
+          "id": "processes-signals-fc-orphan",
+          "type": "flashcard",
+          "front": "What happens to a child whose parent dies first?",
+          "back": "It becomes an orphan and is reparented to PID 1 (init/systemd), which then becomes responsible for reaping it via wait().",
+          "hint": "Adoption by the root of the tree."
+        },
+        {
+          "id": "processes-signals-fc-wait",
+          "type": "flashcard",
+          "front": "What does wait() do?",
+          "back": "It lets a parent collect the exit status of a terminated child, which also removes the child's entry from the process table (reaping it).",
+          "hint": "How a parent learns its child died."
+        },
+        {
+          "id": "processes-signals-mcq-pstree",
+          "type": "mcq",
+          "prompt": "Which command best displays the parent/child ancestry of processes as a tree?",
+          "choices": [
+            "pstree",
+            "free -h",
+            "uptime",
+            "lsof"
+          ],
+          "answerIndex": 0,
+          "explanation": "pstree renders the process hierarchy. free shows memory, uptime shows load, and lsof lists open files — none show the tree."
+        },
+        {
+          "id": "processes-signals-mcq-fork",
+          "type": "mcq",
+          "prompt": "After a successful fork() followed by exec() in the child, what is true of the child's PID?",
+          "choices": [
+            "It changes to a new value during exec()",
+            "It stays the same as the PID assigned at fork()",
+            "It always equals the parent's PID",
+            "It becomes 1"
+          ],
+          "answerIndex": 1,
+          "explanation": "exec() replaces the program image but preserves the PID. The new PID is assigned at fork() and does not change when the image is replaced."
+        },
+        {
+          "id": "processes-signals-mcq-pid1duty",
+          "type": "mcq",
+          "prompt": "What duty must PID 1 perform that ordinary processes need not?",
+          "choices": [
+            "Allocate all system memory",
+            "Reap orphaned/adopted children by calling wait()",
+            "Run with the highest CPU priority",
+            "Mount the root filesystem"
+          ],
+          "answerIndex": 1,
+          "explanation": "PID 1 adopts orphans and must reap them in a wait() loop, or the system fills with zombies. Ordinary processes only reap their own children."
+        }
+      ]
+    },
+    {
+      "id": "processes-signals-lesson-states",
+      "title": "Process States & Viewing Tools",
+      "order": 2,
+      "difficulty": 2,
+      "content": "At any instant a process is in one **state**, shown in the `STAT` column of `ps`:\n\n- **R** — *Running or runnable* (on a CPU or waiting for one).\n- **S** — *Interruptible sleep*: blocked but **signalable** (most idle processes).\n- **D** — *Uninterruptible sleep*: blocked deep in the kernel, usually on disk or NFS I/O.\n- **Z** — *Zombie*: finished, but the parent hasn't `wait()`ed yet.\n- **T** — *Stopped*: paused by `SIGSTOP`/`SIGTSTP` (e.g. Ctrl-Z).\n\nThe one to internalize is **D**. A D-state process is parked inside a kernel call that cannot be safely interrupted, so it does **not** check for signals — **even `SIGKILL` is ignored** until the I/O returns. That's why `kill -9` sometimes \"does nothing\": the process literally cannot run any code, including a death, until the kernel operation completes. Fix the I/O (the stuck disk, the dead NFS mount), not the signal.\n\n```bash\n# BSD vs SysV syntax both work:\nps aux                 # BSD style, every process\nps -ef                 # SysV style, full listing\nps -eo pid,stat,wchan,comm   # see WHY a process sleeps\n\ntop                    # live view; press 'x' to sort, 'f' fields\npgrep -a sshd          # PIDs (and cmdline) matching a name\npkill -TERM nginx      # signal by name pattern\n```\n\n`top`/`htop` give a live, sortable view; `pgrep`/`pkill` let you target processes by name instead of hunting PIDs. The `wchan` column tells you the kernel function a sleeping process is parked in — invaluable for diagnosing a stubborn D-state.",
+      "items": [
+        {
+          "id": "processes-signals-fc-states",
+          "type": "flashcard",
+          "front": "What do the process states R, S, D, Z, T mean?",
+          "back": "R = running/runnable; S = interruptible sleep (signalable); D = uninterruptible sleep (kernel I/O, not signalable); Z = zombie (exited, not yet reaped); T = stopped (paused by SIGSTOP/SIGTSTP).",
+          "hint": "Five letters in the ps STAT column."
+        },
+        {
+          "id": "processes-signals-fc-dstate",
+          "type": "flashcard",
+          "front": "Why won't a process in D-state die even with kill -9?",
+          "back": "D is uninterruptible sleep: the process is blocked inside a kernel operation (usually I/O) that can't be safely interrupted, so it doesn't check pending signals — including SIGKILL — until the I/O completes.",
+          "hint": "It can't run any code, not even its own death."
+        },
+        {
+          "id": "processes-signals-fc-dfix",
+          "type": "flashcard",
+          "front": "How do you actually clear a stuck D-state process?",
+          "back": "You can't signal it away. Resolve the underlying I/O: recover the hung disk, restore or force-unmount the dead NFS share, etc. Once the kernel call returns, the process can act on its pending signals.",
+          "hint": "Fix the cause, not the symptom."
+        },
+        {
+          "id": "processes-signals-fc-bsdsysv",
+          "type": "flashcard",
+          "front": "Contrast ps aux with ps -ef.",
+          "back": "Both list all processes. 'ps aux' is BSD-style syntax (no dash, shows %CPU/%MEM/START). 'ps -ef' is SysV-style (dash, shows UID/PPID/full command). Same data, different conventions.",
+          "hint": "One has a dash, one doesn't."
+        },
+        {
+          "id": "processes-signals-fc-pgrep",
+          "type": "flashcard",
+          "front": "What do pgrep and pkill do?",
+          "back": "They match processes by name/attributes. pgrep prints matching PIDs (with -a, the full command line); pkill sends a signal to all matches — no need to look up PIDs manually.",
+          "hint": "grep and kill, but for processes by name."
+        },
+        {
+          "id": "processes-signals-mcq-zombie",
+          "type": "mcq",
+          "prompt": "A process shows STAT 'Z'. What does this indicate?",
+          "choices": [
+            "It is consuming 100% CPU",
+            "It has exited but its parent has not yet called wait() to reap it",
+            "It is swapped entirely to disk",
+            "It is waiting on a network socket"
+          ],
+          "answerIndex": 1,
+          "explanation": "Z (zombie/defunct) means the process finished and is holding only a process-table slot for its exit status, pending a wait() from its parent."
+        },
+        {
+          "id": "processes-signals-mcq-kill9d",
+          "type": "mcq",
+          "prompt": "You run 'kill -9 <pid>' on a process stuck in D-state and nothing happens. Why?",
+          "choices": [
+            "SIGKILL is being caught by a handler",
+            "The process is in uninterruptible sleep and cannot process the signal until its kernel I/O returns",
+            "You lack permission to signal it",
+            "kill -9 only pauses processes"
+          ],
+          "answerIndex": 1,
+          "explanation": "In D-state the process is blocked in an uninterruptible kernel operation and cannot check pending signals — SIGKILL queues but is not delivered until the I/O completes. SIGKILL itself is never catchable."
+        },
+        {
+          "id": "processes-signals-mcq-wchan",
+          "type": "mcq",
+          "prompt": "Which ps field helps you see WHY a sleeping process is blocked?",
+          "choices": [
+            "comm",
+            "wchan",
+            "%cpu",
+            "tty"
+          ],
+          "answerIndex": 1,
+          "explanation": "wchan shows the kernel function the process is sleeping in, which reveals what it's waiting on (e.g. an I/O routine) — key for diagnosing D-state hangs."
+        },
+        {
+          "id": "processes-signals-mcq-toplive",
+          "type": "mcq",
+          "prompt": "Which tool gives a continuously updating, sortable view of running processes?",
+          "choices": [
+            "ps -ef",
+            "top",
+            "pstree",
+            "nohup"
+          ],
+          "answerIndex": 1,
+          "explanation": "top (or htop) refreshes live and lets you sort by CPU, memory, etc. ps is a one-shot snapshot, pstree shows hierarchy, nohup detaches a job from the terminal."
+        },
+        {
+          "id": "processes-signals-img-states",
+          "type": "flashcard",
+          "front": "Process state transition diagram (R/S/D/Z/T)",
+          "back": "State diagram showing transitions between R (running), S (interruptible sleep), D (uninterruptible sleep), T (stopped), and Z (zombie), with the signals and events that trigger each transition.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/processes-signals-1.svg"
+        }
+      ]
+    },
+    {
+      "id": "processes-signals-lesson-signals",
+      "title": "Signals: Delivery, Disposition & trap",
+      "order": 3,
+      "difficulty": 3,
+      "content": "A **signal** is an asynchronous notification the kernel delivers to a process. Each has a default **disposition** (action) the program can usually override by installing a handler. Common ones:\n\n- **SIGTERM (15)** — polite \"please terminate,\" the default of `kill`. Catchable, so programs can clean up.\n- **SIGINT (2)** — Ctrl-C interrupt from the terminal.\n- **SIGHUP (1)** — \"hangup\"; historically terminal closed, now widely reused to mean \"reload config.\"\n- **SIGSTOP / SIGCONT** — pause and resume a process.\n- **SIGKILL (9)** — immediate, forcible termination.\n\nTwo signals are **uncatchable, unblockable, and unignorable**: **SIGKILL** and **SIGSTOP**. The kernel acts on them *for* the process — it never hands them to user code. This is deliberate: SIGKILL is the guaranteed last resort so a buggy or malicious program can't trap its own kill and refuse to die. The flip side is that SIGKILL gives the process **no chance to clean up** (flush buffers, remove lock files), which is why you try SIGTERM first.\n\n```bash\nkill -TERM 4242        # ask nicely (default)\nkill -9 4242           # SIGKILL: cannot be trapped, no cleanup\nkill -l                # list all signal names/numbers\n\n# Trap SIGTERM/SIGINT in a script to clean up on exit\ncleanup() { rm -f /tmp/work.$$; echo \"cleaned up\"; }\ntrap cleanup TERM INT EXIT\nwhile true; do sleep 1; done\n```\n\nIn shell scripts, **`trap`** installs handlers for catchable signals — ideal for removing temp files or stopping children on `SIGTERM`. But you can never `trap` SIGKILL or SIGSTOP; the shell will accept the syntax for KILL but it will simply never fire. Design cleanup around SIGTERM and accept that SIGKILL means abrupt death.",
+      "items": [
+        {
+          "id": "processes-signals-fc-sigterm-kill",
+          "type": "flashcard",
+          "front": "Difference between SIGTERM and SIGKILL?",
+          "back": "SIGTERM (15) is a catchable, polite request to terminate — the process can clean up first. SIGKILL (9) is forcible and uncatchable — the kernel kills the process immediately with no cleanup. Always try TERM before KILL.",
+          "hint": "One can be handled, one cannot."
+        },
+        {
+          "id": "processes-signals-fc-uncatchable",
+          "type": "flashcard",
+          "front": "Which two signals cannot be caught, blocked, or ignored?",
+          "back": "SIGKILL and SIGSTOP. The kernel enforces them directly without ever delivering them to user code.",
+          "hint": "9 and the one that pauses you."
+        },
+        {
+          "id": "processes-signals-fc-whykill",
+          "type": "flashcard",
+          "front": "Why is SIGKILL deliberately uncatchable?",
+          "back": "So there is always a guaranteed way to terminate a process. If programs could trap SIGKILL, a buggy or malicious one could refuse to die. The cost is no cleanup chance, so SIGTERM is tried first.",
+          "hint": "It's the last resort that must always work."
+        },
+        {
+          "id": "processes-signals-fc-sighup",
+          "type": "flashcard",
+          "front": "What does SIGHUP traditionally mean, and how is it commonly reused?",
+          "back": "Originally 'hangup' — the controlling terminal closed. Many daemons now repurpose SIGHUP to mean 'reload your configuration without restarting.'",
+          "hint": "Hangup, but daemons read it as 'reload'."
+        },
+        {
+          "id": "processes-signals-fc-trap",
+          "type": "flashcard",
+          "front": "What does the shell 'trap' builtin do?",
+          "back": "It installs a handler that runs when the script receives a specified catchable signal (or pseudo-events like EXIT) — commonly used to clean up temp files or child processes on SIGTERM/SIGINT.",
+          "hint": "Run my cleanup when this signal arrives."
+        },
+        {
+          "id": "processes-signals-mcq-trapkill",
+          "type": "mcq",
+          "prompt": "A colleague writes 'trap cleanup KILL' in a bash script. What actually happens when the process receives SIGKILL?",
+          "choices": [
+            "cleanup runs, then the process exits",
+            "The script refuses the signal",
+            "cleanup never runs; the kernel terminates the process immediately",
+            "The signal is converted to SIGTERM"
+          ],
+          "answerIndex": 2,
+          "explanation": "SIGKILL can never be trapped. The trap is silently ineffective — the kernel kills the process without running any handler."
+        },
+        {
+          "id": "processes-signals-mcq-default-kill",
+          "type": "mcq",
+          "prompt": "Which signal does 'kill <pid>' send when no signal is specified?",
+          "choices": [
+            "SIGKILL",
+            "SIGTERM",
+            "SIGINT",
+            "SIGHUP"
+          ],
+          "answerIndex": 1,
+          "explanation": "Plain kill defaults to SIGTERM (15), the catchable request-to-terminate, giving the process a chance to shut down cleanly."
+        },
+        {
+          "id": "processes-signals-mcq-int",
+          "type": "mcq",
+          "prompt": "Pressing Ctrl-C in a terminal sends which signal to the foreground process?",
+          "choices": [
+            "SIGINT",
+            "SIGSTOP",
+            "SIGKILL",
+            "SIGHUP"
+          ],
+          "answerIndex": 0,
+          "explanation": "Ctrl-C sends SIGINT (interrupt). Ctrl-Z would send SIGTSTP (stop). SIGINT is catchable, so programs can intercept it."
+        },
+        {
+          "id": "processes-signals-mcq-cleanup",
+          "type": "mcq",
+          "prompt": "Why should you prefer SIGTERM over SIGKILL when stopping a service?",
+          "choices": [
+            "SIGTERM is faster",
+            "SIGTERM lets the process run cleanup (flush buffers, remove locks) before exiting",
+            "SIGKILL only works as root",
+            "SIGTERM cannot be blocked"
+          ],
+          "answerIndex": 1,
+          "explanation": "SIGTERM is catchable, so a well-written program can flush data and release resources. SIGKILL gives no such opportunity and risks corruption or stale lock files."
+        }
+      ]
+    },
+    {
+      "id": "processes-signals-lesson-jobcontrol",
+      "title": "Job Control, Priorities & Resource Limits",
+      "order": 4,
+      "difficulty": 3,
+      "content": "Your shell groups the processes it launches into **jobs** and arranges them into **process groups** and a **session** — the machinery behind terminal job control.\n\n- Append **`&`** to run a command in the **background**.\n- **`Ctrl-Z`** sends **SIGTSTP**, stopping the foreground job (state T).\n- **`jobs`** lists them; **`fg %1`** resumes job 1 in the foreground, **`bg %1`** resumes it in the background (sends SIGCONT).\n- **`disown`** removes a job from the shell's table so it won't get SIGHUP when the shell exits.\n- **`nohup cmd &`** runs a command immune to SIGHUP, redirecting output to `nohup.out`.\n- **`setsid`** starts a command in a brand-new session, fully detached.\n\n```bash\nsleep 1000 &          # background, prints [1] 12345\njobs -l               # list jobs with PIDs\nfg %1                 # bring it forward; Ctrl-Z to stop again\nbg %1                 # resume in background\ndisown %1             # survive shell logout\nnohup ./backup.sh &   # immune to hangup, logs to nohup.out\n```\n\n**Priority:** the **niceness** value (−20 to +19, default 0) hints the scheduler. *Higher* nice = *lower* priority (you're being \"nice\" to others). Start a job nicer with `nice -n 10 cmd`; change a running one with `renice 5 -p <pid>`. Only root can set negative (higher-priority) values.\n\n```bash\nnice -n 15 tar -czf big.tgz /data   # low-priority background work\nrenice -n -5 -p 12345               # needs root: raise priority\nulimit -a                            # show current resource limits\nulimit -n 4096                       # raise open-file-descriptor cap\n```\n\n**Resource limits** are per-process ceilings (`getrlimit`/`setrlimit`) you inspect and adjust with **`ulimit`**: max open files (`-n`), max processes (`-u`), core dump size (`-c`), memory. Soft limits can be raised up to the hard limit; only root raises the hard limit. These caps are inherited across `exec`, so a limit you set in a login shell shapes everything it launches.",
+      "items": [
+        {
+          "id": "processes-signals-fc-amp",
+          "type": "flashcard",
+          "front": "What does appending '&' to a command do?",
+          "back": "It runs the command in the background as a job, returning the prompt immediately. The shell prints the job number and PID, and the process keeps running while you do other things.",
+          "hint": "Background the job."
+        },
+        {
+          "id": "processes-signals-fc-ctrlz",
+          "type": "flashcard",
+          "front": "What does Ctrl-Z do, and how do you resume the job?",
+          "back": "Ctrl-Z sends SIGTSTP, stopping (pausing) the foreground job (state T). Resume it with 'fg' (foreground) or 'bg' (background), which delivers SIGCONT.",
+          "hint": "Pause now; fg or bg to continue."
+        },
+        {
+          "id": "processes-signals-fc-nohup-disown",
+          "type": "flashcard",
+          "front": "Difference between nohup and disown?",
+          "back": "nohup launches a command immune to SIGHUP up front (logging to nohup.out). disown removes an already-running job from the shell's job table so it won't receive SIGHUP at shell exit. Both help a job survive logout.",
+          "hint": "One is preemptive, one is after the fact."
+        },
+        {
+          "id": "processes-signals-fc-nice",
+          "type": "flashcard",
+          "front": "How does the nice value affect scheduling?",
+          "back": "Niceness ranges −20 (highest priority) to +19 (lowest), default 0. A HIGHER nice value means LOWER priority — you're being nicer to other processes. Set it with 'nice', change it with 'renice'.",
+          "hint": "Higher number = more polite = less CPU."
+        },
+        {
+          "id": "processes-signals-fc-ulimit",
+          "type": "flashcard",
+          "front": "What is ulimit used for?",
+          "back": "It views and sets per-process resource limits (the getrlimit/setrlimit ceilings): max open files (-n), max user processes (-u), core size (-c), memory, etc. These are inherited across exec().",
+          "hint": "Per-process resource ceilings in the shell."
+        },
+        {
+          "id": "processes-signals-mcq-bg",
+          "type": "mcq",
+          "prompt": "You stopped a job with Ctrl-Z. Which command resumes it running in the background?",
+          "choices": [
+            "fg %1",
+            "bg %1",
+            "kill %1",
+            "disown %1"
+          ],
+          "answerIndex": 1,
+          "explanation": "bg sends SIGCONT and resumes the job in the background. fg resumes it in the foreground, kill signals it, and disown just removes it from the job table."
+        },
+        {
+          "id": "processes-signals-mcq-nicehigh",
+          "type": "mcq",
+          "prompt": "A process has a nice value of +19. What does this imply?",
+          "choices": [
+            "It has the highest possible scheduling priority",
+            "It has the lowest priority — it yields CPU to almost everything else",
+            "It can only be run by root",
+            "It is exempt from the OOM killer"
+          ],
+          "answerIndex": 1,
+          "explanation": "+19 is the lowest priority. Higher nice values mean the process is 'nicer' and gives up CPU to others. Negative values (raising priority) require root."
+        },
+        {
+          "id": "processes-signals-mcq-renice-root",
+          "type": "mcq",
+          "prompt": "A non-root user tries 'renice -n -5 -p 1234' and it fails. Why?",
+          "choices": [
+            "renice only accepts positive values from anyone, but lowering nice (raising priority) requires root",
+            "The PID does not exist",
+            "renice cannot target running processes",
+            "You must use kill instead"
+          ],
+          "answerIndex": 0,
+          "explanation": "Setting a negative nice value raises priority, which only root may do. Unprivileged users can only increase niceness (lower priority)."
+        },
+        {
+          "id": "processes-signals-mcq-ulimit-inherit",
+          "type": "mcq",
+          "prompt": "You set 'ulimit -n 4096' in your login shell. Which processes are affected?",
+          "choices": [
+            "Only the shell itself",
+            "Every process the shell launches afterward, since limits are inherited across exec()",
+            "All processes system-wide",
+            "Only root-owned processes"
+          ],
+          "answerIndex": 1,
+          "explanation": "Resource limits are per-process and inherited by children across exec(), so the new cap applies to everything that shell launches — not system-wide and not retroactive."
+        },
+        {
+          "id": "processes-signals-mcq-nohup",
+          "type": "mcq",
+          "prompt": "What is the primary effect of running a command with nohup?",
+          "choices": [
+            "It raises the command's scheduling priority",
+            "It makes the command ignore SIGHUP so it survives terminal/logout, and redirects output to nohup.out",
+            "It runs the command as root",
+            "It limits the command's memory usage"
+          ],
+          "answerIndex": 1,
+          "explanation": "nohup makes the process immune to SIGHUP (the hangup sent when the controlling terminal closes), so it keeps running after logout, with output saved to nohup.out by default."
+        }
+      ]
+    }
+  ]
+}

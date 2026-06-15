@@ -1,0 +1,270 @@
+{
+  "id": "users-auth",
+  "title": "Users, Groups & Authentication",
+  "order": 4,
+  "lessons": [
+    {
+      "id": "users-auth-l1",
+      "title": "Identity: UID/GID, passwd, shadow & group",
+      "order": 1,
+      "difficulty": 1,
+      "content": "On Linux, an \"account\" is just rows in flat files keyed by numeric IDs. The kernel only ever deals in numbers: every process has a **UID** (user ID) and **GID** (primary group), plus a set of *supplementary* GIDs. Names are a human convenience resolved at lookup time.\n\nThree files define the model:\n\n- `/etc/passwd` — one line per user: `name:x:UID:GID:GECOS:home:shell`. The `x` is a placeholder; the real hash lives elsewhere. This file is world-readable.\n- `/etc/shadow` — `name:hash:lastchange:min:max:warn:...`. Root-only (mode 640, group `shadow`). The hash is `$id$salt$digest`: `$6$` = SHA-512, `$y$` = yescrypt (modern default on Debian/Ubuntu), `$2b$` = bcrypt. A `!` or `*` in the hash field means the password is locked — login by password is impossible.\n- `/etc/group` — `name:x:GID:member1,member2`. Lists *supplementary* members; your *primary* group comes from the passwd line.\n\nConvention: UID `0` is **root** (omnipotent, not because of the name but because the kernel special-cases UID 0). UIDs below ~1000 are **system/service accounts**; regular humans start at 1000 (the `UID_MIN` in `/etc/login.defs`).\n\n```bash\nid                       # uid, gid, and all groups for you\nid -u; id -gn            # numeric uid; primary group name\ngetent passwd 1000       # resolve via nsswitch, not just the file\nsudo grep '^root' /etc/shadow   # see root's hash field\n```\n\nThink of it like a hardware part number: the silicon (kernel) cares about the number; the label (name) is for the humans reading the schematic.",
+      "items": [
+        {
+          "id": "users-auth-l1-f1",
+          "type": "flashcard",
+          "front": "What does the kernel actually use to identify a user and their permissions?",
+          "back": "Numeric IDs: a UID, a primary GID, and a set of supplementary GIDs. Names are only resolved by userspace at lookup time; the kernel never sees them.",
+          "hint": "Names are a convenience layer."
+        },
+        {
+          "id": "users-auth-l1-f2",
+          "type": "flashcard",
+          "front": "What are the seven colon-separated fields of an /etc/passwd line?",
+          "back": "name : x (password placeholder) : UID : primary GID : GECOS (comment/full name) : home directory : login shell.",
+          "hint": "Starts with name, ends with shell."
+        },
+        {
+          "id": "users-auth-l1-f3",
+          "type": "flashcard",
+          "front": "Why does /etc/passwd contain an 'x' instead of the password, and where is the real secret?",
+          "back": "The 'x' is a placeholder because /etc/passwd is world-readable. The actual password hash lives in /etc/shadow, which is root-only (mode 640, group 'shadow').",
+          "hint": "Who can read each file?"
+        },
+        {
+          "id": "users-auth-l1-f4",
+          "type": "flashcard",
+          "front": "Decode the shadow hash prefixes $6$, $y$, and $2b$.",
+          "back": "$6$ = SHA-512 crypt; $y$ = yescrypt (modern default on Debian/Ubuntu); $2b$ = bcrypt. The format is $id$salt$digest.",
+          "hint": "One number, one letter, one b-variant."
+        },
+        {
+          "id": "users-auth-l1-f5",
+          "type": "flashcard",
+          "front": "What does a '!' or '*' in the shadow password field mean?",
+          "back": "The account's password is locked — no password can hash to '!' or '*', so password login is impossible. Key auth (e.g. SSH keys) may still work.",
+          "hint": "No valid hash starts with that character."
+        },
+        {
+          "id": "users-auth-l1-m1",
+          "type": "mcq",
+          "prompt": "Which file stores the actual password hash on a modern Linux system?",
+          "choices": [
+            "/etc/passwd",
+            "/etc/shadow",
+            "/etc/group",
+            "/etc/login.defs"
+          ],
+          "answerIndex": 1,
+          "explanation": "/etc/passwd is world-readable and holds only an 'x' placeholder; the hash lives in root-only /etc/shadow. /etc/group lists group membership; /etc/login.defs holds policy like UID_MIN."
+        },
+        {
+          "id": "users-auth-l1-m2",
+          "type": "mcq",
+          "prompt": "A user's UID is 0. What does that mean?",
+          "choices": [
+            "The account is disabled",
+            "It is the root/superuser account",
+            "It is a service account with no login",
+            "The UID failed to assign"
+          ],
+          "answerIndex": 1,
+          "explanation": "The kernel special-cases UID 0 as root with full privileges. The name 'root' is irrelevant; any account with UID 0 is superuser."
+        },
+        {
+          "id": "users-auth-l1-m3",
+          "type": "mcq",
+          "prompt": "Where does a user's PRIMARY group come from?",
+          "choices": [
+            "The member list in /etc/group",
+            "The GID field on their /etc/passwd line",
+            "The GECOS field",
+            "/etc/gshadow only"
+          ],
+          "answerIndex": 1,
+          "explanation": "The primary GID is the 4th field of the passwd line. /etc/group's member list defines SUPPLEMENTARY group membership, not the primary group."
+        }
+      ]
+    },
+    {
+      "id": "users-auth-l2",
+      "title": "Managing accounts, service users & privilege escalation",
+      "order": 2,
+      "difficulty": 2,
+      "content": "Now the operational side: creating accounts, locking down service accounts, and escalating privilege safely.\n\n**User management** edits the files for you (never hand-edit shadow):\n\n```bash\nsudo useradd -m -s /bin/bash -G sudo alice   # create, make home, set shell, add group\nsudo passwd alice                            # set/change password (writes shadow)\nsudo usermod -aG docker alice                # APPEND a supplementary group (-a is vital)\nsudo userdel -r bob                          # remove user + home\nid alice; groups alice                       # verify membership\n```\n\nForget `-a` in `usermod -aG` and you *replace* all supplementary groups — a classic foot-gun that silently drops people from `sudo`.\n\n**Service accounts** run daemons, not people. They get a **nologin shell** so a stolen credential can't open an interactive session:\n\n```bash\nsudo useradd -r -s /usr/sbin/nologin -M svc-app   # -r = system uid (<1000), -M = no home\n```\n\n`/usr/sbin/nologin` simply prints a message and exits non-zero — the login flow's final `exec shell` step dead-ends. This is least-privilege in practice.\n\n**Privilege escalation**: `su` *becomes* another user (default root) and needs the **target's** password; `su -` also loads a login environment. `sudo` runs one command as root (or another user) after checking *your* password against policy in `/etc/sudoers`. Prefer `sudo` — it's per-command, logged, and policy-driven. Crucially: a group you were just added to does **not** apply to your current shell, because credentials are fixed when the session is created. Log out and back in (or `newgrp`) to pick it up.",
+      "items": [
+        {
+          "id": "users-auth-l2-f1",
+          "type": "flashcard",
+          "front": "Why must you use 'usermod -aG group user' and not 'usermod -G group user'?",
+          "back": "Without -a, -G REPLACES the user's entire supplementary group set with just the listed group(s), silently removing them from others (e.g. sudo). -a appends.",
+          "hint": "a = append."
+        },
+        {
+          "id": "users-auth-l2-f2",
+          "type": "flashcard",
+          "front": "What is a nologin shell and why give it to a service account?",
+          "back": "/usr/sbin/nologin prints a message and exits non-zero, so the login flow's final 'exec shell' dead-ends. A compromised service credential can't open an interactive shell — least privilege.",
+          "hint": "It dead-ends the last step of login."
+        },
+        {
+          "id": "users-auth-l2-f3",
+          "type": "flashcard",
+          "front": "What does 'useradd -r' do, and how does the resulting account differ from a normal one?",
+          "back": "-r creates a system account with a UID below UID_MIN (~1000). System accounts are for daemons/services; usually paired with -M (no home) and a nologin shell.",
+          "hint": "r = system/reserved range."
+        },
+        {
+          "id": "users-auth-l2-f4",
+          "type": "flashcard",
+          "front": "Whose password does 'su' ask for vs 'sudo'?",
+          "back": "su asks for the TARGET account's password (root by default). sudo asks for YOUR own password and checks it against the sudoers policy. sudo is per-command and logged.",
+          "hint": "su = target's secret; sudo = your secret + policy."
+        },
+        {
+          "id": "users-auth-l2-f5",
+          "type": "flashcard",
+          "front": "You ran 'usermod -aG docker me' but 'docker ps' still says permission denied in your shell. Why?",
+          "back": "Your current shell's credentials (UID/GID + supplementary groups) were fixed when the session was created. Group changes only take effect in a new session: log out/in, or run 'newgrp docker'.",
+          "hint": "Credentials are set once, at session start."
+        },
+        {
+          "id": "users-auth-l2-m1",
+          "type": "mcq",
+          "prompt": "Which command creates a service account that cannot open an interactive shell?",
+          "choices": [
+            "useradd -m -s /bin/bash svc",
+            "useradd -r -s /usr/sbin/nologin svc",
+            "useradd -G sudo svc",
+            "useradd -s /bin/sh -m svc"
+          ],
+          "answerIndex": 1,
+          "explanation": "-r gives a system UID and /usr/sbin/nologin makes the shell dead-end on login. The others grant a real shell (and one adds the sudo group)."
+        },
+        {
+          "id": "users-auth-l2-m2",
+          "type": "mcq",
+          "prompt": "After 'usermod -aG sudo carol', why can carol's currently-open terminal still not run sudo?",
+          "choices": [
+            "The change requires a reboot",
+            "sudo caches denials for 5 minutes",
+            "Her open session's group set was fixed at login; she must start a new session",
+            "usermod -aG does not write /etc/group"
+          ],
+          "answerIndex": 2,
+          "explanation": "Supplementary groups are resolved into the process credentials when the session starts. Existing processes keep the old set; a fresh login (or newgrp) is needed."
+        },
+        {
+          "id": "users-auth-l2-m3",
+          "type": "mcq",
+          "prompt": "What is the safest, most auditable way to let a user run a single admin task?",
+          "choices": [
+            "Give them the root password for su",
+            "Add them to a sudoers rule for that specific command",
+            "Set their UID to 0",
+            "chmod 4777 the tool"
+          ],
+          "answerIndex": 1,
+          "explanation": "A targeted sudoers rule is per-command, logged, and uses the user's own password. Sharing the root password, UID 0, or world setuid binaries all violate least privilege."
+        }
+      ]
+    },
+    {
+      "id": "users-auth-l3",
+      "title": "Sudoers, PAM, the login flow & directory-backed auth",
+      "order": 3,
+      "difficulty": 3,
+      "content": "Tie it together: from a typed password to a running shell, and how policy is configured.\n\n**sudoers** is edited *only* with `visudo`, which locks the file and syntax-checks before saving — a broken `/etc/sudoers` can lock everyone out. Modern systems drop snippets in `/etc/sudoers.d/`.\n\n```bash\nsudo visudo                              # safely edit /etc/sudoers\n# alice ALL=(ALL:ALL) ALL               # full sudo\n# svc  ALL=(root) NOPASSWD: /usr/bin/systemctl restart app   # one command, no prompt\nsudo visudo -f /etc/sudoers.d/app        # edit a drop-in\n```\n\n`NOPASSWD:` skips the password for matched commands (used for automation). Mind the difference: `sudo cmd` runs one command keeping much of *your* environment, while `sudo -i` starts a full **root login shell** (loads root's profile, cwd, env) — like logging in as root.\n\n**PAM** (Pluggable Authentication Modules) is the framework that *applications* call so they don't implement auth themselves. Configs live in `/etc/pam.d/<service>`. Rules are grouped into four management groups stacked in order: **auth** (prove identity, e.g. `pam_unix` checks the shadow hash), **account** (is the account valid/unexpired?), **password** (changing the secret), **session** (set up/tear down — mount home, set limits, open a logind session). Control flags (`required`, `requisite`, `sufficient`, `optional`) decide how a module's result affects the stack.\n\n**The full login journey**: `login`/`sshd`/`gdm` collects the username and secret → PAM `auth` runs `pam_unix`, which uses **NSS** (`/etc/nsswitch.conf`) to find the account (`files`, then maybe `sss`/`ldap`) and verifies the hash → `account`/`session` phases run → the process does setuid/setgid to the resolved UID/GID and adds supplementary groups → finally it `exec`s the login shell. In enterprises, `nsswitch.conf` points at **SSSD/LDAP** so accounts live in a central directory, not local files — but the PAM+NSS pipeline is identical. Day to day you skip the password entirely with **SSH key auth**: the key proves identity, then PAM's `account`/`session` phases still run (covered in topic 06).",
+      "items": [
+        {
+          "id": "users-auth-l3-f1",
+          "type": "flashcard",
+          "front": "Why edit /etc/sudoers with visudo instead of a normal editor?",
+          "back": "visudo locks the file against concurrent edits and runs a syntax check before saving. A malformed sudoers file can lock everyone (including you) out of sudo.",
+          "hint": "It validates before it lets you save."
+        },
+        {
+          "id": "users-auth-l3-f2",
+          "type": "flashcard",
+          "front": "What is the difference between 'sudo cmd' and 'sudo -i'?",
+          "back": "'sudo cmd' runs one command as root while largely keeping your environment/cwd. 'sudo -i' starts a full root LOGIN shell — loads root's profile, env, and home, as if you logged in as root.",
+          "hint": "-i = interactive login shell."
+        },
+        {
+          "id": "users-auth-l3-f3",
+          "type": "flashcard",
+          "front": "Name PAM's four management groups and what each does.",
+          "back": "auth (verify identity, e.g. check the password), account (is the account valid/unexpired/allowed?), password (change the credential), session (set up/tear down the session — home, limits, logind).",
+          "hint": "Prove, permit, change, set-up."
+        },
+        {
+          "id": "users-auth-l3-f4",
+          "type": "flashcard",
+          "front": "What role does /etc/nsswitch.conf play during login?",
+          "back": "It tells the system WHERE to look up accounts/groups: e.g. 'passwd: files sss ldap'. PAM's pam_unix uses NSS to resolve the user from local files and/or a directory (SSSD/LDAP) before verifying the hash.",
+          "hint": "Name Service Switch — the lookup order."
+        },
+        {
+          "id": "users-auth-l3-f5",
+          "type": "flashcard",
+          "front": "In enterprise auth with SSSD/LDAP, what changes vs local /etc/passwd, and what stays the same?",
+          "back": "What changes: nsswitch.conf points lookups at a central directory (sss/ldap) instead of local files. What stays the same: the PAM stack + NSS pipeline and the overall login flow are identical.",
+          "hint": "Same plumbing, different account source."
+        },
+        {
+          "id": "users-auth-l3-f6",
+          "type": "flashcard",
+          "front": "What does 'NOPASSWD:' do in a sudoers rule, and why use it carefully?",
+          "back": "It lets the matched command(s) run via sudo without prompting for a password — useful for automation/scripts. Risky because it widens passwordless privilege, so scope it to specific commands only.",
+          "hint": "Mostly for non-interactive automation."
+        },
+        {
+          "id": "users-auth-l3-m1",
+          "type": "mcq",
+          "prompt": "Which PAM management group actually verifies that the typed password matches the stored hash?",
+          "choices": [
+            "session",
+            "account",
+            "auth",
+            "password"
+          ],
+          "answerIndex": 2,
+          "explanation": "The 'auth' group proves identity; pam_unix here checks the secret against /etc/shadow. 'account' checks validity, 'password' changes the secret, 'session' sets up/tears down the session."
+        },
+        {
+          "id": "users-auth-l3-m2",
+          "type": "mcq",
+          "prompt": "Put the login journey in the correct order.",
+          "choices": [
+            "exec shell -> verify hash -> NSS lookup -> setuid",
+            "collect credentials -> PAM auth verifies hash (via NSS) -> account/session -> setuid/setgid -> exec login shell",
+            "NSS lookup -> exec shell -> PAM session -> setuid",
+            "setuid -> collect credentials -> exec shell -> PAM auth"
+          ],
+          "answerIndex": 1,
+          "explanation": "Credentials are collected, PAM auth verifies the hash (resolving the account through NSS), account/session phases run, the process drops to the resolved UID/GID with supplementary groups, then execs the login shell."
+        },
+        {
+          "id": "users-auth-l3-m3",
+          "type": "mcq",
+          "prompt": "A sudoers line reads: 'deploy ALL=(root) NOPASSWD: /usr/bin/systemctl restart web'. What can user 'deploy' do?",
+          "choices": [
+            "Run any command as root without a password",
+            "Restart the web service as root without being prompted for a password",
+            "Only edit /etc/sudoers",
+            "Log in as root interactively"
+          ],
+          "answerIndex": 1,
+          "explanation": "The rule grants exactly that one command, as root, with no password prompt. It does not grant other commands, root login, or sudoers editing."
+        },
+        {
+          "id": "users-auth-l3-img1",
+          "type": "flashcard",
+          "front": "The password-to-shell journey: login/sshd collects credentials, PAM auth verifies the shadow hash, NSS resolves the account, the process drops to the right UID/GID with supplementary groups, then execs the login shell.",
+          "back": "Review the diagram above.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-1.svg"
+        }
+      ]
+    }
+  ]
+}

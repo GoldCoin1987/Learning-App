@@ -1,0 +1,288 @@
+{
+  "id": "kernel-userspace-syscalls",
+  "title": "Kernel vs Userspace & System Calls",
+  "order": 7,
+  "lessons": [
+    {
+      "id": "kernel-userspace-syscalls-l1",
+      "title": "The Ring Model and the Syscall Gateway",
+      "order": 1,
+      "difficulty": 1,
+      "content": "Your CPU runs in one of two relevant privilege levels. On x86-64 these are **ring 0** (kernel mode) and **ring 3** (user mode); other ISAs have analogous EL1/EL0 or supervisor/user modes. In ring 3 your code cannot touch hardware directly, cannot reprogram the MMU, and cannot execute privileged instructions — the same protection scheme you knew on radar hardware where only privileged firmware could poke certain registers. Everything else (browsers, compilers, your daemon) lives in ring 3.\n\nWhen user code needs something only the kernel may do — read a file, allocate memory, send a packet — it cannot just jump into kernel code. That would defeat isolation. Instead it executes a **trap**: a single controlled instruction (`syscall` on x86-64, `svc` on ARM) that switches the CPU to ring 0 at *one fixed kernel entry point*. The kernel decides what to do based on a number you placed in a register.\n\n```c\n/* No stdio. A raw syscall: number in rax, args in rdi/rsi/rdx. */\n#include <unistd.h>\nint main(void) {\n    write(1, \"hi\\n\", 3);   /* __NR_write = 1 on x86-64 */\n    return 0;\n}\n```\n\nThe argument count and order is the **syscall calling convention**, distinct from the C calling convention. The gateway is narrow on purpose: a fixed entry, a validated syscall number, and arguments the kernel must treat as untrusted. This single boundary — cross it deliberately or not at all — is the conceptual core of how Linux stays safe from the millions of lines of code running above it.\n\n```bash\nstrace -e trace=write ./a.out   # see the one write() crossing the line\n```",
+      "items": [
+        {
+          "id": "kernel-userspace-syscalls-l1-fc1",
+          "type": "flashcard",
+          "front": "On x86-64, which ring is kernel mode and which is user mode?",
+          "back": "Ring 0 is kernel mode (full privilege: hardware, MMU, privileged instructions). Ring 3 is user mode where ordinary applications run with no direct hardware access.",
+          "hint": "Lower number = more privilege."
+        },
+        {
+          "id": "kernel-userspace-syscalls-l1-fc2",
+          "type": "flashcard",
+          "front": "What instruction does user code execute to enter the kernel, and why can't it just call kernel functions directly?",
+          "back": "A trap instruction (`syscall` on x86-64, `svc` on ARM). A direct call would bypass the privilege boundary; the trap switches to ring 0 at one fixed, controlled entry point chosen by the kernel.",
+          "hint": "One controlled door, not arbitrary jumps."
+        },
+        {
+          "id": "kernel-userspace-syscalls-l1-fc3",
+          "type": "flashcard",
+          "front": "How does the kernel know which operation a syscall is requesting?",
+          "back": "By the syscall number placed in a designated register (rax on x86-64). The kernel uses it to index the syscall table and dispatch to the right handler (e.g. number 1 = write).",
+          "hint": "A number in a register, then a table lookup."
+        },
+        {
+          "id": "kernel-userspace-syscalls-l1-fc4",
+          "type": "flashcard",
+          "front": "Why is the user/kernel boundary called a 'narrow' or 'controlled' gateway?",
+          "back": "There is a single fixed entry point, a validated syscall number, and arguments the kernel treats as untrusted. Code cannot jump into arbitrary kernel addresses, which is what preserves isolation.",
+          "hint": "One door, validated inputs."
+        },
+        {
+          "id": "kernel-userspace-syscalls-l1-mcq1",
+          "type": "mcq",
+          "prompt": "A normal C program in ring 3 tries to execute a privileged instruction that reprograms the MMU. What happens?",
+          "choices": [
+            "The CPU silently allows it because the process owns its own memory",
+            "The CPU raises a fault/exception; the kernel typically kills the process",
+            "It is automatically converted into the equivalent system call",
+            "It succeeds only if the program was compiled with -O2"
+          ],
+          "answerIndex": 1,
+          "explanation": "Privileged instructions executed in ring 3 trigger a CPU fault. The kernel handles the exception, usually delivering SIGILL/SIGSEGV and terminating the offender. That hardware enforcement is what makes user mode a sandbox."
+        },
+        {
+          "id": "kernel-userspace-syscalls-l1-mcq2",
+          "type": "mcq",
+          "prompt": "On x86-64, where does the kernel expect the syscall NUMBER to be when the `syscall` instruction executes?",
+          "choices": [
+            "On the top of the user stack",
+            "In the rax register",
+            "In an environment variable",
+            "In the first argument register, rdi"
+          ],
+          "answerIndex": 1,
+          "explanation": "The syscall number goes in rax; arguments go in rdi, rsi, rdx, r10, r8, r9. rdi holds the first argument, not the number. This is the syscall convention, which differs from the C function calling convention."
+        },
+        {
+          "id": "kernel-userspace-syscalls-l1-mcq3",
+          "type": "mcq",
+          "prompt": "Which statement best describes what 'trapping into the kernel' does to CPU privilege level?",
+          "choices": [
+            "It permanently elevates the process to ring 0",
+            "It switches from ring 3 to ring 0 for the duration of the syscall, then returns to ring 3",
+            "It has no effect on privilege; only the scheduler changes rings",
+            "It drops the process from ring 3 to ring 4 for safety"
+          ],
+          "answerIndex": 1,
+          "explanation": "A trap raises privilege to ring 0 at the kernel entry point, the kernel does the work, then execution returns to ring 3 where the application resumes. The elevation is temporary and scoped to the call."
+        },
+        {
+          "id": "kernel-userspace-syscalls-l1-mcq4",
+          "type": "mcq",
+          "prompt": "Why must the kernel treat syscall arguments (like a pointer passed to write()) as untrusted?",
+          "choices": [
+            "Because user pointers are always encrypted",
+            "Because a malicious or buggy ring-3 program could pass garbage, kernel, or out-of-range addresses",
+            "Because the C standard requires it",
+            "Because pointers change value when crossing the trap"
+          ],
+          "answerIndex": 1,
+          "explanation": "Anything from ring 3 could be hostile or buggy: a bad pointer, an address that overlaps kernel memory, or an invalid length. The kernel must validate and copy carefully (copy_from_user), never blindly dereference, or it would expose a privilege-escalation hole."
+        }
+      ]
+    },
+    {
+      "id": "kernel-userspace-syscalls-l2",
+      "title": "What the Kernel Provides, libc, and Syscall Families",
+      "order": 2,
+      "difficulty": 2,
+      "content": "Behind the gateway the kernel is a multiplexer for shared resources. The big services it provides: **process scheduling** (deciding which thread runs on which CPU), **memory management** (virtual memory, paging, and the MMU translating per-process virtual addresses to physical frames — the same address-translation idea as a hardware page table), the **VFS** (one `open/read/write` interface over ext4, XFS, procfs, NFS, …), the **network stack** (TCP/IP, sockets), and **device drivers** that own the actual hardware.\n\nYou rarely issue raw `syscall` instructions. The **C library** (glibc on most distros, musl on Alpine/embedded) is a thin wrapper: `read()` in your code is a tiny libc stub that marshals arguments into registers, executes the trap, and converts the kernel's return into a C-friendly value plus `errno`. libc also adds buffering (stdio's `fread`), which is why one `printf` may not equal one `write`.\n\n```c\n#include <fcntl.h>\n#include <unistd.h>\nint fd = open(\"data.bin\", O_RDONLY);   /* open + read + close: 3 syscalls */\nchar buf[4096];\nssize_t n = read(fd, buf, sizeof buf);\nclose(fd);\n```\n\nDistinguish **API** from **ABI**. The API is the source-level contract (function names, header types) you compile against. The **ABI** is the binary contract: which register holds which argument, struct layouts, the syscall numbers themselves. Linux famously keeps a stable syscall ABI — an old binary keeps working — even as APIs evolve.\n\nKey syscall families to recognize: **process** (`fork`, `execve`, `wait4`, `exit`, `clone` — `clone` underlies both threads and container namespaces); **file** (`open`, `read`, `write`, `close`, `lseek`, `stat`, `mmap`); **IPC/sync** (`pipe`, `socket`, `shmget`, `futex` — the primitive under mutexes); **signals** (`kill`, `sigaction`, `rt_sigprocmask`).\n\n```bash\nstrace -e trace=%process ./launcher   # watch fork/execve/wait4/clone\n```",
+      "items": [
+        {
+          "id": "kernel-userspace-syscalls-l2-fc1",
+          "type": "flashcard",
+          "front": "Name the five core services the Linux kernel provides behind the syscall gateway.",
+          "back": "Process scheduling, memory management (virtual memory / paging / MMU), the VFS (unified file interface), the network stack (TCP/IP, sockets), and device drivers.",
+          "hint": "CPU, memory, files, network, hardware."
+        },
+        {
+          "id": "kernel-userspace-syscalls-l2-fc2",
+          "type": "flashcard",
+          "front": "What role does glibc/musl play relative to system calls?",
+          "back": "It is a thin wrapper library: it marshals arguments into registers, executes the trap instruction, and converts the kernel's return into a C return value plus errno. It also adds conveniences like stdio buffering.",
+          "hint": "The shim between your C call and the raw trap."
+        },
+        {
+          "id": "kernel-userspace-syscalls-l2-fc3",
+          "type": "flashcard",
+          "front": "API vs ABI — what is the difference, and which does Linux keep stable across kernel versions?",
+          "back": "API = source-level contract (function/type names you compile against). ABI = binary contract (argument registers, struct layouts, syscall numbers). Linux keeps the syscall ABI stable so old binaries keep running.",
+          "hint": "Source contract vs binary contract."
+        },
+        {
+          "id": "kernel-userspace-syscalls-l2-fc4",
+          "type": "flashcard",
+          "front": "What does the MMU do, and how does it tie into kernel memory management?",
+          "back": "The MMU translates a process's virtual addresses into physical frame addresses using page tables the kernel sets up, faulting into the kernel on a miss (demand paging). It gives each process its own isolated address space.",
+          "hint": "Virtual-to-physical address translation."
+        },
+        {
+          "id": "kernel-userspace-syscalls-l2-fc5",
+          "type": "flashcard",
+          "front": "Which syscall underlies both creating threads and creating container namespaces?",
+          "back": "clone(). With different flags it shares more or less of the parent (address space, file descriptors, namespaces). fork() is essentially clone() with a conservative flag set; threads share the address space; CLONE_NEW* flags create new namespaces.",
+          "hint": "One flexible primitive, many flag combinations."
+        },
+        {
+          "id": "kernel-userspace-syscalls-l2-mcq1",
+          "type": "mcq",
+          "prompt": "Why might a single printf() in your program NOT correspond to a single write() syscall seen under strace?",
+          "choices": [
+            "strace cannot see write() at all",
+            "stdio in libc buffers output, so multiple printf calls may coalesce into one write, or none until flush",
+            "printf is a kernel function, not a libc function",
+            "write() is deprecated and never actually runs"
+          ],
+          "answerIndex": 1,
+          "explanation": "libc's stdio layer buffers. Several printf calls can accumulate in a userspace buffer and be flushed with one write() (or at exit). This is exactly why strace output sometimes 'lags' your printfs — the syscall happens at flush time."
+        },
+        {
+          "id": "kernel-userspace-syscalls-l2-mcq2",
+          "type": "mcq",
+          "prompt": "Reading one file with the classic open/read/close pattern issues roughly how many system calls (ignoring buffering details)?",
+          "choices": [
+            "Zero — file access does not use syscalls",
+            "Exactly one combined 'fileio' syscall",
+            "At least three: open, read, close (more read()s for larger files)",
+            "Exactly two: fopen and fclose"
+          ],
+          "answerIndex": 2,
+          "explanation": "open(), read(), and close() are three distinct syscalls; large files need multiple read() calls. fopen/fclose are libc wrappers that themselves call open/close. Each is a separate trap into the kernel."
+        },
+        {
+          "id": "kernel-userspace-syscalls-l2-mcq3",
+          "type": "mcq",
+          "prompt": "Which group correctly lists FILE-related system calls?",
+          "choices": [
+            "fork, execve, wait4, clone",
+            "open, read, write, lseek, mmap",
+            "kill, sigaction, rt_sigprocmask",
+            "pipe, socket, futex, shmget"
+          ],
+          "answerIndex": 1,
+          "explanation": "open/read/write/lseek/mmap are file-oriented. The first option is the process family, the third is the signal family, and the fourth is IPC/synchronization. Recognizing families lets you skim strace output fast."
+        },
+        {
+          "id": "kernel-userspace-syscalls-l2-mcq4",
+          "type": "mcq",
+          "prompt": "Linux maintains a stable syscall ABI. What practical guarantee does this give?",
+          "choices": [
+            "Source code never needs recompiling between distros",
+            "A binary compiled years ago can still issue the same syscalls and run on a newer kernel",
+            "All kernel internal functions keep the same names",
+            "Drivers never need updating"
+          ],
+          "answerIndex": 1,
+          "explanation": "The stable syscall ABI means syscall numbers and their argument conventions do not change incompatibly, so an old userspace binary keeps working on a new kernel. Internal kernel symbols and driver APIs, by contrast, are explicitly NOT stable."
+        }
+      ]
+    },
+    {
+      "id": "kernel-userspace-syscalls-l3",
+      "title": "Tracing, errno, and What Physically Happens on read()",
+      "order": 3,
+      "difficulty": 3,
+      "content": "When a program 'just fails,' reach for **strace** before guessing. It intercepts every syscall (via ptrace), printing the name, decoded arguments, return value, and on failure the symbolic errno. `ltrace` does the same for library calls. `/proc/<pid>/syscall` shows the syscall a process is blocked in right now.\n\n```bash\nstrace -f -e trace=openat,read,write cat /etc/hostname\nstrace -c ls            # histogram: counts + time per syscall\ncat /proc/$(pgrep -n sshd)/syscall   # which syscall is it stuck in?\n```\n\nA failing line looks like `openat(AT_FDCWD, \"/nope\", O_RDONLY) = -1 ENOENT (No such file or directory)`. At the ABI level the kernel returned a small negative number; libc saw it, set the thread-local `errno` to `ENOENT`, and returned `-1`. Always check the return value, then read `errno` — strace just shows you both at once.\n\nDistinguish a **syscall** from an **interrupt**. A syscall is *synchronous and voluntary*: your code executes the trap and expects to resume. An **interrupt** is *asynchronous*: a hardware device (NIC, timer, the radar ADC you once serviced) or a software event yanks the CPU into a handler regardless of what was running. Both transfer control to the kernel, but one is requested and one is imposed. Each transfer is a **context switch** of privilege; switching to a *different process* is a heavier context switch (save/restore registers, swap page tables).\n\nWhat physically happens on `read(fd, buf, 4096)`? (1) libc traps in with `__NR_read` and the three args. (2) Ring 0; VFS routes by fd to the backing filesystem/driver. (3) The kernel checks its **page cache**; on a miss it issues block I/O and the calling process is put to **sleep (S/D state)** while DMA fills a kernel buffer. (4) An **interrupt** from the disk signals completion. (5) The kernel uses **`copy_to_user`** to move bytes from kernel space into your `buf`, validating the address first (never a raw memcpy — a bad pointer must fail safely, not crash the kernel). (6) It returns the byte count; you wake back in ring 3. The mirror, `copy_from_user`, guards writes inbound — the trust boundary enforced in code.",
+      "items": [
+        {
+          "id": "kernel-userspace-syscalls-l3-fc1",
+          "type": "flashcard",
+          "front": "What does strace show you for each system call, and what underlying mechanism does it use?",
+          "back": "It shows the syscall name, decoded arguments, the return value, and on failure the symbolic errno. It works via the ptrace() mechanism, which lets one process intercept another's syscalls.",
+          "hint": "Name, args, return, errno — powered by ptrace."
+        },
+        {
+          "id": "kernel-userspace-syscalls-l3-fc2",
+          "type": "flashcard",
+          "front": "When a syscall fails, what does the kernel return at the ABI level, and what does libc do with it?",
+          "back": "The kernel returns a small negative value (e.g. -ENOENT). libc detects this, stores the positive code in the thread-local errno, and returns -1 (or NULL) to your program.",
+          "hint": "Negative from kernel; -1 plus errno from libc."
+        },
+        {
+          "id": "kernel-userspace-syscalls-l3-fc3",
+          "type": "flashcard",
+          "front": "Syscall vs interrupt: what is the key difference?",
+          "back": "A syscall is synchronous and voluntary — user code executes a trap and expects to resume. An interrupt is asynchronous and imposed — a hardware device or event diverts the CPU regardless of what was running. Both enter the kernel.",
+          "hint": "Requested by you vs forced by hardware."
+        },
+        {
+          "id": "kernel-userspace-syscalls-l3-fc4",
+          "type": "flashcard",
+          "front": "What do copy_to_user() and copy_from_user() do, and why not a plain memcpy?",
+          "back": "They move data across the user/kernel boundary while validating the userspace address can be safely accessed. A bad user pointer makes them fail cleanly (returning an error) instead of faulting in ring 0 and crashing or corrupting the kernel.",
+          "hint": "Safe, validated copies across the trust boundary."
+        },
+        {
+          "id": "kernel-userspace-syscalls-l3-fc5",
+          "type": "flashcard",
+          "front": "Which file reveals the syscall a running process is currently blocked in, and how is that useful?",
+          "back": "/proc/<pid>/syscall. It tells you what a hung or slow process is waiting on (e.g. a read on a network fd) without attaching strace, which is handy for a quick, low-impact diagnosis.",
+          "hint": "Under /proc, per-PID, single line."
+        },
+        {
+          "id": "kernel-userspace-syscalls-l3-mcq1",
+          "type": "mcq",
+          "prompt": "During a read() that misses the page cache and goes to disk, what is the calling process typically doing?",
+          "choices": [
+            "Busy-spinning in ring 3 polling the disk register directly",
+            "Sleeping (S or D state) while the kernel issues block I/O and DMA fills a buffer",
+            "Running in ring 0 the entire time at 100% CPU",
+            "Killed and restarted by the scheduler"
+          ],
+          "answerIndex": 1,
+          "explanation": "On a cache miss the process is put to sleep (interruptible S, or uninterruptible D during the actual transfer) so the CPU can run other work. A completion interrupt from the device later wakes it. User code never polls the disk register directly — that is ring-0 driver territory."
+        },
+        {
+          "id": "kernel-userspace-syscalls-l3-mcq2",
+          "type": "mcq",
+          "prompt": "strace prints: openat(AT_FDCWD, \"/etc/secret\", O_RDONLY) = -1 EACCES (Permission denied). What do you conclude?",
+          "choices": [
+            "The file does not exist",
+            "The syscall succeeded but returned no data",
+            "The open failed due to permissions; errno was set to EACCES and the call returned -1",
+            "strace itself crashed"
+          ],
+          "answerIndex": 2,
+          "explanation": "The return value -1 with EACCES means the openat syscall failed specifically on permissions (not a missing file, which would be ENOENT). This is the canonical strace workflow: find the first failing syscall and read its errno to pinpoint the real problem."
+        },
+        {
+          "id": "kernel-userspace-syscalls-l3-mcq3",
+          "type": "mcq",
+          "prompt": "Which command gives you a histogram of how many times each syscall was made and the time spent in each?",
+          "choices": [
+            "strace -f program",
+            "strace -c program",
+            "ltrace -S program",
+            "cat /proc/self/syscall"
+          ],
+          "answerIndex": 1,
+          "explanation": "strace -c produces a summary table: calls, errors, and time per syscall. -f follows child processes (forks) but still shows the per-call trace; ltrace traces library calls; /proc/self/syscall shows only the current single syscall."
+        },
+        {
+          "id": "kernel-userspace-syscalls-l3-mcq4",
+          "type": "mcq",
+          "prompt": "Why does the kernel use copy_to_user() to deliver read() data into your buffer instead of memcpy()?",
+          "choices": [
+            "memcpy is slower than copy_to_user",
+            "copy_to_user encrypts the data in transit",
+            "The user pointer is untrusted; copy_to_user validates it and fails safely instead of faulting in ring 0",
+            "memcpy cannot copy more than 4096 bytes"
+          ],
+          "answerIndex": 2,
+          "explanation": "The destination pointer came from ring 3 and could be invalid or hostile. copy_to_user checks the address and handles a fault gracefully (returning bytes-not-copied) rather than letting a bad dereference crash or compromise the kernel. It is the trust boundary expressed in code."
+        }
+      ]
+    }
+  ]
+}
