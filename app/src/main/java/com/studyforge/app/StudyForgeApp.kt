@@ -3,13 +3,16 @@ package com.studyforge.app
 import android.app.Application
 import android.content.Context
 import androidx.room.Room
+import coil.ImageLoader
+import coil.ImageLoaderFactory
+import coil.decode.SvgDecoder
 import com.studyforge.app.data.PackRepository
 import com.studyforge.app.data.StudyDatabase
 import com.studyforge.app.data.StudyRepository
 import com.studyforge.app.notifications.ReminderScheduler
 import com.studyforge.app.notifications.ensureNotificationChannel
 
-class StudyForgeApp : Application() {
+class StudyForgeApp : Application(), ImageLoaderFactory {
     lateinit var container: AppContainer
         private set
 
@@ -19,6 +22,12 @@ class StudyForgeApp : Application() {
         ensureNotificationChannel(this)
         ReminderScheduler.scheduleNext(this)
     }
+
+    // App-wide Coil loader with SVG support; disk cache makes images available offline after first view.
+    override fun newImageLoader(): ImageLoader =
+        ImageLoader.Builder(this)
+            .components { add(SvgDecoder.Factory()) }
+            .build()
 }
 
 /** Lightweight manual DI container (no Hilt, to keep the scaffold lean). */

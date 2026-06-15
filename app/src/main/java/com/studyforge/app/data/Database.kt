@@ -76,9 +76,12 @@ interface PackDao {
 
 @Dao
 interface ItemDao {
-    /** IGNORE preserves existing SRS state when a newer pack version is re-imported. */
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAll(items: List<ItemEntity>)
+
+    /** Insert-or-replace; the repository carries forward SRS state for existing rows. */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(item: ItemEntity)
 
     @Update
     suspend fun update(item: ItemEntity)

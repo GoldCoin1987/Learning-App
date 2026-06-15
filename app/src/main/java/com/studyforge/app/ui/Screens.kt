@@ -1,6 +1,8 @@
 package com.studyforge.app.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -35,6 +38,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import coil.compose.AsyncImage
 import com.studyforge.app.AppContainer
 import com.studyforge.app.data.StudyCard
 import com.studyforge.app.data.SubtopicSummary
@@ -251,45 +255,51 @@ private fun CardView(card: StudyCard, position: Int, total: Int, onGrade: (Int) 
     var revealed by remember(item.id) { mutableStateOf(false) }
     var selected by remember(item.id) { mutableStateOf<Int?>(null) }
 
-    Column(modifier = Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         Text("$position / $total", style = MaterialTheme.typography.labelMedium)
         Text("${card.subtopicTitle} › ${card.lessonTitle}", style = MaterialTheme.typography.labelMedium)
         HorizontalDivider()
 
         if (item.type == ItemType.FLASHCARD) {
-            Text(item.front.orEmpty(), style = MaterialTheme.typography.titleLarge)
+            RichText(item.front.orEmpty(), textSizeSp = 20f)
+            item.image?.let { CardImage(it) }
             if (revealed) {
-                Spacer(Modifier.height(8.dp))
-                Text(item.back.orEmpty(), style = MaterialTheme.typography.bodyLarge)
+                HorizontalDivider()
+                RichText(item.back.orEmpty(), textSizeSp = 17f)
+                item.backImage?.let { CardImage(it) }
             }
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(8.dp))
             if (!revealed) {
-                item.hint?.let { Text("Hint: $it", style = MaterialTheme.typography.bodySmall) }
+                item.hint?.let { RichText("Hint: $it", textSizeSp = 14f) }
                 Button(onClick = { revealed = true }, modifier = Modifier.fillMaxWidth()) { Text("Reveal answer") }
             } else {
                 GradeButtons(onGrade)
             }
         } else { // MCQ
-            Text(item.prompt.orEmpty(), style = MaterialTheme.typography.titleLarge)
-            Spacer(Modifier.height(8.dp))
+            RichText(item.prompt.orEmpty(), textSizeSp = 20f)
+            item.image?.let { CardImage(it) }
+            Spacer(Modifier.height(4.dp))
             item.choices.forEachIndexed { i, choice ->
                 val show = selected != null
                 val correct = item.answerIndex == i
+                val marker = when {
+                    show && correct -> "✓ "
+                    show && selected == i -> "✗ "
+                    else -> ""
+                }
                 OutlinedButton(
                     onClick = { if (selected == null) selected = i },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    val marker = when {
-                        show && correct -> "✓ "
-                        show && selected == i -> "✗ "
-                        else -> ""
-                    }
-                    Text("$marker$choice")
+                    RichText(marker + choice, modifier = Modifier.fillMaxWidth(), textSizeSp = 15f)
                 }
             }
             if (selected != null) {
                 Spacer(Modifier.height(8.dp))
-                item.explanation?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                item.explanation?.let { RichText(it, textSizeSp = 16f) }
                 Spacer(Modifier.height(8.dp))
                 Button(
                     onClick = { onGrade(if (selected == item.answerIndex) Sm2.GRADE_GOOD else Sm2.GRADE_AGAIN) },
@@ -298,6 +308,15 @@ private fun CardView(card: StudyCard, position: Int, total: Int, onGrade: (Int) 
             }
         }
     }
+}
+
+@Composable
+private fun CardImage(url: String) {
+    AsyncImage(
+        model = url,
+        contentDescription = null,
+        modifier = Modifier.fillMaxWidth().heightIn(max = 260.dp),
+    )
 }
 
 @Composable

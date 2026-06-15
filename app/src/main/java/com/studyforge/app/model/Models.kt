@@ -74,4 +74,8 @@ data class Item(
     val choices: List<String> = emptyList(),
     val answerIndex: Int? = null,
     val explanation: String? = null,
+    // optional images (absolute URLs; PNG/JPG/SVG). `image` shows with the front/prompt,
+    // `backImage` with a flashcard's answer side. Text fields may contain LaTeX ($...$ / $$...$$).
+    val image: String? = null,
+    val backImage: String? = null,
 )

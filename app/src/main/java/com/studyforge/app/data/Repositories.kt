@@ -6,6 +6,7 @@ import com.studyforge.app.model.Item
 import com.studyforge.app.model.Lesson
 import com.studyforge.app.model.Pack
 import com.studyforge.app.model.Subtopic
+import androidx.room.withTransaction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -39,7 +40,7 @@ class PackRepository(
         install(pack, todayEpochDay)
     }
 
-    suspend fun install(pack: Pack, todayEpochDay: Long) {
+    suspend fun install(pack: Pack, todayEpochDay: Long) = db.withTransaction {
         db.packDao().upsert(
             PackEntity(
                 id = pack.id,
@@ -50,16 +51,24 @@ class PackRepository(
                 installedAt = todayEpochDay,
             )
         )
-        val entities = buildList {
-            for (subtopic in pack.subtopics) {
-                for (lesson in subtopic.lessons) {
-                    for (item in lesson.items) {
-                        add(item.toEntity(pack.id, subtopic, lesson, todayEpochDay))
-                    }
+        for (subtopic in pack.subtopics) {
+            for (lesson in subtopic.lessons) {
+                for (item in lesson.items) {
+                    val fresh = item.toEntity(pack.id, subtopic, lesson, todayEpochDay)
+                    val existing = db.itemDao().getItem(pack.id, item.id)
+                    // Update content on re-import, but carry forward SRS progress for known items.
+                    val merged = if (existing != null) fresh.copy(
+                        ef = existing.ef,
+                        intervalDays = existing.intervalDays,
+                        reps = existing.reps,
+                        dueEpochDay = existing.dueEpochDay,
+                        lastReviewedEpochDay = existing.lastReviewedEpochDay,
+                        introduced = existing.introduced,
+                    ) else fresh
+                    db.itemDao().upsert(merged)
                 }
             }
         }
-        db.itemDao().insertAll(entities)
     }
 
     private fun httpGet(url: String): String {
