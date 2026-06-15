@@ -11,10 +11,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import io.noties.markwon.Markwon
 import io.noties.markwon.ext.latex.JLatexMathPlugin
+import io.noties.markwon.inlineparser.MarkwonInlineParserPlugin
 
 /**
- * Renders a text field as markdown with inline/block LaTeX (`$...$` and `$$...$$`), via Markwon +
- * JLatexMath (native, offline). Plain text passes through unchanged, so existing cards still work.
+ * Renders a text field as markdown with inline/block LaTeX (`$...$` and `$$...$$`).
+ * Inline LaTeX requires MarkwonInlineParserPlugin to be registered alongside JLatexMathPlugin.
+ * Rendering is wrapped defensively: any unparseable LaTeX falls back to plain text instead of crashing.
  */
 @Composable
 fun RichText(text: String, modifier: Modifier = Modifier, textSizeSp: Float = 16f) {
@@ -23,10 +25,16 @@ fun RichText(text: String, modifier: Modifier = Modifier, textSizeSp: Float = 16
     val sizePx = TypedValue.applyDimension(
         TypedValue.COMPLEX_UNIT_SP, textSizeSp, context.resources.displayMetrics,
     )
-    val markwon = remember {
-        Markwon.builder(context)
-            .usePlugin(JLatexMathPlugin.create(sizePx) { builder -> builder.inlinesEnabled(true) })
-            .build()
+    val markwon = remember(sizePx) {
+        runCatching {
+            Markwon.builder(context)
+                .usePlugin(MarkwonInlineParserPlugin.create())
+                .usePlugin(JLatexMathPlugin.create(sizePx) { builder ->
+                    builder.inlinesEnabled(true)
+                    builder.blocksEnabled(true)
+                })
+                .build()
+        }.getOrNull()
     }
     AndroidView(
         modifier = modifier,
@@ -37,7 +45,13 @@ fun RichText(text: String, modifier: Modifier = Modifier, textSizeSp: Float = 16
         },
         update = { tv ->
             tv.setTextColor(colorArgb)
-            markwon.setMarkdown(tv, text)
+            val mw = markwon
+            if (mw == null) {
+                tv.text = text
+            } else {
+                runCatching { mw.setMarkdown(tv, text) }
+                    .onFailure { tv.text = text }
+            }
         },
     )
 }

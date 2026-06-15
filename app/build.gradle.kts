@@ -14,8 +14,8 @@ android {
         applicationId = "com.studyforge.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.4.0"
+        versionCode = 5
+        versionName = "0.4.1"
     }
 
     buildTypes {
@@ -64,6 +64,7 @@ dependencies {
 
     implementation(libs.markwon.core)
     implementation(libs.markwon.ext.latex)
+    implementation(libs.markwon.inline.parser)
     implementation(libs.coil.compose)
     implementation(libs.coil.svg)
 }
