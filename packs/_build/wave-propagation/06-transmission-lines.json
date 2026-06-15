@@ -1,0 +1,367 @@
+{
+  "id": "transmission-lines",
+  "title": "Transmission Lines & the Telegrapher's Equations",
+  "order": 6,
+  "lessons": [
+    {
+      "id": "transmission-lines-l1",
+      "title": "When a Wire Becomes a Transmission Line",
+      "order": 1,
+      "difficulty": 1,
+      "content": "You spent years treating wires as ideal nodes: voltage is the same everywhere on them, instantly. That model is a *lumped* approximation, and it quietly fails when the line gets **electrically long** — when its physical length is no longer tiny compared to the signal's wavelength.\n\nThe rule of thumb: treat a line as lumped only if its length $l \\lesssim \\lambda/10$. Once $l$ approaches $\\lambda$, the finite propagation speed matters. A signal launched at one end takes real time to reach the other; while it's in transit the voltage genuinely differs from point to point. The line now stores energy in distributed inductance and capacitance and must be modeled as a **distributed** structure.\n\nWavelength on the line is $\\lambda = v_p / f$, where $v_p$ is the phase velocity (often $\\sim 2/3\\,c$ on coax). So 'high frequency' isn't an absolute — a 1 m trace is lumped at 1 MHz ($\\lambda = 300$ m) but distributed at 1 GHz ($\\lambda = 30$ cm).\n\nThis is exactly why a fast digital edge on a long PCB trace *rings*: the edge has high-frequency content, the trace is electrically long for that content, and energy reflects off the unmatched far end and bounces back. The same physics you saw on radar feed cables governs a DDR clock line. The takeaway: **always compare $l$ to $\\lambda$ before deciding which model applies.** When in doubt, the distributed model is the safe choice — it reduces to the lumped one in the short-line limit.",
+      "items": [
+        {
+          "id": "transmission-lines-l1-fc1",
+          "type": "flashcard",
+          "front": "What makes a wire 'electrically long' enough to need a transmission-line model?",
+          "back": "Its physical length becomes a non-negligible fraction of the wavelength (rule of thumb $l \\gtrsim \\lambda/10$), so finite propagation delay makes voltage vary along the line.",
+          "hint": "Compare physical length to $\\lambda$."
+        },
+        {
+          "id": "transmission-lines-l1-fc2",
+          "type": "flashcard",
+          "front": "Write the relationship between wavelength on a line, phase velocity, and frequency.",
+          "back": "$\\lambda = v_p / f$. Higher frequency shrinks $\\lambda$, so the same physical line becomes electrically longer.",
+          "hint": "It's the same $v = f\\lambda$ you already know."
+        },
+        {
+          "id": "transmission-lines-l1-fc3",
+          "type": "flashcard",
+          "front": "Why does a fast digital edge ring on a long PCB trace?",
+          "back": "The edge contains high-frequency content for which the trace is electrically long; the unmatched far end reflects energy that travels back, producing overshoot and ringing.",
+          "hint": "Reflections plus an unterminated end."
+        },
+        {
+          "id": "transmission-lines-l1-fc4",
+          "type": "flashcard",
+          "front": "What four distributed (per-unit-length) parameters describe any transmission line?",
+          "back": "Series resistance $R$, series inductance $L$, shunt conductance $G$, and shunt capacitance $C$ — the R, L, G, C model.",
+          "hint": "Two series, two shunt."
+        },
+        {
+          "id": "transmission-lines-l1-mc1",
+          "type": "mcq",
+          "prompt": "A 1 m trace carries a signal with $v_p = 2\\times10^8$ m/s. At roughly what frequency does it start behaving as a transmission line (using $l \\approx \\lambda/10$)?",
+          "choices": ["~2 MHz", "~20 MHz", "~200 MHz", "~2 GHz"],
+          "answerIndex": 1,
+          "explanation": "$\\lambda = 10l = 10$ m, so $f = v_p/\\lambda = 2\\times10^8 / 10 = 2\\times10^7$ Hz = 20 MHz. Above this the line is no longer safely lumped."
+        },
+        {
+          "id": "transmission-lines-l1-mc2",
+          "type": "mcq",
+          "prompt": "The lumped-circuit model assumes:",
+          "choices": ["Voltage and current are uniform across the element at any instant", "Signals propagate at exactly the speed of light", "The line has no capacitance", "Reflections always occur at both ends"],
+          "answerIndex": 0,
+          "explanation": "Lumped analysis treats an element as a single node/pair where V and I are spatially uniform. That holds only when propagation delay across it is negligible versus the signal period."
+        },
+        {
+          "id": "transmission-lines-l1-mc3",
+          "type": "mcq",
+          "prompt": "Which statement about the distributed model is correct?",
+          "choices": ["It only applies above 1 GHz", "It reduces to the lumped model in the short-line limit", "It ignores propagation delay", "It requires the line to be lossless"],
+          "answerIndex": 1,
+          "explanation": "The distributed model is general; as $l/\\lambda \\to 0$ the delay vanishes and it collapses to the familiar lumped approximation. It is always the safe default."
+        },
+        {
+          "id": "transmission-lines-l1-mc4",
+          "type": "mcq",
+          "prompt": "A 1 m coax line carries a 1 MHz signal with $\\lambda = 200$ m. The appropriate model is:",
+          "choices": ["Distributed, because all coax is distributed", "Lumped, because $l \\ll \\lambda/10$", "Neither model applies", "Depends on the load only"],
+          "answerIndex": 1,
+          "explanation": "$\\lambda/10 = 20$ m and $l = 1$ m $\\ll 20$ m, so the line is electrically short and a lumped model is fine at 1 MHz."
+        },
+        {
+          "id": "transmission-lines-l1-mc5",
+          "type": "mcq",
+          "prompt": "Why is 'high frequency' not an absolute threshold for needing a transmission-line model?",
+          "choices": ["Because it depends only on the load impedance", "Because what matters is the ratio of physical length to wavelength, not frequency alone", "Because all lines are lossless below 100 MHz", "Because phase velocity is always c"],
+          "answerIndex": 1,
+          "explanation": "The same frequency is 'low' on a short line and 'high' on a long one. The decisive quantity is $l/\\lambda$, which couples both length and frequency (via $v_p$)."
+        }
+      ]
+    },
+    {
+      "id": "transmission-lines-l2",
+      "title": "The RLGC Model & Telegrapher's Equations",
+      "order": 2,
+      "difficulty": 2,
+      "content": "Model a line as an infinite ladder of identical sections, each of length $\\Delta z$: a series $R\\,\\Delta z$ and $L\\,\\Delta z$, then a shunt $G\\,\\Delta z$ and $C\\,\\Delta z$ to the return conductor. Applying Kirchhoff's laws to one section and letting $\\Delta z \\to 0$ gives the **telegrapher's equations**:\n\n$$\\frac{\\partial V}{\\partial z} = -\\left(R + j\\omega L\\right) I, \\qquad \\frac{\\partial I}{\\partial z} = -\\left(G + j\\omega C\\right) V$$\n\nDifferentiate one and substitute the other to decouple them into wave equations:\n\n$$\\frac{d^2 V}{dz^2} = \\gamma^2 V, \\qquad \\gamma = \\sqrt{(R + j\\omega L)(G + j\\omega C)} = \\alpha + j\\beta$$\n\nHere $\\gamma$ is the **complex propagation constant**: $\\alpha$ (Np/m) is attenuation, $\\beta$ (rad/m) is the phase constant, with $\\beta = 2\\pi/\\lambda$ and phase velocity $v_p = \\omega/\\beta$. The solution is a sum of forward and backward traveling waves, $V(z) = V_0^+ e^{-\\gamma z} + V_0^- e^{+\\gamma z}$.\n\nThe ratio of voltage to current in a single traveling wave defines the **characteristic impedance**:\n\n$$Z_0 = \\sqrt{\\frac{R + j\\omega L}{G + j\\omega C}}$$\n\nFor a **lossless** line ($R = G = 0$) this collapses to the clean result $Z_0 = \\sqrt{L/C}$, which is purely real and frequency-independent — the reason a well-made 50 $\\Omega$ coax looks like 50 $\\Omega$ across a huge band. For a **low-loss** line $Z_0 \\approx \\sqrt{L/C}$ still holds to good approximation, with loss appearing mainly as a small $\\alpha$.",
+      "items": [
+        {
+          "id": "transmission-lines-l2-fc1",
+          "type": "flashcard",
+          "front": "State the two telegrapher's equations (phasor form).",
+          "back": "$\\frac{dV}{dz} = -(R + j\\omega L) I$ and $\\frac{dI}{dz} = -(G + j\\omega C) V$. Decoupling them yields $\\frac{d^2V}{dz^2} = \\gamma^2 V$.",
+          "hint": "Series impedance acts on I; shunt admittance acts on V."
+        },
+        {
+          "id": "transmission-lines-l2-fc2",
+          "type": "flashcard",
+          "front": "Define the complex propagation constant $\\gamma$ and its parts.",
+          "back": "$\\gamma = \\sqrt{(R + j\\omega L)(G + j\\omega C)} = \\alpha + j\\beta$, where $\\alpha$ is attenuation (Np/m) and $\\beta$ is the phase constant (rad/m), with $\\beta = 2\\pi/\\lambda$.",
+          "hint": "Real part attenuates, imaginary part advances phase."
+        },
+        {
+          "id": "transmission-lines-l2-fc3",
+          "type": "flashcard",
+          "front": "Give the general and lossless expressions for characteristic impedance.",
+          "back": "General: $Z_0 = \\sqrt{(R + j\\omega L)/(G + j\\omega C)}$. Lossless ($R=G=0$): $Z_0 = \\sqrt{L/C}$, real and frequency-independent.",
+          "hint": "Set the loss terms to zero."
+        },
+        {
+          "id": "transmission-lines-l2-fc4",
+          "type": "flashcard",
+          "front": "What does the general line voltage solution $V(z) = V_0^+ e^{-\\gamma z} + V_0^- e^{+\\gamma z}$ represent physically?",
+          "back": "A superposition of a forward-traveling wave ($e^{-\\gamma z}$, toward the load) and a backward-traveling reflected wave ($e^{+\\gamma z}$, toward the source).",
+          "hint": "Two directions of travel."
+        },
+        {
+          "id": "transmission-lines-l2-fc5",
+          "type": "flashcard",
+          "front": "How is phase velocity obtained from the telegrapher's solution?",
+          "back": "$v_p = \\omega / \\beta$. For a lossless line $\\beta = \\omega\\sqrt{LC}$, giving $v_p = 1/\\sqrt{LC}$, independent of frequency (no dispersion).",
+          "hint": "Phase velocity = $\\omega$ over the phase constant."
+        },
+        {
+          "id": "transmission-lines-l2-diag1",
+          "type": "flashcard",
+          "front": "Identify the four elements in one section of the per-unit-length transmission-line model and their placement.",
+          "back": "Series branch: $R\\,\\Delta z$ then $L\\,\\Delta z$. Shunt branch (to return): $G\\,\\Delta z$ in parallel with $C\\,\\Delta z$. Cascading infinitely many such sections models the line.",
+          "hint": "Two series, two shunt — see the diagram.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/transmission-lines-1.svg"
+        },
+        {
+          "id": "transmission-lines-l2-mc1",
+          "type": "mcq",
+          "prompt": "For a lossless line with $L = 250$ nH/m and $C = 100$ pF/m, $Z_0$ is approximately:",
+          "choices": ["25 Ω", "50 Ω", "100 Ω", "75 Ω"],
+          "answerIndex": 1,
+          "explanation": "$Z_0 = \\sqrt{L/C} = \\sqrt{250\\times10^{-9}/100\\times10^{-12}} = \\sqrt{2500} = 50\\,\\Omega$."
+        },
+        {
+          "id": "transmission-lines-l2-mc2",
+          "type": "mcq",
+          "prompt": "Which condition makes $Z_0$ purely real and independent of frequency?",
+          "choices": ["$R = G = 0$ (lossless)", "$L = C$", "$\\omega \\to 0$", "$R = L$ and $G = C$"],
+          "answerIndex": 0,
+          "explanation": "With $R=G=0$, $Z_0 = \\sqrt{j\\omega L / j\\omega C} = \\sqrt{L/C}$ — the $\\omega$ cancels, leaving a real, frequency-independent value."
+        },
+        {
+          "id": "transmission-lines-l2-mc3",
+          "type": "mcq",
+          "prompt": "In $\\gamma = \\alpha + j\\beta$, what are the units of $\\alpha$ and $\\beta$ respectively?",
+          "choices": ["dB/m and Hz", "Np/m and rad/m", "rad/m and Np/m", "Ω/m and S/m"],
+          "answerIndex": 1,
+          "explanation": "$\\alpha$ is the attenuation constant in nepers per meter; $\\beta$ is the phase constant in radians per meter (1 Np = 8.686 dB)."
+        },
+        {
+          "id": "transmission-lines-l2-mc4",
+          "type": "mcq",
+          "prompt": "The telegrapher's equations are derived from the RLGC section by applying:",
+          "choices": ["Maxwell's equations directly in 3D", "Kirchhoff's voltage and current laws to a section as Δz → 0", "The Smith chart construction", "Snell's law at the section boundary"],
+          "answerIndex": 1,
+          "explanation": "KVL around the series R-L and KCL at the shunt G-C node, then taking the limit $\\Delta z \\to 0$, yields the coupled first-order telegrapher's equations."
+        },
+        {
+          "id": "transmission-lines-l2-mc5",
+          "type": "mcq",
+          "prompt": "On a low-loss line, what is the practical effect of small but nonzero $R$ and $G$?",
+          "choices": ["$Z_0$ becomes infinite", "$Z_0 \\approx \\sqrt{L/C}$ still, but a small $\\alpha$ attenuates the wave", "The line stops propagating waves", "Phase velocity exceeds c"],
+          "answerIndex": 1,
+          "explanation": "For low loss, $Z_0$ stays close to $\\sqrt{L/C}$; the chief consequence of $R$ and $G$ is a nonzero attenuation constant $\\alpha$, slowly shrinking the wave amplitude with distance."
+        }
+      ]
+    },
+    {
+      "id": "transmission-lines-l3",
+      "title": "Reflections, Reflection Coefficient & VSWR",
+      "order": 3,
+      "difficulty": 2,
+      "content": "When a forward wave hits a load $Z_L$ that does not equal $Z_0$, it cannot satisfy the load's V/I ratio alone, so part of it reflects. The **load reflection coefficient** is\n\n$$\\Gamma_L = \\frac{Z_L - Z_0}{Z_L + Z_0}$$\n\nIt's complex, with $|\\Gamma_L| \\le 1$ for passive loads. Three terminations anchor your intuition:\n\n- **Matched** ($Z_L = Z_0$): $\\Gamma_L = 0$. All power delivered, no reflection — the goal.\n- **Open** ($Z_L \\to \\infty$): $\\Gamma_L = +1$. Full reflection, voltage doubles at the open.\n- **Short** ($Z_L = 0$): $\\Gamma_L = -1$. Full reflection with a $180^\\circ$ phase flip, voltage null at the short.\n\nA reflected wave interferes with the incident one to form a **standing wave**: a stationary pattern of voltage maxima and minima. Adjacent maxima (or minima) are spaced $\\lambda/2$ apart, and a maximum and the next minimum are $\\lambda/4$ apart. The severity is captured by the **voltage standing wave ratio**:\n\n$$\\text{VSWR} = \\frac{V_{\\max}}{V_{\\min}} = \\frac{1 + |\\Gamma|}{1 - |\\Gamma|}$$\n\nVSWR runs from 1 (perfect match) to $\\infty$ (total reflection). The related **return loss** is $RL = -20\\log_{10}|\\Gamma|$ dB — a large positive dB number means a good match. These are the first numbers any RF or radar tech reads off a meter: a VSWR of 2:1 ($|\\Gamma| = 1/3$, $RL \\approx 9.5$ dB) is a common 'still acceptable' threshold for an antenna feed.",
+      "items": [
+        {
+          "id": "transmission-lines-l3-fc1",
+          "type": "flashcard",
+          "front": "Write the load reflection coefficient in terms of $Z_L$ and $Z_0$.",
+          "back": "$\\Gamma_L = \\dfrac{Z_L - Z_0}{Z_L + Z_0}$. It is complex; $|\\Gamma_L| \\le 1$ for a passive load.",
+          "hint": "Difference over sum."
+        },
+        {
+          "id": "transmission-lines-l3-fc2",
+          "type": "flashcard",
+          "front": "Give $\\Gamma_L$ for matched, open, and short terminations.",
+          "back": "Matched ($Z_L=Z_0$): $\\Gamma_L=0$. Open ($Z_L\\to\\infty$): $\\Gamma_L=+1$. Short ($Z_L=0$): $\\Gamma_L=-1$ (180° flip).",
+          "hint": "0, +1, -1."
+        },
+        {
+          "id": "transmission-lines-l3-fc3",
+          "type": "flashcard",
+          "front": "Relate VSWR to the magnitude of the reflection coefficient.",
+          "back": "$\\text{VSWR} = \\dfrac{1 + |\\Gamma|}{1 - |\\Gamma|}$, ranging from 1 (matched) to $\\infty$ (total reflection).",
+          "hint": "One plus over one minus."
+        },
+        {
+          "id": "transmission-lines-l3-fc4",
+          "type": "flashcard",
+          "front": "What is the spacing between adjacent voltage maxima on a standing-wave pattern, and between a max and the next min?",
+          "back": "Adjacent maxima (or minima) are $\\lambda/2$ apart; a maximum and the next minimum are $\\lambda/4$ apart.",
+          "hint": "Half a wavelength and a quarter."
+        },
+        {
+          "id": "transmission-lines-l3-fc5",
+          "type": "flashcard",
+          "front": "Define return loss and state what a large value means.",
+          "back": "$RL = -20\\log_{10}|\\Gamma|$ dB. A large positive dB value means small $|\\Gamma|$ — i.e. a good match (little reflected power).",
+          "hint": "It's $|\\Gamma|$ in dB, sign-flipped."
+        },
+        {
+          "id": "transmission-lines-l3-diag1",
+          "type": "flashcard",
+          "front": "On a standing-wave plot of $|V(z)|$, how do you read VSWR, and what spacing separates the minima?",
+          "back": "VSWR is the ratio of the envelope's maximum to its minimum, $V_{\\max}/V_{\\min}$. Successive minima (and maxima) are separated by $\\lambda/2$.",
+          "hint": "Ratio of the dashed envelope lines.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/transmission-lines-2.svg"
+        },
+        {
+          "id": "transmission-lines-l3-mc1",
+          "type": "mcq",
+          "prompt": "A 75 Ω load terminates a 50 Ω line. What is $\\Gamma_L$?",
+          "choices": ["0.2", "0.5", "0.33", "-0.2"],
+          "answerIndex": 0,
+          "explanation": "$\\Gamma_L = (75-50)/(75+50) = 25/125 = 0.2$. Real and positive because $Z_L > Z_0$ and both are real."
+        },
+        {
+          "id": "transmission-lines-l3-mc2",
+          "type": "mcq",
+          "prompt": "If $|\\Gamma| = 0.5$, the VSWR is:",
+          "choices": ["1.5", "2", "3", "0.5"],
+          "answerIndex": 2,
+          "explanation": "$\\text{VSWR} = (1+0.5)/(1-0.5) = 1.5/0.5 = 3$, i.e. 3:1."
+        },
+        {
+          "id": "transmission-lines-l3-mc3",
+          "type": "mcq",
+          "prompt": "A shorted termination ($Z_L = 0$) produces a reflection coefficient of:",
+          "choices": ["+1 with no phase change", "0", "-1, a full reflection with 180° phase flip", "0.5"],
+          "answerIndex": 2,
+          "explanation": "$\\Gamma_L = (0 - Z_0)/(0 + Z_0) = -1$: total reflection with a $180^\\circ$ phase inversion, forcing a voltage null at the short."
+        },
+        {
+          "id": "transmission-lines-l3-mc4",
+          "type": "mcq",
+          "prompt": "A VSWR of 2:1 corresponds to a return loss of approximately:",
+          "choices": ["3 dB", "6 dB", "9.5 dB", "20 dB"],
+          "answerIndex": 2,
+          "explanation": "VSWR 2 gives $|\\Gamma| = (2-1)/(2+1) = 1/3$. $RL = -20\\log_{10}(1/3) \\approx 9.54$ dB."
+        },
+        {
+          "id": "transmission-lines-l3-mc5",
+          "type": "mcq",
+          "prompt": "What physically creates a standing wave on a mismatched line?",
+          "choices": ["Attenuation along the line", "Interference between the incident and reflected traveling waves", "Dispersion of the phase velocity", "Skin effect in the conductor"],
+          "answerIndex": 1,
+          "explanation": "The forward and reflected waves superpose to form a stationary interference pattern of fixed maxima and minima — the standing wave."
+        }
+      ]
+    },
+    {
+      "id": "transmission-lines-l4",
+      "title": "Input Impedance, the λ/4 Transformer & Stubs",
+      "order": 4,
+      "difficulty": 3,
+      "content": "Looking into a line of length $l$ terminated in $Z_L$, the impedance you see depends on how far you are from the load, because the reflected wave's phase rotates as it travels. For a lossless line:\n\n$$Z_{in}(l) = Z_0 \\frac{Z_L + jZ_0 \\tan\\beta l}{Z_0 + jZ_L \\tan\\beta l}$$\n\nThis single equation contains the most useful tricks in RF. **Quarter-wave** ($l = \\lambda/4$, so $\\beta l = \\pi/2$, $\\tan\\beta l \\to \\infty$): the formula reduces to\n\n$$Z_{in} = \\frac{Z_0^2}{Z_L}$$\n\nThe line *inverts* the load. This is the **quarter-wave transformer**: to match a real load $Z_L$ to a source $Z_S$, insert a $\\lambda/4$ section with $Z_0 = \\sqrt{Z_S Z_L}$. To match 100 $\\Omega$ to 50 $\\Omega$, use $Z_0 = \\sqrt{50\\cdot100} \\approx 70.7\\,\\Omega$. **Half-wave** ($l = \\lambda/2$): $\\tan\\beta l = 0$, so $Z_{in} = Z_L$ — the line repeats the load impedance every half wavelength, regardless of $Z_0$.\n\n**Stubs** exploit the open/short cases. A shorted line ($Z_L = 0$) gives $Z_{in} = jZ_0\\tan\\beta l$ — a pure reactance you can dial to any value (inductive or capacitive) by choosing $l$. An open line gives $Z_{in} = -jZ_0\\cot\\beta l$. So a stub is a lossless, tunable reactance: when you need a specific $+jX$ or $-jX$ to cancel a load's reactive part, you reach for a stub of the right length. This is the foundation of single- and double-stub matching networks, the topic of the next module's Smith-chart work.",
+      "items": [
+        {
+          "id": "transmission-lines-l4-fc1",
+          "type": "flashcard",
+          "front": "Write the lossless input-impedance formula for a line of length $l$ terminated in $Z_L$.",
+          "back": "$Z_{in}(l) = Z_0 \\dfrac{Z_L + jZ_0 \\tan\\beta l}{Z_0 + jZ_L \\tan\\beta l}$.",
+          "hint": "$Z_0$ times (load + j Z0 tan) over (Z0 + j load tan)."
+        },
+        {
+          "id": "transmission-lines-l4-fc2",
+          "type": "flashcard",
+          "front": "What does a quarter-wave ($\\lambda/4$) line do to the load impedance?",
+          "back": "It inverts it: $Z_{in} = Z_0^2 / Z_L$. A high load looks low and vice versa.",
+          "hint": "$\\tan(\\pi/2) \\to \\infty$ in the formula."
+        },
+        {
+          "id": "transmission-lines-l4-fc3",
+          "type": "flashcard",
+          "front": "How do you size a quarter-wave transformer to match real impedances $Z_S$ and $Z_L$?",
+          "back": "Choose the section's characteristic impedance $Z_0 = \\sqrt{Z_S Z_L}$ (geometric mean) and make it $\\lambda/4$ long.",
+          "hint": "Geometric mean of the two impedances."
+        },
+        {
+          "id": "transmission-lines-l4-fc4",
+          "type": "flashcard",
+          "front": "What is the input impedance of a half-wavelength ($\\lambda/2$) line?",
+          "back": "$Z_{in} = Z_L$. A half-wave line repeats the load impedance exactly, independent of $Z_0$. Impedance repeats every $\\lambda/2$.",
+          "hint": "$\\tan(\\pi) = 0$."
+        },
+        {
+          "id": "transmission-lines-l4-fc5",
+          "type": "flashcard",
+          "front": "Give the input reactance of a shorted stub and an open stub of length $l$.",
+          "back": "Shorted: $Z_{in} = jZ_0\\tan\\beta l$ (inductive/capacitive by length). Open: $Z_{in} = -jZ_0\\cot\\beta l$. Both are pure reactances on a lossless line.",
+          "hint": "Short uses tan, open uses cot (with a minus sign)."
+        },
+        {
+          "id": "transmission-lines-l4-fc6",
+          "type": "flashcard",
+          "front": "Why is a stub useful in a matching network?",
+          "back": "It is a lossless, length-tunable reactance. By choosing its length you produce exactly the $+jX$ or $-jX$ needed to cancel a load's reactive part.",
+          "hint": "Tunable reactance with no resistor needed."
+        },
+        {
+          "id": "transmission-lines-l4-mc1",
+          "type": "mcq",
+          "prompt": "To match a 100 Ω load to a 50 Ω line with a quarter-wave transformer, the section's $Z_0$ should be:",
+          "choices": ["50 Ω", "75 Ω", "70.7 Ω", "150 Ω"],
+          "answerIndex": 2,
+          "explanation": "$Z_0 = \\sqrt{Z_S Z_L} = \\sqrt{50\\cdot100} = \\sqrt{5000} \\approx 70.7\\,\\Omega$."
+        },
+        {
+          "id": "transmission-lines-l4-mc2",
+          "type": "mcq",
+          "prompt": "A 25 Ω load is seen through a $\\lambda/4$ section of 50 Ω line. The input impedance is:",
+          "choices": ["25 Ω", "50 Ω", "75 Ω", "100 Ω"],
+          "answerIndex": 3,
+          "explanation": "$Z_{in} = Z_0^2/Z_L = 50^2/25 = 2500/25 = 100\\,\\Omega$. The quarter-wave line inverts the load about $Z_0$."
+        },
+        {
+          "id": "transmission-lines-l4-mc3",
+          "type": "mcq",
+          "prompt": "Looking into a $\\lambda/2$ line terminated in a complex load $Z_L = 30 + j40\\ \\Omega$ on a 50 Ω line, the input impedance is:",
+          "choices": ["50 Ω", "$30 + j40\\ \\Omega$", "$30 - j40\\ \\Omega$", "$Z_0^2/Z_L$"],
+          "answerIndex": 1,
+          "explanation": "A half-wave line repeats the load exactly: $Z_{in} = Z_L = 30 + j40\\ \\Omega$, regardless of $Z_0$."
+        },
+        {
+          "id": "transmission-lines-l4-mc4",
+          "type": "mcq",
+          "prompt": "A shorted lossless stub presents what kind of input impedance?",
+          "choices": ["A pure resistance equal to $Z_0$", "A pure reactance $jZ_0\\tan\\beta l$", "Always an open circuit", "A complex impedance with equal real and imaginary parts"],
+          "answerIndex": 1,
+          "explanation": "With $Z_L = 0$, the formula gives $Z_{in} = jZ_0\\tan\\beta l$ — a purely imaginary (reactive) input, tunable via length."
+        },
+        {
+          "id": "transmission-lines-l4-mc5",
+          "type": "mcq",
+          "prompt": "A shorted stub one-eighth wavelength long ($\\beta l = \\pi/4$) on a 50 Ω line presents:",
+          "choices": ["$-j50\\ \\Omega$", "$+j50\\ \\Omega$", "$+j25\\ \\Omega$", "0 Ω"],
+          "answerIndex": 1,
+          "explanation": "$Z_{in} = j50\\tan(\\pi/4) = j50\\cdot1 = +j50\\ \\Omega$ — an inductive reactance."
+        },
+        {
+          "id": "transmission-lines-l4-mc6",
+          "type": "mcq",
+          "prompt": "Why does input impedance vary with position along a mismatched line?",
+          "choices": ["Because $Z_0$ changes with distance", "Because the reflected wave's phase rotates as it travels, changing the V/I ratio", "Because attenuation dominates", "Because the load value changes"],
+          "answerIndex": 1,
+          "explanation": "The incident and reflected waves combine with a position-dependent relative phase ($\\beta l$), so their voltage-to-current ratio — the input impedance — rotates with distance."
+        }
+      ]
+    }
+  ]
+}
