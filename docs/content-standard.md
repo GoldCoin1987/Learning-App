@@ -35,12 +35,15 @@ People learn best through visuals, so **aim for at least one diagram per lesson*
 - Good diagram types: labeled apparatus/setups, before/after, graphs with labeled axes, cycles/flows,
   comparison side-by-sides, anatomy/parts call-outs, number lines/scales.
 
-## 4. Questions (items)
+## 4. Questions (items) — MCQ-ONLY for all new content
 
-- Each lesson ≥ 8 items, roughly half **flashcards**, half **MCQs**.
-- Flashcards: one clear idea; `front` a question/prompt, `back` a complete plain-language answer; optional `hint`.
+- **All new questions are multiple choice.** Do NOT author flashcards in new content (a dedicated
+  flashcard builder is planned for later; the app/schema still supports the `flashcard` type, and
+  existing packs contain them until reworked).
+- Each lesson has **≥ 8 MCQ items**.
 - MCQs: exactly **4 string choices**, one correct (`answerIndex`, 0-based int), and an `explanation`
-  that *teaches* (why right, why the tempting wrong one is wrong) — not just "correct!".
+  that *teaches* (why right, and why the tempting wrong one is wrong) — not just "correct!".
+- Write good distractors: plausible, reflecting common beginner misconceptions, not throwaways.
 
 ## 5. Strict schema (enforced by `packs/_build/assemble.py` — do not deviate)
 
