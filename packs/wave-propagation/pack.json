@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "id": "wave-propagation",
   "title": "Wave Propagation",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "Wave propagation / EM for EE/radar/software (PARTIAL - building out): the physics gate before radar. Readings + LaTeX + diagrams; tiered easy to hard.",
   "requires": [
     "mathematics"
@@ -3776,6 +3776,311 @@
               ],
               "answerIndex": 1,
               "explanation": "Direct and ground-reflected rays interfere, producing height/range-dependent lobing; beyond the crossover distance the average power settles into the $1/d^4$ regime."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "link-budgets-noise",
+      "title": "Link Budgets, Noise & Interference",
+      "order": 12,
+      "lessons": [
+        {
+          "id": "link-budgets-noise-link-budgets-noise-l1",
+          "title": "Friis & the dB Link Budget",
+          "order": 1,
+          "difficulty": 1,
+          "content": "A **link budget** is just bookkeeping: every gain adds and every loss subtracts until you arrive at the received power. The physics behind it is the **Friis transmission equation**, which for free space gives received power as\n\n$$P_r = P_t G_t G_r \\left(\\frac{\\lambda}{4\\pi d}\\right)^2.$$\n\nThe term $\\left(\\frac{\\lambda}{4\\pi d}\\right)^2$ is the inverse of **free-space path loss** (FSPL). Note it scales with $\\lambda^2$, not $\\lambda$ — higher frequencies suffer more loss for a fixed antenna *gain*, a fact mmWave planners live with.\n\nMultiplying ratios is tedious, so RF engineers work in **decibels**, where multiplication becomes addition. Taking $10\\log_{10}$ of Friis turns it into a clean sum and difference:\n\n$$P_r(\\text{dBm}) = \\underbrace{P_t + G_t}_{\\text{EIRP}} + G_r - \\text{FSPL} - L_{\\text{misc}}.$$\n\nHere **EIRP** (effective isotropic radiated power) bundles transmit power and transmit antenna gain; $L_{\\text{misc}}$ collects connector, feedline, atmospheric, and pointing losses. FSPL in dB is\n\n$$\\text{FSPL(dB)} = 20\\log_{10}(d) + 20\\log_{10}(f) + 32.45,\\quad d\\text{ in km}, f\\text{ in MHz}.$$\n\nThe key dB unit discipline: $\\text{dBm}$ and $\\text{dBW}$ are *absolute* power references; $\\text{dBi}$ is gain over isotropic; plain $\\text{dB}$ is a *ratio*. You can add a dB to a dBm but never two dBm together. As a radar tech you read VSWR and power off meters in these units daily — this is the same arithmetic scaled up to a whole link.",
+          "items": [
+            {
+              "id": "link-budgets-noise-l1-fc1",
+              "type": "flashcard",
+              "front": "Write the Friis transmission equation in its power-ratio form.",
+              "back": "$P_r = P_t G_t G_r \\left(\\frac{\\lambda}{4\\pi d}\\right)^2$. The bracketed term is the reciprocal of free-space path loss.",
+              "hint": "It contains $(\\lambda / 4\\pi d)^2$."
+            },
+            {
+              "id": "link-budgets-noise-l1-fc2",
+              "type": "flashcard",
+              "front": "What is EIRP and how is it computed in dB?",
+              "back": "Effective Isotropic Radiated Power: the power an isotropic radiator would need to match your transmitter's peak gain. $\\text{EIRP} = P_t(\\text{dBm}) + G_t(\\text{dBi}) - L_{\\text{feed}}$."
+            },
+            {
+              "id": "link-budgets-noise-l1-fc3",
+              "type": "flashcard",
+              "front": "Why does free-space path loss increase with frequency at fixed antenna gain?",
+              "back": "Friis carries a $\\lambda^2$ factor in the received power. As $f$ rises, $\\lambda$ shrinks, so the effective aperture of a fixed-gain antenna shrinks and FSPL (proportional to $(4\\pi d/\\lambda)^2$) grows."
+            },
+            {
+              "id": "link-budgets-noise-l1-fc4",
+              "type": "flashcard",
+              "front": "Distinguish dBm, dBW, dBi, and dB.",
+              "back": "dBm/dBW are absolute power (ref 1 mW / 1 W). dBi is antenna gain relative to an isotropic radiator. Plain dB is a dimensionless ratio (gain or loss). Add dB to dBm; never add two dBm."
+            },
+            {
+              "id": "link-budgets-noise-l1-mc1",
+              "type": "mcq",
+              "prompt": "Worked budget: $P_t = 10$ dBW, $G_t = 20$ dBi, feed loss 2 dB, FSPL = 162 dB, $G_r = 40$ dBi, atmospheric loss 3 dB. What is $P_r$?",
+              "choices": [
+                "-97 dBW",
+                "-107 dBW",
+                "-87 dBW",
+                "-117 dBW"
+              ],
+              "answerIndex": 0,
+              "explanation": "EIRP = 10 + 20 - 2 = 28 dBW. $P_r$ = EIRP + $G_r$ - FSPL - atmos = 28 + 40 - 162 - 3 = -97 dBW."
+            },
+            {
+              "id": "link-budgets-noise-l1-mc2",
+              "type": "mcq",
+              "prompt": "Doubling the link distance $d$ changes FSPL by approximately:",
+              "choices": [
+                "+6 dB",
+                "+3 dB",
+                "+12 dB",
+                "+20 dB"
+              ],
+              "answerIndex": 0,
+              "explanation": "FSPL $\\propto d^2$, so doubling $d$ multiplies loss by 4, and $10\\log_{10}(4) \\approx 6$ dB."
+            },
+            {
+              "id": "link-budgets-noise-l1-mc3",
+              "type": "mcq",
+              "prompt": "Which operation is INVALID in dB bookkeeping?",
+              "choices": [
+                "Adding two dBm power levels together",
+                "Adding a dBi gain to a dBm power",
+                "Subtracting a dB loss from a dBm power",
+                "Adding a dB gain to a dBW power"
+              ],
+              "answerIndex": 0,
+              "explanation": "dBm is a logarithmic absolute power; adding two of them implies multiplying two powers, which is meaningless. Gains/losses (dB, dBi) add to or subtract from an absolute level."
+            },
+            {
+              "id": "link-budgets-noise-l1-mc4",
+              "type": "mcq",
+              "prompt": "In the dB form $P_r = \\text{EIRP} + G_r - \\text{FSPL} - L_{\\text{misc}}$, what does $L_{\\text{misc}}$ typically include?",
+              "choices": [
+                "Connector, feedline, atmospheric, rain, and pointing losses",
+                "Only the transmit antenna gain",
+                "Thermal noise power",
+                "The receiver's required SNR"
+              ],
+              "answerIndex": 0,
+              "explanation": "$L_{\\text{misc}}$ collects all the incidental losses beyond free-space spreading. Noise and required SNR enter later, when comparing $P_r$ against sensitivity."
+            },
+            {
+              "id": "link-budgets-noise-l1-mc5",
+              "type": "mcq",
+              "prompt": "FSPL(dB) = $20\\log_{10} d + 20\\log_{10} f + 32.45$ (d in km, f in MHz). At 2400 MHz over 10 km, FSPL is approximately:",
+              "choices": [
+                "120 dB",
+                "100 dB",
+                "140 dB",
+                "90 dB"
+              ],
+              "answerIndex": 0,
+              "explanation": "$20\\log_{10}(10)=20$; $20\\log_{10}(2400)\\approx 67.6$; sum $+32.45 \\approx 120$ dB."
+            }
+          ]
+        },
+        {
+          "id": "link-budgets-noise-link-budgets-noise-l2",
+          "title": "Thermal Noise, Noise Figure & Sensitivity",
+          "order": 2,
+          "difficulty": 2,
+          "content": "A signal is only useful relative to the **noise floor**. The fundamental floor is **thermal (Johnson-Nyquist) noise**, the available noise power from any resistor:\n\n$$N = kTB,$$\n\nwhere $k = 1.38\\times10^{-23}$ J/K is Boltzmann's constant, $T$ the temperature in kelvin, and $B$ the bandwidth in Hz. At the standard reference $T_0 = 290$ K, the floor in dBm is the number every receiver engineer memorizes:\n\n$$N(\\text{dBm}) = -174 + 10\\log_{10}B.$$\n\nSo a 1 Hz bandwidth floor is $-174$ dBm, and a 1 MHz channel is $-174 + 60 = -114$ dBm.\n\nReal receivers add their own noise. **Noise figure** $F$ is the factor by which a stage degrades SNR: $F = \\text{SNR}_{\\text{in}}/\\text{SNR}_{\\text{out}}$, equivalently expressed as an **equivalent noise temperature** $T_e = (F-1)T_0$. For a cascade, the **Friis noise formula** gives the system noise figure:\n\n$$F_{\\text{sys}} = F_1 + \\frac{F_2-1}{G_1} + \\frac{F_3-1}{G_1 G_2} + \\cdots$$\n\nThe lesson is decisive: once the **first stage (the LNA)** has high gain $G_1$, later stages are divided down and contribute little. This is *why* the LNA sits first, right at the antenna — exactly the front-end logic of a radar receiver.\n\nPutting it together, the **receiver sensitivity** (minimum detectable signal) is\n\n$$S_{\\min}(\\text{dBm}) = -174 + 10\\log_{10}B + F(\\text{dB}) + \\text{SNR}_{\\min}.$$\n\nThe link only closes if $P_r > S_{\\min}$.",
+          "items": [
+            {
+              "id": "link-budgets-noise-l2-fc1",
+              "type": "flashcard",
+              "front": "State the thermal noise power equation and the value of $k$.",
+              "back": "$N = kTB$, with $k = 1.38\\times10^{-23}$ J/K, $T$ in kelvin, $B$ in Hz. It is independent of frequency (white) and of the resistor value.",
+              "hint": "Three letters, all multiplied."
+            },
+            {
+              "id": "link-budgets-noise-l2-fc2",
+              "type": "flashcard",
+              "front": "What is the thermal noise floor in dBm at 290 K?",
+              "back": "$N(\\text{dBm}) = -174 + 10\\log_{10}B$. The $-174$ dBm/Hz is $10\\log_{10}(kT_0)$ converted to dBm at $T_0 = 290$ K."
+            },
+            {
+              "id": "link-budgets-noise-l2-fc3",
+              "type": "flashcard",
+              "front": "Define noise figure F and its relation to equivalent noise temperature.",
+              "back": "$F = \\text{SNR}_{\\text{in}}/\\text{SNR}_{\\text{out}}$ (the SNR degradation of a stage). Equivalent noise temperature $T_e = (F-1)T_0$, with $T_0 = 290$ K."
+            },
+            {
+              "id": "link-budgets-noise-l2-fc4",
+              "type": "flashcard",
+              "front": "Write the Friis cascade noise formula and state its main implication.",
+              "back": "$F_{\\text{sys}} = F_1 + \\frac{F_2-1}{G_1} + \\frac{F_3-1}{G_1 G_2} + \\cdots$. With a high-gain low-noise first stage, the first stage (LNA) dominates the system noise figure."
+            },
+            {
+              "id": "link-budgets-noise-l2-mc1",
+              "type": "mcq",
+              "prompt": "kTB calc: compute the thermal noise floor in a $B = 10$ MHz bandwidth at 290 K.",
+              "choices": [
+                "-104 dBm",
+                "-114 dBm",
+                "-94 dBm",
+                "-174 dBm"
+              ],
+              "answerIndex": 0,
+              "explanation": "$N = -174 + 10\\log_{10}(10^7) = -174 + 70 = -104$ dBm."
+            },
+            {
+              "id": "link-budgets-noise-l2-mc2",
+              "type": "mcq",
+              "prompt": "Cascade: $F_1 = 2$ dB, $G_1 = 20$ dB LNA; $F_2 = 10$ dB mixer. Why is system NF only slightly above 2 dB?",
+              "choices": [
+                "The mixer's excess noise (F2-1) is divided by the LNA gain G1=100",
+                "Noise figures simply average",
+                "The mixer noise is added directly with no scaling",
+                "Bandwidth cancels the mixer noise"
+              ],
+              "answerIndex": 0,
+              "explanation": "Friis: $F_{\\text{sys}} = F_1 + (F_2-1)/G_1$. In linear terms $F_1 \\approx 1.58$, $(F_2-1)/G_1 = (10-1)/100 = 0.09$, so $F_{\\text{sys}} \\approx 1.67$ (≈2.2 dB). The high LNA gain suppresses later stages."
+            },
+            {
+              "id": "link-budgets-noise-l2-mc3",
+              "type": "mcq",
+              "prompt": "A receiver has NF = 5 dB, $B = 1$ MHz, and needs $\\text{SNR}_{\\min} = 12$ dB. Its sensitivity is:",
+              "choices": [
+                "-97 dBm",
+                "-114 dBm",
+                "-85 dBm",
+                "-107 dBm"
+              ],
+              "answerIndex": 0,
+              "explanation": "$S_{\\min} = -174 + 10\\log_{10}(10^6) + 5 + 12 = -174 + 60 + 5 + 12 = -97$ dBm."
+            },
+            {
+              "id": "link-budgets-noise-l2-mc4",
+              "type": "mcq",
+              "prompt": "If you halve the receiver bandwidth, the thermal noise floor changes by:",
+              "choices": [
+                "-3 dB (3 dB lower)",
+                "-6 dB",
+                "+3 dB",
+                "No change"
+              ],
+              "answerIndex": 0,
+              "explanation": "$N \\propto B$, so halving $B$ gives $10\\log_{10}(0.5) \\approx -3$ dB. Narrower bandwidth = lower noise floor = better sensitivity (at the cost of data rate or pulse resolution)."
+            },
+            {
+              "id": "link-budgets-noise-l2-mc5",
+              "type": "mcq",
+              "prompt": "Why is the LNA placed first in the chain, right at the antenna?",
+              "choices": [
+                "Its gain divides down the noise contribution of every following stage",
+                "It increases the available bandwidth",
+                "It eliminates free-space path loss",
+                "It converts dBm to dBW"
+              ],
+              "answerIndex": 0,
+              "explanation": "By the Friis cascade formula, only the first stage's noise enters undivided; a high-gain low-noise first stage sets the system noise figure and minimizes signal degradation before lossy stages."
+            }
+          ]
+        },
+        {
+          "id": "link-budgets-noise-link-budgets-noise-l3",
+          "title": "SNR, Margin, Interference & the Radar Range Equation",
+          "order": 3,
+          "difficulty": 3,
+          "content": "With $P_r$ and the noise floor in hand, the deliverable metric is **signal-to-noise ratio**, $\\text{SNR} = P_r - N$ in dB. For digital links the cleaner figure is **energy-per-bit to noise-density**, $E_b/N_0$, related to SNR by\n\n$$\\frac{E_b}{N_0} = \\text{SNR}\\cdot\\frac{B}{R_b},$$\n\nwhere $R_b$ is the bit rate. Each modulation/coding scheme needs a minimum $E_b/N_0$ to hit a target BER (e.g. BPSK needs about 9.6 dB for $10^{-5}$ uncoded). The amount by which the actual SNR exceeds the required value is the **link margin**; the slice reserved specifically for fading and rain is the **fade margin**. Margin buys availability — the fraction of time the link stays up.\n\nSignals also compete with other signals. **C/N** is carrier-to-noise; **C/I** is carrier-to-interference. When $I \\gg N$ the link is **interference-limited** (adding transmit power helps nobody, since interferers scale too); when $N \\gg I$ it is **noise-limited** (more power or lower NF helps). Co-channel and adjacent-channel interference, intermod, and jamming all enter through C/I — in radar this is the **jamming-to-signal ratio J/S**, countered by spread-spectrum processing gain.\n\nFinally, the payoff for the radar tech: the **radar range equation** is a Friis link budget folded on itself with a target in the middle:\n\n$$P_r = \\frac{P_t G^2 \\lambda^2 \\sigma}{(4\\pi)^3 R^4}.$$\n\nThe one-way $1/R^2$ spreading happens twice (out and back), giving $1/R^4$; the antenna gain appears squared (same aperture transmits and receives); and the target's radar cross-section $\\sigma$ replaces the receive antenna. Set $P_r = S_{\\min}$ and solve for $R$ to get detection range — the same sensitivity arithmetic from Lesson 2.",
+          "items": [
+            {
+              "id": "link-budgets-noise-l3-fc1",
+              "type": "flashcard",
+              "front": "How does SNR relate to $E_b/N_0$?",
+              "back": "$\\frac{E_b}{N_0} = \\text{SNR}\\cdot\\frac{B}{R_b}$, where $B$ is bandwidth and $R_b$ the bit rate. $E_b/N_0$ normalizes out bandwidth and rate so modulations can be compared at a fixed BER."
+            },
+            {
+              "id": "link-budgets-noise-l3-fc2",
+              "type": "flashcard",
+              "front": "Define link margin and fade margin.",
+              "back": "Link margin = actual SNR (or $E_b/N_0$) minus the required value. Fade margin is the portion of that margin set aside to ride out fading/rain, which directly sets link availability."
+            },
+            {
+              "id": "link-budgets-noise-l3-fc3",
+              "type": "flashcard",
+              "front": "Contrast a noise-limited and an interference-limited link.",
+              "back": "Noise-limited ($N \\gg I$): performance set by thermal noise; more TX power or lower NF helps. Interference-limited ($I \\gg N$): set by C/I; raising power doesn't help because interferers scale too — you need filtering, spatial nulling, or coordination."
+            },
+            {
+              "id": "link-budgets-noise-l3-fc4",
+              "type": "flashcard",
+              "front": "Why does the radar range equation have $1/R^4$ and $G^2$?",
+              "back": "The wave spreads as $1/R^2$ outbound and again $1/R^2$ on the echo return, giving $1/R^4$. The same antenna transmits and receives, so its gain enters squared ($G^2$). RCS $\\sigma$ replaces the receive antenna's capture.",
+              "hint": "Two-way path; one shared aperture."
+            },
+            {
+              "id": "link-budgets-noise-l3-mc1",
+              "type": "mcq",
+              "prompt": "$P_r = -97$ dBm and the noise floor $N = -104$ dBm. The SNR is:",
+              "choices": [
+                "7 dB",
+                "-7 dB",
+                "201 dB",
+                "97 dB"
+              ],
+              "answerIndex": 0,
+              "explanation": "SNR = $P_r - N$ = $-97 - (-104) = 7$ dB."
+            },
+            {
+              "id": "link-budgets-noise-l3-mc2",
+              "type": "mcq",
+              "prompt": "A link needs $\\text{SNR}_{\\min} = 12$ dB and achieves 18 dB. The link margin is:",
+              "choices": [
+                "6 dB",
+                "30 dB",
+                "1.5 dB",
+                "-6 dB"
+              ],
+              "answerIndex": 0,
+              "explanation": "Margin = achieved - required = 18 - 12 = 6 dB. This is the headroom against fades before the link drops below threshold."
+            },
+            {
+              "id": "link-budgets-noise-l3-mc3",
+              "type": "mcq",
+              "prompt": "In the radar range equation $P_r = \\frac{P_t G^2 \\lambda^2 \\sigma}{(4\\pi)^3 R^4}$, doubling range $R$ reduces $P_r$ by:",
+              "choices": [
+                "12 dB",
+                "6 dB",
+                "3 dB",
+                "24 dB"
+              ],
+              "answerIndex": 0,
+              "explanation": "$P_r \\propto 1/R^4$, so doubling $R$ divides power by 16, i.e. $10\\log_{10}(16) \\approx 12$ dB. Detection range is hard-won in radar."
+            },
+            {
+              "id": "link-budgets-noise-l3-mc4",
+              "type": "mcq",
+              "prompt": "An adjacent transmitter raises interference far above the thermal floor. To improve this link you should FIRST:",
+              "choices": [
+                "Improve C/I via filtering, antenna nulling, or frequency coordination",
+                "Increase your own transmit power",
+                "Lower the receiver noise figure",
+                "Narrow bandwidth to cut kTB"
+              ],
+              "answerIndex": 0,
+              "explanation": "The link is interference-limited ($I \\gg N$). Raising power or lowering NF addresses noise, not interference — and power increases may worsen the shared environment. Reject the interferer instead."
+            },
+            {
+              "id": "link-budgets-noise-l3-mc5",
+              "type": "mcq",
+              "prompt": "What single change turns a one-way Friis link budget into the two-way radar range equation?",
+              "choices": [
+                "Replace the receive antenna with a target RCS and apply the spreading loss twice",
+                "Add 3 dB for polarization mismatch",
+                "Convert all dBm values to dBW",
+                "Double the bandwidth"
+              ],
+              "answerIndex": 0,
+              "explanation": "The radar re-radiates off a target of cross-section $\\sigma$ and the energy travels out and back, so spreading ($1/R^2$) applies twice ($1/R^4$) and the shared antenna gain squares.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/link-budgets-noise-1.svg"
             }
           ]
         }
