@@ -4,298 +4,510 @@
   "order": 9,
   "lessons": [
     {
-      "id": "memory-volatile-sram-dram",
-      "title": "Volatile Memory: SRAM vs DRAM and DDR",
+      "id": "memory-intro-hierarchy",
+      "title": "What Is Memory? Volatile vs Non-Volatile and the Hierarchy",
       "order": 1,
       "difficulty": 1,
-      "content": "The memory hierarchy trades speed for density and cost, and the first split is **volatile vs non-volatile**: volatile memory loses its contents when power drops. Two volatile families dominate.\n\n**SRAM** stores one bit in a **6-transistor (6T) cell**: two cross-coupled inverters form a bistable latch, plus two access transistors gated by the **word line** that connect the cell to a differential **bit-line** pair (BL, BL'). Because the latch actively holds its state, SRAM needs **no refresh**, has a **non-destructive read**, and is very fast. The price is area: six transistors per bit means **low density** and high cost. That is exactly why SRAM is used where speed matters and capacity is modest, CPU caches and **FPGA block RAM**.\n\n**DRAM** stores a bit as charge on a single capacitor, the **1T1C cell**: one access transistor plus one tiny capacitor. This is enormously dense and cheap, but the capacitor **leaks**, so every row must be periodically rewritten, the **refresh** requirement (typically every ~64 ms). Reading drains the capacitor, so the read is **destructive** and the sense amplifiers must **write the value back** after every access. DRAM is addressed in two phases, **row** then **column** (RAS/CAS), to share pins.\n\nModern **SDRAM/DDR** is synchronous to a clock and organized into **banks** so accesses can be interleaved. **Bursts** stream several words per command, and **CAS latency (CL)** is the clock-cycle delay from a read command to first data. DDR transfers on **both clock edges** (double data rate); successive generations (DDR2/3/4/5) raise bus rates and burst length while lowering voltage.",
+      "content": "**Memory** is where a system stores **bits** (the 0s and 1s it works with) so it can *remember* data. You already met one tiny memory: a flip-flop holds a single bit. Real systems need to remember billions of bits, so we build big memories out of many cells.\n\n**The first big idea: two families.** Some memory is **volatile** — it forgets everything the moment power is removed. Other memory is **non-volatile** — it keeps its data even with the power off. Here is the everyday hook: your computer's **RAM** is volatile working memory, while its **SSD** (or a USB flash drive) is non-volatile storage. That is why an *unsaved* document vanishes during a power cut, but *saved* files are still there when you reboot. A phone is the same: a little fast **working memory** that empties when off, and a big **storage** that keeps your photos.\n\n**The second big idea: a hierarchy.** No single memory is both huge and lightning-fast and cheap. So computers stack several layers, trading speed against size and cost. At the top sit tiny, blazing-fast **registers**; below them a small fast **cache**; then larger **main memory** (RAM); and at the bottom big, slower **storage**. As you go down, memory gets **bigger and cheaper per bit but slower**. The top (volatile) layers do the fast day-to-day work; the bottom (non-volatile) layer keeps everything safe long-term.\n\n**Recap:** memory stores bits. Volatile memory is fast working memory that forgets when powered off; non-volatile memory is slower storage that remembers. Real systems layer them into a hierarchy: fast-and-small near the processor, slow-and-big for storage.",
       "items": [
         {
           "id": "memory-001",
-          "type": "flashcard",
-          "front": "SRAM 6T cell vs DRAM 1T1C cell: structure and the key consequences of each.",
-          "back": "Left, SRAM: two cross-coupled inverters (a bistable latch) plus two access transistors to a differential bit-line pair, gated by the word line. It actively holds state, so no refresh and non-destructive read, but six transistors per bit means low density. Right, DRAM: one transistor and one storage capacitor. Very dense and cheap, but the charge leaks (needs refresh) and reading discharges the cap (destructive read, requires write-back).",
-          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/memory-1.svg"
+          "type": "mcq",
+          "prompt": "What is the single most important difference between volatile and non-volatile memory?",
+          "choices": [
+            "Volatile memory loses its data when power is removed; non-volatile memory keeps its data without power",
+            "Volatile memory is always smaller than non-volatile memory",
+            "Volatile memory stores letters and non-volatile memory stores numbers",
+            "Volatile memory is non-volatile memory that has been turned off"
+          ],
+          "answerIndex": 0,
+          "explanation": "The defining split is power behavior: volatile memory (like RAM) forgets its contents when power is cut, while non-volatile memory (like flash) retains data even with the power off. Size and cost differences exist but follow from this; both can store any kind of bits.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/memory-3.svg"
         },
         {
           "id": "memory-002",
-          "type": "flashcard",
-          "front": "Why does DRAM need refresh while SRAM does not?",
-          "back": "DRAM stores each bit as charge on a tiny capacitor (1T1C). Junction and subthreshold leakage drain that charge over milliseconds, so each row must be periodically read and rewritten (refresh, typically every ~64 ms) to keep the data valid. SRAM stores its bit in a cross-coupled inverter latch (6T) that is actively driven by the supply, so as long as power is present the state is regenerated continuously and no refresh is needed.",
-          "hint": "Charge on a leaky cap vs an actively-driven latch."
+          "type": "mcq",
+          "prompt": "You are typing a document but have not saved it. A power cut hits. Why is your typing lost while your previously saved files survive?",
+          "choices": [
+            "The unsaved text lived only in volatile working memory (RAM), which forgets on power loss; saved files were written to non-volatile storage",
+            "Saved files are smaller, so they are easier to keep",
+            "The power cut erased the storage but not the RAM",
+            "Unsaved text is stored in the cache, which is non-volatile"
+          ],
+          "answerIndex": 0,
+          "explanation": "While you type, the document sits in fast volatile RAM. RAM loses everything when power drops, so the unsaved work is gone. Saving copies the data into non-volatile storage, which keeps it through a power cut. This is exactly why 'save often' matters."
         },
         {
           "id": "memory-003",
-          "type": "flashcard",
-          "front": "What does 'destructive read' mean for DRAM, and how is it handled?",
-          "back": "Sensing a DRAM cell connects its storage capacitor to the bit line, which shares/drains the cell's charge so the original value is lost (corrupted) by the act of reading. The sense amplifiers detect the small voltage swing, regenerate the full logic level, and write the value back into the row (precharge/restore) after every read. This is part of why DRAM has a row-cycle time and why a whole row is opened at once.",
-          "hint": "Reading drains the cap; sense amps must write it back."
+          "type": "mcq",
+          "prompt": "In a computer, which pairing correctly matches a part to its memory family?",
+          "choices": [
+            "RAM = volatile working memory; SSD/flash drive = non-volatile storage",
+            "RAM = non-volatile storage; SSD = volatile working memory",
+            "Both RAM and SSD are volatile",
+            "Both RAM and SSD are non-volatile"
+          ],
+          "answerIndex": 0,
+          "explanation": "RAM is the fast working memory that empties when the machine is off (volatile). The SSD or USB flash drive is the long-term storage that keeps files without power (non-volatile). Swapping them is the common beginner mix-up."
         },
         {
           "id": "memory-004",
-          "type": "flashcard",
-          "front": "Why is DRAM addressed in two phases (RAS then CAS)?",
-          "back": "To save package pins and cost, the address is multiplexed: the row address is presented first and latched by RAS (Row Address Strobe), opening an entire row into the sense amplifiers; then the column address is presented and latched by CAS (Column Address Strobe) to pick the word within that open row. This halves the number of address pins and matches DRAM's internal two-dimensional array organization.",
-          "hint": "Pin saving; row strobe then column strobe."
+          "type": "mcq",
+          "prompt": "As you move DOWN the memory hierarchy (from registers toward storage), what generally happens?",
+          "choices": [
+            "Memory gets bigger and cheaper per bit, but slower",
+            "Memory gets smaller, faster, and cheaper",
+            "Memory gets faster and more expensive per bit",
+            "Nothing changes except the color of the chip"
+          ],
+          "answerIndex": 0,
+          "explanation": "The hierarchy is a deliberate trade-off. Lower levels (main memory, storage) hold far more data at lower cost per bit but respond more slowly. Upper levels (registers, cache) are tiny and costly per bit but extremely fast. You cannot get huge, fast, and cheap all at once."
         },
         {
           "id": "memory-005",
-          "type": "flashcard",
-          "front": "In DDR SDRAM, what do 'double data rate', 'banks', 'burst', and 'CAS latency' each mean?",
-          "back": "Double data rate: data is transferred on BOTH the rising and falling edges of the clock, doubling throughput for a given clock. Banks: independent sub-arrays that can have rows open simultaneously, so accesses interleave and hide row-open latency. Burst: one command streams several consecutive words (burst length) instead of one. CAS latency (CL): the number of clock cycles from issuing a read (column) command until the first data word appears.",
-          "hint": "Both edges; interleaved arrays; multi-word streams; read-to-data delay."
+          "type": "mcq",
+          "prompt": "Why do computers bother with a hierarchy of several memory types instead of using just one kind?",
+          "choices": [
+            "No single technology is simultaneously huge, very fast, and cheap, so layers trade speed against size and cost",
+            "Engineers like making things complicated",
+            "Each program legally requires four memory types",
+            "Volatile memory cannot be read without non-volatile memory present"
+          ],
+          "answerIndex": 0,
+          "explanation": "A fast memory technology is expensive and small; a cheap, huge one is slow. By layering them — a little fast memory near the processor backed by lots of slow cheap memory — a system gets most of the speed of the fast layer with most of the capacity of the slow one."
         },
         {
           "id": "memory-006",
           "type": "mcq",
-          "prompt": "A design needs a small, very fast on-chip scratchpad with single-cycle deterministic access and no controller overhead. Which memory fits best?",
+          "prompt": "A flip-flop from an earlier lesson is best described as:",
           "choices": [
-            "SRAM (e.g., FPGA block RAM)",
-            "DDR4 DRAM",
-            "NAND flash",
-            "Serial EEPROM"
+            "A 1-bit memory element — the smallest building block that remembers a single 0 or 1",
+            "A non-volatile storage chip",
+            "A device that stores one full byte",
+            "A type of flash memory"
           ],
           "answerIndex": 0,
-          "explanation": "SRAM gives fast, deterministic, non-destructive single-cycle access with no refresh and no multi-phase addressing, which is exactly what an on-chip scratchpad or cache wants. DRAM adds refresh, RAS/CAS, and controller latency; NAND and EEPROM are non-volatile but far slower and block/page oriented."
+          "explanation": "A flip-flop holds exactly one bit. Large memories are conceptually many such cells organized together. Flip-flops are volatile (they need power to hold state) and are the basis of registers and SRAM cells, not flash."
         },
         {
           "id": "memory-007",
           "type": "mcq",
-          "prompt": "Why is DRAM able to achieve much higher bit density than SRAM?",
+          "prompt": "Which layer of the hierarchy is typically the FASTEST but holds the LEAST data?",
           "choices": [
-            "Its 1-transistor-1-capacitor cell is far smaller than SRAM's 6-transistor cell",
-            "DRAM cells store multiple bits each by design",
-            "DRAM does not need bit lines",
-            "SRAM cells require larger capacitors than DRAM"
+            "Registers (closest to the processor)",
+            "The SSD",
+            "Main memory (RAM)",
+            "A USB flash drive"
           ],
           "answerIndex": 0,
-          "explanation": "A DRAM cell is just one transistor and one (trench/stacked) capacitor, while an SRAM cell needs six transistors for its cross-coupled latch and access devices. The much smaller per-bit cell area is the entire reason DRAM is denser and cheaper per bit, at the cost of refresh and destructive reads."
+          "explanation": "Registers sit at the very top of the hierarchy: tiny in capacity but the fastest memory of all, right inside the processor. Cache is next, then RAM, then storage. The SSD and USB drive are at the slow, high-capacity bottom."
         },
         {
           "id": "memory-008",
           "type": "mcq",
-          "prompt": "On a DDR memory whose I/O bus runs at 1600 MT/s, what is the effective clock frequency of the data strobe driving it?",
+          "prompt": "Which task calls for NON-VOLATILE memory rather than volatile memory?",
           "choices": [
-            "800 MHz",
-            "1600 MHz",
-            "3200 MHz",
-            "400 MHz"
+            "Keeping your saved photos so they are still there after the phone is powered off",
+            "Holding the numbers a calculation is using for the next microsecond",
+            "Serving as the processor's fast scratch space during a program",
+            "Acting as a temporary buffer that is fine to lose on shutdown"
           ],
           "answerIndex": 0,
-          "explanation": "DDR transfers data on both clock edges, so the megatransfers-per-second figure is twice the clock frequency: 1600 MT/s corresponds to an 800 MHz clock. (Internal prefetch and core arrays run slower still; the 2x edge trick is what gives 'double data rate'.)"
+          "explanation": "Data that must survive power-off — saved photos, files, settings — belongs in non-volatile memory. Short-lived working data (scratch space, temporary buffers, numbers being computed right now) is fine in fast volatile memory, which is why those uses are listed as the wrong answers here."
         },
         {
           "id": "memory-009",
           "type": "mcq",
-          "prompt": "Which statement about CAS latency (CL) is correct?",
+          "prompt": "Which statement about the hierarchy is TRUE?",
           "choices": [
-            "It is the number of clock cycles from a read command to the first valid data word",
-            "It is the time the DRAM can hold data without refresh",
-            "It is the number of banks in the device",
-            "It is the voltage margin on the bit lines"
+            "The top (fast, small) layers are usually volatile, while the bottom storage layer is non-volatile",
+            "Every layer of the hierarchy is non-volatile",
+            "The top layers are non-volatile and the bottom is volatile",
+            "Speed and capacity are unrelated to a memory's position in the hierarchy"
           ],
           "answerIndex": 0,
-          "explanation": "CAS latency is the delay, measured in clock cycles, between issuing the read (column-address) command and the appearance of the first data on the bus. It is a key DRAM timing spec; lower CL at a given data rate means lower read latency. Refresh interval, bank count, and bit-line margin are separate parameters."
+          "explanation": "In a typical computer the fast upper layers (registers, cache, RAM) are volatile working memory, and the big bottom layer (storage) is non-volatile. Position in the hierarchy directly reflects the speed-vs-size-vs-cost trade-off."
+        }
+      ]
+    },
+    {
+      "id": "memory-volatile-sram-dram",
+      "title": "Volatile Working Memory: SRAM vs DRAM (and DDR)",
+      "order": 2,
+      "difficulty": 2,
+      "content": "Volatile memory is the fast working memory that forgets when power is off. There are two main kinds, and they make opposite trade-offs.\n\n**SRAM** (Static RAM) stores each bit in a little latch made of transistors — essentially the same flip-flop idea you already know. A common cell uses **6 transistors**, so people call it a **6T cell**. Because the latch actively holds its bit as long as power is on, SRAM is **fast** and needs no upkeep. The catch: six transistors per bit takes a lot of chip area, so SRAM is **expensive and not very dense** (you cannot fit much of it). That is why SRAM is used where speed matters most and you only need a little: the processor's **cache**.\n\n**DRAM** (Dynamic RAM) takes the opposite path. Each bit is stored as a tiny electric **charge** on a **capacitor** (a component that holds charge), reached through a single transistor — the **1T1C cell** (1 transistor, 1 capacitor). One transistor and one capacitor is much smaller than six transistors, so DRAM is **very dense and cheap**: this is what your gigabytes of main memory are made of. The catch: the capacitor slowly **leaks** its charge away, so the data would fade in milliseconds. To prevent that, DRAM must be **refreshed** — the contents are read and rewritten over and over (typically every ~64 ms). Worse, *reading* a cell drains its charge too, so DRAM has a **destructive read** and must write the value back after each access.\n\n**DDR.** Modern DRAM is sold as **DDR** (Double Data Rate). 'Double data rate' just means it moves data on **both** edges of the clock (rising and falling) instead of one, doubling throughput. Successive generations (DDR2, DDR3, DDR4, DDR5) keep raising speed and lowering voltage. You do not need the details — just know DDR is fast DRAM for main memory.\n\n**Recap:** SRAM = fast, made of latches, low density, used for cache. DRAM = dense and cheap, stores charge on capacitors, must be refreshed, used for main memory. DDR is high-speed DRAM.",
+      "items": [
+        {
+          "id": "memory-010",
+          "type": "mcq",
+          "prompt": "Why does DRAM need to be REFRESHED while SRAM does not?",
+          "choices": [
+            "DRAM stores each bit as charge on a tiny capacitor that slowly leaks away, so it must be rewritten periodically; SRAM holds its bit in an actively-driven latch that does not fade while powered",
+            "DRAM is non-volatile and must be reminded it is on",
+            "SRAM leaks faster, so it refreshes itself automatically",
+            "Refresh adds more storage capacity to the DRAM"
+          ],
+          "answerIndex": 0,
+          "explanation": "A DRAM bit is just charge on a leaky capacitor; without periodic refresh (reading and rewriting), the charge — and the data — fades within milliseconds. An SRAM cell is a latch driven by the power supply, so it regenerates its own state continuously and needs no refresh.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/memory-1.svg"
+        },
+        {
+          "id": "memory-011",
+          "type": "mcq",
+          "prompt": "Why is DRAM much DENSER (more bits per chip) and cheaper per bit than SRAM?",
+          "choices": [
+            "A DRAM cell is just 1 transistor + 1 capacitor, far smaller than SRAM's 6-transistor latch",
+            "DRAM cells each store eight bits at once",
+            "DRAM does not need any transistors",
+            "SRAM uses larger capacitors than DRAM"
+          ],
+          "answerIndex": 0,
+          "explanation": "DRAM's 1T1C cell is tiny compared with SRAM's 6T latch, so far more bits fit in the same area, lowering cost per bit. The price DRAM pays for that density is the need for refresh and its destructive read. SRAM has no capacitor in its storage element at all."
+        },
+        {
+          "id": "memory-012",
+          "type": "mcq",
+          "prompt": "What does it mean that DRAM has a 'destructive read'?",
+          "choices": [
+            "Reading a cell drains its capacitor, so the value must be written back after every read",
+            "Reading DRAM permanently breaks the chip",
+            "DRAM can only be read once in its lifetime",
+            "Reading DRAM erases the entire chip"
+          ],
+          "answerIndex": 0,
+          "explanation": "Sensing a DRAM cell connects its capacitor to the bit line, which drains the stored charge in the act of reading. The chip detects the value, then rewrites (restores) it. 'Destructive' refers to this single read disturbing the stored charge — not to physical damage or one-time use."
+        },
+        {
+          "id": "memory-013",
+          "type": "mcq",
+          "prompt": "Which memory is the best fit for a processor's small, very fast CACHE?",
+          "choices": [
+            "SRAM, because it is fast and needs no refresh",
+            "DRAM, because it is cheap and dense",
+            "NAND flash, because it is non-volatile",
+            "A hard disk, because it is large"
+          ],
+          "answerIndex": 0,
+          "explanation": "Cache must be as fast as possible and is small, which is exactly SRAM's strength: a fast latch-based cell with no refresh overhead. DRAM is denser and cheaper but slower (refresh, destructive read), so it serves as the larger main memory, not the cache."
+        },
+        {
+          "id": "memory-014",
+          "type": "mcq",
+          "prompt": "Which memory is the best fit for the several gigabytes of MAIN memory in a typical computer?",
+          "choices": [
+            "DRAM (sold as DDR), because it is dense and cheap enough to provide large capacity",
+            "SRAM, because it never needs refresh",
+            "NOR flash, because code runs from it",
+            "Registers, because they are fastest"
+          ],
+          "answerIndex": 0,
+          "explanation": "Main memory needs a lot of capacity at a reasonable cost, which is DRAM's strength thanks to its tiny 1T1C cell. SRAM is too expensive and bulky for gigabytes; flash is non-volatile storage, not fast working memory; registers are tiny."
+        },
+        {
+          "id": "memory-015",
+          "type": "mcq",
+          "prompt": "What does 'Double Data Rate' (the DDR in DDR4/DDR5) actually mean?",
+          "choices": [
+            "Data is transferred on BOTH the rising and falling edges of the clock, doubling throughput for a given clock speed",
+            "The memory has double the storage of older memory",
+            "The data is automatically duplicated for safety",
+            "The chip runs on double the voltage"
+          ],
+          "answerIndex": 0,
+          "explanation": "DDR moves a chunk of data on each clock edge — both rising and falling — instead of only once per cycle, so it carries twice the data at the same clock rate. It is not about doubling capacity, duplicating data, or raising voltage (newer DDR generations actually lower voltage)."
+        },
+        {
+          "id": "memory-016",
+          "type": "mcq",
+          "prompt": "Both SRAM and DRAM are VOLATILE. What does that imply for their contents at power-off?",
+          "choices": [
+            "Both lose all their contents when power is removed",
+            "SRAM keeps data without power but DRAM does not",
+            "DRAM keeps data without power but SRAM does not",
+            "Both keep their contents indefinitely without power"
+          ],
+          "answerIndex": 0,
+          "explanation": "SRAM and DRAM are both volatile working memory: cut the power and both forget everything. Their differences (speed, density, refresh) matter while powered, but neither can store data through a power-off the way flash or other non-volatile memory can."
+        },
+        {
+          "id": "memory-017",
+          "type": "mcq",
+          "prompt": "An SRAM cell is built from cross-coupled inverters forming a latch. How does this connect to flip-flops you already know?",
+          "choices": [
+            "It is essentially the same bistable-latch idea — a circuit that actively holds one of two stable states, i.e. one bit",
+            "It is completely unrelated to flip-flops",
+            "It stores charge on a capacitor like a flip-flop does",
+            "A flip-flop needs refresh, just like the SRAM cell"
+          ],
+          "answerIndex": 0,
+          "explanation": "An SRAM cell is a small latch — the same bistable idea as a flip-flop — that actively holds one bit as long as power is present. That is why it needs no refresh. Flip-flops hold state with feedback, not stored charge, and they do not need refreshing."
+        },
+        {
+          "id": "memory-018",
+          "type": "mcq",
+          "prompt": "A team wants the largest possible amount of working memory for the lowest cost, accepting that a memory controller will handle refresh. Which technology do they pick?",
+          "choices": [
+            "DRAM, whose tiny 1T1C cell gives the highest density and lowest cost per bit",
+            "SRAM, because it is the densest memory available",
+            "NOR flash, because it is the cheapest working memory",
+            "Registers, because there can be millions of them"
+          ],
+          "answerIndex": 0,
+          "explanation": "For maximum capacity at minimum cost, DRAM wins because its one-transistor-one-capacitor cell packs the most bits per area. The cost is refresh and a destructive read, which a controller manages. SRAM is the least dense, not the most; flash is non-volatile storage, not working memory."
         }
       ]
     },
     {
       "id": "memory-nonvolatile-rom-flash",
-      "title": "Non-Volatile Memory: ROM, EEPROM, and NOR vs NAND Flash",
-      "order": 2,
-      "difficulty": 2,
-      "content": "Non-volatile memory keeps data with power removed. The family tree runs from mask **ROM** (contents fixed at fabrication, cheapest at volume) through **PROM** (one-time fuse programming), **EPROM** (UV-erasable), to **EEPROM** (electrically erasable, byte-addressable read and write). EEPROM is ideal for small, frequently changed data such as calibration constants and serial numbers, but it is expensive per bit.\n\n**Flash** is the dominant non-volatile technology. The storage element is a **floating-gate** (or charge-trap) transistor: charge trapped on an isolated gate shifts the cell's threshold voltage, and that shift is read as a 0 or 1. Flash can be programmed bit-by-bit toward one state but can only be **erased in large blocks**, hence **erase-before-write**: you cannot simply overwrite a byte; the block must be erased first.\n\nTwo architectures diverge sharply. **NOR flash** wires cells in parallel for fast random read and full address/data buses, so code can run directly from it, **Execute-In-Place (XIP)**, with no copy to RAM. It is used for boot code and firmware. **NAND flash** strings cells in series, giving far higher density but only **page/block** access (no random byte read), making it the basis of mass storage (SSDs, eMMC, SD cards).\n\nCells also trade endurance for density: **SLC** (1 bit/cell) is fastest and most durable; **MLC/TLC/QLC** pack 2/3/4 bits per cell at lower cost but with slower writes, weaker error margins, and fewer program/erase cycles. Because every erase wears the oxide, flash needs **wear leveling** (spreading writes across blocks), plus ECC and **bad-block management**, all handled by the flash controller/FTL.",
+      "title": "Non-Volatile Storage: ROM, EEPROM, and Flash",
+      "order": 3,
+      "difficulty": 3,
+      "content": "Non-volatile memory keeps its data with the power off — it is your system's long-term storage. Here is the family, from least to most flexible.\n\n**ROM** (Read-Only Memory) has its contents fixed when the chip is manufactured. It is cheapest in huge quantities but can never be changed. **PROM** can be programmed once by the user (then it is permanent). **EPROM** can be erased with ultraviolet light and reprogrammed. **EEPROM** (Electrically Erasable Programmable ROM) can be erased and rewritten **electrically, one byte at a time**, right in the circuit. EEPROM is perfect for small amounts of data that change occasionally — a classic example is **calibration constants** or a serial number — but it is expensive per bit, so you do not use it for bulk storage.\n\n**Flash** is the dominant non-volatile technology today — it is what is inside SSDs, SD cards, and USB sticks. Each bit is stored on a **floating gate**: an isolated piece of a transistor that traps electric charge. Trapped charge stays put with the power off (that is the non-volatility), and whether charge is present is read back as a 0 or 1.\n\nFlash has one big quirk: **erase-before-write**. You can program individual cells one way, but you can only *erase* (reset them the other way) in large chunks called **blocks**. So to change a small piece of data you must erase a whole block first. And every erase slightly **wears out** the cell; after enough erase cycles a block dies. To cope, flash controllers use **wear leveling** — spreading writes evenly across all blocks so none wears out early.\n\n**Two flavors of flash.** **NOR flash** wires cells in parallel so any byte can be read quickly and at random; this lets a processor run code **directly** from it (handy for boot/firmware). **NAND flash** wires cells in series, which is much denser and cheaper but only allows access by page/block (no single-byte random read) — ideal for **mass storage**.\n\n**Bits per cell.** To pack in more data, a cell can store more than one bit by using more charge levels: **SLC** (1 bit/cell) is fastest and longest-lived; **MLC** (2), **TLC** (3), and **QLC** (4) are cheaper and denser but slower and wear out sooner.\n\n**Recap:** ROM/EEPROM suit small fixed or rarely-changed data; flash (NOR for code, NAND for bulk) dominates storage, stores bits as trapped charge, erases in blocks, and wears out — so wear leveling spreads the damage.",
       "items": [
-        {
-          "id": "memory-010",
-          "type": "flashcard",
-          "front": "Order the classic ROM family by programmability: ROM, PROM, EPROM, EEPROM.",
-          "back": "Mask ROM: contents defined at fabrication, not changeable, cheapest in high volume. PROM: one-time programmable by blowing fuses/antifuses in the field. EPROM: erasable by UV light through a quartz window, then reprogrammable (bulk erase). EEPROM: electrically erasable and writable in-circuit, byte-addressable for both read and write, but costly per bit. Each step adds reprogrammability at higher cost per bit.",
-          "hint": "Fixed -> one-time -> UV-erasable -> electrically byte-erasable."
-        },
-        {
-          "id": "memory-011",
-          "type": "flashcard",
-          "front": "How does a floating-gate flash cell store a bit?",
-          "back": "The cell is a MOSFET with an extra electrically isolated 'floating' gate buried in the oxide between the control gate and channel. Injecting/removing charge on that floating gate (via tunneling or hot-electron injection) shifts the transistor's threshold voltage. When read, the cell either conducts or not at a given gate voltage, and that threshold shift is interpreted as the stored bit. The charge stays trapped with power off, giving non-volatility. (Modern devices may use a charge-trap layer instead of a conductive gate.)",
-          "hint": "Trapped charge shifts the threshold voltage."
-        },
-        {
-          "id": "memory-012",
-          "type": "flashcard",
-          "front": "What is 'erase-before-write' in flash, and why does it exist?",
-          "back": "Flash programming can only move bits in one direction (typically setting them to 0) cell-by-cell, but returning bits to the erased state (1) can only be done a whole block at a time. So you cannot overwrite arbitrary data in place: the block must first be erased (all 1s), then programmed. This block-granular erase is a consequence of the cell/array structure and is why flash needs a translation layer to update small amounts of data efficiently.",
-          "hint": "Program bit-by-bit one way; erase only in big blocks."
-        },
-        {
-          "id": "memory-013",
-          "type": "flashcard",
-          "front": "NOR vs NAND flash: cell arrangement, access granularity, and typical use.",
-          "back": "NOR: cells in parallel, full random-access read with address/data buses and fast read of any byte, so code can run directly from it (XIP). Lower density, used for boot/firmware. NAND: cells in series strings, much higher density and cheaper, but read/write only by page and erase by block (no true random byte read). Used for mass storage (SSD, eMMC, SD). NOR favors code execution; NAND favors bulk data.",
-          "hint": "Parallel/random/XIP vs series/page-block/mass-storage."
-        },
-        {
-          "id": "memory-014",
-          "type": "flashcard",
-          "front": "What is Execute-In-Place (XIP) and which flash supports it?",
-          "back": "XIP means the CPU fetches and executes instructions directly from the non-volatile memory without first copying them into RAM. It requires fast, random-access reads with a memory-mapped interface, which NOR flash provides. NAND flash cannot do true XIP because it lacks random byte read (page-oriented, needs a buffer), so NAND-based systems copy/boot code into RAM first.",
-          "hint": "Run code straight from NOR; NAND must copy to RAM."
-        },
-        {
-          "id": "memory-015",
-          "type": "flashcard",
-          "front": "Compare SLC, MLC, TLC, and QLC flash on bits/cell, speed, endurance, and cost.",
-          "back": "SLC = 1 bit/cell: fastest, highest endurance (most P/E cycles), most expensive per bit. MLC = 2 bits/cell, TLC = 3, QLC = 4: progressively higher density and lower cost per bit, but slower (more program steps and read levels), tighter voltage margins (more ECC needed), and fewer program/erase cycles before wear-out. More bits per cell trades durability and speed for capacity and cost.",
-          "hint": "More bits/cell = cheaper/denser but slower and less durable."
-        },
-        {
-          "id": "memory-016",
-          "type": "mcq",
-          "prompt": "A microcontroller must boot and run its firmware directly from non-volatile memory with no external RAM copy. Which is the natural choice?",
-          "choices": [
-            "NOR flash, because it supports random-access reads and XIP",
-            "NAND flash, because it is densest",
-            "QLC NAND, for lowest cost per bit",
-            "DRAM, because it is fast"
-          ],
-          "answerIndex": 0,
-          "explanation": "Execute-in-place requires fast random byte reads over a memory-mapped bus, which NOR flash provides. NAND (including QLC) is page-oriented and cannot do true XIP, so it must copy code to RAM first. DRAM is volatile, so it cannot hold boot code with power off."
-        },
-        {
-          "id": "memory-017",
-          "type": "mcq",
-          "prompt": "Why can you not simply rewrite a single byte in NAND flash the way you can in EEPROM?",
-          "choices": [
-            "NAND can program toward one state cell-by-cell but can only erase in large blocks, so an in-place byte change is impossible without erasing the whole block",
-            "NAND has no data bus",
-            "NAND bytes are read-only after manufacture",
-            "NAND requires UV light to write"
-          ],
-          "answerIndex": 0,
-          "explanation": "Flash erase is block-granular: bits can be programmed one way per cell but only returned to the erased state a whole block at a time (erase-before-write). To change one byte, a controller must read-modify-write an entire block (or write to a fresh block and remap), which is why a flash translation layer exists. EEPROM, by contrast, supports true byte erase/write."
-        },
-        {
-          "id": "memory-018",
-          "type": "mcq",
-          "prompt": "What problem does wear leveling solve in a flash-based storage device?",
-          "choices": [
-            "It spreads program/erase cycles across all blocks so no single block wears out prematurely",
-            "It increases the read speed of the device",
-            "It removes the need for error-correcting codes",
-            "It eliminates the erase-before-write requirement"
-          ],
-          "answerIndex": 0,
-          "explanation": "Each flash block tolerates only a limited number of program/erase cycles before the oxide degrades. Wear leveling (in the controller/FTL) distributes writes evenly across physical blocks so hot, frequently-updated logical data does not destroy a few blocks while others stay fresh, extending device lifetime. It does not change erase granularity or remove the need for ECC and bad-block handling."
-        },
         {
           "id": "memory-019",
           "type": "mcq",
-          "prompt": "For storing a few hundred bytes of calibration constants that are updated occasionally and must survive power loss, the best fit is:",
+          "prompt": "How does a flash cell store a bit so that it survives with the power off?",
           "choices": [
-            "EEPROM (byte-erasable, in-circuit writable, non-volatile)",
+            "Charge is trapped on an isolated 'floating gate'; the trapped charge stays put without power and is read back as a 0 or 1",
+            "It keeps a tiny battery charged inside each cell",
+            "It refreshes itself thousands of times per second",
+            "It stores the bit as a spinning magnetic disk"
+          ],
+          "answerIndex": 0,
+          "explanation": "Flash uses a floating-gate (or charge-trap) transistor: electrons trapped on the isolated gate change how the cell conducts, and that is read as the stored bit. Because the gate is isolated, the charge — and the data — remains with the power off. No battery, refresh, or spinning disk is involved.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/memory-4.svg"
+        },
+        {
+          "id": "memory-020",
+          "type": "mcq",
+          "prompt": "Why can you not simply overwrite a single byte in NAND flash the way you can in EEPROM?",
+          "choices": [
+            "Flash can program cells but can only erase in large blocks, so changing one byte requires erasing a whole block first (erase-before-write)",
+            "NAND flash is read-only after manufacture",
+            "NAND flash has no electrical connection for writing",
+            "NAND flash needs ultraviolet light to write"
+          ],
+          "answerIndex": 0,
+          "explanation": "Flash erase is block-granular: you can program individual cells one direction but can only reset them the other direction a whole block at a time. So an in-place single-byte change is impossible without erasing the surrounding block. EEPROM, by contrast, supports true byte-level erase and write."
+        },
+        {
+          "id": "memory-021",
+          "type": "mcq",
+          "prompt": "A microcontroller must boot and run its firmware DIRECTLY from non-volatile memory, with no copy into RAM first. Which is the natural choice?",
+          "choices": [
+            "NOR flash, because its parallel cells allow fast random reads, so code can run in place",
+            "NAND flash, because it is the densest",
+            "QLC NAND, for the lowest cost per bit",
+            "DRAM, because it is fast"
+          ],
+          "answerIndex": 0,
+          "explanation": "Running code in place needs fast random reads of any address, which NOR flash provides because its cells are accessed in parallel. NAND (including QLC) only allows page access, so code must be copied to RAM first. DRAM is volatile and cannot hold the firmware with the power off."
+        },
+        {
+          "id": "memory-022",
+          "type": "mcq",
+          "prompt": "Which flash type is the basis of high-capacity MASS STORAGE like SSDs, SD cards, and USB drives?",
+          "choices": [
+            "NAND flash, because its series cells give much higher density and lower cost",
+            "NOR flash, because it allows random byte reads",
+            "EEPROM, because it is byte-writable",
+            "Mask ROM, because it is cheapest"
+          ],
+          "answerIndex": 0,
+          "explanation": "NAND flash strings cells in series, sacrificing random byte read but gaining the density and low cost per bit that mass storage needs. NOR is for code execution, EEPROM for small parameters, and mask ROM cannot be written at all — none of those are used for bulk storage."
+        },
+        {
+          "id": "memory-023",
+          "type": "mcq",
+          "prompt": "What problem does WEAR LEVELING solve in a flash storage device?",
+          "choices": [
+            "It spreads erase/write cycles evenly across all blocks so no single heavily-used block wears out early",
+            "It makes the device read faster",
+            "It removes the erase-before-write requirement",
+            "It converts NAND flash into NOR flash"
+          ],
+          "answerIndex": 0,
+          "explanation": "Each flash block tolerates only a limited number of erase cycles before it fails. Wear leveling, run by the controller, distributes writes evenly so frequently-updated data does not destroy a few blocks while others stay fresh, extending the device's life. It does not change erase rules or read speed."
+        },
+        {
+          "id": "memory-024",
+          "type": "mcq",
+          "prompt": "You need to store a few hundred bytes of calibration constants that change occasionally and must survive power loss. Which memory fits best?",
+          "choices": [
+            "EEPROM, which is non-volatile and can be erased/written one byte at a time in-circuit",
             "NAND flash with QLC cells",
-            "SRAM backed by nothing",
+            "SRAM with no backup",
             "Mask ROM"
           ],
           "answerIndex": 0,
-          "explanation": "EEPROM is non-volatile and supports true byte-level erase/write in-circuit, ideal for small, occasionally-updated parameters like calibration data. NAND is block-erased and oversized for a few hundred bytes; SRAM is volatile (loses data on power-off); mask ROM cannot be updated at all."
+          "explanation": "EEPROM is non-volatile and supports true byte-level updates in the circuit — ideal for small, occasionally-changed parameters like calibration data. NAND is block-erased and oversized for a few hundred bytes; SRAM is volatile (loses data at power-off); mask ROM can never be updated."
+        },
+        {
+          "id": "memory-025",
+          "type": "mcq",
+          "prompt": "Compared with SLC (1 bit per cell), how do MLC/TLC/QLC (2/3/4 bits per cell) flash behave?",
+          "choices": [
+            "Higher density and lower cost per bit, but slower writes and fewer erase cycles before wear-out",
+            "Higher density AND faster AND longer-lived in every way",
+            "Lower density but much faster",
+            "Identical in every respect except color"
+          ],
+          "answerIndex": 0,
+          "explanation": "Packing more bits per cell (by distinguishing more charge levels) raises capacity and lowers cost, but the levels are closer together, so writes are slower, errors are likelier, and the cell wears out after fewer cycles. SLC stores one bit and is the fastest and most durable, but costs the most per bit."
+        },
+        {
+          "id": "memory-026",
+          "type": "mcq",
+          "prompt": "Order this ROM family by how easily the contents can be changed, from least to most flexible: mask ROM, EPROM, EEPROM.",
+          "choices": [
+            "Mask ROM (fixed at manufacture) → EPROM (UV-erasable, reprogrammable) → EEPROM (electrically byte-erasable in-circuit)",
+            "EEPROM → EPROM → mask ROM",
+            "EPROM → mask ROM → EEPROM",
+            "They are all equally easy to change"
+          ],
+          "answerIndex": 0,
+          "explanation": "Mask ROM is fixed when the chip is made and can never change. EPROM can be erased with UV light and reprogrammed. EEPROM goes further: electrical erase and write, one byte at a time, in the circuit. Flexibility rises across that order — and so does cost per bit."
+        },
+        {
+          "id": "memory-027",
+          "type": "mcq",
+          "prompt": "Which of these tasks is best served by NOR flash specifically (rather than NAND, EEPROM, or DRAM)?",
+          "choices": [
+            "Holding boot/firmware code that the processor reads at random and executes in place",
+            "Storing a 256 GB photo library",
+            "Saving a single 4-byte counter that updates every second",
+            "Buffering data that is fine to lose at shutdown"
+          ],
+          "answerIndex": 0,
+          "explanation": "NOR flash's fast random reads make it the natural home for boot/firmware code that runs in place. A huge photo library suits dense NAND; a tiny frequently-updated counter suits byte-writable EEPROM; throwaway buffers suit volatile RAM. Matching the memory to the access pattern is the key skill."
         }
       ]
     },
     {
       "id": "memory-organization-dualport-fifo",
       "title": "Memory Organization, Dual-Port, and FIFOs",
-      "order": 3,
+      "order": 4,
       "difficulty": 3,
-      "content": "A memory chip is specified as **depth x width**: depth is the number of addressable locations (set by the number of address lines, $2^n$), and width is the bits per location (the data-bus width). A 8Kx8 device has $2^{13}=8192$ words of 8 bits, so 13 address lines and 8 data lines, plus control lines (chip-select **CS**, output-enable **OE**, write-enable **WE**).\n\nYou build bigger memories from smaller chips two ways. To **widen** the word, place chips side by side sharing the same address and CS but driving different data-bus slices, two 8Kx4 parts make an 8Kx8. To **deepen** (add capacity), stack chips that share the address and data buses; the **high-order address bits** drive a **decoder** whose outputs are the per-chip **chip-selects**, so exactly one chip responds at a time. This **chip-select decoding** is how a 2:4 decoder lets four 8Kx8 chips form a 32Kx8 map, with A14-A13 selecting the bank and A12-A0 selecting the word inside it.\n\nKey timing: **access time** is the delay from a valid address (or CS) to valid data; a read/write **cycle** also includes setup, hold, and recovery.\n\nStandard single-port RAM allows one access per cycle. **Dual-port RAM** has two independent address/data ports, so two agents (e.g., two clock domains or a CPU and a DMA engine) can read/write the same array concurrently. A **FIFO** is built on dual-port memory with separate write and read pointers and full/empty flags; an **asynchronous FIFO** uses Gray-coded pointers synchronized across clock domains, the canonical safe **clock-domain crossing** structure from the timing module. **CAM** (content-addressable memory) inverts the model: you present data and it returns the matching address.",
+      "content": "Now that we know the technologies, how is a memory chip actually arranged, and how do we build a bigger memory from smaller ones?\n\n**Depth × width.** A memory chip is described as **depth × width**. **Depth** is how many separate locations it has; **width** is how many bits each location holds. The chip reaches a location using **address lines** (which pick *which* location) and moves the bits on **data lines** (which carry the *contents*). With $n$ address lines you can pick $2^n$ locations, so an '8K × 8' chip has $2^{13}=8192$ locations of 8 bits each — meaning 13 address lines and 8 data lines, plus a few control lines such as **chip-select** (CS), which turns one chip on or off.\n\n**Building bigger from smaller.** You can combine small chips two ways. To make each location *wider*, place chips **side by side**, sharing the same address lines but each carrying a different slice of the data — two 8K×4 chips make an 8K×8. To add more *locations* (more depth), **stack** chips that share the address and data lines, and use the **high-order address bits** through a **decoder** to drive each chip's chip-select. That way exactly one chip responds for any address. For example, two top address bits through a 2:4 decoder let four 8K×8 chips form a 32K×8 memory, each chip owning one range of addresses.\n\n**Dual-port and FIFOs.** Ordinary memory has one **port** (one set of address/data lines), so one access happens at a time. A **dual-port** memory has **two** independent ports, so two parts of a system can read or write the same memory at once. A very useful structure built this way is a **FIFO** (First-In, First-Out) — a queue: data is written in at one end and read out at the other in the same order, like a line at a checkout. A FIFO has a separate write pointer and read pointer plus 'full' and 'empty' flags, and it is the standard, safe way to pass a stream of data between two parts of a system that run on different clocks.\n\n**Recap:** memory is organized as depth × width, reached by address lines and read/written over data lines; you widen memory by adding data slices and deepen it by decoding high address bits into chip-selects; dual-port memory allows two simultaneous accesses, and a FIFO built on it safely buffers a stream between two sides.",
       "items": [
-        {
-          "id": "memory-020",
-          "type": "flashcard",
-          "front": "Depth x width expansion with a chip-select decoder: how four 8Kx8 chips form a 32Kx8 memory.",
-          "back": "Each 8Kx8 chip uses the low address bits A12-A0 to pick a word inside it and shares the common 8-bit data bus. The high address bits A14-A13 feed a 2:4 decoder whose four outputs drive the four chips' chip-select pins, so exactly one bank is enabled for any address. Bank 0 covers 0x0000-0x1FFF, bank 1 0x2000-0x3FFF, and so on, giving a contiguous 32Kx8 map.",
-          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/memory-2.svg"
-        },
-        {
-          "id": "memory-021",
-          "type": "flashcard",
-          "front": "What do 'depth' and 'width' mean for a memory device, and how do they relate to pin counts?",
-          "back": "Depth is the number of addressable locations, equal to 2^(number of address lines); width is the number of bits stored per location, equal to the number of data lines. A 16Kx8 part has depth 16384 (so 14 address lines, since 2^14 = 16384) and width 8 (8 data lines), plus control pins (CS, OE, WE). Depth x width is the device's total bit capacity.",
-          "hint": "Depth = 2^(addr lines); width = data lines."
-        },
-        {
-          "id": "memory-022",
-          "type": "flashcard",
-          "front": "How do you WIDEN a memory word versus DEEPEN total capacity using smaller chips?",
-          "back": "Widen: place chips in parallel that share the same address lines and the same chip-select, but each drives a different slice of the data bus (e.g., two 8Kx4 chips -> 8Kx8). Deepen: stack chips sharing both the address and data buses, and use the high-order address bits through a decoder to generate a separate chip-select per chip, so only one responds per access (e.g., four 8Kx8 chips -> 32Kx8).",
-          "hint": "Widen = parallel data slices; deepen = decode high bits to chip-selects."
-        },
-        {
-          "id": "memory-023",
-          "type": "flashcard",
-          "front": "What is the role of the chip-select (CS) line and why is a decoder used when deepening memory?",
-          "back": "CS enables a memory chip; when deasserted the chip ignores the bus and tri-states its data outputs. When several chips share the same address and data buses to form a deeper memory, the high-order address bits are fed to a decoder whose outputs are the individual chip-selects. This guarantees exactly one chip drives the data bus for any address, preventing bus contention and mapping each chip to a distinct address range.",
-          "hint": "CS enables one chip; decoder turns high address bits into one-hot selects."
-        },
-        {
-          "id": "memory-024",
-          "type": "flashcard",
-          "front": "Define memory 'access time' and how it differs from 'cycle time'.",
-          "back": "Access time is the delay from presenting a valid address (or asserting CS/OE) until valid data appears on the outputs, it characterizes a single read. Cycle time is the minimum time before a new access can begin and includes access time plus setup, hold, precharge/recovery, and (in DRAM) write-back/restore. Cycle time is therefore equal to or longer than access time; the two differ most in DRAM where the destructive-read restore extends the cycle.",
-          "hint": "Address-to-data delay vs minimum time between accesses."
-        },
-        {
-          "id": "memory-025",
-          "type": "flashcard",
-          "front": "What is a dual-port RAM and what is it used for?",
-          "back": "A dual-port RAM is a memory array with two independent access ports, each with its own address, data, and control lines, allowing two agents to read/write concurrently (often in different clock domains). Uses: passing data between a CPU and a DMA engine or peripheral, sharing a buffer between two processors, and as the storage core of a FIFO. Designers must handle the case of both ports addressing the same cell simultaneously (collision/arbitration).",
-          "hint": "Two independent ports into one array; concurrent access."
-        },
-        {
-          "id": "memory-026",
-          "type": "flashcard",
-          "front": "How is an asynchronous FIFO built, and why is it the standard clock-domain-crossing structure?",
-          "back": "An async FIFO is a dual-port RAM with a write pointer in the write clock domain and a read pointer in the read clock domain, plus full/empty flag logic. The pointers are encoded in Gray code (only one bit changes per increment) and synchronized into the opposite domain through two-flop synchronizers; comparing the synchronized pointers safely generates full/empty. Gray coding ensures that even if a synchronizer samples mid-transition, the value is off by at most one count, never a wild value, making the crossing metastability-safe.",
-          "hint": "Dual-port RAM + Gray-coded pointers synchronized across domains."
-        },
-        {
-          "id": "memory-027",
-          "type": "mcq",
-          "prompt": "You need a 64Kx16 memory but only have 16Kx8 chips. How many chips and what addressing scheme?",
-          "choices": [
-            "8 chips: 2 in parallel for width (x16) and 4 deep banks selected by a 2:4 decoder on the high address bits",
-            "4 chips, all sharing one chip-select",
-            "16 chips with no decoder needed",
-            "2 chips: one for the high byte and one for the low address"
-          ],
-          "answerIndex": 0,
-          "explanation": "Width: two 16Kx8 chips side-by-side give 16Kx16 (one drives D15-D8, the other D7-D0). Depth: 64K / 16K = 4 banks, so four such pairs = 8 chips total, with the top two address bits feeding a 2:4 decoder that drives the four bank chip-selects. That is 8 chips with a 2:4 decoder."
-        },
         {
           "id": "memory-028",
           "type": "mcq",
-          "prompt": "In a memory built from several chips on a shared data bus, what prevents two chips from driving the bus at once?",
+          "prompt": "In the description 'depth × width' for a memory chip, what do the two numbers mean?",
           "choices": [
-            "A decoder ensures only one chip's chip-select is active per address, and unselected chips tri-state their outputs",
-            "Each chip drives a separate, private data bus",
-            "The data bus uses open-collector outputs only",
-            "The CPU reads all chips and votes on the result"
+            "Depth = how many addressable locations; width = how many bits each location holds",
+            "Depth = how many bits per location; width = how many chips are used",
+            "Depth = the chip's thickness; width = its physical size",
+            "Depth = number of data lines; width = number of address lines"
           ],
           "answerIndex": 0,
-          "explanation": "Chip-select decoding maps each address to exactly one chip; a deselected chip places its data pins in high-impedance (tri-state), so it does not fight the active driver. This one-hot selection is what avoids bus contention on the shared data bus. The other options either defeat the purpose of sharing a bus or are not how standard SRAM/ROM buses work."
+          "explanation": "Depth is the count of separate locations you can address; width is the number of bits stored at each location. So '8K × 8' means 8192 locations, each 8 bits wide. Depth is set by the address lines, width by the data lines — not the other way around.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/memory-2.svg"
         },
         {
           "id": "memory-029",
           "type": "mcq",
-          "prompt": "Why are FIFO pointers Gray-coded when the FIFO crosses clock domains?",
+          "prompt": "A memory chip has 13 address lines. How many separate locations can it address?",
           "choices": [
-            "Only one bit changes per increment, so a synchronizer that samples mid-transition still reads a value off by at most one, never a corrupt multi-bit value",
-            "Gray code makes the FIFO deeper",
-            "Gray code removes the need for full and empty flags",
-            "Gray code lets both clocks run at exactly the same frequency"
+            "2^13 = 8192 locations",
+            "13 locations",
+            "26 locations",
+            "1024 locations"
           ],
           "answerIndex": 0,
-          "explanation": "When a multi-bit pointer is sampled in another clock domain, several bits could be in transition at once with binary coding, yielding a meaningless value. Gray code changes only one bit per count, so a metastable sample resolves to either the old or new value, off by at most one, which keeps the full/empty comparison safe. It does not change depth, replace flags, or synchronize clock frequencies."
+          "explanation": "Each address line is one bit, so n address lines select 2^n locations. With 13 lines that is 2^13 = 8192 (often written 8K). This is why a chip with more capacity needs more address lines."
+        },
+        {
+          "id": "memory-030",
+          "type": "mcq",
+          "prompt": "What is the job of the ADDRESS lines versus the DATA lines on a memory chip?",
+          "choices": [
+            "Address lines pick WHICH location; data lines carry the bits stored at that location",
+            "Address lines carry the stored bits; data lines pick the location",
+            "Both carry the stored data; neither selects a location",
+            "Address lines set the chip's voltage; data lines set its clock"
+          ],
+          "answerIndex": 0,
+          "explanation": "The address lines are like a house number — they select which location you are talking to. The data lines are the contents being read out or written in. Mixing up the two roles is a common beginner error; they serve completely different purposes."
+        },
+        {
+          "id": "memory-031",
+          "type": "mcq",
+          "prompt": "You have 8K×4 chips but need each location to be 8 bits WIDE. What do you do?",
+          "choices": [
+            "Place two chips side by side sharing the address lines, one carrying the upper 4 data bits and the other the lower 4",
+            "Stack the chips and decode the high address bits",
+            "Use a single chip and refresh it faster",
+            "Connect both chips to the same data lines and enable both at once"
+          ],
+          "answerIndex": 0,
+          "explanation": "To widen each word you put chips in parallel: they share the same address (so they pick the same location together) but each drives a different slice of the data bus. Two 8K×4 chips thus form an 8K×8. Stacking with a decoder adds depth, not width; driving both onto the same data lines would cause a conflict."
+        },
+        {
+          "id": "memory-032",
+          "type": "mcq",
+          "prompt": "To build a deeper memory (more locations) from several chips on a SHARED data bus, what ensures only one chip drives the bus for a given address?",
+          "choices": [
+            "The high-order address bits feed a decoder whose outputs are the per-chip chip-selects, so exactly one chip is enabled at a time",
+            "All chips are enabled together and the fastest one wins",
+            "Each chip gets its own private data bus",
+            "The processor reads every chip and averages the results"
+          ],
+          "answerIndex": 0,
+          "explanation": "When deepening memory, the top address bits go through a decoder that activates exactly one chip's chip-select per address; the others stay disabled (and release the shared data bus). This one-at-a-time selection maps each chip to its own address range and prevents two chips from fighting over the bus."
+        },
+        {
+          "id": "memory-033",
+          "type": "mcq",
+          "prompt": "Using a 2:4 decoder on the top two address bits, how many 8K×8 chips combine into what total memory?",
+          "choices": [
+            "Four 8K×8 chips form a 32K×8 memory, each chip owning one 8K address range",
+            "Two 8K×8 chips form a 16K×16 memory",
+            "Four chips form an 8K×32 memory",
+            "Sixteen chips form a 32K×8 memory"
+          ],
+          "answerIndex": 0,
+          "explanation": "A 2:4 decoder produces four chip-selects, so four 8K-deep chips stack into 4 × 8K = 32K locations, still 8 bits wide: a 32K×8 memory. Each chip responds to its own quarter of the address range. The width stays 8 because we are deepening, not widening."
+        },
+        {
+          "id": "memory-034",
+          "type": "mcq",
+          "prompt": "What is the defining feature of a DUAL-PORT memory?",
+          "choices": [
+            "It has two independent sets of address/data lines, so two parts of a system can access it at the same time",
+            "It stores two bits in every cell",
+            "It is twice as fast as any single-port memory",
+            "It can only be read, never written"
+          ],
+          "answerIndex": 0,
+          "explanation": "Dual-port means two independent access ports into the same memory array, allowing two agents to read or write concurrently (often useful between two parts running on different clocks). It is about simultaneous access, not about storing extra bits or being inherently read-only."
+        },
+        {
+          "id": "memory-035",
+          "type": "mcq",
+          "prompt": "What does a FIFO do, and how does it behave?",
+          "choices": [
+            "It is a queue: data written in first is read out first, in the same order, like a line at a checkout",
+            "It reads out data in reverse order, last-in first-out",
+            "It returns a random stored value on each read",
+            "It is a non-volatile storage chip for files"
+          ],
+          "answerIndex": 0,
+          "explanation": "FIFO stands for First-In, First-Out: items leave in the same order they arrived, like people in a queue. It uses separate write and read pointers and full/empty flags. (Last-in-first-out is a stack, not a FIFO, and a FIFO is a buffering structure, not file storage.)"
+        },
+        {
+          "id": "memory-036",
+          "type": "mcq",
+          "prompt": "Why is a FIFO the standard, safe way to pass a stream of data between two parts of a system running on DIFFERENT clocks?",
+          "choices": [
+            "It decouples the writer and reader — each works at its own clock through its own pointer — while the full/empty flags keep them from overrunning each other",
+            "It forces both sides to run on exactly the same clock",
+            "It makes the data non-volatile so timing no longer matters",
+            "It deletes data whenever the clocks disagree"
+          ],
+          "answerIndex": 0,
+          "explanation": "A FIFO lets the writing side and the reading side each operate on its own clock, buffering data in between; the full flag stops the writer from overflowing and the empty flag stops the reader from underflowing. That clean handoff is exactly what is needed when two clock domains must exchange a data stream safely."
         }
       ]
     }
