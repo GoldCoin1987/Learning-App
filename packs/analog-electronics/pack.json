@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "id": "analog-electronics",
   "title": "Analog Electronics",
-  "version": "2.11.0",
+  "version": "2.12.0",
   "description": "Analog electronics from scratch (beginner rework in progress): 15 sub-topics from DC networks through noise, layout and instrumentation. Beginner-first readings, diagrams, tiered easy to hard.",
   "requires": [
     "mathematics"
@@ -7363,134 +7363,602 @@
       "order": 12,
       "lessons": [
         {
-          "id": "power-regulation-linear-regulators",
-          "title": "Linear Regulators, LDOs & Dropout",
+          "id": "power-regulation-supply-chain",
+          "title": "What a Power Supply Does: From Wall AC to Steady DC",
           "order": 1,
           "difficulty": 1,
-          "content": "A linear regulator holds $V_{out}$ constant by controlling a **series-pass** element (a transistor between input and output) as a variable resistor, with an error amplifier comparing a divided sample of $V_{out}$ against a reference. The classic three-terminal parts (7805-style) are simple and quiet but waste power: the pass device burns whatever voltage it drops.\n\nThe headroom it needs is the **dropout voltage** $V_{DO}$ — the minimum $V_{in}-V_{out}$ at which regulation still holds. A standard regulator may need 2 V; a **low-dropout (LDO)** regulator uses a PMOS (or PNP) pass device and drops only tens to a few hundred mV, letting you regulate, say, 3.3 V from a 3.6 V battery.\n\nEfficiency is brutally simple:\n\n$$\\eta = \\frac{V_{out} I_{out}}{V_{in} I_{in}} \\approx \\frac{V_{out}}{V_{in}}$$\n\nsince $I_{in} \\approx I_{out}$ (quiescent current aside). Dropping 12 V to 5 V at 1 A dissipates $P_D = (V_{in}-V_{out})I_{out} = 7\\,\\mathrm{W}$ in the pass device — a heatsink problem.\n\nKey static specs: **line regulation** ($\\Delta V_{out}$ per $\\Delta V_{in}$), **load regulation** ($\\Delta V_{out}$ per $\\Delta I_{out}$), and **PSRR** (how well it rejects input ripple, frequency-dependent and falling at high $f$). For a radar tech turned dev: the LDO is the quiet \"finisher\" rail you trust, but only when its drop is small enough to keep it cool.",
+          "content": "Plug a phone charger into the wall and a tiny miracle happens: the wall gives a high, wobbling **AC** voltage, and out the other end comes a calm, steady **5 volts DC** your phone can use. That conversion is what a **power supply** does.\n\nFirst, two words. **DC (direct current)** is voltage that stays at one steady level, like the 1.5 V from a battery. **AC (alternating current)** is voltage that swings up and down many times a second, like the 120 V or 230 V in your wall socket. Almost every chip inside electronics needs clean, steady DC. But our two common sources are not clean: wall power is AC, and batteries *sag* (their voltage drops as they drain or when the device draws more current).\n\nSo a power supply has two jobs: **convert** (turn AC into DC, or one DC voltage into another) and **regulate** (hold the output steady). **Regulation** means the output voltage stays nearly constant even when the input changes or the load draws more current. A good 5 V rail stays at 5 V whether the wall sags to 110 V or the phone suddenly pulls more power.\n\nThe classic chain from a wall outlet runs in stages: wall **AC** -> **transformer** (lowers the high AC voltage) -> **rectifier** (a set of diodes that flips the AC so it only goes one direction, making bumpy DC) -> **smoothing capacitor** (a tank that fills in the bumps) -> **regulator** (irons out what is left into a flat, steady voltage). You met the transformer, rectifier, and smoothing capacitor in the diodes sub-topic; this whole sub-topic is about that last box, the **regulator**.\n\nRecap: a power supply converts messy AC (or a sagging battery) into clean DC, and regulation is the promise that the output holds steady no matter what wiggles at the input or the load.",
+          "items": [
+            {
+              "id": "power-regulation-supply-chain-001",
+              "type": "mcq",
+              "prompt": "What does it mean for a power supply to 'regulate' its output?",
+              "choices": [
+                "It makes the output voltage as high as possible",
+                "It keeps the output voltage nearly constant even when the input or load changes",
+                "It converts DC into AC",
+                "It stores energy in a battery for later"
+              ],
+              "answerIndex": 1,
+              "explanation": "Regulation means holding the output steady. A regulated 5 V rail stays near 5 V whether the input sags or the load suddenly draws more current. Making the voltage 'as high as possible' is the opposite of regulation, which is about constancy, not size."
+            },
+            {
+              "id": "power-regulation-supply-chain-002",
+              "type": "mcq",
+              "prompt": "What is the key difference between DC and AC?",
+              "choices": [
+                "DC is always higher voltage than AC",
+                "DC stays at one steady level; AC swings up and down repeatedly",
+                "DC is used only in batteries and never in chargers",
+                "AC cannot be converted into DC"
+              ],
+              "answerIndex": 1,
+              "explanation": "DC (direct current) holds a steady level, like a battery's 1.5 V. AC (alternating current) alternates, swinging up and down many times per second, like wall power. AC can absolutely be converted to DC; that is exactly what a power supply does."
+            },
+            {
+              "id": "power-regulation-supply-chain-003",
+              "type": "mcq",
+              "prompt": "Why do most electronic chips need a regulated DC supply rather than raw wall power?",
+              "choices": [
+                "Chips run on AC and just need it amplified",
+                "Wall power is already perfectly steady DC",
+                "Chips need clean, steady DC, but wall power is AC and batteries sag",
+                "Regulation makes the chip run faster"
+              ],
+              "answerIndex": 2,
+              "explanation": "Chips need clean, constant DC to work correctly. Wall power is AC (it swings), and batteries sag (their voltage drops with use and load). A power supply bridges that gap by converting and regulating. Regulation is about steadiness, not speed."
+            },
+            {
+              "id": "power-regulation-supply-chain-004",
+              "type": "mcq",
+              "prompt": "In the classic wall-powered supply chain, what is the correct order of stages?",
+              "choices": [
+                "Rectifier -> transformer -> regulator -> smoothing capacitor",
+                "Transformer -> rectifier -> smoothing capacitor -> regulator",
+                "Regulator -> smoothing capacitor -> rectifier -> transformer",
+                "Smoothing capacitor -> regulator -> transformer -> rectifier"
+              ],
+              "answerIndex": 1,
+              "explanation": "The order is transformer (lower the AC voltage), rectifier (flip AC into bumpy one-direction DC), smoothing capacitor (fill the bumps), then regulator (flatten it into a steady output). Each stage feeds the next.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/analog-electronics/images/power-regulation-3.svg"
+            },
+            {
+              "id": "power-regulation-supply-chain-005",
+              "type": "mcq",
+              "prompt": "What is the job of the rectifier in the supply chain?",
+              "choices": [
+                "To raise the voltage to a higher level",
+                "To use diodes to make the AC flow in only one direction, producing bumpy DC",
+                "To store energy for hours",
+                "To hold the final output perfectly flat"
+              ],
+              "answerIndex": 1,
+              "explanation": "A rectifier is a set of diodes that flips the negative swings of AC so current only goes one way, turning AC into pulsing (bumpy) DC. It does not raise voltage (that is the transformer) and it does not give a flat output (that takes the capacitor and regulator)."
+            },
+            {
+              "id": "power-regulation-supply-chain-006",
+              "type": "mcq",
+              "prompt": "What does the smoothing capacitor contribute after the rectifier?",
+              "choices": [
+                "It converts the DC back into AC",
+                "It acts like a small tank that fills in the dips between the bumps, reducing ripple",
+                "It lowers the average voltage to zero",
+                "It is what makes the voltage swing up and down"
+              ],
+              "answerIndex": 1,
+              "explanation": "The rectifier's output is bumpy DC. The smoothing capacitor charges on each bump and discharges into the load during the dips, partly filling them in and reducing the leftover wobble (ripple). The regulator then irons out what remains."
+            },
+            {
+              "id": "power-regulation-supply-chain-007",
+              "type": "mcq",
+              "prompt": "A phone charger turns wall AC into 5 V DC. Which everyday device is also a power supply doing the same kind of job?",
+              "choices": [
+                "A laptop power brick converting wall AC to a steady DC rail",
+                "A flashlight bulb",
+                "A pair of headphones",
+                "A wall switch"
+              ],
+              "answerIndex": 0,
+              "explanation": "A laptop brick is a power supply: it converts wall AC into a regulated DC rail for the laptop, exactly like a phone charger. A bulb, headphones, and a switch are loads or controls, not supplies that convert and regulate."
+            },
+            {
+              "id": "power-regulation-supply-chain-008",
+              "type": "mcq",
+              "prompt": "Why is a battery's output not as 'clean' as a regulated supply, even though a battery already gives DC?",
+              "choices": [
+                "A battery actually gives AC",
+                "A battery's voltage sags as it drains or as the load draws more current",
+                "A battery's voltage rises uncontrollably over time",
+                "A battery cannot power any electronics"
+              ],
+              "answerIndex": 1,
+              "explanation": "A battery gives DC, but its voltage sags: it droops as the battery drains and dips further when the load draws more current. A regulator placed after the battery holds the rail steady despite that sag, which is why battery devices still use regulators."
+            },
+            {
+              "id": "power-regulation-supply-chain-009",
+              "type": "mcq",
+              "prompt": "Which stage of the chain is this whole sub-topic mainly about?",
+              "choices": [
+                "The transformer",
+                "The rectifier diodes",
+                "The regulator that holds the final output steady",
+                "The wall outlet"
+              ],
+              "answerIndex": 2,
+              "explanation": "You already met the transformer, rectifier, and smoothing capacitor with diodes. This sub-topic focuses on the final box, the regulator, which takes the rough DC and holds it at a flat, steady value despite changes in input and load."
+            }
+          ]
+        },
+        {
+          "id": "power-regulation-linear-regulators",
+          "title": "Linear Regulators & LDOs: Simple, Quiet, but They Waste Heat",
+          "order": 2,
+          "difficulty": 2,
+          "content": "The simplest regulator is the **linear regulator**, the little three-legged chip (like the famous 7805) on countless circuit boards. Give it a higher, somewhat messy voltage and it gives back a lower, rock-steady one.\n\nHere is the intuition. Imagine a tap (faucet) on a pipe with too much water pressure. To get a gentle, steady flow you open the tap part way, throttling the excess. A linear regulator does the electrical version: it puts an adjustable resistance, called the **pass element** (a transistor acting like a controlled valve), in series with the load. A built-in feedback circuit constantly watches the output and nudges that valve so the output stays put. If the output starts to rise, it closes a little; if it sags, it opens a little.\n\nThis is simple and very **quiet** (its output has almost no electrical noise), which makes it great for sensitive circuits. But there is a catch, and it is the big idea of this lesson: **the throttled-away voltage turns into heat.** If you feed in 12 V and take out 5 V at 1 amp, the pass element is dropping 7 V while 1 A flows through it, so it burns $P = (V_{in}-V_{out}) \\times I = 7 \\times 1 = 7$ watts as heat. Efficiency is roughly $\\eta \\approx V_{out}/V_{in}$, so 5 V from 12 V is only about 42% efficient; the rest is wasted warmth. The bigger the gap between input and output, the more heat.\n\nThat heat penalty drives a key spec: the **dropout voltage**, the smallest input-to-output gap at which the regulator can still hold steady. An ordinary linear regulator might need 2 V of headroom. A **low-dropout regulator (LDO)** needs only a tiny gap (tens of millivolts to a few hundred), so it can make, say, 3.3 V from a nearly-empty 3.6 V battery and waste very little.\n\nTwo more steadiness specs you will hear: **line regulation** (how little the output moves when the *input* changes) and **load regulation** (how little it moves when the *load current* changes). Smaller numbers are better.\n\nRecap: a linear regulator throttles a transistor like a valve to hold the output steady. It is simple and clean but wastes the dropped voltage as heat, so it is best when the input-to-output gap is small, and an LDO is the version that needs only a tiny gap.",
           "items": [
             {
               "id": "power-regulation-linear-regulators-001",
-              "type": "flashcard",
-              "front": "What is the series-pass element in a linear regulator, and how does it regulate?",
-              "back": "It is a transistor (BJT or MOSFET) placed in series between input and output. An error amplifier compares a divided sample of V_out to a reference and continuously adjusts the pass device's drop so V_out stays constant. It behaves like an automatically-controlled variable resistor.",
-              "hint": "Think of a controlled variable resistor in series with the load."
+              "type": "mcq",
+              "prompt": "A linear regulator is often compared to a water tap (valve) because it:",
+              "choices": [
+                "Stores charge and releases it in bursts",
+                "Acts as an adjustable resistance in series with the load, throttling the excess to hold the output steady",
+                "Switches fully on and off thousands of times a second",
+                "Boosts the voltage higher than the input"
+              ],
+              "answerIndex": 1,
+              "explanation": "Like throttling a tap to get a gentle steady flow, the linear regulator's pass transistor acts as a controlled variable resistance in series, dropping the extra voltage so the output stays put. It does not switch on/off (that is a switcher) and it cannot boost above the input."
             },
             {
               "id": "power-regulation-linear-regulators-002",
-              "type": "flashcard",
-              "front": "Define dropout voltage and explain why a low value matters.",
-              "back": "Dropout voltage V_DO is the minimum V_in - V_out at which the regulator can still hold regulation. A low V_DO (an LDO) lets you regulate when input and output are close, e.g. 3.3 V out from a 3.6 V battery, extending battery life and reducing wasted heat.",
-              "hint": "It is the headroom the pass device needs to keep working."
+              "type": "mcq",
+              "prompt": "A linear regulator takes 12 V in and gives 5 V out at 1 A. About how much power does it waste as heat in the pass element?",
+              "choices": [
+                "5 W",
+                "7 W",
+                "12 W",
+                "Almost zero, linear regulators are very efficient"
+              ],
+              "answerIndex": 1,
+              "explanation": "Heat = (Vin - Vout) x I = (12 - 5) x 1 = 7 W burned in the pass element. This is the central weakness of linear regulators: the dropped voltage becomes heat, so a big input-to-output gap means a lot of wasted power."
             },
             {
               "id": "power-regulation-linear-regulators-003",
-              "type": "flashcard",
-              "front": "Why does an LDO typically use a PMOS or PNP pass device instead of an NPN/NMOS follower?",
-              "back": "A PMOS/PNP common-source/common-emitter pass element can be driven into saturation so its drop is only the device's R_DS(on)*I or V_CE(sat), giving dropout of tens to a few hundred mV. An NPN/NMOS follower needs an extra base/gate drive above V_in (or a charge pump) and inherently drops more.",
-              "hint": "Which configuration can pull the output nearly all the way to the input?"
+              "type": "mcq",
+              "prompt": "The rough efficiency of a linear regulator is approximately Vout/Vin. Making 3.3 V from 12 V is therefore about:",
+              "choices": [
+                "About 27% efficient",
+                "About 73% efficient",
+                "About 90% efficient",
+                "100% efficient"
+              ],
+              "answerIndex": 0,
+              "explanation": "Efficiency is about Vout/Vin = 3.3/12 = 0.275, roughly 27%. Nearly three-quarters of the power is wasted as heat. This is why a large drop is a bad job for a linear regulator and a switcher is preferred."
             },
             {
               "id": "power-regulation-linear-regulators-004",
-              "type": "flashcard",
-              "front": "Write the approximate efficiency of a linear regulator and state what it implies.",
-              "back": "eta = (V_out * I_out)/(V_in * I_in), and since I_in ~ I_out, eta ~ V_out/V_in. Efficiency is set almost entirely by the voltage ratio: a big input-to-output drop means low efficiency and high heat, regardless of how 'good' the regulator is.",
-              "hint": "Currents in and out are nearly equal; only voltage differs."
+              "type": "mcq",
+              "prompt": "What is the 'dropout voltage' of a linear regulator?",
+              "choices": [
+                "The output voltage when the chip overheats and shuts down",
+                "The smallest input-to-output gap at which it can still hold the output steady",
+                "The voltage at which the output drops to zero",
+                "The amount of ripple left on the output"
+              ],
+              "answerIndex": 1,
+              "explanation": "Dropout voltage is the minimum headroom (Vin minus Vout) the regulator needs to keep regulating. Below it, the output can no longer be held steady and starts to follow the input down. It is not a shutdown threshold or a ripple figure."
             },
             {
               "id": "power-regulation-linear-regulators-005",
-              "type": "flashcard",
-              "front": "Define line regulation and load regulation.",
-              "back": "Line regulation = change in V_out per unit change in V_in (with load fixed), often in mV/V or %. Load regulation = change in V_out per unit change in load current I_out (with V_in fixed), often in mV/A or %. Both quantify how 'stiff' the output is to disturbances.",
-              "hint": "One varies the input, the other varies the current draw."
+              "type": "mcq",
+              "prompt": "Why is a low-dropout regulator (LDO) useful in a battery device?",
+              "choices": [
+                "It can boost the battery voltage higher",
+                "It needs only a tiny input-to-output gap, so it keeps regulating even as the battery sags close to the target voltage",
+                "It stores energy when the battery is full",
+                "It never produces any heat at all"
+              ],
+              "answerIndex": 1,
+              "explanation": "An LDO needs only a tiny headroom (tens to a few hundred mV), so it can still make 3.3 V from a nearly-empty 3.6 V battery, squeezing more life from the cell. It is still a linear regulator, so it cannot boost above the input, and it still makes some heat (just less, because the gap is small)."
             },
             {
               "id": "power-regulation-linear-regulators-006",
               "type": "mcq",
-              "prompt": "A linear regulator steps 12 V down to 5 V at 1.5 A load. Approximately how much power is dissipated in the pass device?",
+              "prompt": "Which job is the BEST fit for a simple linear regulator?",
               "choices": [
-                "5 W",
-                "7.5 W",
-                "10.5 W",
-                "18 W"
+                "Stepping 24 V down to 3.3 V at 3 A",
+                "Making a clean 3.3 V from a 3.6 V supply for a sensitive, low-noise circuit",
+                "Converting 48 V down to 5 V at high current",
+                "Any case where efficiency is the single most important goal"
               ],
-              "answerIndex": 2,
-              "explanation": "P_D = (V_in - V_out) * I_out = (12 - 5) * 1.5 = 7 * 1.5 = 10.5 W. This large dissipation (plus poor ~42% efficiency, 5/12) is exactly why a switcher is preferred for big voltage ratios."
+              "answerIndex": 1,
+              "explanation": "Linear regulators shine for small drops, where little heat is wasted, and their quiet output suits sensitive circuits. Large drops (24 to 3.3, 48 to 5) waste huge amounts of heat, and if efficiency is paramount you want a switcher instead."
             },
             {
               "id": "power-regulation-linear-regulators-007",
               "type": "mcq",
-              "prompt": "PSRR (power supply rejection ratio) of a typical LDO usually:",
+              "prompt": "What does the feedback inside a linear regulator do when the output starts to sag below its target?",
               "choices": [
-                "Is constant across all frequencies",
-                "Is high at low frequency but degrades as frequency increases",
-                "Improves steadily as frequency increases",
-                "Only applies to switching regulators"
+                "It opens the pass element a little more to bring the output back up",
+                "It shuts the output off completely",
+                "It increases the input voltage",
+                "It does nothing; linear regulators have no feedback"
               ],
-              "answerIndex": 1,
-              "explanation": "PSRR is highest at DC/low frequency (often 60-80 dB) because the loop has high gain there, and it falls off at higher frequencies as loop gain rolls off. This is why an LDO cleans up low-frequency ripple well but a tight switching spike may still leak through."
+              "answerIndex": 0,
+              "explanation": "The feedback constantly compares the output to a target and adjusts the pass 'valve.' If the output sags, it opens the valve a bit to restore it; if it rises, it closes a bit. This continuous correction is what holds the output steady. Linear regulators absolutely rely on feedback."
             },
             {
               "id": "power-regulation-linear-regulators-008",
               "type": "mcq",
-              "prompt": "Which scenario is the BEST fit for a simple linear regulator rather than a switcher?",
+              "prompt": "What is the difference between line regulation and load regulation?",
               "choices": [
-                "Converting 24 V to 3.3 V at 3 A on a battery-powered board",
-                "A small drop (e.g., 3.6 V to 3.3 V) feeding a low-noise analog/RF stage",
-                "A 48 V telecom rail down to 12 V at 10 A",
-                "Any application where efficiency is the dominant concern"
+                "Line regulation is about heat; load regulation is about noise",
+                "Line regulation = how little the output moves when the input changes; load regulation = how little it moves when the load current changes",
+                "They are two names for the same thing",
+                "Line regulation applies only to AC, load regulation only to DC"
               ],
               "answerIndex": 1,
-              "explanation": "Linear regulators shine for small drops where the efficiency penalty is mild and their quiet, ripple-free output benefits sensitive analog/RF circuits. Large drops or high currents waste too much power as heat, favoring a switcher."
+              "explanation": "Line regulation measures output steadiness against input-voltage changes; load regulation measures steadiness against load-current changes. Both describe how 'stiff' the rail is, and smaller numbers are better. Neither is about heat or noise directly."
             },
             {
               "id": "power-regulation-linear-regulators-009",
-              "type": "flashcard",
-              "front": "Why do LDOs usually require a minimum output capacitor with a bounded ESR?",
-              "back": "The output capacitor sets a pole that stabilizes the LDO's feedback loop. Many older LDOs need the cap's ESR to fall in a window to place a compensating zero; too little or too much ESR can cause oscillation. Modern 'cap-stable' LDOs are designed to tolerate low-ESR ceramics.",
-              "hint": "It is a loop-stability (phase margin) issue, ties to Module 11."
+              "type": "mcq",
+              "prompt": "Two linear regulators both output 5 V at 1 A. One is fed 6 V, the other 15 V. Which wastes more heat, and why?",
+              "choices": [
+                "The 6 V one, because lower input means more heat",
+                "The 15 V one, because the bigger input-to-output gap is dropped as heat",
+                "They waste exactly the same, since both output 5 V",
+                "Neither wastes heat because the current is the same"
+              ],
+              "answerIndex": 1,
+              "explanation": "Heat = (Vin - Vout) x I. The 6 V unit burns (6-5) x 1 = 1 W; the 15 V unit burns (15-5) x 1 = 10 W. The larger gap is dissipated as heat, so a smaller input-to-output gap is always more efficient for a linear regulator.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/analog-electronics/images/power-regulation-4.svg"
+            }
+          ]
+        },
+        {
+          "id": "power-regulation-switching-converters",
+          "title": "Switch-Mode Supplies: Buck, Boost & High Efficiency",
+          "order": 3,
+          "difficulty": 3,
+          "content": "If a linear regulator wastes the dropped voltage as heat, how does a tiny phone charger turn high-voltage wall power into 5 V without getting scorching hot? The answer is the **switch-mode power supply (SMPS)**, also called a **switcher**. It is the modern default for almost every power conversion, and the reason your charger is small and cool.\n\nThe trick is to stop throttling and start **switching**. Instead of holding a valve half-open and burning the excess, a switcher flips a transistor fully **on** and fully **off** very fast, often hundreds of thousands of times a second. A fully-on switch wastes almost nothing (no voltage across it), and a fully-off switch wastes almost nothing (no current through it). An **inductor** (a coil that stores energy in a magnetic field) and a **capacitor** then smooth those chopped pulses into a steady DC output. Because no big resistance sits in the path, efficiency is typically **85 to 95%**, far better than a linear regulator on the same job.\n\nThe knob that sets the output is the **duty cycle** $D$, the fraction of each cycle the switch is on (so $D$ is between 0 and 1). For a **buck** converter, which steps voltage *down*, the output is simply $V_{out} = D\\,V_{in}$. Want 5 V from 12 V? Set $D = 5/12 \\approx 0.42$, on about 42% of the time. A **boost** converter steps voltage *up* ($V_{out}$ larger than $V_{in}$, useful to run 5 V gadgets from a 1.5 V cell), and a **buck-boost** can go either above or below the input.\n\nNothing is free. Switching that fast creates **ripple** (a small leftover wiggle on the output) and **EMI** (electromagnetic interference, electrical noise that can leak into nearby circuits). A linear regulator is quiet; a switcher is efficient but noisier. That tradeoff is the whole reason both kinds still exist.\n\nRecap: a switcher chops the input on and off fast and uses an inductor and capacitor to average it out, reaching 85 to 95% efficiency. A buck steps down ($V_{out}=D\\,V_{in}$), a boost steps up, and a buck-boost does both, at the cost of more ripple and noise.",
+          "items": [
+            {
+              "id": "power-regulation-switching-converters-001",
+              "type": "mcq",
+              "prompt": "How does a switch-mode supply avoid wasting energy as heat the way a linear regulator does?",
+              "choices": [
+                "It uses a bigger resistor to share the load",
+                "It switches a transistor fully on and fully off fast, where little power is wasted in either state",
+                "It runs the input through more diodes",
+                "It simply runs cooler by being smaller"
+              ],
+              "answerIndex": 1,
+              "explanation": "A fully-on switch has almost no voltage across it and a fully-off switch has almost no current through it, so each state wastes little power. By switching between them rapidly and averaging with an inductor and capacitor, the switcher avoids the constant throttling loss of a linear regulator."
+            },
+            {
+              "id": "power-regulation-switching-converters-002",
+              "type": "mcq",
+              "prompt": "What two components smooth a switcher's chopped pulses into a steady DC output?",
+              "choices": [
+                "Two resistors",
+                "An inductor (coil) and a capacitor",
+                "A transformer and a diode bridge",
+                "Two transistors in series"
+              ],
+              "answerIndex": 1,
+              "explanation": "The inductor stores energy in its magnetic field and resists sudden current changes, while the capacitor holds the voltage steady. Together they average the rapid on/off pulses into a smooth DC output. Resistors would just waste power."
+            },
+            {
+              "id": "power-regulation-switching-converters-003",
+              "type": "mcq",
+              "prompt": "A buck converter follows Vout = D x Vin. To make 5 V from a 12 V input, the duty cycle D should be about:",
+              "choices": [
+                "0.12",
+                "0.42",
+                "0.71",
+                "2.4"
+              ],
+              "answerIndex": 1,
+              "explanation": "D = Vout/Vin = 5/12 = 0.42, so the switch is on about 42% of each cycle. A duty cycle is a fraction between 0 and 1, so 2.4 is impossible, and a buck can only step down."
+            },
+            {
+              "id": "power-regulation-switching-converters-004",
+              "type": "mcq",
+              "prompt": "Which converter would you use to power a 5 V device from a single 1.5 V battery cell?",
+              "choices": [
+                "A buck, because it steps voltage down",
+                "A boost, because it steps voltage up",
+                "A linear regulator, because it is efficient",
+                "None; you cannot get 5 V from 1.5 V"
+              ],
+              "answerIndex": 1,
+              "explanation": "A boost converter steps voltage up, so it can raise 1.5 V to 5 V. A buck only steps down, and a linear regulator can never output more than its input. Switchers can move energy to a higher voltage by trading current for voltage."
+            },
+            {
+              "id": "power-regulation-switching-converters-005",
+              "type": "mcq",
+              "prompt": "Why is a switch-mode supply typically much more efficient (85 to 95%) than a linear regulator for a large voltage drop?",
+              "choices": [
+                "It throttles the extra voltage more gently",
+                "It does not burn the voltage difference as heat; it switches and stores energy instead of dissipating it",
+                "It uses a higher input voltage",
+                "Linear regulators are actually more efficient; this is a myth"
+              ],
+              "answerIndex": 1,
+              "explanation": "A linear regulator's efficiency is about Vout/Vin, so a big drop wastes most of the power as heat. A switcher instead shuttles energy through an inductor and capacitor with low-loss switching, so efficiency stays high (85 to 95%) regardless of the voltage ratio."
+            },
+            {
+              "id": "power-regulation-switching-converters-006",
+              "type": "mcq",
+              "prompt": "What is the duty cycle D in a switch-mode converter?",
+              "choices": [
+                "The number of times per second the switch toggles",
+                "The fraction of each cycle that the switch is turned on",
+                "The total output power",
+                "The voltage across the inductor"
+              ],
+              "answerIndex": 1,
+              "explanation": "Duty cycle is the on-time divided by the full period, a fraction between 0 and 1. The number of toggles per second is the switching frequency, a different quantity. Adjusting D is how the converter sets its output voltage."
+            },
+            {
+              "id": "power-regulation-switching-converters-007",
+              "type": "mcq",
+              "prompt": "What is the main downside of switch-mode supplies compared with linear regulators?",
+              "choices": [
+                "They are always larger and heavier",
+                "They produce ripple and EMI (electrical noise) that can disturb sensitive circuits",
+                "They can only step voltage down",
+                "They cannot be made efficient"
+              ],
+              "answerIndex": 1,
+              "explanation": "Fast switching creates output ripple and EMI (electromagnetic interference) that linear regulators avoid. That noise is the price of the high efficiency. Switchers are usually smaller, can step up or down, and are very efficient, so those are not the downside."
+            },
+            {
+              "id": "power-regulation-switching-converters-008",
+              "type": "mcq",
+              "prompt": "Which converter can produce an output that is either higher OR lower than its input?",
+              "choices": [
+                "Buck",
+                "Boost",
+                "Buck-boost",
+                "Linear regulator"
+              ],
+              "answerIndex": 2,
+              "explanation": "A buck-boost can step up or down, making it handy when the input might be above or below the target (such as a battery that starts above and sags below). A buck only steps down, a boost only steps up, and a linear regulator only steps down.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/analog-electronics/images/power-regulation-1.svg"
+            },
+            {
+              "id": "power-regulation-switching-converters-009",
+              "type": "mcq",
+              "prompt": "In the buck converter diagram, what is the role of the inductor (the coil)?",
+              "choices": [
+                "It boosts the voltage above the input",
+                "It stores energy and smooths the chopped current into a steadier flow to the output",
+                "It blocks all current to protect the load",
+                "It converts DC back into AC"
+              ],
+              "answerIndex": 1,
+              "explanation": "The inductor stores energy in its magnetic field and resists sudden current changes, so it smooths the switch's chopped pulses into a steadier current delivered to the output capacitor and load. In a buck it does not boost the voltage."
+            },
+            {
+              "id": "power-regulation-switching-converters-010",
+              "type": "mcq",
+              "prompt": "Why is the switch-mode supply called the 'modern default' for power conversion?",
+              "choices": [
+                "It is the cheapest possible circuit with only one part",
+                "Its high efficiency means small size, little heat, and long battery life, which most products need",
+                "It produces the quietest, lowest-noise output of any regulator",
+                "It is the only circuit that can output DC"
+              ],
+              "answerIndex": 1,
+              "explanation": "High efficiency means little wasted heat, so the supply can be small and run cool, and battery devices last longer. That fits most modern products. It is not the quietest (linear wins there), nor the simplest single part, nor the only DC source."
+            }
+          ]
+        },
+        {
+          "id": "power-regulation-linear-vs-switching",
+          "title": "Choosing a Supply & Cleaning Up Noise (Switcher then LDO)",
+          "order": 4,
+          "difficulty": 3,
+          "content": "Now that you know both kinds, how do you choose? It comes down to a simple tradeoff you have already met: **linear regulators are quiet but waste heat; switchers are efficient but noisy.**\n\nThink of it as quiet-but-hot versus efficient-but-noisy. A **linear regulator (or LDO)** is simple, cheap, and produces a very clean output, but its efficiency is only about $V_{out}/V_{in}$, so a big voltage drop wastes a lot of heat. A **switcher** stays 85 to 95% efficient across a wide range, but it sprays **ripple** and **EMI** (electrical noise) that can spoil sensitive circuits like radio receivers, precision sensors, or audio. So you pick by asking: how big is the voltage drop, how much current, how much do I care about efficiency, and how sensitive is the load to noise?\n\nBut what if you need *both* high efficiency *and* a clean, quiet rail, for example to power a sensitive radio circuit? The clever answer is to use them together: **switcher first, then LDO.** The switcher does the heavy lifting, efficiently dropping the voltage most of the way. Then an LDO sits right after it and scrubs off the leftover switching noise, delivering a clean rail. You give up a little efficiency in the LDO's small drop, but you get the best of both worlds: most of the switcher's efficiency plus the LDO's quiet. Keeping the LDO's drop small keeps that extra waste tiny.\n\nFinally, real supplies include **protection** so a fault does not destroy things: **OVP** (over-voltage protection, shuts down if the output climbs too high), **OCP** (over-current protection, limits or cuts off if too much current is drawn, as in a short circuit), and **thermal shutdown** (turns off if the chip gets too hot). Many also add **soft-start**, easing the output up gently at power-on so it does not slam a huge inrush current into the capacitors.\n\nRecap: choose linear for small drops and quiet rails, switcher for efficiency and big drops, and cascade switcher-then-LDO when you need both efficiency and a clean output. Protection features (OVP, OCP, thermal shutdown) keep the supply safe when something goes wrong.",
+          "items": [
+            {
+              "id": "power-regulation-linear-vs-switching-001",
+              "type": "mcq",
+              "prompt": "The core tradeoff between linear and switching regulators is best summarized as:",
+              "choices": [
+                "Linear is efficient but slow; switching is wasteful but fast",
+                "Linear is quiet but wastes heat; switching is efficient but noisy",
+                "Linear can step up; switching can only step down",
+                "They behave identically; the choice does not matter"
+              ],
+              "answerIndex": 1,
+              "explanation": "Linear regulators give a clean, quiet output but waste the voltage drop as heat. Switchers are highly efficient but produce ripple and EMI. That quiet-but-hot versus efficient-but-noisy tradeoff is exactly why both types remain in use."
+            },
+            {
+              "id": "power-regulation-linear-vs-switching-002",
+              "type": "mcq",
+              "prompt": "You need an efficient supply AND a very clean, low-noise rail for a sensitive radio receiver. What is the common best-practice solution?",
+              "choices": [
+                "Use only a linear regulator and accept the heat",
+                "Use only a switcher and accept the noise",
+                "Use a switcher first to step down efficiently, then an LDO to scrub the leftover noise",
+                "Use two switchers in a row"
+              ],
+              "answerIndex": 2,
+              "explanation": "The switcher-then-LDO cascade gives the best of both: the switcher does the efficient bulk step-down, and the LDO cleans up the residual switching ripple to deliver a quiet rail. Two switchers would still leave noise; a bare switcher would degrade the receiver."
+            },
+            {
+              "id": "power-regulation-linear-vs-switching-003",
+              "type": "mcq",
+              "prompt": "In a switcher-then-LDO design, what is the LDO's main job?",
+              "choices": [
+                "To boost the voltage higher than the switcher's output",
+                "To remove the leftover switching ripple and noise, giving a clean output",
+                "To make the supply more efficient than the switcher alone",
+                "To store energy for backup"
+              ],
+              "answerIndex": 1,
+              "explanation": "The LDO post-regulator scrubs the residual switching noise from the switcher to produce a clean rail. It does not boost (it is a linear regulator) and it slightly lowers overall efficiency because of its small drop; that small loss is the price of the clean output."
+            },
+            {
+              "id": "power-regulation-linear-vs-switching-004",
+              "type": "mcq",
+              "prompt": "For a 48 V telecom rail that must be stepped down to 12 V at 10 A as efficiently as possible, the better choice is:",
+              "choices": [
+                "A linear regulator, for its clean output",
+                "A switch-mode converter, for its high efficiency at a large drop and high current",
+                "A switcher-then-LDO cascade, mainly for low noise",
+                "No regulator at all"
+              ],
+              "answerIndex": 1,
+              "explanation": "A large drop (48 to 12) at high current would burn enormous heat in a linear regulator. A switcher stays efficient regardless of the ratio, so it is the right pick. Low noise is not the priority here, so the extra LDO is unnecessary."
+            },
+            {
+              "id": "power-regulation-linear-vs-switching-005",
+              "type": "mcq",
+              "prompt": "Why does adding the LDO after the switcher cost a little efficiency, and how is that kept small?",
+              "choices": [
+                "The LDO boosts the voltage, which always wastes power; you cannot reduce it",
+                "The LDO drops a little voltage as heat; keeping its drop small keeps the waste tiny",
+                "The LDO adds noise, which wastes power",
+                "It does not cost any efficiency at all"
+              ],
+              "answerIndex": 1,
+              "explanation": "An LDO is still a linear regulator, so the small voltage it drops becomes heat (efficiency about Vout/Vin across the LDO). Designing for a small drop, which is what 'low-dropout' enables, keeps that loss tiny while still cleaning the rail."
+            },
+            {
+              "id": "power-regulation-linear-vs-switching-006",
+              "type": "mcq",
+              "prompt": "What does over-current protection (OCP) do?",
+              "choices": [
+                "Shuts down or limits the supply when too much current is drawn, such as during a short circuit",
+                "Raises the output voltage when current is low",
+                "Filters out switching ripple",
+                "Slowly ramps the output at startup"
+              ],
+              "answerIndex": 0,
+              "explanation": "OCP limits or cuts off the output when current exceeds a safe level, protecting the supply and load from faults like a short circuit. Ramping the output gently at startup is soft-start, and ripple filtering is a different function."
+            },
+            {
+              "id": "power-regulation-linear-vs-switching-007",
+              "type": "mcq",
+              "prompt": "What is the purpose of soft-start in a power supply?",
+              "choices": [
+                "To improve efficiency at full load",
+                "To ramp the output up gently at power-on, limiting the inrush current that charges the capacitors",
+                "To raise the output voltage above its target",
+                "To increase the switching frequency"
+              ],
+              "answerIndex": 1,
+              "explanation": "Soft-start eases the output up over a short time so the output capacitors charge gradually, limiting the inrush current surge. A sudden start could spike current, trip protection, or sag the input rail. It does not change efficiency or the target voltage."
+            },
+            {
+              "id": "power-regulation-linear-vs-switching-008",
+              "type": "mcq",
+              "prompt": "Which list contains standard power-supply PROTECTION features?",
+              "choices": [
+                "Buck, boost, buck-boost",
+                "Over-voltage protection, over-current protection, thermal shutdown",
+                "Duty cycle, ripple, efficiency",
+                "Line regulation, load regulation, dropout"
+              ],
+              "answerIndex": 1,
+              "explanation": "OVP, OCP, and thermal shutdown are the classic protections that keep a supply safe during faults. The other lists are converter types, operating quantities, or performance specs, not protection features."
+            },
+            {
+              "id": "power-regulation-linear-vs-switching-009",
+              "type": "mcq",
+              "prompt": "On a chart of efficiency versus the input-to-output drop, how does a linear regulator compare with a switcher?",
+              "choices": [
+                "Both stay flat near 90% as the drop grows",
+                "The linear regulator's efficiency falls as the drop grows (it is about Vout/Vin), while the switcher stays roughly flat and high",
+                "The linear regulator's efficiency rises as the drop grows",
+                "The switcher's efficiency falls steeply while the linear stays flat"
+              ],
+              "answerIndex": 1,
+              "explanation": "A linear regulator's efficiency is about Vout/Vin, so as the drop (Vin minus Vout) grows, efficiency falls and heat rises. A switcher stays roughly flat at 85 to 95% across a wide range, which is exactly why switchers win for large drops.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/analog-electronics/images/power-regulation-2.svg"
             }
           ]
         },
         {
           "id": "power-regulation-voltage-references",
-          "title": "Voltage References: Bandgap & Zener",
-          "order": 2,
-          "difficulty": 2,
-          "content": "Every regulator and every ADC/DAC is only as accurate as the **reference** it compares against. A reference is a circuit whose output voltage is deliberately insensitive to temperature, supply, and load.\n\nThe workhorse is the **bandgap reference**. A forward-biased junction's $V_{BE}$ has a negative tempco (about $-2\\,\\mathrm{mV/^{\\circ}C}$). The difference in $V_{BE}$ between two junctions run at different current densities is **PTAT** (proportional to absolute temperature) and has a positive tempco:\n\n$$\\Delta V_{BE} = \\frac{kT}{q}\\ln(N)$$\n\nScaling the PTAT term by a gain and summing it with a $V_{BE}$ cancels the slopes to first order, yielding roughly the silicon bandgap voltage, near $1.2\\,\\mathrm{V}$, that is flat over temperature:\n\n$$V_{ref} = V_{BE} + K\\,\\frac{kT}{q}\\ln(N)$$\n\nThe **buried (subsurface) Zener** reference is an alternative: a Zener diode below the silicon surface, away from contamination, giving very low noise and excellent long-term stability — favored in precision instrumentation, though it needs more headroom (typically >7 V) and more current.\n\nThe three numbers that matter: **initial accuracy** (trim error at 25 degC, in % or mV), **temperature drift** (tempco in ppm/degC), and **noise** (low-frequency $1/f$ noise in $\\mu V_{pp}$ over 0.1-10 Hz, plus broadband density). For a 16-bit ADC at 5 V, one LSB is about $76\\,\\mu\\mathrm{V}$ — so a reference drifting 50 ppm/degC over 20 degC already eats several LSBs. Reference drift and noise set the absolute-accuracy floor of the whole signal chain.",
+          "title": "Voltage References: The Steady Yardstick Inside a Supply",
+          "order": 5,
+          "difficulty": 3,
+          "content": "Every regulator promised to hold its output at, say, exactly 5 V. But 5 V compared to *what*? Somewhere inside, the regulator's feedback needs a fixed, trustworthy voltage to measure against, a built-in ruler. That ruler is the **voltage reference**.\n\nA voltage reference is a small circuit whose output voltage is deliberately made to stay almost perfectly constant no matter what. Unlike the main output, it does not deliver much power; its only job is to be *stable* and *accurate*. If the reference drifts, everything that trusts it drifts too. The same idea matters far beyond power supplies: an **ADC** (analog-to-digital converter, the chip that turns a real-world voltage into a number) measures its input *relative to a reference*, so the reference sets the accuracy of every reading. A noisy or drifting reference quietly corrupts every measurement.\n\nThe everyday workhorse is the **bandgap reference**. You do not need its internals, just the clever idea: it combines two voltages inside the silicon that drift in *opposite* directions as temperature changes, one rising with heat and one falling. Add them in the right proportion and the drifts cancel, leaving an output that barely moves with temperature, landing near 1.2 V. That temperature steadiness is its whole point.\n\nThree numbers describe how good a reference is. **Initial accuracy**: how close it is to the ideal value at room temperature. **Temperature drift**: how much it moves as temperature changes, given in **ppm per degree C** (parts per million, that is, millionths, per degree). **Noise**: tiny random wiggle on the output. For precision work all three must be small.\n\nA quick feel for ppm: a 5 V reference rated at 25 ppm per degree C, over a 40-degree swing, drifts about $5\\,\\mathrm{V} \\times 25 \\times 40 / 1{,}000{,}000 = 5\\,\\mathrm{mV}$. Small, but in a precise instrument that error can matter.\n\nRecap: a voltage reference is the steady internal yardstick a regulator (and every ADC) measures against. The common bandgap type cancels temperature drift to stay near 1.2 V, and a reference is judged by its accuracy, its drift (in ppm per degree C), and its noise.",
           "items": [
             {
               "id": "power-regulation-voltage-references-001",
-              "type": "flashcard",
-              "front": "What is the core idea behind a bandgap voltage reference?",
-              "back": "Sum a voltage with a negative temperature coefficient (a transistor's V_BE, about -2 mV/degC) with a scaled PTAT voltage that has a positive tempco (delta-V_BE between junctions at different current densities). The slopes cancel to first order, giving an output near the silicon bandgap (~1.2 V) that is nearly flat over temperature.",
-              "hint": "Add something that falls with T to something that rises with T."
+              "type": "mcq",
+              "prompt": "What is the job of a voltage reference inside a regulator?",
+              "choices": [
+                "To deliver most of the output power to the load",
+                "To provide a fixed, stable voltage that the feedback measures the output against",
+                "To switch the transistor on and off",
+                "To convert AC into DC"
+              ],
+              "answerIndex": 1,
+              "explanation": "A regulator must compare its output against something fixed; the reference is that internal 'ruler.' It does not supply load power, switch, or rectify; its sole job is to be a stable, accurate yardstick."
             },
             {
               "id": "power-regulation-voltage-references-002",
-              "type": "flashcard",
-              "front": "Give the expression for the PTAT difference voltage between two junctions at current-density ratio N.",
-              "back": "delta-V_BE = (kT/q) * ln(N), where kT/q is the thermal voltage (~25.9 mV at 300 K) and N is the ratio of current densities. This term is proportional to absolute temperature, so it has a positive temperature coefficient.",
-              "hint": "Thermal voltage times the natural log of the density ratio."
+              "type": "mcq",
+              "prompt": "Why does an ADC (analog-to-digital converter) need a stable voltage reference?",
+              "choices": [
+                "It increases how fast the ADC can sample",
+                "An ADC measures its input relative to the reference, so reference drift or noise corrupts every reading",
+                "It lowers the ADC's power consumption",
+                "It removes the need for any input filtering"
+              ],
+              "answerIndex": 1,
+              "explanation": "An ADC compares the unknown input against its reference to produce a number, so the reference sets the accuracy of every conversion. If the reference drifts or is noisy, that error scales into all the readings. It has nothing to do with sample speed or power."
             },
             {
               "id": "power-regulation-voltage-references-003",
-              "type": "flashcard",
-              "front": "What are the three key specifications of a voltage reference?",
-              "back": "Initial accuracy (trim error at 25 degC, in % or mV), temperature drift (tempco in ppm/degC), and noise (low-frequency 0.1-10 Hz noise in microvolts peak-to-peak plus broadband density in nV/rtHz). Long-term stability (drift over 1000 hours) is a fourth for precision work.",
-              "hint": "How right at room temp, how it moves with temp, and how noisy."
+              "type": "mcq",
+              "prompt": "What is the clever idea behind a bandgap voltage reference?",
+              "choices": [
+                "It uses a large battery to stay constant",
+                "It combines two internal voltages that drift in opposite directions with temperature, so the drifts cancel",
+                "It switches rapidly to average out drift",
+                "It boosts the input to exactly 1.2 V"
+              ],
+              "answerIndex": 1,
+              "explanation": "A bandgap reference adds a voltage that rises with temperature to one that falls with temperature, in the right proportion, so their drifts cancel and the output stays nearly flat over temperature (near 1.2 V). It does not use a battery or switching to achieve this."
             },
             {
               "id": "power-regulation-voltage-references-004",
-              "type": "flashcard",
-              "front": "What advantage does a buried (subsurface) Zener reference have over a surface Zener or bandgap?",
-              "back": "The breakdown occurs below the silicon surface, away from surface contamination and crystal defects, giving much lower noise and superior long-term stability. It is the choice for precision instrumentation references, at the cost of needing higher headroom (>7 V) and more operating current.",
-              "hint": "Keeping the action away from the dirty surface buys low noise."
+              "type": "mcq",
+              "prompt": "A bandgap reference's output naturally lands near which value?",
+              "choices": [
+                "0.7 V",
+                "1.2 V",
+                "3.3 V",
+                "5.0 V"
+              ],
+              "answerIndex": 1,
+              "explanation": "When the opposing temperature drifts are balanced, the bandgap output settles near 1.2 V (related to silicon's bandgap voltage). Higher reference voltages like 3.3 or 5 V are usually built by scaling a bandgap up."
             },
             {
               "id": "power-regulation-voltage-references-005",
               "type": "mcq",
-              "prompt": "A 5.000 V reference specifies 25 ppm/degC drift. Over a 40 degC temperature swing, the worst-case output change is approximately:",
+              "prompt": "What does temperature drift of 'ppm per degree C' describe?",
+              "choices": [
+                "How much current the reference can supply per degree",
+                "How many parts-per-million (millionths) the output changes for each degree C of temperature change",
+                "How fast the reference responds to load changes",
+                "The reference's noise level"
+              ],
+              "answerIndex": 1,
+              "explanation": "Drift in ppm per degree C tells you how many millionths of the output voltage it shifts per degree of temperature change. Smaller is better. It is about temperature stability, not current capability, speed, or noise."
+            },
+            {
+              "id": "power-regulation-voltage-references-006",
+              "type": "mcq",
+              "prompt": "A 5 V reference is rated 25 ppm per degree C. Over a 40 degree C temperature swing, the worst-case output change is about:",
               "choices": [
                 "0.5 mV",
                 "5 mV",
@@ -7498,248 +7966,46 @@
                 "0.5 V"
               ],
               "answerIndex": 1,
-              "explanation": "Drift = 25 ppm/degC * 40 degC = 1000 ppm = 0.001 of 5.000 V = 5 mV. For a 12-bit, 5 V system (1 LSB ~ 1.22 mV) that is about 4 LSB of error from the reference alone."
-            },
-            {
-              "id": "power-regulation-voltage-references-006",
-              "type": "mcq",
-              "prompt": "Why is a low-noise reference critical for a high-resolution ADC?",
-              "choices": [
-                "It increases the ADC sample rate",
-                "Reference noise and drift directly modulate the ADC's full-scale, setting the absolute-accuracy floor",
-                "It reduces the digital interface power",
-                "It eliminates the need for an anti-aliasing filter"
-              ],
-              "answerIndex": 1,
-              "explanation": "An ADC measures the input relative to its reference. Any reference noise or drift scales the conversion result, so it sets the absolute accuracy and effective noise floor. A reference noisier than 1 LSB throws away resolution you paid for."
+              "explanation": "Change = 5 V x 25 x 40 / 1,000,000 = 5 mV. (25 ppm/degree x 40 degrees = 1000 ppm = 0.001 of 5 V = 5 mV.) Small in absolute terms but enough to matter in a precise instrument."
             },
             {
               "id": "power-regulation-voltage-references-007",
               "type": "mcq",
-              "prompt": "Approximately what is the thermal voltage kT/q at room temperature (~300 K)?",
+              "prompt": "Which three specifications best describe the quality of a voltage reference?",
               "choices": [
-                "2.6 mV",
-                "26 mV",
-                "260 mV",
-                "1.2 V"
+                "Duty cycle, ripple, and EMI",
+                "Initial accuracy, temperature drift, and noise",
+                "Dropout, line regulation, and load regulation",
+                "Inductance, capacitance, and switching frequency"
               ],
               "answerIndex": 1,
-              "explanation": "kT/q = (1.38e-23 * 300)/1.6e-19 ~ 0.0259 V, about 26 mV. This thermal voltage appears in the diode equation and in the PTAT term (kT/q)ln(N) of a bandgap reference."
+              "explanation": "A reference is judged by how close it is to ideal at room temperature (initial accuracy), how much it moves with temperature (drift, in ppm/degree C), and its random output wiggle (noise). The other lists describe switchers or regulator outputs, not references."
             },
             {
               "id": "power-regulation-voltage-references-008",
-              "type": "flashcard",
-              "front": "Why does the bandgap output land near 1.2 V specifically?",
-              "back": "When the V_BE and PTAT slopes are cancelled, extrapolating V_BE back to absolute zero (0 K) lands at the silicon bandgap energy expressed in volts, about 1.2 V (1.205 eV / q). The temperature-compensated reference therefore sits near that bandgap value.",
-              "hint": "It is the silicon bandgap energy expressed in volts."
+              "type": "mcq",
+              "prompt": "Why must a voltage reference deliver only a little current rather than power the whole load?",
+              "choices": [
+                "Because references are too expensive to make large",
+                "Its only job is to be a stable, accurate yardstick; the regulator's pass element supplies the actual load current",
+                "Because it would otherwise produce too much noise",
+                "Because references can only work at 1.2 V"
+              ],
+              "answerIndex": 1,
+              "explanation": "The reference exists to be a precise voltage to compare against, not a power source. The regulator's pass element (or switcher) handles the heavy load current. Keeping the reference lightly loaded helps it stay stable and accurate."
             },
             {
               "id": "power-regulation-voltage-references-009",
-              "type": "flashcard",
-              "front": "What is a series reference versus a shunt reference?",
-              "back": "A series (three-terminal) reference acts like a regulator: it draws only the current it needs and presents V_ref at its output pin. A shunt (two-terminal) reference behaves like a precision Zener: you supply it through a series resistor and it sinks current to hold V_ref across itself. Series is more efficient; shunt is simpler and clamps.",
-              "hint": "One is regulator-like, the other is Zener-like with a ballast resistor."
-            }
-          ]
-        },
-        {
-          "id": "power-regulation-switching-converters",
-          "title": "Switch-Mode Supplies: Buck, Boost & Buck-Boost",
-          "order": 3,
-          "difficulty": 3,
-          "content": "A switch-mode power supply (SMPS) is now the default for any rail with a meaningful voltage drop or current. Instead of burning the excess as heat, it chops the input with a switch at frequency $f_{sw}$ and uses an inductor and capacitor to store and average energy, so efficiency is set by switching/conduction losses, not the voltage ratio — typically 85-95%.\n\n**Buck (step-down).** In steady state, volt-second balance on the inductor gives\n\n$$V_{out} = D\\,V_{in}$$\n\nwhere the duty cycle $D = t_{on}/T$. The peak-to-peak inductor ripple current is\n\n$$\\Delta I_L = \\frac{(V_{in}-V_{out})\\,D}{L\\,f_{sw}}$$\n\nand the output ripple voltage is largely $\\Delta I_L$ flowing through the output cap's impedance (ESR dominates above a few kHz).\n\n**Boost (step-up).** $V_{out} = \\frac{V_{in}}{1-D}$.\n\n**Buck-boost.** $|V_{out}| = V_{in}\\,\\frac{D}{1-D}$ (output is inverted in the basic topology), able to go above or below $V_{in}$.\n\nIf inductor current stays above zero all cycle, the converter is in **continuous conduction mode (CCM)**; at light load it may drop to zero each cycle — **discontinuous conduction mode (DCM)** — where the ideal duty-cycle relations no longer hold. **Synchronous rectification** replaces the catch diode with a low-$R_{DS(on)}$ MOSFET, eliminating the diode's $\\sim 0.5\\,\\mathrm{V}$ drop and recovering efficiency at low output voltages. The price of switching is **EMI and ripple**: fast $dV/dt$ edges and the switching spectrum demand tight loop layout (Module 14) and filtering. A **flyback** (isolated buck-boost with a coupled inductor) extends this to isolated rails.",
-          "items": [
-            {
-              "id": "power-regulation-switching-converters-001",
-              "type": "flashcard",
-              "front": "State the ideal steady-state output of a buck converter in terms of duty cycle and explain why.",
-              "back": "V_out = D * V_in, where D = t_on/T. It follows from inductor volt-second balance: over one cycle the average voltage across the inductor must be zero, so the input applied during t_on averages down to V_out, giving V_out = D*V_in. Since D <= 1, the buck only steps down.",
-              "hint": "Volt-second balance: average inductor voltage is zero in steady state."
-            },
-            {
-              "id": "power-regulation-switching-converters-002",
-              "type": "flashcard",
-              "front": "Give the ideal transfer functions for boost and (inverting) buck-boost converters.",
-              "back": "Boost: V_out = V_in/(1 - D), which always steps up (D -> 1 gives large boost). Inverting buck-boost: |V_out| = V_in * D/(1 - D), output inverted, can be smaller or larger than V_in depending on whether D is below or above 0.5.",
-              "hint": "Boost has (1-D) in the denominator; buck-boost has D/(1-D)."
-            },
-            {
-              "id": "power-regulation-switching-converters-003",
-              "type": "flashcard",
-              "front": "Write the buck inductor peak-to-peak ripple current and name the knobs that reduce it.",
-              "back": "delta-I_L = (V_in - V_out)*D/(L*f_sw). Increase inductance L or switching frequency f_sw to reduce ripple. Higher f_sw also shrinks the required L and C for a given ripple, at the cost of more switching loss.",
-              "hint": "Volt-seconds across L divided by L; raise L or f_sw to cut it."
-            },
-            {
-              "id": "power-regulation-switching-converters-004",
-              "type": "flashcard",
-              "front": "Differentiate continuous (CCM) and discontinuous (DCM) conduction mode.",
-              "back": "In CCM the inductor current never reaches zero within a switching cycle (typical at moderate-to-heavy load), and the simple duty-cycle relations hold. In DCM, at light load the inductor current hits zero and sits there part of each cycle; the transfer function becomes load-dependent and the simple D relations no longer apply.",
-              "hint": "Does the inductor current ever touch zero during a cycle?"
-            },
-            {
-              "id": "power-regulation-switching-converters-005",
-              "type": "flashcard",
-              "front": "What is synchronous rectification and why is it used?",
-              "back": "It replaces the freewheeling (catch) diode with a low-R_DS(on) MOSFET switched in anti-phase with the main switch. This removes the diode's ~0.4-0.7 V forward drop and its conduction loss, substantially improving efficiency especially at low output voltages and high current.",
-              "hint": "Swap the catch diode for an actively-driven MOSFET."
-            },
-            {
-              "id": "power-regulation-switching-converters-006",
               "type": "mcq",
-              "prompt": "A synchronous buck runs from 12 V and must produce 3.3 V. What duty cycle does it need (ideal)?",
+              "prompt": "If a regulator's internal voltage reference drifts upward with temperature, what happens to the regulated output?",
               "choices": [
-                "0.13",
-                "0.275",
-                "0.36",
-                "0.73"
+                "Nothing; the output is independent of the reference",
+                "The output drifts too, because the feedback holds the output to match the (now-shifted) reference",
+                "The output drops to zero",
+                "The output becomes AC"
               ],
               "answerIndex": 1,
-              "explanation": "For a buck, V_out = D*V_in, so D = V_out/V_in = 3.3/12 = 0.275 (about 27.5%). The high-side switch is on roughly a quarter of each cycle."
-            },
-            {
-              "id": "power-regulation-switching-converters-007",
-              "type": "mcq",
-              "prompt": "For a buck delivering 5 V from 12 V at f_sw = 500 kHz with L = 10 uH (D = 0.417), the inductor ripple current is closest to:",
-              "choices": [
-                "0.58 A",
-                "1.17 A",
-                "2.3 A",
-                "5.0 A"
-              ],
-              "answerIndex": 0,
-              "explanation": "delta-I_L = (V_in - V_out)*D/(L*f_sw) = (12-5)*0.417/(10e-6 * 500e3) = 2.92/5 = 0.58 A peak-to-peak."
-            },
-            {
-              "id": "power-regulation-switching-converters-008",
-              "type": "mcq",
-              "prompt": "In most practical SMPS output capacitors above a few kHz, the dominant contributor to output ripple voltage is:",
-              "choices": [
-                "The capacitor's capacitance value C",
-                "The capacitor's equivalent series resistance (ESR)",
-                "The inductor's DC resistance",
-                "The reference noise"
-              ],
-              "answerIndex": 1,
-              "explanation": "Output ripple is roughly delta-I_L flowing through the cap impedance. Above a few kHz the ESR term (delta-I_L * ESR) usually dominates over the 1/(8*f*C) capacitive term, which is why low-ESR ceramics/polymers reduce ripple. Ties to Module 2 ESR/ESL."
-            },
-            {
-              "id": "power-regulation-switching-converters-009",
-              "type": "mcq",
-              "prompt": "A flyback converter is best described as:",
-              "choices": [
-                "A buck with synchronous rectification",
-                "A non-isolated boost with a snubber",
-                "An isolated buck-boost using a coupled inductor (transformer) to store and transfer energy",
-                "A linear regulator with a transformer input"
-              ],
-              "answerIndex": 2,
-              "explanation": "A flyback is the isolated cousin of the buck-boost: energy is stored in a coupled inductor (transformer) during the switch on-time and delivered to the isolated secondary during off-time. It provides galvanic isolation and can produce multiple outputs from one magnetic."
-            },
-            {
-              "id": "power-regulation-switching-converters-010",
-              "type": "flashcard",
-              "front": "In the buck converter topology diagram, identify the role of each element.",
-              "back": "High-side switch (PWM at duty D) chops V_in onto the SW node; the inductor L smooths current into the output; the low-side device (catch diode or synchronous MOSFET) provides the freewheel path when the high-side is off; C_out filters the ripple to give a clean V_out = D*V_in across the load R_L.",
-              "hint": "Switch, inductor, catch device, output cap, load.",
-              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/analog-electronics/images/power-regulation-1.svg"
-            }
-          ]
-        },
-        {
-          "id": "power-regulation-linear-vs-switching",
-          "title": "Linear vs Switching, Low-Noise Rails & Decoupling",
-          "order": 4,
-          "difficulty": 3,
-          "content": "Choosing a rail is an engineering trade, not a default. The headline comparison:\n\n- **Linear/LDO:** quiet (no switching spectrum), simple, cheap, fast transient response, but $\\eta \\approx V_{out}/V_{in}$ — heat scales with the drop.\n- **Switching:** $\\eta = 85\\text{-}95\\%$ across wide ratios, but injects ripple at $f_{sw}$ plus harmonics and broadband edge noise, needs an inductor, and complicates layout (Module 14).\n\nFor a sensitive analog/RF front-end (your radar-receiver world, Module 8) the modern best-practice rail is **switcher-then-LDO**: a buck does the bulk, efficient step-down, then an LDO cleans up the residual ripple. The LDO's job is set by its **PSRR** at the switching frequency — but PSRR rolls off with frequency, so you place $f_{sw}$ where the LDO still has rejection, or add an LC post-filter. You also lose the efficiency you spend in the LDO's drop, so keep that drop small.\n\n**Decoupling** is the local energy reservoir that keeps the rail stiff during fast current demands. Use **bulk** capacitance (electrolytic/tantalum, tens of $\\mu$F) for low-frequency/transient sag, plus **local ceramics** ($0.1\\,\\mu$F, sometimes 1-10 $\\mu$F) right at each IC for high-frequency. The high-frequency limit is set by the cap's **ESL** and the loop inductance of its connection (Module 2, Module 14): minimize loop area, use multiple vias, and put the small cap closest to the pin. Add protection — **OVP, OCP, thermal shutdown** — plus **soft-start** to limit inrush as the output cap charges, and proper **power sequencing** where multiple rails must come up in order.",
-          "items": [
-            {
-              "id": "power-regulation-linear-vs-switching-001",
-              "type": "flashcard",
-              "front": "Summarize the core trade-off between linear and switching regulators.",
-              "back": "Linear/LDO: low noise, simple, fast transient, cheap, but efficiency ~ V_out/V_in so big drops mean heat. Switching: high efficiency (85-95%) over wide ratios but produces switching ripple/EMI, needs an inductor, and demands careful layout. Choose by drop size, current, efficiency need, and noise sensitivity.",
-              "hint": "Quiet-but-hot versus efficient-but-noisy."
-            },
-            {
-              "id": "power-regulation-linear-vs-switching-002",
-              "type": "flashcard",
-              "front": "Describe the switcher-then-LDO architecture and when to use it.",
-              "back": "A switching converter does the bulk, efficient voltage conversion, then a low-dropout linear regulator post-regulates to scrub residual switching ripple and noise. Use it for sensitive analog, RF, ADC reference, PLL/clock, or radar front-end rails where a bare switcher's ripple would degrade performance.",
-              "hint": "Efficient bulk step-down followed by a quiet finisher."
-            },
-            {
-              "id": "power-regulation-linear-vs-switching-003",
-              "type": "flashcard",
-              "front": "Why does the LDO's PSRR-versus-frequency curve matter in a switcher-then-LDO design?",
-              "back": "The LDO must reject the switcher's ripple at f_sw and its harmonics. PSRR falls with frequency, so if f_sw lands where PSRR is low, ripple leaks through. Mitigate by choosing f_sw where the LDO still has good rejection, adding an LC post-filter, or picking a high-PSRR LDO.",
-              "hint": "Rejection is not flat; it rolls off where the switcher lives."
-            },
-            {
-              "id": "power-regulation-linear-vs-switching-004",
-              "type": "flashcard",
-              "front": "What is the role of bulk versus local (ceramic) decoupling capacitors?",
-              "back": "Bulk caps (tens of uF, electrolytic/tantalum) supply low-frequency transient current and hold the rail up during slow load steps. Local ceramics (0.1 uF and 1-10 uF) placed right at each IC pin supply high-frequency current and keep the high-frequency rail impedance low. Together they cover a wide frequency range.",
-              "hint": "Big-and-slow reservoir plus small-and-fast local source."
-            },
-            {
-              "id": "power-regulation-linear-vs-switching-005",
-              "type": "flashcard",
-              "front": "What sets the high-frequency effectiveness limit of a decoupling capacitor?",
-              "back": "Its ESL (equivalent series inductance) plus the loop inductance of the mounting (traces and vias). Above the cap's self-resonant frequency it looks inductive, so it stops decoupling. Minimize loop area, use short wide traces and multiple vias, and place the smallest cap closest to the pin. Ties to Module 2 and Module 14.",
-              "hint": "Parasitic inductance, not the capacitance value."
-            },
-            {
-              "id": "power-regulation-linear-vs-switching-006",
-              "type": "mcq",
-              "prompt": "Why add an LDO after a buck converter on a sensitive RF receiver rail, despite the efficiency cost?",
-              "choices": [
-                "To increase the output voltage above the buck output",
-                "To scrub the buck's switching ripple/noise so it does not desensitize the front-end",
-                "To provide galvanic isolation",
-                "To eliminate the need for an output capacitor on the buck"
-              ],
-              "answerIndex": 1,
-              "explanation": "The buck is efficient but noisy; switching ripple and spurs can degrade receiver sensitivity (Module 8/13). The LDO's PSRR attenuates that ripple to deliver a clean rail. You trade a small LDO drop (efficiency) for low noise."
-            },
-            {
-              "id": "power-regulation-linear-vs-switching-007",
-              "type": "mcq",
-              "prompt": "What is the primary purpose of soft-start in a power supply?",
-              "choices": [
-                "To improve steady-state load regulation",
-                "To ramp the output gradually, limiting inrush current as the output capacitor charges",
-                "To increase switching frequency at startup",
-                "To raise the reference voltage slowly for accuracy"
-              ],
-              "answerIndex": 1,
-              "explanation": "Soft-start ramps the reference/output up over a controlled time so the output capacitor charges gradually, limiting inrush current that would otherwise spike, stress the input source, trip OCP, or cause a brownout on the input rail."
-            },
-            {
-              "id": "power-regulation-linear-vs-switching-008",
-              "type": "mcq",
-              "prompt": "Which set lists standard power-supply PROTECTION features?",
-              "choices": [
-                "PWM, PFM, CCM",
-                "OVP, OCP, thermal shutdown",
-                "PSRR, line regulation, load regulation",
-                "ESR, ESL, DCR"
-              ],
-              "answerIndex": 1,
-              "explanation": "Over-voltage protection (OVP), over-current protection (OCP), and thermal shutdown are the classic protections, often joined by under-voltage lockout (UVLO) and reverse-polarity protection. The other options are modes, performance specs, or parasitics."
-            },
-            {
-              "id": "power-regulation-linear-vs-switching-009",
-              "type": "mcq",
-              "prompt": "On a linear-vs-switching efficiency chart, the linear regulator's efficiency as a function of the input-output drop:",
-              "choices": [
-                "Stays flat near 90% like the switcher",
-                "Equals V_out/V_in, so it falls as the drop (V_in - V_out) grows",
-                "Rises as the drop grows",
-                "Is independent of the voltage ratio"
-              ],
-              "answerIndex": 1,
-              "explanation": "A linear regulator's efficiency is eta ~ V_out/V_in, so as the input-output drop increases, efficiency falls. A switcher stays roughly flat (80-95%) across a wide ratio, which is the whole reason to switch for large drops.",
-              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/analog-electronics/images/power-regulation-2.svg"
+              "explanation": "The feedback forces the output to track the reference. If the reference shifts, the output shifts with it. That is precisely why a low-drift reference matters: the whole supply's accuracy can be no better than its reference."
             }
           ]
         }
