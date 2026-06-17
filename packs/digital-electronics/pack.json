@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "id": "digital-electronics",
   "title": "Digital Electronics",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Digital electronics from scratch (beginner rework in progress): 14 sub-topics from number systems through HDL and FPGAs. Beginner-first readings, diagrams, tiered easy to hard.",
   "requires": [
     "analog-electronics"
@@ -3622,394 +3622,606 @@
       "lessons": [
         {
           "id": "sequential-logic-sequential-logic-lesson-1",
-          "title": "From Combinational to Stateful: The SR Latch",
+          "title": "Memory from Feedback: The SR Latch",
           "order": 1,
           "difficulty": 1,
-          "content": "Combinational logic is memoryless: outputs are a pure function of present inputs, $Q = f(\\text{inputs})$. The moment you feed an output back to an input, you create **memory** — the circuit's output now depends on its history. That feedback is the whole leap into *sequential* logic.\n\nThe simplest memory cell is the **SR latch**. In the NOR form, two cross-coupled NOR gates produce complementary outputs $Q$ and $\\bar{Q}$. Asserting $S$ (Set) drives $Q\\!=\\!1$; asserting $R$ (Reset) drives $Q\\!=\\!0$. With $S\\!=\\!R\\!=\\!0$ the latch *holds* its last value — that is the storage. The NAND form is the dual: it uses active-low $\\bar{S}$/$\\bar{R}$ inputs.\n\nThe trap is the **forbidden state**. For the NOR latch, $S\\!=\\!R\\!=\\!1$ forces *both* outputs to 0, so $Q$ and $\\bar{Q}$ are no longer complements — the invariant is broken. Worse, if both inputs then drop to 0 simultaneously, the latch enters a **race**: whichever gate is marginally faster wins, so the final state is unpredictable and can even oscillate. As an ex-radar tech, picture this as a comparator with positive feedback that hasn't decided which rail to slam to.\n\nThe behavior is summarized by the characteristic equation of the SR latch:\n\n$$Q_{\\text{next}} = S + \\bar{R}\\,Q \\quad (\\text{with } SR = 0 \\text{ required})$$\n\nThe constraint $SR=0$ is exactly the promise to never enter the forbidden state. Everything richer — gated latches, flip-flops, registers — is built by disciplining *when* an SR-like core is allowed to change.",
+          "content": "Think of a light with two buttons: one marked ON, one marked OFF. Press ON and the light stays on, even after you let go. Press OFF and it stays off. The light *remembers* the last button you pressed. That memory is the whole idea behind this sub-topic.\n\nSo far you have studied **combinational logic** (the AND, OR, and other gates from earlier sub-topics): its output depends only on the inputs *right now*. Take the inputs away and it instantly forgets. **Sequential logic** is different: its output depends on what happened in the *past*. It has memory.\n\nThe trick that creates memory is **feedback** — wiring a circuit's output back into its own input so it can hold onto a value. The simplest memory circuit built this way is the **SR latch** (SR stands for **Set–Reset**). It is two simple gates wired so each one feeds the other, forming a loop that locks in a value.\n\nIt has two inputs and behaves just like our light:\n\n- **S (Set) = 1** → forces the output **Q = 1** (turn it on).\n- **R (Reset) = 1** → forces the output **Q = 0** (turn it off).\n- **S = 0, R = 0** → **Hold**: the latch keeps whatever it had. *This holding is the memory.*\n\nThere is one combination to avoid. Pressing both buttons at once — **S = 1 and R = 1** — is the **forbidden state**: it tells the latch to turn on and off at the same time, which makes no sense and leaves the output unpredictable. Good designs simply never do this.\n\n**Recap:** combinational logic forgets instantly; sequential logic remembers. Feedback is what gives it memory, and the SR latch is the first, simplest example — set it, reset it, or leave it alone to hold.",
           "items": [
-            {
-              "id": "sequential-logic-1-fc-1",
-              "type": "flashcard",
-              "front": "What single structural change turns combinational logic into sequential (stateful) logic?",
-              "back": "Feedback: routing an output back to an input creates memory, so the output depends on past inputs, not just present ones.",
-              "hint": "Memoryless vs. memory."
-            },
-            {
-              "id": "sequential-logic-1-fc-2",
-              "type": "flashcard",
-              "front": "In a NOR-based SR latch, what do S=0, R=0 do?",
-              "back": "Hold (latch retains its previous Q). This 'no change' mode is the actual storage behavior.",
-              "hint": "Neither set nor reset is asserted."
-            },
-            {
-              "id": "sequential-logic-1-fc-3",
-              "type": "flashcard",
-              "front": "Why is S=R=1 the 'forbidden' state of a NOR SR latch?",
-              "back": "It forces both Q and Q-bar to 0, violating the complementary-output invariant; and releasing both inputs together causes an unpredictable race.",
-              "hint": "What happens to the invariant Q = NOT(Q-bar)?"
-            },
-            {
-              "id": "sequential-logic-1-fc-4",
-              "type": "flashcard",
-              "front": "State the characteristic equation of the SR latch.",
-              "back": "$Q_{\\\\text{next}} = S + \\\\bar{R}\\\\,Q$, valid under the constraint $SR = 0$.",
-              "hint": "Set forces 1; otherwise hold unless reset."
-            },
-            {
-              "id": "sequential-logic-1-fc-5",
-              "type": "flashcard",
-              "front": "How does the NAND SR latch differ from the NOR form at its inputs?",
-              "back": "The NAND latch uses active-low inputs (S-bar, R-bar); asserting an input means driving it to 0, and S-bar=R-bar=0 is its forbidden state.",
-              "hint": "Active-low duality."
-            },
             {
               "id": "sequential-logic-1-mcq-1",
               "type": "mcq",
-              "prompt": "What fundamentally distinguishes sequential logic from combinational logic?",
+              "prompt": "What is the key difference between combinational and sequential logic?",
               "choices": [
-                "Sequential logic uses only NAND gates",
-                "Sequential logic outputs depend on input history via feedback/state",
-                "Combinational logic cannot use XOR gates",
-                "Sequential logic is always slower than combinational logic"
+                "Combinational logic is faster than sequential logic",
+                "Sequential logic has memory — its output depends on past inputs, not just present ones",
+                "Sequential logic can only use NAND gates",
+                "Combinational logic needs a clock and sequential logic does not"
               ],
               "answerIndex": 1,
-              "explanation": "Sequential logic stores state; its output depends on present inputs plus stored history, enabled by feedback. Gate choice and speed are unrelated to the distinction."
+              "explanation": "Combinational logic forgets instantly: its output depends only on the inputs right now. Sequential logic remembers — its output depends on its history. Speed and gate choice are not the defining difference.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-3.svg"
             },
             {
               "id": "sequential-logic-1-mcq-2",
               "type": "mcq",
-              "prompt": "For a NOR-based SR latch, which input combination is the forbidden state?",
+              "prompt": "What single trick lets a circuit store a value (have memory)?",
               "choices": [
-                "S=0, R=0",
-                "S=1, R=0",
-                "S=0, R=1",
-                "S=1, R=1"
+                "Feedback — wiring an output back to an input so the circuit holds its state",
+                "Using more inputs than outputs",
+                "Adding a resistor to slow the signal down",
+                "Connecting two outputs together"
               ],
-              "answerIndex": 3,
-              "explanation": "S=R=1 drives both outputs to 0 (breaking complementarity) and leads to an unpredictable race if both inputs are released simultaneously."
+              "answerIndex": 0,
+              "explanation": "Feedback creates the memory loop: when an output is routed back to an input, the circuit can hold onto a value instead of forgetting it instantly. That is the leap into sequential logic.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-3.svg"
             },
             {
               "id": "sequential-logic-1-mcq-3",
               "type": "mcq",
-              "prompt": "With S=0 and R=0 applied to a stable NOR SR latch, the output Q will:",
+              "prompt": "In an SR latch, what does asserting S (Set) = 1 do?",
               "choices": [
-                "Always go to 0",
-                "Always go to 1",
-                "Hold its previous value",
-                "Oscillate indefinitely"
+                "Forces the output Q to 0",
+                "Forces the output Q to 1",
+                "Makes the latch forget everything",
+                "Has no effect unless R is also 1"
               ],
-              "answerIndex": 2,
-              "explanation": "The hold condition retains the stored bit. Oscillation is a risk only when leaving the forbidden state, not during normal hold."
+              "answerIndex": 1,
+              "explanation": "Set means 'turn it on': S=1 drives Q=1. Think of the ON button on the remembering light. R=1 is the OFF button that drives Q=0.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-3.svg"
             },
             {
               "id": "sequential-logic-1-mcq-4",
               "type": "mcq",
-              "prompt": "Why is leaving the SR forbidden state dangerous even after you stop asserting it?",
+              "prompt": "An SR latch currently holds Q = 1. You set S = 0 and R = 0. What is Q now?",
               "choices": [
-                "It permanently damages the gates",
-                "Both inputs releasing at once causes a race; the final state is determined by tiny gate-delay differences",
-                "It inverts the clock",
-                "It converts the latch into a combinational gate"
+                "It drops to 0",
+                "It stays at 1 (hold)",
+                "It oscillates back and forth",
+                "It becomes unknown"
               ],
               "answerIndex": 1,
-              "explanation": "From the all-driven state, simultaneous release makes the two cross-coupled gates race; whichever is marginally faster wins, so the settled state is unpredictable."
+              "explanation": "S=0, R=0 is the Hold condition: the latch keeps whatever value it had. Holding the last value is exactly what makes the latch a memory cell.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-3.svg"
+            },
+            {
+              "id": "sequential-logic-1-mcq-5",
+              "type": "mcq",
+              "prompt": "Which input combination is the 'forbidden state' of an SR latch?",
+              "choices": [
+                "S = 0, R = 0",
+                "S = 1, R = 0",
+                "S = 0, R = 1",
+                "S = 1, R = 1"
+              ],
+              "answerIndex": 3,
+              "explanation": "S=1 and R=1 together tell the latch to set and reset at the same time — a contradiction. The output becomes unpredictable, so good designs never apply this combination.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-3.svg"
+            },
+            {
+              "id": "sequential-logic-1-mcq-6",
+              "type": "mcq",
+              "prompt": "Why is the S = R = 1 combination a problem rather than just 'another setting'?",
+              "choices": [
+                "It physically burns out the gates",
+                "It asks the latch to be both ON and OFF at once, so the result is unpredictable",
+                "It always forces Q to 1",
+                "It turns the latch into a combinational gate"
+              ],
+              "answerIndex": 1,
+              "explanation": "Set says 'go to 1' and Reset says 'go to 0' — demanding both at once is a contradiction. The latch cannot do both, and the settled value can't be relied on. It does not damage the hardware.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-3.svg"
+            },
+            {
+              "id": "sequential-logic-1-mcq-7",
+              "type": "mcq",
+              "prompt": "The everyday 'light with separate ON and OFF buttons that stays put' is a good picture of which circuit?",
+              "choices": [
+                "An AND gate",
+                "An SR latch",
+                "A plain wire",
+                "A resistor"
+              ],
+              "answerIndex": 1,
+              "explanation": "ON = Set, OFF = Reset, and 'no button pressed' = Hold. The light remembering its last state is exactly how an SR latch stores one bit. An AND gate has no memory.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-3.svg"
+            },
+            {
+              "id": "sequential-logic-1-mcq-8",
+              "type": "mcq",
+              "prompt": "How many bits of information can one SR latch store?",
+              "choices": [
+                "Zero — it has no memory",
+                "One bit (a single 0 or 1)",
+                "Eight bits (one byte)",
+                "As many as you have inputs"
+              ],
+              "answerIndex": 1,
+              "explanation": "An SR latch holds a single value on its output Q — either 0 or 1. That is one bit. To store more bits, you use several latches (or flip-flops) together.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-3.svg"
             }
           ]
         },
         {
           "id": "sequential-logic-sequential-logic-lesson-2",
-          "title": "Level vs. Edge: Gated D Latches and D Flip-Flops",
+          "title": "The Clock: D Latches vs D Flip-Flops",
           "order": 2,
-          "difficulty": 1,
-          "content": "An SR latch with a free-running data input is awkward, so we add a control. A **gated D latch** ties $S$ and $R$ to a single data line $D$ and its complement, both qualified by an **enable** (often called the gate or clock level). The characteristic behavior is **level-sensitive**:\n\n$$Q_{\\text{next}} = \\begin{cases} D & \\text{when EN} = 1 \\\\ Q & \\text{when EN} = 0 \\end{cases}$$\n\nWhile $EN=1$ the latch is **transparent** — $Q$ follows $D$ continuously, glitches and all. When $EN$ falls, the latch *holds* whatever $D$ was at that instant. Transparency is exactly what makes raw latches hazardous in synchronous design: data can ripple through several open latches in one phase.\n\nThe fix is **edge triggering**. A **D flip-flop** captures $D$ only at one clock *transition* (conventionally the rising edge), then holds for the entire rest of the cycle. The classic implementation is the **master–slave** pair: two gated D latches with opposite-phase enables. While the clock is low, the *master* is transparent and tracks $D$ while the *slave* holds. On the rising edge the master freezes and the slave becomes transparent, passing the master's captured value to $Q$. The net effect is a single, clean sample per clock — see the timing diagram, where $Q$ updates only at rising edges.\n\nThis is *the* distinction to internalize: a **latch is level-sensitive (transparent while enabled)**, a **flip-flop is edge-sensitive (samples once per edge)**. The flip-flop is the fundamental storage element of synchronous design precisely because its update instant is unambiguous, which makes timing analysis tractable.",
+          "difficulty": 2,
+          "content": "The plain SR latch reacts the instant its inputs change. In a real system with thousands of memory cells, we want them all to update *together*, in step, so nothing gets out of sync. The solution is a **clock**: a signal that ticks steadily between 0 and 1, like a heartbeat or a metronome keeping the band in time. Every memory cell listens to the same clock and acts on its beat.\n\nFirst, a tidier memory cell. A **D latch** ('D' for **Data**) has just one data input, D, plus an **enable** input. There is no forbidden state to worry about. Its rule is simple:\n\n- While **enable = 1**, the output **Q follows D** continuously — whatever D does, Q copies. We say the latch is **transparent**, as if you could see straight through it.\n- When **enable = 0**, Q **holds** the last value D had.\n\nBecause the D latch reacts to the *level* of the enable (the whole time it is high), we call it **level-sensitive**.\n\nNow the most important device in this sub-topic: the **D flip-flop**. It also copies D to Q, but only at one precise moment — the instant the clock *rises* from 0 to 1, called the **rising edge**. It samples D right then, copies it to Q, and ignores D for the entire rest of the cycle. Because it reacts to the *edge* (the moment of change), we call it **edge-triggered**.\n\nThis is the single most important distinction in the whole topic:\n\n- A **latch is level-sensitive**: transparent the whole time it is enabled.\n- A **flip-flop is edge-triggered**: it samples once, on the clock edge.\n\nThe timing diagram makes it visible: the latch output wiggles along with D while enabled, but the flip-flop output only steps at each rising edge.\n\nThere is also a way to force a flip-flop's value: a **set** (force to 1) or **reset/clear** (force to 0) input. If it acts the instant it is asserted, ignoring the clock, it is **asynchronous**. If it waits for the next clock edge like everything else, it is **synchronous**. Synchronous is the well-behaved default; asynchronous reset is mainly for getting everything to a known state at power-on.\n\n**Recap:** the clock is the shared heartbeat. A D latch is transparent while enabled (level); a D flip-flop captures D once per clock edge (edge). Learn that one difference cold.",
           "items": [
-            {
-              "id": "sequential-logic-2-fc-1",
-              "type": "flashcard",
-              "front": "Define 'transparent' for a gated D latch.",
-              "back": "While the enable is asserted (EN=1), Q follows D continuously in real time. When EN deasserts, Q holds the last D value.",
-              "hint": "Level-sensitive while enabled.",
-              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-1.svg"
-            },
-            {
-              "id": "sequential-logic-2-fc-2",
-              "type": "flashcard",
-              "front": "What is the one-sentence difference between a latch and a flip-flop?",
-              "back": "A latch is level-sensitive (transparent while enabled); a flip-flop is edge-triggered (samples its input only at a clock edge).",
-              "hint": "Level vs. edge."
-            },
-            {
-              "id": "sequential-logic-2-fc-3",
-              "type": "flashcard",
-              "front": "How does a master-slave D flip-flop achieve edge triggering?",
-              "back": "Two gated D latches with opposite-phase enables: while CLK=0 the master tracks D and the slave holds; on the rising edge the master freezes and the slave passes the captured value out. One clean sample per cycle.",
-              "hint": "Two latches, opposite enables."
-            },
-            {
-              "id": "sequential-logic-2-fc-4",
-              "type": "flashcard",
-              "front": "Write the characteristic equation of a D flip-flop.",
-              "back": "$Q_{\\\\text{next}} = D$, sampled at the active clock edge (Q holds between edges).",
-              "hint": "It just stores D, but only at the edge."
-            },
-            {
-              "id": "sequential-logic-2-fc-5",
-              "type": "flashcard",
-              "front": "Why are transparent latches risky in a clocked datapath?",
-              "back": "During the transparent phase, data can ripple through multiple open latches in a single clock phase, defeating the one-update-per-clock assumption and complicating timing.",
-              "hint": "Think 'race through' during the high phase."
-            },
             {
               "id": "sequential-logic-2-mcq-1",
               "type": "mcq",
-              "prompt": "A gated D latch has EN=1 the whole time D toggles. What does Q do?",
+              "prompt": "In one sentence, what is the difference between a latch and a flip-flop?",
               "choices": [
-                "Q ignores D until the next clock edge",
-                "Q follows D continuously (transparent)",
-                "Q latches D only once and freezes",
-                "Q goes to high-impedance"
+                "A latch stores two bits; a flip-flop stores one",
+                "A latch is level-sensitive (transparent while enabled); a flip-flop is edge-triggered (samples once per clock edge)",
+                "A latch needs a clock; a flip-flop does not",
+                "A flip-flop is always slower than a latch"
               ],
               "answerIndex": 1,
-              "explanation": "A latch is level-sensitive; while enabled it is transparent and Q tracks D in real time."
+              "explanation": "This is THE distinction to memorize. A latch follows its input the whole time it is enabled (a level). A flip-flop captures its input only at the clock edge (a moment). Both store one bit.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-4.svg"
             },
             {
               "id": "sequential-logic-2-mcq-2",
               "type": "mcq",
-              "prompt": "In a master-slave positive-edge D flip-flop, when is the value of D actually captured?",
+              "prompt": "What role does the clock play in a sequential system?",
               "choices": [
-                "Continuously while CLK is high",
-                "At the rising edge of CLK",
-                "At the falling edge of CLK",
-                "Whenever D changes"
+                "It supplies power to the gates",
+                "It is a steady ticking signal that keeps every memory cell updating in step (a shared heartbeat)",
+                "It stores the data",
+                "It converts analog signals to digital"
               ],
               "answerIndex": 1,
-              "explanation": "On the rising edge the master stops tracking D (freezing the captured value) and the slave passes it to the output, so capture is effectively at the rising edge."
+              "explanation": "The clock is a regular tick between 0 and 1 — like a metronome — that all the flip-flops listen to so they update together. It carries timing, not power or data.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-4.svg"
             },
             {
               "id": "sequential-logic-2-mcq-3",
               "type": "mcq",
-              "prompt": "Why is the edge-triggered flip-flop preferred as the storage element of synchronous design?",
+              "prompt": "A D latch has its enable held at 1 while D toggles several times. What does Q do?",
               "choices": [
-                "It uses fewer transistors than a latch",
-                "It can store two bits at once",
-                "Its update instant is unambiguous (one edge per cycle), making timing analysis tractable",
-                "It does not require a clock"
+                "Q ignores D until the next clock edge",
+                "Q follows D continuously (the latch is transparent)",
+                "Q captures D just once and freezes",
+                "Q goes to an unknown state"
               ],
-              "answerIndex": 2,
-              "explanation": "A single, well-defined update instant per clock cycle is what makes setup/hold timing analysis and synchronous discipline work. (Latches actually use fewer transistors.)"
+              "answerIndex": 1,
+              "explanation": "A latch is level-sensitive: while enabled it is transparent, so Q copies D in real time. Capturing once and freezing is flip-flop behavior, not latch behavior.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-4.svg"
             },
             {
               "id": "sequential-logic-2-mcq-4",
               "type": "mcq",
-              "prompt": "Looking at a CLK/D/Q timing diagram, you see Q change value only at the instants CLK rises. This indicates the device is a:",
+              "prompt": "A positive-edge-triggered D flip-flop samples its input D at which moment?",
               "choices": [
-                "Transparent (level-sensitive) latch",
-                "Positive-edge-triggered flip-flop",
-                "Combinational buffer",
-                "Tri-state buffer"
+                "Continuously while the clock is high",
+                "At the instant the clock rises from 0 to 1 (the rising edge)",
+                "Whenever D changes",
+                "Once when power is applied"
               ],
               "answerIndex": 1,
-              "explanation": "Updates confined to rising edges are the signature of a positive-edge-triggered flip-flop; a latch would show Q tracking D throughout the enable level."
+              "explanation": "A positive-edge flip-flop captures D exactly at the rising edge and then holds it for the rest of the cycle. Following D the whole time the clock is high would be latch (level-sensitive) behavior.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-4.svg"
+            },
+            {
+              "id": "sequential-logic-2-mcq-5",
+              "type": "mcq",
+              "prompt": "On a timing diagram, the output Q changes value ONLY at the instants the clock rises. What kind of device is this?",
+              "choices": [
+                "A transparent (level-sensitive) latch",
+                "A positive-edge-triggered flip-flop",
+                "A plain AND gate",
+                "A resistor"
+              ],
+              "answerIndex": 1,
+              "explanation": "Changes confined to the rising edges are the signature of an edge-triggered flip-flop. A latch would show Q wiggling along with D for the whole time it is enabled.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-1.svg"
+            },
+            {
+              "id": "sequential-logic-2-mcq-6",
+              "type": "mcq",
+              "prompt": "What does 'transparent' mean for a D latch?",
+              "choices": [
+                "It is physically see-through",
+                "While enabled, its output simply passes the input through in real time",
+                "It works without any input",
+                "It only updates at a clock edge"
+              ],
+              "answerIndex": 1,
+              "explanation": "Transparent means you can 'see through' it: while the enable is high, Q just follows D. When the enable drops, the latch closes and holds the last value.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-4.svg"
+            },
+            {
+              "id": "sequential-logic-2-mcq-7",
+              "type": "mcq",
+              "prompt": "What is the difference between a synchronous reset and an asynchronous reset on a flip-flop?",
+              "choices": [
+                "A synchronous reset acts only at the next clock edge; an asynchronous reset acts immediately, ignoring the clock",
+                "A synchronous reset is slower to wire up",
+                "An asynchronous reset only works while the clock is high",
+                "There is no real difference"
+              ],
+              "answerIndex": 0,
+              "explanation": "Synchronous reset waits for the clock edge, staying in step with everything else. Asynchronous reset fires the moment it is asserted, regardless of the clock — handy for power-on, riskier mid-operation.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-1.svg"
+            },
+            {
+              "id": "sequential-logic-2-mcq-8",
+              "type": "mcq",
+              "prompt": "A D flip-flop has D = 1 just before a rising clock edge, then D drops to 0 right after the edge. What is Q after the edge?",
+              "choices": [
+                "0, because D ended at 0",
+                "1, because it captured D = 1 at the edge and holds it",
+                "Unknown",
+                "It keeps toggling"
+              ],
+              "answerIndex": 1,
+              "explanation": "The flip-flop samples D at the rising edge (D=1 there) and holds that value until the next edge. Changes to D after the edge are ignored for the rest of the cycle.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-1.svg"
             }
           ]
         },
         {
           "id": "sequential-logic-sequential-logic-lesson-3",
-          "title": "JK, T, Resets, Registers & Shift Registers",
+          "title": "More Flip-Flops: JK and T",
           "order": 3,
           "difficulty": 2,
-          "content": "The D flip-flop is the workhorse, but two relatives matter. The **JK flip-flop** generalizes SR with no forbidden state: $J\\!=\\!K\\!=\\!1$ **toggles**. Its characteristic equation is\n\n$$Q_{\\text{next}} = J\\bar{Q} + \\bar{K}Q.$$\n\nTie $J\\!=\\!K\\!=\\!1$ (or $J\\!=\\!K\\!=\\!T$) and you get the **T (toggle) flip-flop**: $Q_{\\text{next}} = T \\oplus Q$. T flip-flops are the natural building block of counters because each toggles at half the rate of the one feeding it.\n\n**Set/reset timing matters.** An **asynchronous** preset/clear acts *immediately*, independent of the clock — useful for power-on init but dangerous mid-operation because it can violate timing and recovery/removal windows. A **synchronous** reset only takes effect at the active clock edge, keeping the device inside the synchronous discipline. The modern default is *asynchronous-assert, synchronous-deassert* for the global reset, and synchronous reset everywhere else.\n\n**Registers** are just $N$ flip-flops sharing one clock — a **parallel-load** register captures an $N$-bit word in one edge. **Shift registers** wire each flip-flop's $Q$ to the next one's $D$ (see the 4-bit diagram), moving data one stage per clock. The access-pattern taxonomy: **SISO** (serial-in serial-out, a delay line), **SIPO** (serial-in parallel-out, deserializer), **PISO** (parallel-in serial-out, serializer), and PIPO (a plain register). Add XOR feedback from selected taps and a shift register becomes a **linear-feedback shift register (LFSR)**: an $n$-bit maximal LFSR cycles through $2^n - 1$ states, generating pseudorandom sequences used for scramblers, CRCs, and radar pseudo-noise codes.",
+          "content": "The D flip-flop is the everyday workhorse, but two close relatives are worth meeting because they show up inside counters.\n\nFirst, the **JK flip-flop**. It is like the SR latch (J acts like Set, K acts like Reset), but cleverly *fixes the forbidden state*. Recall that S = R = 1 was illegal. With a JK flip-flop, J = K = 1 is perfectly legal and does something useful: it **toggles** — the output flips to the opposite of whatever it was (0 becomes 1, 1 becomes 0) on each clock edge. So a JK flip-flop has four modes on each clock tick:\n\n- J = 0, K = 0 → **hold** (no change)\n- J = 1, K = 0 → **set** Q to 1\n- J = 0, K = 1 → **reset** Q to 0\n- J = 1, K = 1 → **toggle** (flip Q)\n\nSecond, the **T flip-flop** ('T' for **Toggle**). It has a single input T:\n\n- **T = 0** → hold (keep the current value)\n- **T = 1** → toggle on each clock edge\n\nA T flip-flop is just a JK with J and K tied together. Here is why it matters: when T is held at 1, the output flips on every clock edge, so it changes half as often as the clock. In other words, one T flip-flop **divides the clock frequency by two**. Chain several together and each halves the rate again — which, as the next lessons show, is exactly how you build a counter.\n\n**Recap:** the JK flip-flop is an SR with the illegal corner turned into a useful 'toggle'. The T flip-flop toggles when T = 1, dividing the clock by two — the seed of counting.",
           "items": [
-            {
-              "id": "sequential-logic-3-fc-1",
-              "type": "flashcard",
-              "front": "What does a JK flip-flop do when J=K=1, and why is it 'better' than SR here?",
-              "back": "It toggles (Q -> NOT Q). Unlike SR's S=R=1, this is well-defined, so JK has no forbidden state.",
-              "hint": "SR's bad corner becomes useful.",
-              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-2.svg"
-            },
-            {
-              "id": "sequential-logic-3-fc-2",
-              "type": "flashcard",
-              "front": "Give the characteristic equations for the JK and T flip-flops.",
-              "back": "JK: $Q_{\\\\text{next}} = J\\\\bar{Q} + \\\\bar{K}Q$. T: $Q_{\\\\text{next}} = T \\\\oplus Q$ (toggle when T=1).",
-              "hint": "T is JK with J=K tied together."
-            },
-            {
-              "id": "sequential-logic-3-fc-3",
-              "type": "flashcard",
-              "front": "Asynchronous vs. synchronous reset: what is the difference?",
-              "back": "Async reset takes effect immediately, independent of the clock; synchronous reset only takes effect at the active clock edge. Modern best practice: async-assert, sync-deassert for the global reset.",
-              "hint": "Does it wait for an edge?"
-            },
-            {
-              "id": "sequential-logic-3-fc-4",
-              "type": "flashcard",
-              "front": "Define SISO, SIPO, and PISO shift registers.",
-              "back": "SISO: serial-in, serial-out (delay line). SIPO: serial-in, parallel-out (deserializer). PISO: parallel-in, serial-out (serializer).",
-              "hint": "First letters = input form, last = output form."
-            },
-            {
-              "id": "sequential-logic-3-fc-5",
-              "type": "flashcard",
-              "front": "What is an LFSR and how long is a maximal-length sequence for n bits?",
-              "back": "A shift register with XOR feedback from selected taps; a maximal LFSR cycles through $2^n - 1$ states (all but all-zeros), producing a pseudorandom sequence used for scramblers, CRCs, and PN codes.",
-              "hint": "All states except one."
-            },
             {
               "id": "sequential-logic-3-mcq-1",
               "type": "mcq",
-              "prompt": "A T flip-flop with T held at 1 produces an output that:",
+              "prompt": "What does a JK flip-flop do when J = 1 and K = 1?",
               "choices": [
-                "Stays constant",
-                "Toggles every active clock edge (half the clock frequency)",
-                "Follows the clock exactly",
-                "Goes to high-impedance"
+                "Nothing happens (it is forbidden)",
+                "It toggles — the output flips to the opposite value on each clock edge",
+                "It holds its current value",
+                "It always sets Q to 1"
               ],
               "answerIndex": 1,
-              "explanation": "T=1 toggles Q every edge, so Q is a divide-by-2 of the clock. This is why T flip-flops chain naturally into ripple counters."
+              "explanation": "The JK flip-flop turns SR's old illegal corner into something useful: J=K=1 toggles. There is no forbidden state. Holding is J=K=0; forcing to 1 is J=1, K=0.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-2.svg"
             },
             {
               "id": "sequential-logic-3-mcq-2",
               "type": "mcq",
-              "prompt": "Which structure converts a serial bit stream into a parallel word?",
+              "prompt": "How does the JK flip-flop improve on the SR latch?",
               "choices": [
-                "PISO shift register",
-                "SIPO shift register",
-                "SISO shift register",
-                "A single D flip-flop"
+                "It is faster",
+                "It removes the forbidden state by giving the 'both inputs high' case a useful meaning (toggle)",
+                "It needs no clock",
+                "It can store two bits"
               ],
               "answerIndex": 1,
-              "explanation": "Serial-in parallel-out (SIPO) clocks bits in one at a time, then presents all N stage outputs in parallel — a deserializer."
+              "explanation": "SR's S=R=1 was unpredictable. JK assigns that case a clean job — toggle — so every input combination is well defined. Speed and bit count are unchanged.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-2.svg"
             },
             {
               "id": "sequential-logic-3-mcq-3",
               "type": "mcq",
-              "prompt": "An asynchronous (direct) clear on a flip-flop is risky during normal operation primarily because it:",
+              "prompt": "A T flip-flop has T held at 1. On each clock edge, the output:",
               "choices": [
-                "Consumes too much power",
-                "Acts independently of the clock and can violate recovery/removal timing, falling outside synchronous discipline",
-                "Cannot be undone",
-                "Inverts the data input"
+                "Stays constant",
+                "Toggles (flips to the opposite value)",
+                "Copies the clock exactly",
+                "Goes to an unknown state"
               ],
               "answerIndex": 1,
-              "explanation": "Async resets act immediately regardless of the clock, so their assertion/deassertion relative to the edge must obey recovery/removal windows; uncontrolled use breaks synchronous timing analysis."
+              "explanation": "T=1 means toggle: the output flips every clock edge. Because it flips once per edge, it changes half as often as the clock.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-2.svg"
             },
             {
               "id": "sequential-logic-3-mcq-4",
               "type": "mcq",
-              "prompt": "A maximal-length 8-bit LFSR cycles through how many distinct states before repeating?",
+              "prompt": "A T flip-flop with T = 1 produces an output whose frequency is:",
               "choices": [
-                "256",
-                "255",
-                "128",
-                "8"
+                "The same as the clock",
+                "Twice the clock frequency",
+                "Half the clock frequency (a divide-by-2)",
+                "Zero"
+              ],
+              "answerIndex": 2,
+              "explanation": "Toggling once per edge means a full output cycle takes two clock cycles, so the output runs at half the clock frequency. This divide-by-2 behavior is the basis of counters.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-2.svg"
+            },
+            {
+              "id": "sequential-logic-3-mcq-5",
+              "type": "mcq",
+              "prompt": "A T flip-flop is most simply described as:",
+              "choices": [
+                "A JK flip-flop with J and K tied together",
+                "Two D latches in series",
+                "An AND gate with feedback",
+                "A flip-flop that has no clock"
+              ],
+              "answerIndex": 0,
+              "explanation": "Tie J and K together and you get the T flip-flop: T=0 holds, T=1 toggles. It is just a one-input view of the JK.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-2.svg"
+            },
+            {
+              "id": "sequential-logic-3-mcq-6",
+              "type": "mcq",
+              "prompt": "A JK flip-flop currently has Q = 0. The inputs are J = 0, K = 1 at the clock edge. What does Q become?",
+              "choices": [
+                "1 (set)",
+                "0 (reset, and it was already 0)",
+                "It toggles to 1",
+                "Unknown"
               ],
               "answerIndex": 1,
-              "explanation": "A maximal LFSR visits 2^n - 1 = 2^8 - 1 = 255 states; the all-zeros state is excluded because it is a lock-up (XOR feedback would keep it at zero)."
+              "explanation": "J=0, K=1 is the reset case, forcing Q to 0. Since it was already 0, it stays 0. Toggle only happens when both J and K are 1.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-2.svg"
+            },
+            {
+              "id": "sequential-logic-3-mcq-7",
+              "type": "mcq",
+              "prompt": "A T flip-flop has Q = 1. The input is T = 0 at the clock edge. What is Q after the edge?",
+              "choices": [
+                "0",
+                "1 (hold — T = 0 means no change)",
+                "It toggles each edge regardless",
+                "Unknown"
+              ],
+              "answerIndex": 1,
+              "explanation": "T=0 is the hold mode, so Q keeps its value (1). Only T=1 causes a toggle.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-2.svg"
+            },
+            {
+              "id": "sequential-logic-3-mcq-8",
+              "type": "mcq",
+              "prompt": "Why are T flip-flops the natural building block for counters?",
+              "choices": [
+                "They are the cheapest flip-flop",
+                "Each one divides the clock by two, so chaining them produces the doubling pattern of binary counting",
+                "They do not need a clock",
+                "They can store more than one bit each"
+              ],
+              "answerIndex": 1,
+              "explanation": "With T=1, each flip-flop toggles at half the rate of the one before it — exactly the 1, 2, 4, 8... place-value pattern of binary numbers, which is what a counter produces.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-2.svg"
             }
           ]
         },
         {
           "id": "sequential-logic-sequential-logic-lesson-4",
-          "title": "Counters & the Synchronous Design Discipline",
+          "title": "Registers and Shift Registers",
           "order": 4,
           "difficulty": 3,
-          "content": "**Counters** come in two flavors. An **asynchronous (ripple) counter** chains toggle flip-flops so each stage clocks the next; the count *ripples* through. It is cheap but the propagation delays **accumulate** — for $n$ stages the worst-case settling is $\\approx n \\cdot t_{cq}$, producing transient wrong codes (decoding glitches) and limiting $f_{max}$. A **synchronous counter** clocks *every* flip-flop from the same clock and uses combinational next-state logic so all bits update together; settling is one $t_{cq}+t_{pd}$ regardless of width. Always prefer synchronous.\n\n**Modulo-N** counters count $0 \\ldots N-1$ then wrap. A BCD counter is mod-10. You build mod-N by detecting the terminal count and synchronously loading/clearing. **Ring** and **Johnson** counters are shift-register counters: a ring circulates a single 1 through $n$ stages ($n$ states, one-hot, no decode logic); a **Johnson** (twisted-ring) feeds back the *inverted* last output, giving $2n$ states with simple 2-input decode.\n\nThe capstone discipline: **synchronous design**. One clock, every state element registered on the same edge, all logic between registers purely combinational. Two cardinal rules. First, **never gate the clock** — do not AND a clock with an enable. Gating injects skew, glitches, and creates a new (untimed) clock domain. Instead use a **clock enable**: a synchronous mux on the flip-flop's $D$ input that recirculates $Q$ when disabled:\n\n$$D = EN \\,?\\, D_{\\text{new}} : Q.$$\n\nThe clock runs free; only data is gated. Second, anything crossing into this clock domain from another (or from the async world) needs a synchronizer. Adopt this discipline and FPGA timing closure (Module 8) becomes tractable rather than a game of whack-a-mole.",
+          "content": "One flip-flop stores one bit. Real systems handle whole numbers, so we group flip-flops together.\n\nLine up several flip-flops side by side, all sharing the same clock, and you get a **register** — a small box that stores a multi-bit number. With 8 flip-flops you store an 8-bit number; on each clock edge they all capture their inputs at once. This is a **parallel-load** register: a whole number goes in (or stays held) in a single tick. Registers are the scratchpad memory inside processors.\n\nNow wire them differently. Connect each flip-flop's output to the *next* flip-flop's input, like people passing a bucket down a line. On each clock edge, every stored bit slides one step to the right. That is a **shift register** — it slides bits along, one stage per clock. The diagram shows a 4-bit shift register: feed a bit in at the left, and four clocks later it appears at the right.\n\nShift registers come in flavors named by how data enters and leaves (S = serial, one bit at a time; P = parallel, all at once):\n\n- **SISO** (serial-in, serial-out): a delay line — a bit goes in, comes out a few clocks later.\n- **SIPO** (serial-in, parallel-out): bits arrive one at a time, then you read the whole word at once. This *de-serializes* a stream.\n- **PISO** (parallel-in, serial-out): load a whole word, then send it out one bit at a time. This *serializes* a word — how a number gets sent over a single wire.\n- **PIPO** (parallel-in, parallel-out): that is just an ordinary register.\n\nOne neat variant: feed some outputs back through an XOR gate into the input, and the shifting bits cycle through a long, scrambled-looking sequence. That is a **linear-feedback shift register (LFSR)**, a cheap way to make pseudo-random-looking bit patterns — useful for test patterns and error checks.\n\n**Recap:** flip-flops in parallel = a register (stores a number); flip-flops in a chain = a shift register (slides bits along), used to serialize, de-serialize, delay, and (with feedback) make pseudo-random sequences.",
           "items": [
-            {
-              "id": "sequential-logic-4-fc-1",
-              "type": "flashcard",
-              "front": "Ripple vs. synchronous counter: what is the key timing difference?",
-              "back": "In a ripple counter each stage clocks the next, so delays accumulate (~n*t_cq) and produce decode glitches. In a synchronous counter all flip-flops share one clock and update together, settling in one t_cq + t_pd regardless of width.",
-              "hint": "Do the delays add up?"
-            },
-            {
-              "id": "sequential-logic-4-fc-2",
-              "type": "flashcard",
-              "front": "Why must you never gate a clock with an enable signal?",
-              "back": "Gating injects skew and glitches and effectively creates a new, untimed clock domain, wrecking timing closure. Use a synchronous clock enable instead.",
-              "hint": "It corrupts the clock tree."
-            },
-            {
-              "id": "sequential-logic-4-fc-3",
-              "type": "flashcard",
-              "front": "What is the correct way to implement a clock enable on a D flip-flop?",
-              "back": "Keep the clock free-running and place a synchronous mux on D that recirculates Q when disabled: $D = EN\\\\,?\\\\,D_{\\\\text{new}} : Q$. Only data is gated, never the clock.",
-              "hint": "Mux on the data input, not the clock."
-            },
-            {
-              "id": "sequential-logic-4-fc-4",
-              "type": "flashcard",
-              "front": "Ring counter vs. Johnson (twisted-ring) counter: states and feedback?",
-              "back": "Ring: circulates a single 1; n stages give n one-hot states, no decode logic. Johnson: feeds back the inverted last output; n stages give 2n states with simple 2-input decode.",
-              "hint": "Johnson inverts the feedback to double the states."
-            },
-            {
-              "id": "sequential-logic-4-fc-5",
-              "type": "flashcard",
-              "front": "State the three pillars of synchronous design discipline.",
-              "back": "One clock; every state element registered on the same edge; all inter-register logic purely combinational (plus: never gate clocks, synchronize anything crossing domains).",
-              "hint": "One clock, everything registered."
-            },
-            {
-              "id": "sequential-logic-4-fc-6",
-              "type": "flashcard",
-              "front": "How do you build a mod-N counter from a standard binary counter?",
-              "back": "Detect the terminal count (N-1, or N) combinationally and synchronously load/clear back to 0 on the next edge, so it counts 0..N-1 and wraps.",
-              "hint": "Detect-and-reset synchronously."
-            },
             {
               "id": "sequential-logic-4-mcq-1",
               "type": "mcq",
-              "prompt": "Why does a wide asynchronous ripple counter produce transient incorrect output codes?",
+              "prompt": "What is a register, in the simplest terms?",
               "choices": [
-                "Its flip-flops are level-sensitive",
-                "Each stage's clock comes from the previous stage, so bit transitions ripple and momentarily show invalid intermediate codes",
-                "It has no reset input",
-                "The clock frequency is too low"
+                "A single flip-flop",
+                "Several flip-flops sharing one clock, used to store a multi-bit number",
+                "A type of logic gate",
+                "A clock generator"
               ],
               "answerIndex": 1,
-              "explanation": "Because stages clock one another, the bits do not change simultaneously; during the ripple the output passes through wrong intermediate values (decode glitches)."
+              "explanation": "A register is a group of flip-flops on a common clock; together they store a whole number (e.g. 8 flip-flops hold 8 bits). A single flip-flop stores only one bit.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-2.svg"
             },
             {
               "id": "sequential-logic-4-mcq-2",
               "type": "mcq",
-              "prompt": "What is the recommended alternative to ANDing a clock with an enable to stop a register from updating?",
+              "prompt": "What does a shift register do on each clock edge?",
               "choices": [
-                "Lower the supply voltage",
-                "A synchronous clock enable: a mux on D that recirculates Q while the clock runs free",
-                "An asynchronous reset held active",
-                "A tri-state buffer on the clock line"
+                "Loads an entire new number in parallel",
+                "Slides every stored bit one stage along the chain",
+                "Adds one to the stored number",
+                "Clears all bits to zero"
               ],
               "answerIndex": 1,
-              "explanation": "Gating the clock adds skew/glitches and a new clock domain. The clean fix keeps the clock free-running and selects between new data and the held value on the D input."
+              "explanation": "In a shift register, each flip-flop's output feeds the next one's input, so on every clock the bits march one stage along — like passing a bucket down a line.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-2.svg"
             },
             {
               "id": "sequential-logic-4-mcq-3",
               "type": "mcq",
-              "prompt": "A 4-stage Johnson (twisted-ring) counter has how many distinct states?",
+              "prompt": "A 4-bit shift register currently holds the bits 1 0 1 1 (leftmost first). A 0 is fed in at the left on the next clock edge. What does it hold after that edge?",
               "choices": [
-                "4",
-                "8",
-                "15",
-                "16"
+                "0 1 0 1",
+                "1 1 0 1",
+                "0 0 1 0",
+                "1 0 1 1 (unchanged)"
               ],
-              "answerIndex": 1,
-              "explanation": "A Johnson counter of n stages produces 2n states; for n=4 that is 8. A plain 4-stage ring counter would give only 4 (one-hot) states."
+              "answerIndex": 0,
+              "explanation": "Everything slides one place to the right and the new 0 enters at the left: 1011 becomes 0101 (the rightmost 1 falls off the end). The contents always move, so 'unchanged' is wrong.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-2.svg"
             },
             {
               "id": "sequential-logic-4-mcq-4",
               "type": "mcq",
-              "prompt": "Which statement best captures synchronous design discipline?",
+              "prompt": "Which shift register turns a serial stream of bits arriving one at a time into a whole parallel word you can read at once?",
               "choices": [
-                "Use as many independent clocks as convenient and gate them per block",
-                "One clock edge updates all registers; combinational logic only sits between registers; cross-domain signals are synchronized",
-                "Prefer ripple counters and asynchronous resets everywhere for speed",
-                "Avoid registers and rely on transparent latches"
+                "PISO (parallel-in, serial-out)",
+                "SIPO (serial-in, parallel-out)",
+                "SISO (serial-in, serial-out)",
+                "A single D flip-flop"
               ],
               "answerIndex": 1,
-              "explanation": "Single clock, everything registered on one edge, purely combinational logic between registers, no gated clocks, and synchronizers at domain crossings — this is what makes timing closure tractable."
+              "explanation": "SIPO clocks bits in one at a time, then presents all stage outputs together — a de-serializer. PISO does the reverse (word in, bits out).",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-2.svg"
+            },
+            {
+              "id": "sequential-logic-4-mcq-5",
+              "type": "mcq",
+              "prompt": "You want to send an 8-bit number over a single wire, one bit at a time. Which structure do you use?",
+              "choices": [
+                "PISO (parallel-in, serial-out)",
+                "SIPO (serial-in, parallel-out)",
+                "A parallel-load register only",
+                "An AND gate"
+              ],
+              "answerIndex": 0,
+              "explanation": "PISO loads the whole word at once, then shifts it out bit by bit — a serializer, exactly what sending over one wire requires. SIPO does the opposite.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-2.svg"
+            },
+            {
+              "id": "sequential-logic-4-mcq-6",
+              "type": "mcq",
+              "prompt": "A 'parallel-load' register captures its input when?",
+              "choices": [
+                "One bit per clock over several clocks",
+                "All bits together on a single clock edge",
+                "Only when power is applied",
+                "Continuously, with no clock"
+              ],
+              "answerIndex": 1,
+              "explanation": "Parallel load means the entire multi-bit word is captured in one clock edge — all flip-flops grab their inputs simultaneously. Loading one bit per clock is shift-register behavior.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-2.svg"
+            },
+            {
+              "id": "sequential-logic-4-mcq-7",
+              "type": "mcq",
+              "prompt": "What makes an LFSR (linear-feedback shift register) different from a plain shift register?",
+              "choices": [
+                "It has no clock",
+                "It feeds some outputs back through an XOR gate into the input, so it cycles through a long pseudo-random-looking sequence",
+                "It can only store one bit",
+                "It counts upward in plain binary"
+              ],
+              "answerIndex": 1,
+              "explanation": "An LFSR adds XOR feedback from selected stages back to the input. That feedback makes the bit pattern cycle through a long, scrambled-looking sequence — useful for test patterns and error checks. A plain shift register just slides bits with no feedback.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-2.svg"
+            },
+            {
+              "id": "sequential-logic-4-mcq-8",
+              "type": "mcq",
+              "prompt": "How many bits does a SISO (serial-in, serial-out) shift register effectively act as?",
+              "choices": [
+                "A parallel adder",
+                "A delay line — a bit goes in and comes out a fixed number of clocks later",
+                "A clock divider only",
+                "A register with no output"
+              ],
+              "answerIndex": 1,
+              "explanation": "Serial in, serial out means a bit enters at one end and emerges at the other after as many clocks as there are stages — a simple delay line.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-2.svg"
+            }
+          ]
+        },
+        {
+          "id": "sequential-logic-sequential-logic-lesson-5",
+          "title": "Counters and the One-Clock Discipline",
+          "order": 5,
+          "difficulty": 3,
+          "content": "A **counter** counts clock ticks. Think of a digital clock ticking off seconds, or a tally that goes up by one each beat. Internally it is just flip-flops arranged so their stored number increases (or decreases) by one on every clock edge. The diagram shows a 3-bit up counter stepping 0, 1, 2, ... 7 and then wrapping back to 0.\n\nThere are two ways to wire a counter, and the difference matters.\n\n- An **asynchronous (ripple) counter** chains the flip-flops so each one's output clocks the next, like a row of dominoes. It is simple, but the change has to *ripple* down the chain, so the flip-flops do not all update at the same instant. During that ripple the output briefly shows wrong values (glitches), and the more bits you add, the slower it settles.\n- A **synchronous counter** clocks *every* flip-flop from the same clock at once, with a little logic deciding the next value. All bits change together, cleanly, no matter how many there are. **Always prefer synchronous counters.**\n\nCounters can count **up** or **down**, and a **modulo-N** (mod-N) counter counts 0 up to N−1 and then wraps back to 0. A counter that counts 0–9 (mod-10) is how each digit of a decimal display works.\n\nNow the big-picture rule that ties this whole sub-topic together: the **synchronous design discipline**. Use **one clock**, have **every flip-flop update on the same edge**, and put only ordinary combinational logic between them. This keeps everything in step and makes the design predictable.\n\nThere is one tempting mistake to avoid. Suppose you want a counter to pause. The wrong fix is to *gate the clock* — ANDing the clock with an on/off signal to stop the ticks. That corrupts the carefully balanced clock and causes glitches. The right fix is a **clock enable**: let the clock keep ticking freely, but add a little logic on the data input so that when 'enable' is off, each flip-flop simply re-loads its own current value (no visible change). The slogan to remember: **never gate the clock — gate the data instead.**\n\n**Recap:** counters count ticks; synchronous (all flip-flops on one clock) beats ripple. Mod-N counters wrap at N. Keep one clock, register everything on the same edge, and pause with a clock enable — never by chopping the clock.",
+          "items": [
+            {
+              "id": "sequential-logic-5-mcq-1",
+              "type": "mcq",
+              "prompt": "What does a counter do?",
+              "choices": [
+                "Stores a single bit forever",
+                "Counts clock ticks, changing its stored number by one on each clock edge",
+                "Converts serial data to parallel",
+                "Generates the clock signal"
+              ],
+              "answerIndex": 1,
+              "explanation": "A counter is flip-flops arranged so their stored number steps up (or down) by one per clock edge — like a digital clock ticking off seconds.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-5.svg"
+            },
+            {
+              "id": "sequential-logic-5-mcq-2",
+              "type": "mcq",
+              "prompt": "A 3-bit up counter currently shows 011 (decimal 3). What does it show after the next clock edge?",
+              "choices": [
+                "010 (2)",
+                "100 (4)",
+                "011 (unchanged)",
+                "000 (0)"
+              ],
+              "answerIndex": 1,
+              "explanation": "An up counter adds one each edge: 3 + 1 = 4, which is 100 in binary. It only wraps to 000 after reaching its top value (111 = 7).",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-5.svg"
+            },
+            {
+              "id": "sequential-logic-5-mcq-3",
+              "type": "mcq",
+              "prompt": "A 3-bit up counter shows 111 (decimal 7). What does it show after the next clock edge?",
+              "choices": [
+                "1000 (8)",
+                "111 (it stops)",
+                "000 (it wraps back to 0)",
+                "Unknown"
+              ],
+              "answerIndex": 2,
+              "explanation": "With only 3 bits the highest value is 7 (111). One more tick wraps it back to 000 — this 0..7 cycle is a mod-8 counter. It cannot show 8 (that would need a 4th bit).",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-5.svg"
+            },
+            {
+              "id": "sequential-logic-5-mcq-4",
+              "type": "mcq",
+              "prompt": "Why does a wide ripple (asynchronous) counter briefly show wrong values?",
+              "choices": [
+                "Its flip-flops have no clock",
+                "Each stage clocks the next, so the change ripples down the chain and the bits do not all update at the same instant",
+                "It uses too much power",
+                "It has no reset"
+              ],
+              "answerIndex": 1,
+              "explanation": "In a ripple counter the bits change one after another as the carry ripples through, so for a moment the output passes through incorrect intermediate values (glitches). A synchronous counter avoids this by updating all bits together.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-5.svg"
+            },
+            {
+              "id": "sequential-logic-5-mcq-5",
+              "type": "mcq",
+              "prompt": "What is the main advantage of a synchronous counter over a ripple counter?",
+              "choices": [
+                "It needs fewer flip-flops",
+                "All bits update together on the same clock edge, so the output is clean and it stays fast as it gets wider",
+                "It does not need a clock",
+                "It can count higher with the same number of bits"
+              ],
+              "answerIndex": 1,
+              "explanation": "Synchronous means every flip-flop shares one clock and updates simultaneously — no rippling, no glitch parade, and the speed does not degrade with width. This is why synchronous is always preferred.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-5.svg"
+            },
+            {
+              "id": "sequential-logic-5-mcq-6",
+              "type": "mcq",
+              "prompt": "A 'modulo-10' (mod-10) counter counts through which values before wrapping?",
+              "choices": [
+                "0 to 10",
+                "0 to 9, then back to 0",
+                "1 to 10",
+                "0 to 15"
+              ],
+              "answerIndex": 1,
+              "explanation": "A mod-N counter runs 0 up to N−1 then wraps. Mod-10 counts 0..9 then back to 0 — exactly what one digit of a decimal display needs.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-5.svg"
+            },
+            {
+              "id": "sequential-logic-5-mcq-7",
+              "type": "mcq",
+              "prompt": "You need to pause a counter for a while. What is the correct way to do it?",
+              "choices": [
+                "AND the clock with an on/off signal so the clock stops ticking",
+                "Use a clock enable: let the clock run freely, but feed each flip-flop its own value back when paused",
+                "Disconnect the power",
+                "Lower the clock voltage"
+              ],
+              "answerIndex": 1,
+              "explanation": "Gating (chopping) the clock injects glitches and skew and breaks the timing. The clean fix is a clock enable: the clock keeps running and, when disabled, each flip-flop reloads its current value so nothing visibly changes.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-5.svg"
+            },
+            {
+              "id": "sequential-logic-5-mcq-8",
+              "type": "mcq",
+              "prompt": "Which statement best captures the synchronous design discipline?",
+              "choices": [
+                "Use many separate clocks and gate each one as needed",
+                "Use one clock, have every flip-flop update on the same edge, and put only ordinary combinational logic between them",
+                "Prefer ripple counters everywhere because they are simpler",
+                "Avoid flip-flops and rely on transparent latches"
+              ],
+              "answerIndex": 1,
+              "explanation": "One clock, everything registered on the same edge, plain combinational logic between registers, and never a gated clock — that discipline keeps the whole design in step and predictable.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/sequential-logic-5.svg"
             }
           ]
         }
