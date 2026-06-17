@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "id": "digital-electronics",
   "title": "Digital Electronics",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Digital electronics from scratch (beginner rework in progress): 14 sub-topics from number systems through HDL and FPGAs. Beginner-first readings, diagrams, tiered easy to hard.",
   "requires": [
     "analog-electronics"
@@ -2324,353 +2324,650 @@
       "order": 4,
       "lessons": [
         {
-          "id": "combinational-blocks-combinational-blocks-l1-selectors",
-          "title": "Selectors: Multiplexers, Demuxes, Decoders & Encoders",
+          "id": "combinational-blocks-combinational-blocks-l1-design-flow",
+          "title": "From Spec to Circuit: How We Build Logic",
           "order": 1,
           "difficulty": 1,
-          "content": "Combinational logic is memoryless: outputs are a pure function of present inputs. The design flow is always **spec → truth table → minimized logic → schematic**. This lesson covers the routing/selection primitives that dominate real datapaths.\n\nA **multiplexer (mux)** selects one of $2^n$ data inputs onto a single output using $n$ select lines. The 2:1 mux is the atom:\n\n$$Y = \\overline{S}\\,I_0 + S\\,I_1$$\n\nThe key insight for a software dev: **every `if`/`case`/ternary in HDL synthesizes to a mux.** Muxes are also *universal* — a $2^n$:1 mux with the variables on its select lines implements **any** $n$-variable function by hardwiring each data input to the corresponding truth-table row (0 or 1). You can even do an $n$-variable function with a $2^{n-1}$:1 mux by feeding the last variable (or its complement, or 0/1) into the data inputs (Shannon expansion).\n\nA **demultiplexer** is the inverse: it routes one input to one of $2^n$ outputs. A **decoder** (e.g. 3:8) asserts exactly one of $2^n$ outputs for each input code — it generates all minterms, so it's a natural SOP engine and the basis of address/chip-select decoding.\n\nAn **encoder** does the reverse (one-hot → binary) but breaks if two inputs are active. A **priority encoder** fixes this by outputting the code of the *highest-priority* asserted input plus a \"valid\" bit — exactly what an interrupt controller does. As an ex-radar tech: think of a decoder as range-gate selection and a priority encoder as picking the strongest return.",
+          "content": "## Hook\n\nYou already know logic gates (AND, OR, NOT) and a little Boolean algebra. But how do engineers turn a real-world need into an actual circuit? This lesson shows the simple recipe they follow every time.\n\n## Build\n\nFirst, a key word: **combinational** logic means the output depends *only* on the inputs you give it *right now*. There is **no memory** of the past. Press the same buttons and you always get the same answer, instantly. (Later you will meet *sequential* logic, which does remember.)\n\nThink of a vending machine's coin checker: given the coins in the slot right now, it decides yes or no. It does not care what happened yesterday. That is combinational behavior.\n\nThe design recipe has three steps:\n\n1. **Spec** - write down, in plain words, what the circuit must do. Example: \"Turn on the alarm if a door is open AND the system is armed.\"\n2. **Truth table** - list every possible combination of inputs and the output you want for each. A circuit with $n$ inputs has $2^n$ rows.\n3. **Logic / gates** - read the table and build gates that produce those outputs. Often we simplify first so we use fewer gates.\n\nA **truth table** is just a complete list: every input pattern on the left, the desired output on the right. Because it covers *all* cases, it is the honest, complete description of any combinational circuit.\n\nFrom these gates we build reusable **building blocks** that do useful jobs: a *multiplexer* (a selectable switch), a *decoder* (turns a code into one active line), an *adder* (adds numbers), and an *ALU* (the calculator inside a CPU). The rest of this sub-topic builds them up one at a time.\n\n## Recap\n\nCombinational logic has no memory: output depends only on present inputs. The flow is always spec, then truth table, then gates. Master this recipe and every block ahead is just a bigger example of it.",
           "items": [
             {
-              "id": "combinational-blocks-l1-img-mux",
-              "type": "flashcard",
-              "front": "2:1 multiplexer symbol and equation",
-              "back": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/combinational-blocks-2.svg"
-            },
-            {
-              "id": "combinational-blocks-l1-fc-mux-eq",
-              "type": "flashcard",
-              "front": "Write the Boolean equation for a 2:1 multiplexer with inputs $I_0$, $I_1$ and select $S$.",
-              "back": "$Y = \\overline{S}\\,I_0 + S\\,I_1$. When $S=0$ the output follows $I_0$; when $S=1$ it follows $I_1$.",
-              "hint": "Select line and its complement gate the two data inputs."
-            },
-            {
-              "id": "combinational-blocks-l1-fc-mux-universal",
-              "type": "flashcard",
-              "front": "Why is an $n$-select multiplexer called a universal logic element?",
-              "back": "A $2^n$:1 mux with the input variables driving its select lines can realize ANY $n$-variable function: tie each data input to that minterm's truth-table value (0 or 1). Each select code picks the right row.",
-              "hint": "Think about what the data inputs represent relative to a truth table."
-            },
-            {
-              "id": "combinational-blocks-l1-fc-decoder",
-              "type": "flashcard",
-              "front": "What does an $n$-to-$2^n$ decoder output, and why is it a natural SOP generator?",
-              "back": "It asserts exactly one of its $2^n$ outputs — the one matching the input code. Each output line is one minterm, so ORing selected outputs builds any sum-of-products function directly.",
-              "hint": "One-hot output, one line per input combination."
-            },
-            {
-              "id": "combinational-blocks-l1-fc-priority",
-              "type": "flashcard",
-              "front": "How does a priority encoder differ from a plain encoder?",
-              "back": "A plain encoder produces wrong output if more than one input is active. A priority encoder outputs the binary code of the HIGHEST-priority active input and adds a 'valid'/'any' output. Used in interrupt controllers.",
-              "hint": "What happens when two inputs are high at once?"
-            },
-            {
-              "id": "combinational-blocks-l1-fc-demux",
-              "type": "flashcard",
-              "front": "Contrast a demultiplexer with a decoder.",
-              "back": "A demux routes a single data input to one of $2^n$ outputs chosen by the select lines. A decoder with an enable input IS a demux — feed data into the enable and the address into the select lines.",
-              "hint": "They share hardware; the difference is which line carries 'data'."
-            },
-            {
-              "id": "combinational-blocks-l1-mcq-shannon",
+              "id": "combinational-blocks-l1-img-flow",
               "type": "mcq",
-              "prompt": "You want to implement a 4-variable function using a single 8:1 mux (3 select lines). What goes on the data inputs?",
+              "prompt": "A circuit has 3 inputs. How many rows does its complete truth table have?",
               "choices": [
-                "Constant 0 or 1 for every input",
-                "The fourth variable, its complement, 0, or 1 as determined by Shannon expansion",
-                "All four variables on the data inputs and constants on select",
-                "It is impossible; you need a 16:1 mux"
-              ],
-              "answerIndex": 1,
-              "explanation": "With 3 variables on the select lines, the residue function of the 4th variable on each data line is one of {0, 1, $x_4$, $\\overline{x_4}$}. This Shannon-expansion trick halves the needed mux size."
-            },
-            {
-              "id": "combinational-blocks-l1-mcq-hdl",
-              "type": "mcq",
-              "prompt": "In HDL, which construct most directly synthesizes into a multiplexer?",
-              "choices": [
-                "A `case` statement selecting an output by a control signal",
-                "An `always @(posedge clk)` block",
-                "A continuous `assign` of a constant",
-                "A module port declaration"
-              ],
-              "answerIndex": 0,
-              "explanation": "`if`/`case`/ternary expressions that choose among values based on a control signal map directly to muxes — the single most common structure inferred by synthesis. A clocked block infers flip-flops instead."
-            },
-            {
-              "id": "combinational-blocks-l1-mcq-encoder-out",
-              "type": "mcq",
-              "prompt": "An 8-to-3 priority encoder has inputs $D_5$ and $D_2$ both asserted (priority increases with index). What is the 3-bit output?",
-              "choices": [
-                "010 (2)",
-                "111 (7)",
-                "101 (5)",
-                "000 (0)"
+                "3 rows",
+                "6 rows",
+                "8 rows",
+                "9 rows"
               ],
               "answerIndex": 2,
-              "explanation": "The highest-index active input wins. $D_5$ outranks $D_2$, so the output is binary 101 = 5, with the valid bit set."
+              "explanation": "A truth table lists every combination of inputs. With n inputs there are 2^n combinations, and 2^3 = 8. It is 8, not 3 (that is just the input count) and not 9 (that would be 3 squared, which is not how combinations grow)."
+            },
+            {
+              "id": "combinational-blocks-l1-mcq-meaning",
+              "type": "mcq",
+              "prompt": "What does it mean that a circuit is 'combinational'?",
+              "choices": [
+                "Its output depends only on the inputs present right now, with no memory of the past",
+                "It combines several clock signals together",
+                "Its output depends on past inputs as well as present ones",
+                "It can only use AND and OR gates"
+              ],
+              "answerIndex": 0,
+              "explanation": "Combinational means memoryless: the same inputs always give the same output, immediately. A circuit that remembers past inputs is sequential, not combinational. The word has nothing to do with clocks or with which gates are allowed."
+            },
+            {
+              "id": "combinational-blocks-l1-mcq-steps",
+              "type": "mcq",
+              "prompt": "What is the correct order of the standard design flow?",
+              "choices": [
+                "Gates, then truth table, then spec",
+                "Spec, then truth table, then logic/gates",
+                "Truth table, then spec, then gates",
+                "Spec, then gates, then truth table"
+              ],
+              "answerIndex": 1,
+              "explanation": "You first state what the circuit must do (spec), then list the desired output for every input pattern (truth table), then build the gates. Starting from gates would be guessing; the spec must come first."
+            },
+            {
+              "id": "combinational-blocks-l1-mcq-truthtable",
+              "type": "mcq",
+              "prompt": "Why is a truth table considered a complete description of a combinational circuit?",
+              "choices": [
+                "It uses the fewest possible gates",
+                "It lists the output for every possible input combination, leaving nothing out",
+                "It shows how the circuit changes over time",
+                "It only lists the cases where the output is 1"
+              ],
+              "answerIndex": 1,
+              "explanation": "Because it covers all 2^n input patterns, the truth table specifies the output in every case, so nothing is undefined. It says nothing about gate count, and it is not about time (that would be sequential logic)."
+            },
+            {
+              "id": "combinational-blocks-l1-mcq-vending",
+              "type": "mcq",
+              "prompt": "A coin checker outputs 'accept' based only on the coins inserted right now. Which kind of logic is this?",
+              "choices": [
+                "Sequential, because money is involved",
+                "Combinational, because the output depends only on the present inputs",
+                "Neither - it is analog",
+                "Sequential, because it must remember previous coins"
+              ],
+              "answerIndex": 1,
+              "explanation": "If the decision uses only the inputs present at this moment and nothing remembered, it is combinational. A checker that summed coins across multiple insertions would need memory, making that part sequential."
+            },
+            {
+              "id": "combinational-blocks-l1-mcq-why-simplify",
+              "type": "mcq",
+              "prompt": "Why do engineers usually simplify the logic before building the gates?",
+              "choices": [
+                "To use fewer gates, saving space, cost, and delay",
+                "To change what the circuit does",
+                "Because simplified logic is always sequential",
+                "To add more inputs to the circuit"
+              ],
+              "answerIndex": 0,
+              "explanation": "Simplification keeps the same truth table (same behavior) but reaches it with fewer gates, which costs less and is often faster. It must never change what the circuit does; if it did, it would be wrong."
+            },
+            {
+              "id": "combinational-blocks-l1-mcq-alarm",
+              "type": "mcq",
+              "prompt": "Spec: 'Sound the alarm only when the door is open AND the system is armed.' Which single gate matches this?",
+              "choices": [
+                "An OR gate fed by 'door open' and 'armed'",
+                "An AND gate fed by 'door open' and 'armed'",
+                "A NOT gate on 'armed'",
+                "An XOR gate fed by 'door open' and 'armed'"
+              ],
+              "answerIndex": 1,
+              "explanation": "'Both conditions true' is exactly the job of an AND gate. OR would also fire on just one condition; XOR would fire only when the two conditions differ, neither of which matches the spec."
+            },
+            {
+              "id": "combinational-blocks-l1-mcq-blocks",
+              "type": "mcq",
+              "prompt": "In this sub-topic, what is a 'building block' like a multiplexer or adder?",
+              "choices": [
+                "A type of memory cell that stores one bit",
+                "A reusable circuit, made from gates, that performs a useful job",
+                "A single transistor",
+                "A clock generator"
+              ],
+              "answerIndex": 1,
+              "explanation": "Building blocks are reusable combinational circuits assembled from basic gates to do a common task (select an input, add numbers, etc.). They are not memory cells, single transistors, or clocks."
+            },
+            {
+              "id": "combinational-blocks-l1-mcq-rows-2in",
+              "type": "mcq",
+              "prompt": "How many input combinations must you check for a circuit with 4 inputs?",
+              "choices": [
+                "4",
+                "8",
+                "16",
+                "32"
+              ],
+              "answerIndex": 2,
+              "explanation": "Every input can be 0 or 1, so n inputs give 2^n combinations. For 4 inputs that is 2^4 = 16. The count doubles each time you add an input."
             }
           ]
         },
         {
-          "id": "combinational-blocks-combinational-blocks-l2-compare-parity",
-          "title": "Comparators, Parity & Code Converters",
+          "id": "combinational-blocks-combinational-blocks-l2-selectors",
+          "title": "Selectors: Multiplexers, Demuxes, Decoders & Encoders",
           "order": 2,
           "difficulty": 1,
-          "content": "Beyond routing, combinational logic answers questions about data. A **comparator** evaluates two operands. Equality is the simplest: bitwise XNOR each pair and AND the results.\n\n$$\\text{EQ} = \\prod_{i=0}^{n-1}\\overline{(A_i \\oplus B_i)}$$\n\n**Magnitude** comparison ($A>B$, $A=B$, $A<B$) is built MSB-first: compare the top bits; only descend to lower bits where the higher bits are equal. Cascadable comparators (e.g. 74x85) chain this across bytes.\n\n**Parity** is pure XOR. An even-parity generator outputs $P = D_0 \\oplus D_1 \\oplus \\cdots \\oplus D_{n-1}$, appended so the total number of 1s is even. A checker XORs all received bits (including the parity bit); a nonzero result flags an odd number of bit errors. As a radar tech you met this on telemetry links — single-bit error *detection*, no correction, and it misses even-count errors. Modern links extend the idea to CRC (an XOR/shift structure) and Hamming/ECC codes.\n\n**Code converters** are just functions tabulated and minimized. Two recur constantly:\n- **Binary ↔ Gray**: to Gray, $G_i = B_{i+1} \\oplus B_i$ with $G_{\\text{MSB}} = B_{\\text{MSB}}$ (one XOR per bit). Gray's single-bit-change property prevents decoding glitches in encoders and is essential for clock-domain crossing.\n- **Binary → BCD** (e.g. double-dabble) and the **7-segment decoder**, a classic 4-input/7-output truth-table-to-logic exercise that drives displays.\n\nAll of these are memoryless functions: derive the truth table, minimize (next lesson's K-maps help), done.",
+          "content": "## Hook\n\nImagine a TV with several inputs - HDMI 1, HDMI 2, an old game console - and one screen. A little switch inside picks which source reaches the screen. That switch is a **multiplexer**, one of the most-used building blocks in all of digital design.\n\n## Build\n\nA **multiplexer** (mux) is a selectable switch. It has several **data inputs**, a single **output**, and some **select lines** that choose which input gets connected to the output. With $n$ select lines you can choose among $2^n$ inputs. A 4:1 mux has 2 select lines and picks one of 4 inputs; the 2-bit select code (like a channel number) names the chosen input.\n\nEveryday hooks: a mux is a TV input selector, or a railroad switch that routes one train onto one track. The simplest mux is the 2:1: when the select is 0 the output follows input 0; when select is 1 it follows input 1.\n\nThere is a neat bonus: a mux can act as a **universal logic element**. If you put your variables on the select lines and wire each data input to the 0 or 1 you want for that row of the truth table, the mux reproduces *any* function you like. Each select code simply looks up one row.\n\nA **demultiplexer** (demux) is the mux run backwards: one input, many outputs, and the select lines decide which single output the input is routed to. Think of one delivery truck (the input) and a switch that sends it down one of several streets.\n\nA **decoder** turns a binary code into exactly one active output line. A 2-to-4 decoder takes a 2-bit code and raises exactly one of its 4 outputs (the rest stay 0). Everyday hook: a room number chooses which one room's light turns on. Because each output marks one specific input code, a decoder is a handy way to detect any pattern.\n\nAn **encoder** does the reverse: given one active input line, it outputs the binary code for that line. But a plain encoder breaks if two inputs are active at once. A **priority encoder** fixes this: it outputs the code of the *highest-priority* active input and ignores the lower ones, so there is always a clear answer.\n\n## Recap\n\nMux = selectable switch (many in, one out). Demux = one in, many out. Decoder = code in, one line out. Encoder = one line in, code out; the priority version handles ties.",
           "items": [
             {
-              "id": "combinational-blocks-l2-fc-eq",
-              "type": "flashcard",
-              "front": "How do you build an $n$-bit equality comparator from gates?",
-              "back": "XNOR each bit pair ($A_i \\odot B_i$ is true when bits match), then AND all the XNOR outputs: $\\text{EQ} = \\prod_i \\overline{(A_i \\oplus B_i)}$. Any mismatch forces EQ low.",
-              "hint": "XNOR detects 'bits are equal'."
-            },
-            {
-              "id": "combinational-blocks-l2-fc-magnitude",
-              "type": "flashcard",
-              "front": "What ordering does a magnitude comparator use to decide $A>B$?",
-              "back": "MSB-first. Compare the most significant bits; the operand with a 1 where the other has 0 (at the highest differing position) is larger. Lower bits only matter where all higher bits are equal.",
-              "hint": "Same way you compare multi-digit decimal numbers."
-            },
-            {
-              "id": "combinational-blocks-l2-fc-parity-gen",
-              "type": "flashcard",
-              "front": "Write the even-parity bit for data $D_0 \\ldots D_{n-1}$ and state what a checker computes.",
-              "back": "$P = D_0 \\oplus D_1 \\oplus \\cdots \\oplus D_{n-1}$ (XOR of all data bits). The checker XORs all received bits including $P$; a result of 1 means an odd number of bits flipped (error detected).",
-              "hint": "Parity is just a big XOR tree."
-            },
-            {
-              "id": "combinational-blocks-l2-fc-parity-limit",
-              "type": "flashcard",
-              "front": "What is the fundamental limitation of single-bit parity?",
-              "back": "It detects only an ODD number of bit errors and cannot correct any. Two flipped bits (or any even count) pass undetected. Stronger schemes (CRC, Hamming/ECC) are needed for detection of bursts or for correction.",
-              "hint": "Think about what happens with two simultaneous errors."
-            },
-            {
-              "id": "combinational-blocks-l2-fc-gray",
-              "type": "flashcard",
-              "front": "Give the binary-to-Gray conversion formula and why Gray code matters here.",
-              "back": "$G_{\\text{MSB}} = B_{\\text{MSB}}$, and $G_i = B_{i+1} \\oplus B_i$ for lower bits. Successive Gray codes differ by exactly one bit, eliminating decode glitches in shaft/position encoders and enabling safe clock-domain crossing.",
-              "hint": "One XOR per bit, top bit unchanged."
-            },
-            {
-              "id": "combinational-blocks-l2-mcq-gray-convert",
+              "id": "combinational-blocks-l2-img-mux4",
               "type": "mcq",
-              "prompt": "Convert binary 1011 to Gray code.",
+              "prompt": "A 4:1 multiplexer has its select lines set to S1S0 = 10 (binary for 2). Which input appears at the output?",
               "choices": [
-                "1110",
-                "1101",
-                "1011",
-                "1100"
-              ],
-              "answerIndex": 0,
-              "explanation": "MSB stays: G3=1. G2=B3⊕B2=1⊕0=1. G1=B2⊕B1=0⊕1=1. G0=B1⊕B0=1⊕1=0. Result 1110."
-            },
-            {
-              "id": "combinational-blocks-l2-mcq-7seg",
-              "type": "mcq",
-              "prompt": "A 7-segment decoder is best characterized as which kind of circuit?",
-              "choices": [
-                "A sequential circuit requiring a clock",
-                "A combinational truth-table mapping 4 input bits to 7 output segments",
-                "A priority encoder",
-                "A tri-state bus driver"
-              ],
-              "answerIndex": 1,
-              "explanation": "It is purely combinational: 4 input lines (a BCD/hex digit) map to 7 segment-drive outputs via a fixed truth table that you minimize per segment. No state, no clock."
-            },
-            {
-              "id": "combinational-blocks-l2-mcq-parity-errors",
-              "type": "mcq",
-              "prompt": "A byte protected by even parity arrives with two bits flipped during transmission. What does the parity checker report?",
-              "choices": [
-                "It corrects both errors",
-                "It flags an error and identifies the bad bits",
-                "No error — the errors go undetected",
-                "It always reports a framing error"
+                "I0",
+                "I1",
+                "I2",
+                "I3"
               ],
               "answerIndex": 2,
-              "explanation": "Two flips keep the total number of 1s the same parity, so the checker computes 0 (no error). Even-count errors are invisible to single-bit parity — its core weakness."
+              "explanation": "The select code is a number naming the chosen input. Binary 10 equals 2, so input I2 is connected to the output. Reading the code as anything other than its binary value is the common mistake here.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/combinational-blocks-3.svg"
+            },
+            {
+              "id": "combinational-blocks-l2-img-mux2",
+              "type": "mcq",
+              "prompt": "In a 2:1 multiplexer, what appears at output Y when the select line S = 0?",
+              "choices": [
+                "Input I0",
+                "Input I1",
+                "Always 0",
+                "Always 1"
+              ],
+              "answerIndex": 0,
+              "explanation": "When S = 0 the mux connects data input I0 to the output; when S = 1 it connects I1. The output is not a fixed constant - it follows whichever input the select line chooses.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/combinational-blocks-2.svg"
+            },
+            {
+              "id": "combinational-blocks-l2-mcq-selectcount",
+              "type": "mcq",
+              "prompt": "How many select lines does an 8:1 multiplexer need?",
+              "choices": [
+                "2",
+                "3",
+                "4",
+                "8"
+              ],
+              "answerIndex": 1,
+              "explanation": "To choose among 8 inputs you need a code that can count to 8, and 2^3 = 8, so 3 select lines. Two lines would only pick among 4 inputs; eight lines is far more than needed."
+            },
+            {
+              "id": "combinational-blocks-l2-mcq-muxjob",
+              "type": "mcq",
+              "prompt": "In one phrase, what does a multiplexer do?",
+              "choices": [
+                "Adds several numbers together",
+                "Picks one of several inputs and sends it to a single output",
+                "Stores a bit until the next clock",
+                "Splits one input across many outputs"
+              ],
+              "answerIndex": 1,
+              "explanation": "A mux is a selectable switch: many inputs in, one chosen input out, controlled by the select lines. Splitting one input to many outputs is the opposite device, the demultiplexer."
+            },
+            {
+              "id": "combinational-blocks-l2-mcq-demux",
+              "type": "mcq",
+              "prompt": "How does a demultiplexer differ from a multiplexer?",
+              "choices": [
+                "It has one input and routes it to one of many outputs",
+                "It has no select lines",
+                "It adds binary numbers",
+                "It is exactly the same circuit"
+              ],
+              "answerIndex": 0,
+              "explanation": "A demux reverses the mux: a single data input is steered to one chosen output. Both use select lines; the difference is direction (one-to-many versus many-to-one)."
+            },
+            {
+              "id": "combinational-blocks-l2-img-decoder",
+              "type": "mcq",
+              "prompt": "A 2-to-4 decoder receives the input code A1A0 = 10. What do its four outputs Y0..Y3 look like?",
+              "choices": [
+                "All four outputs are 1",
+                "Only Y2 is 1; Y0, Y1, Y3 are 0",
+                "Only Y0 is 1; the rest are 0",
+                "All four outputs are 0"
+              ],
+              "answerIndex": 1,
+              "explanation": "A decoder raises exactly one output - the one matching the input code. Code 10 is binary 2, so Y2 goes high and the others stay low. A decoder never raises more than one line at a time.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/combinational-blocks-4.svg"
+            },
+            {
+              "id": "combinational-blocks-l2-mcq-decoderoutputs",
+              "type": "mcq",
+              "prompt": "How many outputs does a 3-to-8 decoder have, and how many are active at once?",
+              "choices": [
+                "3 outputs, all active",
+                "8 outputs, exactly one active",
+                "8 outputs, all active",
+                "3 outputs, exactly one active"
+              ],
+              "answerIndex": 1,
+              "explanation": "An n-to-2^n decoder turns an n-bit code into 2^n output lines and activates exactly the one matching the code. For n = 3 that is 8 outputs with a single one high."
+            },
+            {
+              "id": "combinational-blocks-l2-mcq-universal",
+              "type": "mcq",
+              "prompt": "How can a multiplexer act as a 'universal' logic element that builds any function?",
+              "choices": [
+                "By putting the variables on the select lines and wiring each data input to the 0 or 1 wanted for that truth-table row",
+                "By removing all of its select lines",
+                "Only if every data input is tied to 1",
+                "It cannot - a mux can only copy one input"
+              ],
+              "answerIndex": 0,
+              "explanation": "Drive the select lines with your input variables; each select code then picks one data input. Set each data input to the output value that row of the truth table needs, and the mux reproduces any function. Tying all inputs to 1 would just output a constant 1."
+            },
+            {
+              "id": "combinational-blocks-l2-mcq-encoder",
+              "type": "mcq",
+              "prompt": "What does an encoder do, and what problem does a priority encoder solve?",
+              "choices": [
+                "It activates one output from a code; priority versions run faster",
+                "It outputs the binary code of an active input line; the priority version resolves the case where two inputs are active by choosing the highest-priority one",
+                "It adds two numbers; the priority version handles carries",
+                "It stores data; the priority version stores more"
+              ],
+              "answerIndex": 1,
+              "explanation": "An encoder is the reverse of a decoder: given an active input line it outputs that line's binary code. If two inputs are active a plain encoder gives a wrong answer; a priority encoder picks the highest-priority active input so the output is always well defined."
+            },
+            {
+              "id": "combinational-blocks-l2-mcq-priority-out",
+              "type": "mcq",
+              "prompt": "In an 8-to-3 priority encoder (higher index = higher priority), inputs D5 and D2 are both active. What 3-bit code does it output?",
+              "choices": [
+                "010 (for D2)",
+                "101 (for D5)",
+                "111",
+                "000"
+              ],
+              "answerIndex": 1,
+              "explanation": "The highest-priority active input wins. D5 outranks D2, so the output is the binary code for 5, which is 101. A plain encoder would garble the result; the priority rule is what makes the answer clean."
             }
           ]
         },
         {
-          "id": "combinational-blocks-combinational-blocks-l3-adders",
-          "title": "Adders: Half, Full, Ripple-Carry & Carry-Lookahead",
+          "id": "combinational-blocks-combinational-blocks-l3-compare-parity",
+          "title": "Comparators, Parity & Code Converters",
           "order": 3,
           "difficulty": 2,
-          "content": "Arithmetic is the heart of the datapath. A **half-adder** adds two bits:\n\n$$S = A \\oplus B, \\qquad C_{\\text{out}} = A \\cdot B$$\n\nIt can't accept a carry-in, so it's only useful for the LSB. A **full-adder** adds three bits ($A$, $B$, $C_{\\text{in}}$):\n\n$$S = A \\oplus B \\oplus C_{\\text{in}}, \\qquad C_{\\text{out}} = AB + C_{\\text{in}}(A \\oplus B)$$\n\nChain $n$ full-adders, carry-out to carry-in, and you get a **ripple-carry adder (RCA)**. It's tiny and regular, but slow: the carry must propagate through every stage, so worst-case delay grows **linearly**, $t \\approx n \\cdot t_{\\text{FA}}$ — the classic critical path.\n\n**Carry-lookahead (CLA)** breaks this. Define per-bit **generate** and **propagate**:\n\n$$G_i = A_i B_i, \\qquad P_i = A_i \\oplus B_i$$\n\nThen $C_{i+1} = G_i + P_i C_i$, which unrolls into a flat expression — e.g.\n\n$$C_1 = G_0 + P_0 C_0, \\quad C_2 = G_1 + P_1 G_0 + P_1 P_0 C_0$$\n\nAll carries compute in parallel from $C_0$, giving roughly **logarithmic** delay at the cost of more gates and fan-in. **Carry-select** adders take a different tack: compute each block twice (assuming carry-in 0 and 1) and mux the right answer once the real carry arrives — trading area for speed. **Subtraction** reuses the adder: $A - B = A + \\overline{B} + 1$, forcing $C_0 = 1$ and inverting $B$ (two's complement). Multipliers are arrays of adders (array/Wallace-tree); these become the MAC units that dominate FPGA DSP and radar pulse compression.",
+          "content": "## Hook\n\nNot every circuit moves data around - some *judge* it. Is this number equal to that one? Is it bigger? Did this message arrive without a typo? These everyday questions map onto small combinational blocks.\n\n## Build\n\nA **comparator** compares two binary numbers. The simplest is an **equality** comparator: it answers 'are A and B the same?' The trick is to compare bit by bit. An **XNOR** gate outputs 1 only when its two inputs match, so XNOR each pair of bits and AND all the results together. If every pair matches, the AND outputs 1 (equal); a single mismatch pulls it to 0.\n\nA **magnitude** comparator answers 'is A greater than, equal to, or less than B?' It works the way you compare multi-digit decimal numbers: start at the **most significant bit** (the leftmost, highest-value bit). Whoever has a 1 where the other has a 0 at the highest differing position is larger. You only look at lower bits when the higher bits tie.\n\n**Parity** is a cheap way to catch errors when data is sent over a wire. A **parity bit** is one extra bit added so the total number of 1s comes out even (for 'even parity'). To make it, XOR all the data bits together. At the far end, a checker XORs everything again; if the count of 1s is no longer even, a bit got flipped. The catch: simple parity only catches an **odd** number of flipped bits. If *two* bits flip, the count stays even and the error slips through. It also cannot fix errors, only flag them.\n\n**Code converters** translate one binary code into another - just a function you tabulate and build. A common one is **binary to Gray code**: Gray code is arranged so that neighbors differ by exactly one bit. That single-bit-change property prevents glitches in position sensors and is why Gray code shows up in encoders. Another familiar converter is the **7-segment decoder**, which takes a 4-bit digit and lights the right segments on a numeric display - a pure truth-table-to-gates job.\n\n## Recap\n\nComparators judge equality (XNOR + AND) or magnitude (most-significant bit first). Parity is a one-bit error *detector* (XOR everything) that misses even-count errors. Code converters re-map one code to another, like binary-to-Gray or the 7-segment display decoder.",
           "items": [
             {
-              "id": "combinational-blocks-l3-img-fa",
-              "type": "flashcard",
-              "front": "Full-adder gate diagram",
-              "back": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/combinational-blocks-1.svg"
-            },
-            {
-              "id": "combinational-blocks-l3-fc-halfadder",
-              "type": "flashcard",
-              "front": "Give the sum and carry equations for a half-adder and state its limitation.",
-              "back": "$S = A \\oplus B$, $C_{\\text{out}} = A \\cdot B$. Limitation: it has no carry-in, so it can only be used at the least-significant bit position of a multi-bit adder.",
-              "hint": "XOR for sum, AND for carry; what's missing as an input?"
-            },
-            {
-              "id": "combinational-blocks-l3-fc-fulladder",
-              "type": "flashcard",
-              "front": "Write the full-adder sum and carry-out equations.",
-              "back": "$S = A \\oplus B \\oplus C_{\\text{in}}$ and $C_{\\text{out}} = AB + C_{\\text{in}}(A \\oplus B)$ (equivalently $AB + AC_{\\text{in}} + BC_{\\text{in}}$, the majority function).",
-              "hint": "Sum is three-way XOR; carry is majority-of-three."
-            },
-            {
-              "id": "combinational-blocks-l3-fc-ripple-delay",
-              "type": "flashcard",
-              "front": "Why is a ripple-carry adder slow, and how does its delay scale with width $n$?",
-              "back": "Each stage's carry-out depends on the previous stage's carry, so the carry ripples serially through all stages. Worst-case delay is linear: $t \\approx n \\cdot t_{\\text{FA}}$. This carry chain is the critical path.",
-              "hint": "Follow the carry from LSB to MSB."
-            },
-            {
-              "id": "combinational-blocks-l3-fc-gp",
-              "type": "flashcard",
-              "front": "Define the generate and propagate signals used in carry-lookahead.",
-              "back": "$G_i = A_i B_i$ (the bit generates a carry regardless of carry-in) and $P_i = A_i \\oplus B_i$ (the bit propagates an incoming carry). Then $C_{i+1} = G_i + P_i C_i$.",
-              "hint": "One ANDs the inputs, the other XORs them."
-            },
-            {
-              "id": "combinational-blocks-l3-fc-subtract",
-              "type": "flashcard",
-              "front": "How is two's-complement subtraction $A-B$ done with an adder?",
-              "back": "Compute $A + \\overline{B} + 1$: invert every bit of $B$ and force the carry-in $C_0 = 1$. A single XOR row controlled by a 'sub' line lets one adder do both add and subtract.",
-              "hint": "Negation = invert + add one."
-            },
-            {
-              "id": "combinational-blocks-l3-mcq-cla-delay",
+              "id": "combinational-blocks-l3-mcq-xnor",
               "type": "mcq",
-              "prompt": "Compared to ripple-carry, carry-lookahead primarily improves which metric, and at what cost?",
+              "prompt": "Which gate outputs 1 exactly when its two inputs are equal, making it the heart of an equality comparator?",
               "choices": [
-                "Reduces gate count at the cost of speed",
-                "Reduces carry-propagation delay (toward logarithmic) at the cost of more gates and higher fan-in",
-                "Eliminates the need for full-adders",
-                "Removes all combinational hazards"
+                "XOR",
+                "XNOR",
+                "NAND",
+                "OR"
               ],
               "answerIndex": 1,
-              "explanation": "CLA computes all carries in parallel from the generate/propagate terms, cutting the linear ripple delay toward logarithmic. The price is more logic and larger fan-in, which is why deep CLAs are built hierarchically in blocks."
+              "explanation": "XNOR outputs 1 when both inputs match (0,0 or 1,1) and 0 when they differ - exactly 'are these bits equal?'. XOR is the opposite (1 when they differ), so it is the wrong choice for detecting equality."
             },
             {
-              "id": "combinational-blocks-l3-mcq-c2",
+              "id": "combinational-blocks-l3-mcq-equality-build",
               "type": "mcq",
-              "prompt": "Using $C_{i+1}=G_i+P_iC_i$, which expression correctly expands $C_2$ in terms of $C_0$?",
+              "prompt": "To check whether two 4-bit numbers are equal, you XNOR each bit pair. What do you do with the four XNOR outputs?",
               "choices": [
-                "$C_2 = G_1 + G_0 + C_0$",
-                "$C_2 = G_1 P_1 + P_0 C_0$",
-                "$C_2 = G_1 + P_1 G_0 + P_1 P_0 C_0$",
-                "$C_2 = P_1 G_1 + G_0 C_0$"
+                "OR them together",
+                "AND them together",
+                "XOR them together",
+                "Add them as numbers"
+              ],
+              "answerIndex": 1,
+              "explanation": "The numbers are equal only if every bit pair matches, i.e. all four XNORs are 1. AND requires all inputs to be 1, so it gives 1 only on full equality. OR would report 'equal' even if just one pair happened to match."
+            },
+            {
+              "id": "combinational-blocks-l3-mcq-magnitude",
+              "type": "mcq",
+              "prompt": "When comparing the magnitude of two binary numbers, where do you start?",
+              "choices": [
+                "At the least significant (rightmost) bit",
+                "At the most significant (leftmost) bit",
+                "At a randomly chosen bit",
+                "In the middle and work outward"
+              ],
+              "answerIndex": 1,
+              "explanation": "The most significant bit carries the most weight, just like the leftmost digit of a decimal number. The first position where the numbers differ, read from the top, decides which is larger. Starting from the right can give the wrong answer."
+            },
+            {
+              "id": "combinational-blocks-l3-mcq-parity-make",
+              "type": "mcq",
+              "prompt": "How do you compute an even-parity bit for a set of data bits?",
+              "choices": [
+                "AND all the data bits",
+                "XOR all the data bits together",
+                "Count the bits and divide by two",
+                "Take the most significant bit"
+              ],
+              "answerIndex": 1,
+              "explanation": "XORing all the bits gives 1 when there is an odd number of 1s. Appending that XOR result makes the overall count of 1s even - that is the even-parity bit. AND or a single bit would not track the count of 1s."
+            },
+            {
+              "id": "combinational-blocks-l3-mcq-parity-limit",
+              "type": "mcq",
+              "prompt": "A byte protected by even parity arrives with TWO bits flipped. What does the parity checker report?",
+              "choices": [
+                "It detects and corrects both errors",
+                "It detects the error and names the bad bits",
+                "It reports no error - the two flips cancel out in the parity count",
+                "It always reports a hardware fault"
               ],
               "answerIndex": 2,
-              "explanation": "Substitute $C_1 = G_0 + P_0 C_0$ into $C_2 = G_1 + P_1 C_1$: $C_2 = G_1 + P_1(G_0 + P_0 C_0) = G_1 + P_1 G_0 + P_1 P_0 C_0$. This flat form lets $C_2$ form without waiting on $C_1$."
+              "explanation": "Two flips change the count of 1s by an even amount, so the parity stays correct and the checker sees nothing wrong. Simple parity only catches an odd number of flips and can never correct errors - that is its core weakness."
             },
             {
-              "id": "combinational-blocks-l3-mcq-carryselect",
+              "id": "combinational-blocks-l3-mcq-parity-detect",
               "type": "mcq",
-              "prompt": "How does a carry-select adder gain speed?",
+              "prompt": "What can single-bit parity actually do for you?",
               "choices": [
-                "It computes each block twice (for carry-in 0 and 1) and muxes the correct result once the real carry arrives",
-                "It removes the carry chain entirely",
-                "It uses sequential logic clocked at a higher frequency",
-                "It replaces full-adders with half-adders"
+                "Correct any single-bit error automatically",
+                "Detect that an odd number of bits flipped, but not fix it",
+                "Detect and correct any number of errors",
+                "Encrypt the data"
+              ],
+              "answerIndex": 1,
+              "explanation": "Parity is detection only, and only for an odd number of flipped bits. It tells you something is wrong but cannot say which bit or repair it. Correction needs stronger schemes like Hamming codes."
+            },
+            {
+              "id": "combinational-blocks-l3-mcq-gray",
+              "type": "mcq",
+              "prompt": "What is special about Gray code that makes it useful in position sensors?",
+              "choices": [
+                "Each value uses fewer bits than binary",
+                "Consecutive values differ by exactly one bit, avoiding glitches during transitions",
+                "It can store negative numbers",
+                "It is faster to add than binary"
+              ],
+              "answerIndex": 1,
+              "explanation": "Because neighbors differ in only one bit, moving from one value to the next never has several bits changing at slightly different times, so no false in-between codes appear. It uses the same number of bits as binary and is not about arithmetic speed."
+            },
+            {
+              "id": "combinational-blocks-l3-mcq-7seg",
+              "type": "mcq",
+              "prompt": "A 7-segment decoder is best described as which kind of circuit?",
+              "choices": [
+                "A combinational circuit that maps a 4-bit digit to 7 segment-on/off outputs",
+                "A memory that stores the displayed digit",
+                "A clocked counter",
+                "A priority encoder"
               ],
               "answerIndex": 0,
-              "explanation": "Each block is duplicated and precomputes both possible carry-in cases in parallel; a fast mux then selects the right sum when the incoming carry is known. It trades area (two adders per block plus a mux) for reduced latency."
+              "explanation": "It is pure combinational logic: 4 input bits (a digit) map through a fixed truth table to 7 outputs that turn the display's segments on or off. There is no stored state and no clock involved."
+            },
+            {
+              "id": "combinational-blocks-l3-mcq-converter",
+              "type": "mcq",
+              "prompt": "At its core, what is any code converter (like binary-to-Gray)?",
+              "choices": [
+                "A circuit that needs a clock to step through codes",
+                "A combinational function you can write as a truth table and build from gates",
+                "A type of memory chip",
+                "An analog amplifier"
+              ],
+              "answerIndex": 1,
+              "explanation": "A converter just maps each input code to a fixed output code, which is exactly a truth table turned into gates - combinational logic. No clock or memory is required."
             }
           ]
         },
         {
-          "id": "combinational-blocks-combinational-blocks-l4-alu-hazards",
-          "title": "The ALU, Flags & Combinational Hazards",
+          "id": "combinational-blocks-combinational-blocks-l4-adders",
+          "title": "Adders: Half, Full, Ripple-Carry & a Faster Idea",
           "order": 4,
-          "difficulty": 3,
-          "content": "An **ALU** fuses the building blocks into one programmable datapath element: a **function-select** input picks among add, subtract, AND, OR, XOR, and shift. A clean structure is a 1-bit **ALU slice** — a full-adder plus logic gates plus an output mux — replicated and chained via the carry to form an $n$-bit ALU. This is the literal heart of every CPU you'll meet in the embedded module.\n\nThe ALU also produces **condition flags**:\n- **Z (Zero):** result is all zeros, $Z = \\overline{R_{n-1} + \\cdots + R_0}$ (NOR of result bits).\n- **N (Negative):** sign bit of the result, $N = R_{n-1}$ (two's-complement MSB).\n- **C (Carry):** carry-out of the MSB — the *unsigned* overflow / borrow indicator.\n- **V (Overflow):** *signed* overflow, $V = C_{n-1} \\oplus C_{n}$ (carry into vs out of the MSB differ), or equivalently when two like-signed operands produce an opposite-signed result.\n\nThe classic rust-knocker: **C and V are different.** $C$ matters for unsigned math; $V$ matters for signed. Mixing them corrupts comparisons and arithmetic.\n\n**Hazards** are transient wrong outputs (glitches) from unequal path delays, even when steady-state logic is correct. A **static-1 hazard**: an output that should stay 1 momentarily dips to 0 (typical of SOP when moving between adjacent K-map terms not covered by a common group). A **static-0 hazard** is the dual. A **dynamic hazard** is multiple transitions on a single intended change, from reconvergent multi-level paths. The fix for a static hazard is to add the **redundant (consensus) product term** that bridges the adjacent groups on the K-map — it costs a gate but holds the output steady. Glitches are harmless into synchronous (clocked) logic if they settle before setup, but deadly on asynchronous control lines, clocks, or resets.",
+          "difficulty": 2,
+          "content": "## Hook\n\nAdding numbers is the most basic math a computer does, and it is built from the gates you already know. Once you can add two bits, you can add numbers of any size by chaining the same little block.\n\n## Build\n\nStart with the smallest job: add two single bits, A and B. The result can be 0, 1, or 2, so you need two output bits - a **sum** and a **carry** (the bit you carry to the next column, just like adding decimal digits). This is a **half-adder**: the sum is $A \\oplus B$ (XOR) and the carry is $A \\cdot B$ (AND). It is called 'half' because it cannot accept a carry coming *in* from a lower column, so it only works for the very first column.\n\nTo add real multi-bit numbers, each column also receives a **carry-in** from the column to its right. A block that adds three bits - A, B, and carry-in - is a **full-adder**. Its outputs: $\\text{Sum} = A \\oplus B \\oplus C_{in}$, and the carry-out is 1 whenever **two or more** of the three inputs are 1 (a 'majority' rule). Worked example: A=1, B=1, Cin=0 gives Sum=0 and Cout=1 (that is 1+1 = binary 10).\n\nNow chain them. Put one full-adder per bit position and feed each carry-out into the next adder's carry-in. That is a **ripple-carry adder** - simple and regular. The downside is in the name: the carry has to *ripple* through every stage one after another. The answer is not final until the carry has traveled all the way from the lowest bit to the highest, so a wider adder is a slower adder. This carry path is the circuit's slowest route.\n\nEngineers speed this up with **carry-lookahead**: instead of waiting for the carry to crawl through each stage, extra logic figures out, in advance and in parallel, whether each column will produce a carry. It looks at whether a column will *generate* a carry on its own or merely *pass along* an incoming one, then computes all the carries at once. The result is much faster addition, at the cost of more gates.\n\nOne more bonus: **subtraction reuses the adder**. In two's complement, $A - B$ equals $A$ plus the bit-flip of $B$ plus 1. So the same hardware adds or subtracts, with a control line that flips B and forces an extra carry-in.\n\n## Recap\n\nHalf-adder: two bits in, sum + carry out, no carry-in. Full-adder: three bits in (adds a carry-in), sum out, carry-out by majority. Chain full-adders for a ripple-carry adder (simple but slow because the carry ripples). Carry-lookahead computes carries in parallel for speed. Subtraction is addition with B inverted plus 1.",
           "items": [
             {
-              "id": "combinational-blocks-l4-fc-aluslice",
-              "type": "flashcard",
-              "front": "Describe the structure of a 1-bit ALU slice and how an $n$-bit ALU is built from it.",
-              "back": "A slice = a full-adder (for add/sub) + AND/OR/XOR gates, with an output mux selected by the function-select lines. Stack $n$ slices, chaining carry-out to carry-in, to form the $n$-bit ALU.",
-              "hint": "Arithmetic unit + logic unit + a selecting mux, replicated bitwise."
-            },
-            {
-              "id": "combinational-blocks-l4-fc-zflag",
-              "type": "flashcard",
-              "front": "How is the Zero (Z) flag computed from an $n$-bit result?",
-              "back": "$Z = \\overline{R_{n-1} + R_{n-2} + \\cdots + R_0}$ — the NOR of all result bits. Z is 1 only when every result bit is 0.",
-              "hint": "All bits zero → NOR them."
-            },
-            {
-              "id": "combinational-blocks-l4-fc-cvsv",
-              "type": "flashcard",
-              "front": "Distinguish the Carry (C) flag from the Overflow (V) flag.",
-              "back": "C is the carry-out of the MSB — it signals UNSIGNED overflow/borrow. V signals SIGNED (two's-complement) overflow: $V = C_{\\text{in,MSB}} \\oplus C_{\\text{out,MSB}}$. They are independent; use C for unsigned math, V for signed.",
-              "hint": "One is for unsigned, the other for two's-complement."
-            },
-            {
-              "id": "combinational-blocks-l4-fc-vformula",
-              "type": "flashcard",
-              "front": "Give two equivalent ways to detect signed overflow (V) in an adder.",
-              "back": "(1) XOR the carry into the MSB with the carry out of the MSB: $V = C_{n-1} \\oplus C_n$. (2) Two operands of the SAME sign yield a result of the OPPOSITE sign. Both detect that the true result fell outside the representable signed range.",
-              "hint": "Carry-in vs carry-out of the top bit; or sign-pattern of operands vs result."
-            },
-            {
-              "id": "combinational-blocks-l4-fc-static1",
-              "type": "flashcard",
-              "front": "What is a static-1 hazard and how is it eliminated?",
-              "back": "A momentary 0-glitch on an output that should remain 1, caused by unequal delays when the input moves between two adjacent minterms covered by different SOP product terms. Fix: add the redundant (consensus) product term that overlaps both groups on the K-map.",
-              "hint": "Glitch while output should stay high; bridge the K-map groups."
-            },
-            {
-              "id": "combinational-blocks-l4-fc-dynamic",
-              "type": "flashcard",
-              "front": "What is a dynamic hazard, and when do hazards actually matter?",
-              "back": "A dynamic hazard is multiple transitions (e.g. 1→0→1→0) on an output that should change just once, arising from reconvergent multi-level paths with differing delays. Hazards are harmless into clocked logic if settled before setup, but dangerous on async lines: clocks, resets, latch enables.",
-              "hint": "More than one transition on a single intended change."
-            },
-            {
-              "id": "combinational-blocks-l4-mcq-vflag",
+              "id": "combinational-blocks-l4-img-fa",
               "type": "mcq",
-              "prompt": "Adding two 8-bit two's-complement numbers, 0x70 + 0x10, gives 0x80. Which flags are set?",
+              "prompt": "Using a full-adder, add the bits A=1, B=1, Cin=0. What are Sum and Cout?",
               "choices": [
-                "C=1, V=0 (unsigned overflow only)",
-                "C=0, V=1, N=1 (signed overflow; result looks negative)",
-                "Z=1 only",
-                "No flags set"
+                "Sum=1, Cout=1",
+                "Sum=0, Cout=1",
+                "Sum=0, Cout=0",
+                "Sum=1, Cout=0"
               ],
               "answerIndex": 1,
-              "explanation": "0x70 (+112) + 0x10 (+16) = 0x80, which as signed is −128 — two positives produced a negative, so V=1 and N=1. There is no carry out of bit 7, so C=0. This is exactly the C≠V trap."
+              "explanation": "1 + 1 + 0 = 2, which in binary is 10: a sum bit of 0 and a carry-out of 1. The carry is 1 because two of the three inputs are 1 (the majority rule). Forgetting the carry and reporting Sum=0, Cout=0 loses the overflow into the next column.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/combinational-blocks-5.svg"
             },
             {
-              "id": "combinational-blocks-l4-mcq-hazard-fix",
+              "id": "combinational-blocks-l4-mcq-halfadder",
               "type": "mcq",
-              "prompt": "A two-level SOP circuit shows a static-1 hazard between two adjacent K-map cells. What is the standard fix?",
+              "prompt": "What are the sum and carry outputs of a half-adder for inputs A and B?",
               "choices": [
-                "Slow down the clock",
-                "Add a redundant consensus product term covering both adjacent groups",
-                "Remove the essential prime implicants",
-                "Convert the circuit to POS form"
+                "Sum = A AND B, Carry = A XOR B",
+                "Sum = A XOR B, Carry = A AND B",
+                "Sum = A OR B, Carry = A AND B",
+                "Sum = A XOR B, Carry = A OR B"
               ],
               "answerIndex": 1,
-              "explanation": "Adding the redundant (consensus) term creates an always-covering group spanning the transition, so the output never drops while inputs change between the two cells. It costs an extra gate but is the canonical hazard cure. Clock speed is irrelevant to a combinational glitch."
+              "explanation": "The sum bit is 1 when exactly one input is 1, which is XOR. The carry is 1 only when both inputs are 1, which is AND. Swapping them (AND for sum) would give the wrong result for 1+0."
             },
             {
-              "id": "combinational-blocks-l4-mcq-glitch-safe",
+              "id": "combinational-blocks-l4-mcq-halflimit",
               "type": "mcq",
-              "prompt": "When are combinational glitches genuinely dangerous rather than harmless?",
+              "prompt": "Why can a half-adder only be used for the lowest bit position of a larger adder?",
               "choices": [
-                "Always — every glitch corrupts the design",
-                "Never — synchronous logic ignores them",
-                "When they feed asynchronous inputs like clocks, resets, or latch enables",
-                "Only when the supply voltage is below 3.3 V"
+                "It is too slow for higher bits",
+                "It has no carry-in, so it cannot accept the carry coming from a lower column",
+                "It produces no carry-out",
+                "It can only output 0"
+              ],
+              "answerIndex": 1,
+              "explanation": "A half-adder adds only two bits and has no input for an incoming carry. Every column above the first must accept a carry-in from the column below, which requires a full-adder. The half-adder does produce a carry-out; it just can't take one in."
+            },
+            {
+              "id": "combinational-blocks-l4-mcq-fulladd",
+              "type": "mcq",
+              "prompt": "How many bits does a full-adder add together, and what extra input does it have compared to a half-adder?",
+              "choices": [
+                "Two bits; it has an extra output",
+                "Three bits; the extra input is a carry-in from the previous column",
+                "Four bits; the extra input is a clock",
+                "Three bits; the extra input is a reset"
+              ],
+              "answerIndex": 1,
+              "explanation": "A full-adder sums three bits: A, B, and a carry-in. That carry-in is the key addition over a half-adder, letting full-adders chain to handle multi-bit numbers. It has nothing to do with clocks or resets - it is combinational."
+            },
+            {
+              "id": "combinational-blocks-l4-mcq-cout-majority",
+              "type": "mcq",
+              "prompt": "A full-adder's carry-out is 1 in which situation?",
+              "choices": [
+                "When all three inputs are 0",
+                "When exactly one input is 1",
+                "When two or more of the three inputs are 1",
+                "Only when all three inputs are 1"
               ],
               "answerIndex": 2,
-              "explanation": "Into a clocked flip-flop, a glitch that settles before the setup window is sampled away harmlessly. But a glitch on a clock, asynchronous reset/preset, or latch enable can trigger a false event — that's where hazard-free covering matters."
+              "explanation": "Carry-out follows a majority rule: it is 1 whenever at least two of A, B, Cin are 1. 'Only when all three' is too strict (it misses 1+1+0), and 'exactly one' would never produce a carry."
+            },
+            {
+              "id": "combinational-blocks-l4-mcq-ripple",
+              "type": "mcq",
+              "prompt": "How is a ripple-carry adder built?",
+              "choices": [
+                "By chaining full-adders, each carry-out feeding the next adder's carry-in",
+                "By using a single half-adder for all bits",
+                "By placing all adders in parallel with no connection",
+                "By using only XOR gates"
+              ],
+              "answerIndex": 0,
+              "explanation": "One full-adder per bit position, with carry-out wired to the next stage's carry-in, forms a ripple-carry adder. The stages must connect through the carry - that connection is exactly what makes the carry 'ripple'."
+            },
+            {
+              "id": "combinational-blocks-l4-mcq-ripple-slow",
+              "type": "mcq",
+              "prompt": "Why does a ripple-carry adder get slower as the numbers get wider?",
+              "choices": [
+                "Wider numbers need more clock cycles",
+                "The carry must travel through every stage in turn before the answer is final",
+                "XOR gates slow down with more inputs",
+                "It runs out of memory"
+              ],
+              "answerIndex": 1,
+              "explanation": "Each stage's correct output waits on the carry arriving from the stage below, so the carry ripples serially from the lowest bit up to the highest. More bits means a longer carry trip and more delay. It is combinational, so there are no clock cycles or memory involved."
+            },
+            {
+              "id": "combinational-blocks-l4-mcq-cla",
+              "type": "mcq",
+              "prompt": "What is the main idea behind a carry-lookahead adder?",
+              "choices": [
+                "It removes the need for any addition",
+                "It computes the carries in parallel ahead of time instead of waiting for them to ripple",
+                "It uses a faster clock",
+                "It replaces full-adders with memory cells"
+              ],
+              "answerIndex": 1,
+              "explanation": "Carry-lookahead uses extra logic to work out every column's carry at once, based on which columns generate or pass along a carry, so the answer does not wait for a slow ripple. The trade-off is more gates. There is no clock in this combinational circuit."
+            },
+            {
+              "id": "combinational-blocks-l4-mcq-subtract",
+              "type": "mcq",
+              "prompt": "How does an adder perform subtraction A - B using two's complement?",
+              "choices": [
+                "It adds A and B, then divides by two",
+                "It computes A plus the inverted bits of B plus 1",
+                "It removes the carry chain",
+                "It cannot subtract at all"
+              ],
+              "answerIndex": 1,
+              "explanation": "In two's complement, negating B means inverting its bits and adding 1. So A - B = A + (NOT B) + 1, which the same adder does by flipping B and forcing a carry-in of 1. A control line lets one circuit both add and subtract."
+            }
+          ]
+        },
+        {
+          "id": "combinational-blocks-combinational-blocks-l5-alu-hazards",
+          "title": "The ALU, Flags & Glitches",
+          "order": 5,
+          "difficulty": 3,
+          "content": "## Hook\n\nEvery time a computer adds, subtracts, or compares, the work happens in one block: the **ALU** (Arithmetic Logic Unit). It is the calculator at the heart of a CPU. This lesson assembles the pieces you have built into that calculator, and then looks at a subtle real-world wrinkle: glitches.\n\n## Build\n\nAn **ALU** combines several operations into one unit and uses a **function-select** input to pick which one to perform: add, subtract, AND, OR, XOR, or shift. Think of it as a calculator whose buttons are chosen by the select code. Inside, an adder handles add/subtract, simple gates handle AND/OR/XOR, and a multiplexer at the output picks the chosen result. Stack one-bit slices together and you get an ALU for whole numbers.\n\nThe ALU also reports **flags** - one-bit status signals that describe the result:\n\n- **Z (Zero):** 1 when the whole result is zero. Useful for 'are these equal?' (subtract and check Z).\n- **C (Carry):** the carry out of the top bit. It signals overflow for **unsigned** numbers.\n- **N (Negative):** the sign bit of the result; 1 means negative in two's complement.\n- **V (Overflow):** **signed** overflow - the true answer was too big or too small to fit, so the sign came out wrong.\n\nA classic trap: **C and V are different things.** C is about unsigned math; V is about signed math. Example: adding two positive signed numbers and getting a negative-looking result sets V (signed overflow) even though C might be 0.\n\nNow the wrinkle. In an ideal world a circuit's output jumps cleanly to its new value. In reality, signals race through different gate paths at slightly different speeds, so an output can briefly show a wrong value before settling. This brief wrong value is a **glitch** (or **hazard**). A **static hazard** is a momentary blip - an output that should hold steady at 1 (or 0) dips the other way for an instant. A **dynamic hazard** is when an output that should change just once flickers several times before settling.\n\nGlitches are usually harmless: if the output feeds a clocked circuit that only looks at the value once it has settled, the blip is ignored. They become dangerous when they feed sensitive lines like a clock or a reset, where a single false pulse can cause real misbehavior. A common cure is to add a small bit of 'redundant' logic that keeps the output covered during the risky transition.\n\n## Recap\n\nAn ALU is a select-driven calculator (add/sub/AND/OR/XOR/shift) built from the blocks you already know, plus a result-selecting mux. It reports flags: Z (zero), C (unsigned carry), N (negative sign), V (signed overflow) - and C is not the same as V. Glitches are brief wrong outputs from unequal path delays; harmless into clocked logic, risky on clocks or resets.",
+          "items": [
+            {
+              "id": "combinational-blocks-l5-img-alu",
+              "type": "mcq",
+              "prompt": "What is the job of the function-select input on an ALU?",
+              "choices": [
+                "It sets the clock speed",
+                "It chooses which operation (add, subtract, AND, OR, etc.) the ALU performs",
+                "It selects which flag to output",
+                "It picks the supply voltage"
+              ],
+              "answerIndex": 1,
+              "explanation": "The function-select code tells the ALU which operation to apply to its inputs, like choosing a button on a calculator. An output mux then routes the chosen operation's result out. It does not set clocks, voltages, or which flag appears.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/combinational-blocks-6.svg"
+            },
+            {
+              "id": "combinational-blocks-l5-mcq-aluis",
+              "type": "mcq",
+              "prompt": "What is an ALU?",
+              "choices": [
+                "A memory chip that stores results",
+                "A combinational block that performs arithmetic and logic operations chosen by a select input",
+                "A clock generator",
+                "A single AND gate"
+              ],
+              "answerIndex": 1,
+              "explanation": "An ALU (Arithmetic Logic Unit) bundles add, subtract, AND, OR, XOR, shift, and more, with a select input choosing the operation - the calculator at the core of a CPU. It computes; it does not store data like memory does."
+            },
+            {
+              "id": "combinational-blocks-l5-mcq-mux-role",
+              "type": "mcq",
+              "prompt": "Inside an ALU, what role does a multiplexer typically play?",
+              "choices": [
+                "It generates the clock",
+                "It selects which operation's result becomes the ALU's output, based on the function-select code",
+                "It stores the flags",
+                "It inverts every input"
+              ],
+              "answerIndex": 1,
+              "explanation": "The ALU computes several operations and a mux, driven by the function-select code, picks the one to send out. This reuses the selectable-switch idea from the mux lesson. The mux does not make clocks or store anything."
+            },
+            {
+              "id": "combinational-blocks-l5-mcq-zflag",
+              "type": "mcq",
+              "prompt": "When is the Zero (Z) flag set to 1?",
+              "choices": [
+                "When the result's sign bit is 1",
+                "When every bit of the result is 0",
+                "When there is a carry out of the top bit",
+                "When the inputs are equal in sign"
+              ],
+              "answerIndex": 1,
+              "explanation": "Z is 1 only when the entire result equals zero (all result bits are 0). The sign bit being 1 is the N flag, and a carry out of the top bit is the C flag - different signals."
+            },
+            {
+              "id": "combinational-blocks-l5-mcq-nflag",
+              "type": "mcq",
+              "prompt": "What does the Negative (N) flag report?",
+              "choices": [
+                "Whether the result is odd",
+                "The sign bit of the result (1 means negative in two's complement)",
+                "Whether a carry occurred",
+                "Whether the result is zero"
+              ],
+              "answerIndex": 1,
+              "explanation": "N simply copies the most significant bit of the result, which is the sign bit in two's complement: 1 means negative. It says nothing about oddness, carries, or zero."
+            },
+            {
+              "id": "combinational-blocks-l5-mcq-cvsv",
+              "type": "mcq",
+              "prompt": "What is the key difference between the Carry (C) flag and the Overflow (V) flag?",
+              "choices": [
+                "C is for signed math; V is for unsigned math",
+                "C signals overflow for unsigned numbers; V signals overflow for signed numbers",
+                "They are two names for the same flag",
+                "C is for addition only; V is for subtraction only"
+              ],
+              "answerIndex": 1,
+              "explanation": "C (the carry out of the top bit) indicates unsigned overflow, while V indicates signed (two's complement) overflow. They are independent and a classic source of bugs when confused - use C for unsigned, V for signed."
+            },
+            {
+              "id": "combinational-blocks-l5-mcq-vexample",
+              "type": "mcq",
+              "prompt": "Adding two POSITIVE signed numbers gives a result whose sign bit is 1 (looks negative). Which flag does this set?",
+              "choices": [
+                "The Zero flag",
+                "The Overflow (V) flag, because the signed result is wrong",
+                "No flag - this is normal",
+                "Only the Carry flag, never V"
+              ],
+              "answerIndex": 1,
+              "explanation": "Two positives can never legitimately sum to a negative, so the answer overflowed the signed range: V is set. This is exactly the signed-overflow case that C alone would not flag, illustrating why C and V differ."
+            },
+            {
+              "id": "combinational-blocks-l5-mcq-glitch",
+              "type": "mcq",
+              "prompt": "What causes a combinational glitch (hazard)?",
+              "choices": [
+                "A missing clock signal",
+                "Signals arriving through different gate paths at slightly different times, so the output briefly shows a wrong value",
+                "The power supply being too high",
+                "Using too few inputs"
+              ],
+              "answerIndex": 1,
+              "explanation": "When one input change reaches the output along paths of unequal delay, the output can momentarily settle on a wrong value before correcting itself - that brief wrong value is the glitch. The steady-state logic is still correct; the issue is timing of the paths."
+            },
+            {
+              "id": "combinational-blocks-l5-mcq-glitch-danger",
+              "type": "mcq",
+              "prompt": "When are glitches genuinely dangerous rather than harmless?",
+              "choices": [
+                "Always - every glitch corrupts the result",
+                "Never - they can be ignored entirely",
+                "When they feed sensitive lines like a clock or a reset, where a false pulse causes a real event",
+                "Only when the numbers are unsigned"
+              ],
+              "answerIndex": 2,
+              "explanation": "A glitch feeding a clocked circuit is sampled only after it settles, so it is harmless. But on a clock, reset, or similar trigger line, a momentary false pulse can fire a real, unwanted event - that is when hazards must be designed out."
             }
           ]
         }
