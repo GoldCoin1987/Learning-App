@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "id": "analog-electronics",
   "title": "Analog Electronics",
-  "version": "2.13.0",
+  "version": "2.14.0",
   "description": "Analog electronics from scratch (beginner rework in progress): 15 sub-topics from DC networks through noise, layout and instrumentation. Beginner-first readings, diagrams, tiered easy to hard.",
   "requires": [
     "mathematics"
@@ -8592,304 +8592,523 @@
       "order": 14,
       "lessons": [
         {
-          "id": "parasitics-grounding-layout-parasitics",
-          "title": "Why Ideal Schematics Lie: Real-Component Parasitics",
+          "id": "parasitics-grounding-layout-parasitics-real-circuits",
+          "title": "Why Real Circuits Aren't the Clean Picture",
           "order": 1,
           "difficulty": 1,
-          "content": "A schematic shows ideal components; a board does not. Every conductor and package adds **parasitics** that dominate at high frequency.\n\n**Capacitors** are not pure $C$. A real cap is a series $RLC$: its **ESR** (equivalent series resistance) and **ESL** (equivalent series inductance) give it a self-resonant frequency\n\n$$f_{SRF} = \\frac{1}{2\\pi\\sqrt{L_{ESL}\\,C}}.$$\n\nBelow $f_{SRF}$ the part is capacitive; above it the ESL takes over and impedance *rises* with frequency, $|Z_L| = \\omega L_{ESL}$. That is why a single bulk cap cannot bypass everything: a 10 uF electrolytic self-resonates in the low MHz, so you pair it with a small 0.1 uF (or 1 nF) ceramic whose higher $f_{SRF}$ covers the high end.\n\n**Inductors** mirror this: their inter-winding capacitance produces a parallel self-resonance above which they look capacitive, so a 'choke' stops being a choke past $f_{SRF}$.\n\n**Traces and leads** add resistance and, more importantly, inductance, roughly $\\sim 1\\ \\mathrm{nH}$ per mm of trace or wire. At $100\\ \\mathrm{MHz}$, $10\\ \\mathrm{mm}$ of trace is $\\omega L \\approx 2\\pi(10^8)(10^{-8}) \\approx 6\\ \\Omega$ of reactance, invisible in DC SPICE, ruinous on the bench. Package lead inductance (a few nH) is why high-speed parts use tiny QFN/BGA bodies.\n\nThe practical lesson, the one that separates the textbook engineer from the bench engineer: **at RF a wire is an inductor, a capacitor becomes an inductor above its SRF, and a resistor has both.** Always ask what the part looks like at your *highest* frequency of interest, not just at DC.",
+          "content": "**Hook.** Have you ever heard someone say a circuit \"works in simulation but not on the bench\"? That gap is what this whole topic is about. A schematic is a tidy drawing: a wire is just a line, a capacitor is a perfect capacitor. But the real board on your desk is made of metal wires and copper traces, and metal never behaves perfectly.\n\n**Build.** Here is the big idea: *every* piece of wire or copper trace secretly carries three tiny unwanted electrical effects. We call them **parasitics** because, like a parasite, they ride along uninvited.\n\n1. **A little resistance (R).** Resistance opposes current flow and turns a bit of your signal into heat. Even copper has some.\n2. **A little inductance (L).** Inductance is the property that resists *changes* in current. Every wire has roughly **1 nanohenry per millimeter** (a nanohenry is a billionth of a henry, the unit of inductance). It does almost nothing for slow signals, but for fast-changing signals it fights back hard.\n3. **A little capacitance (C).** Capacitance is the ability to store charge between two nearby pieces of metal. Any trace sitting near other metal forms a small unwanted capacitor that can leak fast signals away.\n\nFor slow or DC signals, these are so small you can ignore them - that's why the clean schematic works in your head. But the faster the signal (the higher its frequency), the more these tiny R, L, and C start to matter, sometimes enough to wreck the circuit.\n\n**Recap.** Ideal schematics \"lie\" by leaving out parasitics. The rule to remember: a real wire is not just a wire - it is a small resistor, inductor, and capacitor all at once, and at high frequency those hidden parts take over.",
           "items": [
             {
               "id": "parasitics-grounding-layout-001",
-              "type": "flashcard",
-              "front": "Define ESR and ESL of a real capacitor.",
-              "back": "ESR (equivalent series resistance) is the lumped resistive loss in series with the ideal C (plates, leads, dielectric loss). ESL (equivalent series inductance) is the series inductance from the leads/plates/internal structure. Together with C they make the capacitor a series RLC.",
-              "hint": "One causes loss/heating, the other causes resonance."
+              "type": "mcq",
+              "prompt": "What does the word \"parasitic\" mean in electronics?",
+              "choices": [
+                "A tiny, unwanted electrical effect (resistance, inductance, or capacitance) that rides along with a real component or wire",
+                "A component you deliberately add to improve a circuit",
+                "A type of battery used in low-power devices",
+                "A software bug in a circuit simulator"
+              ],
+              "answerIndex": 0,
+              "explanation": "Parasitics are the unwanted R, L, and C that come for free with any real conductor or part - nobody designs them in, but the physics gives them to you anyway. They are not added components, and they are real-world effects, not software issues."
             },
             {
               "id": "parasitics-grounding-layout-002",
-              "type": "flashcard",
-              "front": "Write the self-resonant frequency of a capacitor and describe its impedance above it.",
-              "back": "f_SRF = 1 / (2*pi*sqrt(L_ESL * C)). Below f_SRF the part is capacitive (|Z| falls with f); at f_SRF |Z| is minimum and equals the ESR; above f_SRF the ESL dominates and |Z| RISES with frequency (it behaves like an inductor).",
-              "hint": "Same form as any LC resonance; above it the inductance wins."
+              "type": "mcq",
+              "prompt": "Why does a clean schematic often \"work in simulation but not on the bench\"?",
+              "choices": [
+                "The schematic leaves out parasitics (stray R, L, C) that exist in the real board",
+                "Simulators always use the wrong math",
+                "Real components are always defective",
+                "Bench power supplies output the wrong voltage"
+              ],
+              "answerIndex": 0,
+              "explanation": "An idealized schematic or simulation treats wires as perfect and components as ideal. The real board adds stray resistance, inductance, and capacitance that the drawing ignored - so behavior can differ, especially at high frequency."
             },
             {
               "id": "parasitics-grounding-layout-003",
-              "type": "flashcard",
-              "front": "Roughly how much inductance does a PCB trace or wire add per unit length, and why does it matter?",
-              "back": "About 1 nH per millimeter (a rule of thumb; depends on geometry and return path). It matters because reactance omega*L grows with frequency, so at tens to hundreds of MHz even a few mm of trace presents ohms of impedance, degrading decoupling, adding ringing, and creating voltage drops that DC analysis never shows.",
-              "hint": "About a nanohenry per mm."
+              "type": "mcq",
+              "prompt": "Which three parasitic effects does essentially every real wire or PCB trace carry?",
+              "choices": [
+                "A little resistance, a little inductance, and a little capacitance",
+                "Voltage, current, and power",
+                "Only resistance",
+                "Heat, light, and sound"
+              ],
+              "answerIndex": 0,
+              "explanation": "Every conductor has some resistance (R), some inductance (L), and some capacitance to nearby metal (C). Voltage, current, and power are quantities, not parasitic properties of the wire itself."
             },
             {
               "id": "parasitics-grounding-layout-004",
-              "type": "flashcard",
-              "front": "Why does a real inductor stop acting like an inductor at high frequency?",
-              "back": "Inter-winding (parasitic) capacitance forms a parallel LC with the inductance, giving a parallel self-resonant frequency. Below it the part is inductive; at SRF impedance peaks; above it the parasitic capacitance dominates and the part looks capacitive, so a choke no longer blocks high-frequency current.",
-              "hint": "Turn-to-turn capacitance creates a parallel resonance."
+              "type": "mcq",
+              "prompt": "A rough rule of thumb for the inductance of a wire or PCB trace is about:",
+              "choices": [
+                "1 nanohenry per millimeter of length",
+                "1 farad per millimeter of length",
+                "1 ohm per millimeter of length",
+                "1 volt per millimeter of length"
+              ],
+              "answerIndex": 0,
+              "explanation": "Roughly 1 nH per mm is the handy estimate for trace and lead inductance. Farads measure capacitance, ohms measure resistance, and volts measure voltage - none of those is a unit of inductance."
             },
             {
               "id": "parasitics-grounding-layout-005",
               "type": "mcq",
-              "prompt": "A 0.1 uF ceramic cap has an ESL of about 1 nH. Its self-resonant frequency is closest to:",
+              "prompt": "Parasitic inductance mainly causes trouble for which kind of signal?",
               "choices": [
-                "16 MHz",
-                "1.6 MHz",
-                "160 MHz",
-                "1.6 GHz"
+                "Fast-changing (high-frequency) signals, because inductance resists changes in current",
+                "Steady DC signals, because inductance blocks constant current",
+                "Only signals below 1 hertz",
+                "It affects all signals exactly equally"
               ],
               "answerIndex": 0,
-              "explanation": "f_SRF = 1/(2*pi*sqrt(L*C)) = 1/(2*pi*sqrt(1e-9 * 1e-7)) = 1/(2*pi*sqrt(1e-16)) = 1/(2*pi*1e-8) = 1.59e7 Hz, about 16 MHz. Above this the cap is inductive, which is why a smaller cap (higher SRF) is added in parallel for higher frequencies."
+              "explanation": "Inductance opposes *changes* in current, so its effect grows with how fast the current changes - that is, with frequency. For steady DC it is nearly invisible; for fast edges it fights back strongly."
             },
             {
               "id": "parasitics-grounding-layout-006",
               "type": "mcq",
-              "prompt": "At a capacitor's exact self-resonant frequency, its impedance magnitude is:",
+              "prompt": "Parasitic capacitance forms when a trace sits near other metal. What unwanted thing can it do?",
               "choices": [
-                "At a minimum, equal to its ESR",
-                "At a maximum, set by ESL",
-                "Zero",
-                "Equal to 1/(omega*C)"
+                "Provide a sneaky path that leaks fast (high-frequency) signal away to the nearby metal",
+                "Add a large amount of useful battery storage",
+                "Increase the DC resistance of the trace",
+                "Convert the signal into light"
               ],
               "answerIndex": 0,
-              "explanation": "At series resonance the inductive and capacitive reactances cancel, leaving only the resistive ESR. So |Z| is minimum and equals the ESR. This is why low-ESR caps give the best high-frequency bypassing right at resonance."
+              "explanation": "Two nearby conductors form a small capacitor, and capacitors pass high-frequency signals more easily. So stray capacitance can bleed fast signal energy off to neighboring metal. It does not increase DC resistance or store useful power."
             },
             {
               "id": "parasitics-grounding-layout-007",
               "type": "mcq",
-              "prompt": "Why is a single large bulk capacitor a poor high-frequency bypass on its own?",
+              "prompt": "For a slow DC circuit, why is it usually safe to treat a wire as a perfect wire?",
               "choices": [
-                "Its larger size means more ESL, so it self-resonates at a low frequency and is inductive above it",
-                "Large capacitors have no ESR",
-                "Capacitance falls with temperature only",
-                "It has too little capacitance"
+                "At DC and low frequency the parasitic R, L, and C are so small their effects are negligible",
+                "DC circuits have no current",
+                "Copper has literally zero resistance at any frequency",
+                "Parasitics only exist above 1 GHz"
               ],
               "answerIndex": 0,
-              "explanation": "A bulk electrolytic/large cap has higher ESL and self-resonates in the low MHz; above that it looks inductive and its impedance rises, so it cannot bypass high-frequency noise. Pairing it with a small ceramic (higher SRF) extends low impedance across a wider band."
+              "explanation": "The parasitics are always present, but their influence (especially from L and C) grows with frequency. At DC/low frequency they are tiny enough to ignore. Copper does have some resistance, and parasitics matter well below 1 GHz."
             },
             {
               "id": "parasitics-grounding-layout-008",
               "type": "mcq",
-              "prompt": "10 mm of trace (~10 nH) carries a 100 MHz return current. Its inductive reactance is closest to:",
+              "prompt": "Which statement best captures the key takeaway of this lesson?",
               "choices": [
-                "6 ohms",
-                "0.6 ohms",
-                "60 ohms",
-                "0.06 ohms"
+                "A real wire is secretly a small resistor, inductor, and capacitor, and at high frequency those hidden parts take over",
+                "Schematics are useless and should never be drawn",
+                "Only capacitors have parasitics; wires are perfect",
+                "Parasitics make every circuit fail no matter what"
               ],
               "answerIndex": 0,
-              "explanation": "X_L = omega*L = 2*pi*(1e8)*(1e-8) = 2*pi ~ 6.3 ohms. A DC analysis would call this trace 0 ohms; at 100 MHz it is several ohms, which is why high-speed layout obsesses over trace length and return paths."
+              "explanation": "The whole lesson is that no conductor is ideal: it carries stray R, L, and C, and those matter more as frequency rises. Schematics are still useful; wires are not perfect; and good design manages parasitics rather than being defeated by them."
             },
             {
               "id": "parasitics-grounding-layout-009",
-              "type": "flashcard",
-              "front": "What is the standard two-capacitor decoupling strategy and what parasitic does it work around?",
-              "back": "Use a bulk cap (e.g. 1-10 uF) for low-frequency/charge-reservoir demand in parallel with a small ceramic (e.g. 0.1 uF or 1 nF) placed at the pin for high-frequency demand. It works around ESL/self-resonance: the small cap's higher SRF keeps impedance low where the bulk cap has already gone inductive.",
-              "hint": "Bulk plus local ceramic; covers two different SRF bands."
+              "type": "mcq",
+              "prompt": "Two engineers debate a board that simulated fine but rings and misbehaves at high speed on the bench. Which explanation fits the parasitics idea?",
+              "choices": [
+                "Trace inductance the simulation ignored is reacting to the fast signal edges",
+                "The bench air is too humid for electrons",
+                "The simulator added extra inductance that isn't real",
+                "DC resistance suddenly tripled on the bench"
+              ],
+              "answerIndex": 0,
+              "explanation": "Ringing on fast edges is a classic symptom of stray inductance (often in traces and leads) that an idealized simulation left out. Humidity isn't the issue, the simulator left parasitics out rather than adding them, and DC resistance doesn't jump on its own.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/analog-electronics/images/parasitics-grounding-layout-3.svg"
             }
           ]
         },
         {
-          "id": "parasitics-grounding-layout-grounding-decoupling",
-          "title": "Grounding, Ground Loops & Decoupling",
+          "id": "parasitics-grounding-layout-grounding-loops-hum",
+          "title": "Grounding, Ground Loops & Hum",
           "order": 2,
           "difficulty": 2,
-          "content": "'Ground' is not an equipotential node; it is copper with resistance and inductance, and current through it makes voltage. Master three ideas.\n\n**Ground loops.** If two pieces of equipment share more than one ground path, the conductors enclose a loop. Any time-varying magnetic flux through that loop induces an EMF ($v = -\\,d\\Phi/dt$), and any difference in 'ground' potential drives a circulating current. That current develops a noise voltage across the finite impedance of the return, corrupting your signal: the classic 50/60 Hz hum or radar-shop interference. **Fix:** break the second path (single-point/star ground), or interrupt the loop with isolation (transformer, opto, differential receiver, or a common-mode choke).\n\n**Single-point (star) vs. multipoint.** At low frequency, tie all returns to one **star** node so no shared-impedance current couples between subsystems. At high frequency the inductance of long star spokes dominates, so you instead use a low-impedance **ground plane** (multipoint). Mixed-signal boards keep **analog and digital grounds** separate and join them at exactly **one point**, usually under the ADC, so noisy digital return current never flows through the analog reference.\n\n**Decoupling = loop-area control.** A bypass cap supplies the transient current an IC demands so it isn't pulled through long, inductive supply traces. Its benefit is set by the **loop inductance** of the cap-pin-via path:\n\n$$V_{noise} = L_{loop}\\,\\frac{di}{dt}.$$\n\nWith fast $di/dt$, even a few nH of loop inductance makes hundreds of mV of ground bounce. So place the cap **at the pin**, use short fat traces and adjacent vias, and minimize the enclosed area. The cap value matters less than the loop it sits in.",
+          "content": "**Hook.** Plug a guitar into a cheap amp and you sometimes hear an annoying low *hummmm*. Connect your laptop to powered speakers and the same buzz can appear. That hum is almost always a **grounding** problem - one of the most common real-world circuit headaches.\n\n**Build.** First, what is \"ground\"? In a schematic, ground is the common reference point that everything measures its voltage against - the \"0 volts\" line. We imagine it as one perfect, shared node. But in reality ground is just more copper, and copper has parasitic resistance and inductance. When current flows through that copper, it creates a small voltage along the way (Ohm's law: voltage = current x resistance). So two points both labeled \"ground\" can actually sit at slightly different voltages.\n\nNow the classic problem: a **ground loop**. If two pieces of equipment are connected by *more than one* ground path, those paths form a closed loop. Stray magnetic fields from nearby power wiring (50 or 60 hertz mains) pass through that loop and induce a small unwanted voltage in it, and differences in ground voltage push a circulating current around it. That noise rides into your signal - and in audio you hear it as **mains hum** (a steady 50/60 Hz buzz).\n\nHow do we fix grounding? Two key ideas:\n- **Single-point (star) grounding:** instead of letting grounds connect in a loop, run every part's ground wire back to *one single* common point, like spokes to the hub of a wheel. No loop, no circulating noise current.\n- **Separate analog and digital grounds:** noisy digital chips dump spiky return current into ground. If sensitive analog parts share that exact ground path, the noise corrupts them. So designers keep the two ground regions apart and join them at just one spot (often right under the analog-to-digital converter).\n\n**Recap.** Ground is not a perfect zero-volt magic node - it is copper that develops voltage when current flows. Loops in the ground let noise in (hum); a single-point/star ground and keeping noisy and quiet grounds separate are the cures.",
           "items": [
             {
               "id": "parasitics-grounding-layout-010",
-              "type": "flashcard",
-              "front": "Ground loop vs. star-ground fix: two grounded instruments with two return paths enclose a loop that picks up flux; the star ground ties all returns to one point.",
-              "back": "Left: a shared signal plus two separate ground returns form a loop; enclosed time-varying flux induces a noise EMF and circulating current. Right: every subsystem returns to a single star point, so there is no loop area and no shared-impedance coupling.",
-              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/analog-electronics/images/parasitics-grounding-layout-1.svg"
+              "type": "mcq",
+              "prompt": "In a circuit, what does \"ground\" actually refer to?",
+              "choices": [
+                "The common reference point that all other voltages are measured against - the \"0 V\" node",
+                "The literal soil under the building, always involved in every circuit",
+                "The most positive voltage in the system",
+                "A component that produces power"
+              ],
+              "answerIndex": 0,
+              "explanation": "Ground is the shared reference (the 0 V point) that voltages are compared to. It is not necessarily earth/soil, it is not the highest voltage, and it does not generate power."
             },
             {
               "id": "parasitics-grounding-layout-011",
-              "type": "flashcard",
-              "front": "Decoupling and return-current path: a bypass cap placed right at the IC supply pin, and the high-frequency return current hugging the trace directly beneath it in the ground plane.",
-              "back": "Place the 0.1 uF cap at the pin with a tiny cap-pin-via loop so L_loop*di/dt stays small. Over an unbroken ground plane the high-frequency return current flows directly under the signal trace, minimizing loop area, radiated EMI, and crosstalk.",
-              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/analog-electronics/images/parasitics-grounding-layout-2.svg"
+              "type": "mcq",
+              "prompt": "Why can two points both labeled \"ground\" actually be at slightly different voltages?",
+              "choices": [
+                "Ground is real copper with resistance, so current flowing through it creates a small voltage difference (V = I x R)",
+                "Ground voltage randomly changes with the weather",
+                "It is impossible - all grounds are always identical",
+                "Because ground has infinite resistance"
+              ],
+              "answerIndex": 0,
+              "explanation": "Real ground copper has parasitic resistance (and inductance). When current flows through it, Ohm's law gives a voltage drop, so different ground points can differ by a few millivolts or more. It is not weather-driven, and ground certainly is not a perfect identical node."
             },
             {
               "id": "parasitics-grounding-layout-012",
-              "type": "flashcard",
-              "front": "What is a ground loop and what two mechanisms make it generate noise?",
-              "back": "A ground loop exists when there is more than one ground-return path between subsystems, so the conductors enclose a closed loop. Noise arises (1) magnetically: time-varying flux through the loop induces an EMF (v = -dPhi/dt), and (2) by potential difference: unequal ground potentials drive a circulating current that develops noise voltage across the finite return impedance.",
-              "hint": "More than one return path; flux pickup plus potential differences."
+              "type": "mcq",
+              "prompt": "What is a ground loop?",
+              "choices": [
+                "When equipment is joined by more than one ground path, forming a closed loop that can pick up noise",
+                "A single straight ground wire with no connections",
+                "A loop of wire used to boost signal strength on purpose",
+                "A capacitor connected to ground"
+              ],
+              "answerIndex": 0,
+              "explanation": "A ground loop is created by having two or more separate ground return paths between devices, so the conductors enclose a closed loop. That loop can pick up magnetic interference and carry circulating currents. It is the opposite of a single clean return path."
             },
             {
               "id": "parasitics-grounding-layout-013",
-              "type": "flashcard",
-              "front": "List the standard ways to fix or break a ground loop.",
-              "back": "Use a single-point/star ground (eliminate the second path); galvanic isolation (isolation transformer, optocoupler, isolated amplifier); a differential/balanced receiver that rejects the common-mode ground difference (high CMRR); or a common-mode choke to raise the loop impedance to interfering currents. On a board, a solid low-impedance ground plane also minimizes the developed voltage.",
-              "hint": "Single-point, isolate, go differential, or choke it."
+              "type": "mcq",
+              "prompt": "You connect your laptop to powered speakers and hear a steady low 60 Hz buzz. The most likely cause is:",
+              "choices": [
+                "A ground loop letting mains-frequency interference into the signal",
+                "The speakers being too small",
+                "The audio file being corrupted",
+                "Static electricity stored in the cable"
+              ],
+              "answerIndex": 0,
+              "explanation": "A steady hum at the mains frequency (50 or 60 Hz) is the signature of a ground loop coupling power-line interference into the audio. Speaker size, file corruption, or static would not produce a continuous mains-frequency hum."
             },
             {
               "id": "parasitics-grounding-layout-014",
-              "type": "flashcard",
-              "front": "On a mixed-signal board, how should analog ground (AGND) and digital ground (DGND) be connected?",
-              "back": "Partition the board so analog and digital return currents stay in their own regions, and tie AGND and DGND together at exactly ONE point, typically directly under the ADC (often at its ground pins). This keeps noisy digital return current from flowing through the sensitive analog ground reference.",
-              "hint": "Join at a single point, usually under the ADC."
+              "type": "mcq",
+              "prompt": "What is single-point (star) grounding?",
+              "choices": [
+                "Running every part's ground connection back to one single common point, like spokes to a wheel hub",
+                "Connecting every ground to the nearest other ground in a chain",
+                "Using no ground at all",
+                "Grounding only the loudest component"
+              ],
+              "answerIndex": 0,
+              "explanation": "In a star ground, all returns meet at a single hub point, so no ground loops form and noise current from one section does not flow through another's ground. Chaining grounds together is exactly what creates shared-impedance noise problems."
             },
             {
               "id": "parasitics-grounding-layout-015",
-              "type": "flashcard",
-              "front": "Why does the PHYSICAL placement of a decoupling capacitor matter more than its exact value?",
-              "back": "The cap can only supply transient current through the loop formed by the cap, the pin, and the vias. That loop has inductance L_loop, and the supply-noise voltage is V = L_loop*di/dt. Placing the cap far from the pin (or with a large loop) adds inductance that no value of capacitance can overcome at high di/dt. Place it at the pin with a tiny loop.",
-              "hint": "V = L_loop * di/dt; minimize the loop, not just pick a value."
+              "type": "mcq",
+              "prompt": "Why do designers keep analog ground and digital ground separate on a mixed board?",
+              "choices": [
+                "Digital chips dump spiky, noisy return current that would corrupt sensitive analog signals if they shared the same ground path",
+                "Analog and digital grounds use different metals",
+                "Digital ground carries no current at all",
+                "It makes the board cheaper to manufacture"
+              ],
+              "answerIndex": 0,
+              "explanation": "Fast digital switching pushes noisy current into ground. If quiet analog circuitry shares that exact path, the noise rides into the analog signal. Separating the ground regions keeps the noise out. The metal is the same copper, and digital ground definitely carries current."
             },
             {
               "id": "parasitics-grounding-layout-016",
               "type": "mcq",
-              "prompt": "An IC draws a transient with di/dt = 0.1 A/ns through a decoupling loop with 2 nH of inductance. The supply-rail bounce is about:",
+              "prompt": "When analog and digital grounds are kept separate, they are typically joined together:",
               "choices": [
-                "200 mV",
-                "20 mV",
-                "2 V",
-                "2 mV"
+                "At exactly one single point, often right under the analog-to-digital converter",
+                "At many random points all over the board",
+                "Never - they must stay completely electrically isolated forever",
+                "Only through the power supply's AC plug"
               ],
               "answerIndex": 0,
-              "explanation": "V = L*di/dt = (2e-9 H)*(0.1 A / 1e-9 s) = (2e-9)*(1e8) = 0.2 V = 200 mV. Fast edges plus loop inductance produce large ground/supply bounce, which is why loop area must be minimized."
+              "explanation": "The two ground regions are tied together at one carefully chosen point (commonly under the ADC) so they share a reference but noisy digital return current never crosses the analog ground. Many random joins recreate loops, and total isolation would leave no shared reference."
             },
             {
               "id": "parasitics-grounding-layout-017",
               "type": "mcq",
-              "prompt": "For a purely LOW-frequency analog system, the preferred grounding scheme is:",
+              "prompt": "Which of these is a legitimate way to cure a ground-loop hum?",
               "choices": [
-                "Single-point (star) ground",
-                "Many random ground vias everywhere",
-                "A floating ground with no reference",
-                "Series-daisy-chained grounds through each board"
+                "Break the extra ground path so only one return remains (single-point grounding)",
+                "Add more parallel ground wires to create extra loops",
+                "Increase the volume to drown it out",
+                "Remove the signal cable entirely"
               ],
               "answerIndex": 0,
-              "explanation": "At low frequency, conductor inductance is negligible, so a single-point/star ground prevents shared-impedance coupling between subsystems. At high frequency the spoke inductance dominates and you switch to a solid ground plane (multipoint). Daisy-chaining shares impedance and couples noise."
+              "explanation": "Eliminating the redundant ground path removes the loop, so there is nothing for the interference to circulate through. Adding more ground paths makes more loops (worse), turning up the volume just amplifies the hum, and removing the cable removes the signal too.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/analog-electronics/images/parasitics-grounding-layout-1.svg"
             },
             {
               "id": "parasitics-grounding-layout-018",
               "type": "mcq",
-              "prompt": "Why is a solid ground PLANE preferred over a single-point star ground at high frequencies?",
+              "prompt": "Why is the idea of ground as a \"perfect 0 V everywhere\" node misleading?",
               "choices": [
-                "The long inductive spokes of a star ground present high impedance; a plane offers a low-inductance return everywhere",
-                "A plane has more resistance, which damps noise",
-                "Star grounds radiate less at high frequency",
-                "A plane eliminates ESR in capacitors"
+                "Because real ground is copper with parasitic resistance and inductance, so current through it creates real voltage differences",
+                "Because ground is actually the highest voltage in the circuit",
+                "Because ground does not exist in real circuits",
+                "Because voltage cannot exist on a conductor"
               ],
               "answerIndex": 0,
-              "explanation": "At high frequency the inductance (omega*L) of long star spokes becomes a large impedance and the single point is no longer equipotential. A ground plane gives the return current a low-inductance path directly under each signal trace, minimizing loop area and impedance."
-            },
-            {
-              "id": "parasitics-grounding-layout-019",
-              "type": "mcq",
-              "prompt": "A long signal cable runs between two mains-powered instruments and you hear 60 Hz hum. The most likely cause is:",
-              "choices": [
-                "A ground loop coupling power-line interference through the return path",
-                "Thermal noise in the cable",
-                "Shot noise in the connectors",
-                "The cable's characteristic impedance"
-              ],
-              "answerIndex": 0,
-              "explanation": "Two mains-grounded instruments plus the cable shield form a ground loop; power-line flux and ground-potential differences drive a 60 Hz (or 50 Hz) circulating current that appears as hum. Fixes: single-point ground, isolation, or a differential connection. Thermal/shot noise are broadband, not line-frequency hum."
+              "explanation": "Treating ground as a flawless equal-voltage node ignores that it is physical copper. Current flowing through its parasitic R and L creates small but real voltage differences between ground points - the root of many noise problems."
             }
           ]
         },
         {
-          "id": "parasitics-grounding-layout-return-paths-emc",
-          "title": "Return Paths, Crosstalk & EMI/EMC",
+          "id": "parasitics-grounding-layout-decoupling-bypass-caps",
+          "title": "Decoupling Capacitors: A Local Energy Tank for Each Chip",
           "order": 3,
-          "difficulty": 3,
-          "content": "High-frequency current does not take the path of least *resistance*; it takes the path of least **inductance**, which is the path of least enclosed **loop area**. Over an unbroken ground plane that path lies directly beneath the signal trace (the 'image current'). This single fact governs signal integrity, radiation, and crosstalk.\n\n**Return paths.** Slot or split the plane under a fast trace and the return current must detour around the gap, ballooning the loop area. That raises loop inductance (ringing, ground bounce), increases radiated EMI (a current loop is a magnetic antenna whose far field scales with area $\\times f^2 \\times I$), and lets the now-large field couple into neighbors. **Never route a fast signal across a plane split.**\n\n**Crosstalk** has two parasitic mechanisms. *Capacitive* (electric-field) coupling injects current $i = C_m\\,dV/dt$ from an aggressor's voltage swing into a victim; reduce with spacing, grounded guard traces, and lower impedance. *Inductive* (magnetic-field) coupling induces $v = M\\,dI/dt$ via mutual inductance between loops; reduce by minimizing loop areas, increasing separation, and keeping returns tight. Both fall off quickly with aggressor-victim spacing.\n\n**EMI/EMC.** Every product must both not *emit* excessive interference and be *immune* (susceptibility) to it, and pass regulatory limits (FCC Part 15, CISPR/EN). Tools: a continuous return plane (smallest loops), **shielding** (a Faraday enclosure for E-fields), **ferrite beads** (lossy series impedance that dissipates HF energy as heat), and **common-mode chokes** (high impedance to common-mode current, transparent to the differential signal). Pair this with tight switching loops, **Kelvin/sense** connections at precision nodes, and **guard rings** around high-impedance inputs. Good EMC is overwhelmingly a *layout* outcome, designed in from the start, not a shield bolted on at the end.",
+          "difficulty": 2,
+          "content": "**Hook.** Open almost any electronic device and look closely: next to nearly every chip sits a tiny capacitor, very often a **0.1 microfarad** ceramic. Why does practically every chip get its own little capacitor? That habit is one of the most important - and most universal - rules in real electronics.\n\n**Build.** A chip doesn't sip power smoothly. When it switches, it suddenly gulps a burst of current. That demand has to travel from the power supply through the power trace to the chip. But remember from before: that trace has parasitic inductance, and inductance *resists sudden changes in current*. So the trace can't deliver a fast gulp quickly enough, and the chip's supply voltage briefly sags or bounces. That dip can make the chip misbehave.\n\nThe fix is a **decoupling capacitor** (also called a **bypass capacitor**): a small capacitor placed right next to the chip's power pin, connected between power and ground. Think of it as a **local energy reservoir** - a small water tank right beside a faucet. When the chip suddenly needs a gulp of current, the nearby cap supplies it instantly from its stored charge, instead of forcing the demand all the way back down the inductive trace. The supply voltage stays steady.\n\nTwo practical points:\n- **Placement matters more than the exact value.** The cap must sit *as close as possible* to the power pin. If it is far away, the inductance of the wire between cap and pin defeats the purpose.\n- **Real caps aren't perfect either.** A real capacitor has its own tiny series resistance (called **ESR**, equivalent series resistance) and series inductance (**ESL**, equivalent series inductance). Because of ESL, every capacitor has a frequency (its **self-resonant frequency**) above which it stops acting like a capacitor and starts acting like an inductor. That is why designers sometimes use a big \"bulk\" capacitor for slow demands plus a small ceramic for fast ones - each handles a different speed range.\n\n**Recap.** A decoupling capacitor is a small local energy tank beside each chip that supplies sudden current bursts so the supply voltage stays steady. Put it right at the pin, and remember that real caps have ESR/ESL that limit them at high frequency.",
           "items": [
             {
+              "id": "parasitics-grounding-layout-019",
+              "type": "mcq",
+              "prompt": "What is the main job of a decoupling (bypass) capacitor next to a chip?",
+              "choices": [
+                "To act as a local energy reservoir that instantly supplies sudden current bursts the chip demands",
+                "To increase the chip's clock speed",
+                "To convert AC into DC for the whole board",
+                "To store data when the power is off"
+              ],
+              "answerIndex": 0,
+              "explanation": "The decoupling cap holds a little charge right next to the chip and releases it instantly when the chip suddenly draws current, keeping the supply steady. It does not set clock speed, rectify AC, or store data."
+            },
+            {
               "id": "parasitics-grounding-layout-020",
-              "type": "flashcard",
-              "front": "At high frequency, what path does return current actually take, and why?",
-              "back": "It takes the path of least INDUCTANCE, which is the path that minimizes enclosed loop area. Over a solid ground plane that means the return current flows directly underneath the signal trace (the image current). At DC/low frequency, by contrast, current spreads to follow the path of least resistance.",
-              "hint": "Least inductance = least loop area = directly under the trace."
+              "type": "mcq",
+              "prompt": "Why can't the power supply trace alone deliver a chip's sudden current gulp fast enough?",
+              "choices": [
+                "The trace has parasitic inductance, which resists sudden changes in current",
+                "The trace has zero resistance and so carries no current",
+                "Power supplies cannot provide any current",
+                "Copper melts during every switching event"
+              ],
+              "answerIndex": 0,
+              "explanation": "Trace inductance opposes fast changes in current, so a long supply trace can't ramp up current quickly enough for a sudden demand, and the chip's voltage sags. The trace does carry current, supplies do provide it, and copper does not melt routinely."
             },
             {
               "id": "parasitics-grounding-layout-021",
-              "type": "flashcard",
-              "front": "What happens if a fast signal trace crosses a slot or split in the ground plane?",
-              "back": "The return current cannot flow directly beneath the trace; it must detour around the slot, greatly increasing the enclosed loop area and thus loop inductance. Consequences: ringing/ground bounce, increased radiated EMI (larger loop antenna), and stronger crosstalk to neighbors. Rule: never route a high-speed signal across a plane gap.",
-              "hint": "Return detours, loop area balloons, EMI and ringing rise."
+              "type": "mcq",
+              "prompt": "What capacitor value is the classic \"one per chip\" decoupling choice you'll see everywhere?",
+              "choices": [
+                "0.1 microfarad (a small ceramic)",
+                "10 farads",
+                "1 picofarad only",
+                "There is no common value; it is fully random"
+              ],
+              "answerIndex": 0,
+              "explanation": "The ubiquitous default is a 0.1 uF ceramic placed at each chip's power pin. 10 F is a supercapacitor (far too large here), 1 pF is far too small, and the choice is a well-established convention, not random."
             },
             {
               "id": "parasitics-grounding-layout-022",
-              "type": "flashcard",
-              "front": "Distinguish capacitive from inductive crosstalk and give the coupling law for each.",
-              "back": "Capacitive (electric-field) crosstalk couples through mutual capacitance: injected current i = C_m * dV/dt, driven by the aggressor's voltage swing. Inductive (magnetic-field) crosstalk couples through mutual inductance: induced voltage v = M * dI/dt, driven by the aggressor's current change. Capacitive coupling worsens with high impedance/voltage; inductive with high current and large loops.",
-              "hint": "C_m*dV/dt (electric) vs. M*dI/dt (magnetic)."
+              "type": "mcq",
+              "prompt": "Which everyday analogy best fits a decoupling capacitor?",
+              "choices": [
+                "A small water tank right next to a faucet, ready to supply a sudden demand",
+                "A long hose with many kinks in it",
+                "A light switch on the wall",
+                "A thermometer measuring temperature"
+              ],
+              "answerIndex": 0,
+              "explanation": "Like a small tank beside the tap that handles a sudden burst of demand so the main pipe doesn't have to react instantly, the decoupling cap supplies quick current locally. The other analogies don't capture local instant energy storage."
             },
             {
               "id": "parasitics-grounding-layout-023",
-              "type": "flashcard",
-              "front": "What is a ferrite bead and how does it suppress high-frequency noise?",
-              "back": "A ferrite bead is a lossy ferromagnetic component placed in series with a line. At low frequency it is a small inductance/near short; at high frequency its impedance becomes largely RESISTIVE, dissipating HF energy as heat rather than reflecting it. It is specified by its impedance at a frequency (e.g. 600 ohms at 100 MHz) and damps HF currents on power/signal lines.",
-              "hint": "Frequency-dependent lossy series impedance; absorbs HF energy."
+              "type": "mcq",
+              "prompt": "For a decoupling capacitor, why does physical placement matter so much?",
+              "choices": [
+                "If the cap is far from the power pin, the inductance of the wire between them defeats its purpose",
+                "Placement has no effect; only the value matters",
+                "A distant cap heats up the chip",
+                "Capacitors only work when placed near the board edge"
+              ],
+              "answerIndex": 0,
+              "explanation": "The connection between the cap and the pin has its own inductance; the longer that path, the more it blocks the fast current the cap is supposed to deliver. So the cap must sit right at the pin. Value alone can't overcome a long, inductive connection."
             },
             {
               "id": "parasitics-grounding-layout-024",
-              "type": "flashcard",
-              "front": "How does a common-mode choke reject noise without blocking the wanted signal?",
-              "back": "Both signal conductors are wound on the same core so their differential (wanted) currents produce opposing flux that cancels, giving near-zero impedance to the signal. Common-mode (noise) currents flow the same direction in both, their flux adds, and the choke presents a high impedance that blocks them. It targets common-mode interference while passing differential signals.",
-              "hint": "Differential flux cancels; common-mode flux adds (high Z)."
+              "type": "mcq",
+              "prompt": "What do ESR and ESL stand for in a real capacitor?",
+              "choices": [
+                "Equivalent Series Resistance and Equivalent Series Inductance - the cap's unwanted built-in resistance and inductance",
+                "Extra Storage Reserve and Extra Storage Limit",
+                "Electric Surge Rate and Electric Surge Level",
+                "External Signal Range and External Signal Loss"
+              ],
+              "answerIndex": 0,
+              "explanation": "ESR (equivalent series resistance) and ESL (equivalent series inductance) are the parasitic resistance and inductance that come built into any real capacitor, making it imperfect. The other expansions are invented."
             },
             {
               "id": "parasitics-grounding-layout-025",
-              "type": "flashcard",
-              "front": "What is a Kelvin (4-wire / sense) connection and when do you need it?",
-              "back": "A Kelvin connection uses separate force (current-carrying) and sense (voltage-measuring) conductors to a node, so the IR drop in the force wires/trace is excluded from the measurement. Needed for precision: current-sense resistors, high-current shunts, regulator remote sense, and low-resistance measurements where trace resistance would corrupt the reading.",
-              "hint": "Separate force and sense leads; removes trace-IR error."
+              "type": "mcq",
+              "prompt": "Because of its ESL, what happens to a real capacitor above its self-resonant frequency?",
+              "choices": [
+                "It stops behaving like a capacitor and starts behaving like an inductor",
+                "It becomes a perfect capacitor with no losses",
+                "It turns into a resistor with fixed resistance forever",
+                "It permanently stops working"
+              ],
+              "answerIndex": 0,
+              "explanation": "Above the self-resonant frequency the parasitic inductance (ESL) dominates, so the part acts inductive rather than capacitive and is no longer a good bypass at those frequencies. It is not damaged - it just behaves differently."
             },
             {
               "id": "parasitics-grounding-layout-026",
               "type": "mcq",
-              "prompt": "The single most effective layout practice for minimizing both radiated EMI and crosstalk on a high-speed board is:",
+              "prompt": "Why do designers sometimes place a large \"bulk\" capacitor and a small ceramic capacitor together?",
               "choices": [
-                "Provide a continuous, unbroken ground/return plane adjacent to signal layers",
-                "Add as many test points as possible",
-                "Use the widest possible signal traces",
-                "Increase the supply voltage to improve margin"
+                "Each one works best over a different speed range, so together they keep the supply steady across more frequencies",
+                "The two cancel each other out for safety",
+                "It is purely decorative",
+                "Two capacitors always store exactly double the useful charge"
               ],
               "answerIndex": 0,
-              "explanation": "A continuous adjacent return plane lets each high-frequency return current flow directly under its trace, minimizing loop area. Small loops radiate less (loop emission scales with area) and couple less to neighbors. Most EMC problems trace back to a compromised return path."
+              "explanation": "A big bulk cap handles slower, larger demands while a small ceramic (with a higher self-resonant frequency) handles the fastest ones. Combined, they cover a wider frequency range than either alone. They don't cancel out, and it isn't decorative."
             },
             {
               "id": "parasitics-grounding-layout-027",
               "type": "mcq",
-              "prompt": "A high-impedance op-amp input picks up leakage and noise across the board surface. The best mitigation is:",
+              "prompt": "A chip glitches when it switches, and the supply voltage at its pin briefly dips. The most likely fix is:",
               "choices": [
-                "A guard ring driven to the node's potential surrounding the sensitive trace",
-                "A larger decoupling capacitor on the supply",
-                "A ferrite bead in series with the input",
-                "Increasing the feedback resistor value"
+                "Add a small decoupling capacitor right at the chip's power pin",
+                "Make the power trace as long as possible",
+                "Remove the chip's ground connection",
+                "Lower the supply current to zero"
               ],
               "answerIndex": 0,
-              "explanation": "Guarding surrounds the high-impedance node with a trace held at the same potential (driven by a buffer or the inverting node), so there is no voltage across the surface-leakage path and essentially no leakage current flows. Bigger supply caps or input ferrites do not address surface/insulation leakage at a high-Z node."
-            },
+              "explanation": "A supply dip on fast current demand is the textbook case for a decoupling cap placed at the pin to supply the burst locally. A longer trace adds inductance (worse), removing ground breaks the circuit, and zero current means the chip can't run.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/analog-electronics/images/parasitics-grounding-layout-2.svg"
+            }
+          ]
+        },
+        {
+          "id": "parasitics-grounding-layout-return-paths-crosstalk-emi",
+          "title": "Return Currents, Crosstalk & EMI/EMC",
+          "order": 4,
+          "difficulty": 3,
+          "content": "**Hook.** Why do phone makers obsess over exactly how traces are routed inside a tiny case? Because at high speed, *where the current comes back* matters as much as where it goes - and getting it wrong makes a circuit emit interference and pick up noise from its neighbors.\n\n**Build.** Every current that flows out to a chip must flow *back* to its source. This is the **return current**, and it usually travels in the ground plane (a solid sheet of copper). Here is the surprising part: at high frequency, return current does **not** take the path of least resistance. It takes the path of least **loop area** - it hugs the copper directly underneath the signal trace. A signal trace and its return form a loop, and the circuit \"wants\" that loop as small as possible.\n\nWhy care about loop size? A current flowing around a loop is a tiny **antenna**. A big loop:\n- radiates more interference outward (it broadcasts noise), and\n- picks up more interference from outside.\n\nIf you cut a slot in the ground plane under a fast trace, the return current can't go straight back - it has to detour around the gap, ballooning the loop. That is a classic mistake. **Never route a fast signal across a gap in its ground.**\n\nWhen the stray field from one trace's loop reaches into a *neighboring* trace, the neighbor picks up an unwanted copy of the signal. That's **crosstalk** - signals \"talking\" across to each other. You reduce it with more spacing, smaller loops, and sometimes a grounded \"guard\" trace in between.\n\nZooming out, this is the world of **EMI/EMC**:\n- **EMI** = Electromagnetic Interference: unwanted electrical noise a device emits or receives.\n- **EMC** = Electromagnetic Compatibility: a device behaving well - not jamming others, and not being jammed - and passing the legal limits every product must meet.\n\nCommon tools: a solid continuous ground plane (smallest loops), **shielding** (a metal enclosure that blocks fields, like a Faraday cage), and **ferrite beads** (small lossy beads slipped over a wire that turn high-frequency noise into a little heat and absorb it).\n\n**Recap.** Return current hugs the path of least loop area, right under the trace; big loops radiate and receive interference. Crosstalk is one trace's field leaking into another. Managing return paths, plus shielding and ferrites, is how a design achieves EMC - and it is mostly decided by layout, which is the real reason good engineers say \"works in SPICE\" is only half the battle.",
+          "items": [
             {
               "id": "parasitics-grounding-layout-028",
               "type": "mcq",
-              "prompt": "Capacitive crosstalk from a fast-switching aggressor onto a victim trace can be reduced MOST directly by:",
+              "prompt": "What is the \"return current\" in a circuit?",
               "choices": [
-                "Inserting a grounded guard trace between aggressor and victim and increasing spacing",
-                "Raising the victim node's impedance",
-                "Increasing the aggressor's voltage slew rate",
-                "Removing the ground plane"
+                "The current flowing back to its source to complete the loop, usually through the ground plane",
+                "Current that has been refunded by the power supply",
+                "A current that flows only in capacitors",
+                "Leftover current that disappears after use"
               ],
               "answerIndex": 0,
-              "explanation": "A grounded guard trace intercepts the electric-field coupling (the C_m*dV/dt current returns to ground instead of the victim), and greater spacing lowers the mutual capacitance. Raising victim impedance or aggressor dV/dt makes it WORSE; removing the plane enlarges loops and worsens all coupling."
+              "explanation": "Current must make a complete loop: out through the signal path and back through the return (commonly the ground plane). It doesn't vanish or get \"refunded\" - the return is just the second half of the loop."
             },
             {
               "id": "parasitics-grounding-layout-029",
               "type": "mcq",
-              "prompt": "Why is a switching converter's high-di/dt loop (input cap, switch, diode/synchronous FET) the critical layout loop to keep physically tiny?",
+              "prompt": "At HIGH frequency, which path does return current actually prefer?",
               "choices": [
-                "Its large di/dt across loop inductance generates ringing and broadband radiated EMI proportional to loop area",
-                "It carries the most DC current",
-                "It sets the converter's output voltage",
-                "It determines the feedback divider ratio"
+                "The path of least loop area - it hugs the copper directly beneath the signal trace",
+                "The path of least resistance, spreading out widely",
+                "The longest possible path around the board",
+                "It refuses to return and stays at the chip"
               ],
               "answerIndex": 0,
-              "explanation": "The hot loop carries the chopped (high di/dt) current; loop inductance times di/dt creates voltage spikes/ringing, and the loop radiates as a magnetic antenna with emission scaling with its area. Keeping this loop tiny (cap close to switch, small area) is the number-one switcher layout rule. DC paths and the feedback divider are separate concerns."
+              "explanation": "At high frequency the return current concentrates right under the signal trace to minimize the enclosed loop area (and thus inductance). At DC it would spread to follow least resistance, but high-frequency behavior is different."
+            },
+            {
+              "id": "parasitics-grounding-layout-030",
+              "type": "mcq",
+              "prompt": "Why is a small signal-and-return loop better than a large one?",
+              "choices": [
+                "A current loop acts like a little antenna; a small loop radiates and picks up much less interference",
+                "Small loops carry more current",
+                "Large loops are impossible to build",
+                "Loop size has no effect on interference"
+              ],
+              "answerIndex": 0,
+              "explanation": "A current loop behaves like a small antenna. Smaller loop area means it both broadcasts less noise and receives less from outside. Loop size strongly affects interference - that's the whole point."
+            },
+            {
+              "id": "parasitics-grounding-layout-031",
+              "type": "mcq",
+              "prompt": "What happens if a fast signal trace is routed across a slot (gap) cut in the ground plane?",
+              "choices": [
+                "The return current must detour around the gap, ballooning the loop area and increasing noise and radiation",
+                "Nothing - the gap has no effect on returns",
+                "The signal speeds up and improves",
+                "The trace automatically reroutes itself"
+              ],
+              "answerIndex": 0,
+              "explanation": "With the direct path blocked, the return current has to go the long way around the slot, enlarging the loop. That raises inductance, ringing, and radiated interference. It's a well-known layout mistake to avoid.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/analog-electronics/images/parasitics-grounding-layout-4.svg"
+            },
+            {
+              "id": "parasitics-grounding-layout-032",
+              "type": "mcq",
+              "prompt": "What is crosstalk?",
+              "choices": [
+                "When the field from one trace leaks into a neighboring trace, putting an unwanted copy of the signal onto it",
+                "Two engineers talking over each other",
+                "A capacitor charging too quickly",
+                "The deliberate mixing of two signals in a mixer chip"
+              ],
+              "answerIndex": 0,
+              "explanation": "Crosstalk is the unwanted coupling of one trace's signal into a nearby trace via stray electric or magnetic fields. It is an accidental leak between conductors, not an intentional mixing of signals."
+            },
+            {
+              "id": "parasitics-grounding-layout-033",
+              "type": "mcq",
+              "prompt": "Which of these helps reduce crosstalk between two traces?",
+              "choices": [
+                "Increasing the spacing between them and keeping loop areas small",
+                "Packing the traces as close together as possible",
+                "Removing the ground plane entirely",
+                "Increasing the signal frequency"
+              ],
+              "answerIndex": 0,
+              "explanation": "More spacing weakens the field coupling, and small loops radiate less, so both reduce crosstalk. Packing traces closer, removing the ground plane, or raising frequency all tend to make crosstalk worse."
+            },
+            {
+              "id": "parasitics-grounding-layout-034",
+              "type": "mcq",
+              "prompt": "What do EMI and EMC stand for?",
+              "choices": [
+                "Electromagnetic Interference (the unwanted noise) and Electromagnetic Compatibility (behaving well around other devices)",
+                "Electric Motor Input and Electric Motor Control",
+                "Extra Memory Interface and Extra Memory Cache",
+                "Emergency Mode Indicator and Emergency Mode Control"
+              ],
+              "answerIndex": 0,
+              "explanation": "EMI is the unwanted electromagnetic noise a device emits or receives; EMC is the goal of being electromagnetically compatible - not jamming others and not being jammed - and passing required limits. The other expansions are unrelated."
+            },
+            {
+              "id": "parasitics-grounding-layout-035",
+              "type": "mcq",
+              "prompt": "What does a ferrite bead do when slipped over a wire?",
+              "choices": [
+                "It presents a lossy impedance at high frequency, turning high-frequency noise into a little heat and absorbing it",
+                "It boosts the wire's voltage",
+                "It stores charge like a battery",
+                "It increases the wire's DC resistance to block all current"
+              ],
+              "answerIndex": 0,
+              "explanation": "A ferrite bead becomes resistive (lossy) at high frequency and dissipates that noise energy as heat, damping high-frequency interference while barely affecting the wanted low-frequency or DC signal. It is not a battery and doesn't boost voltage."
+            },
+            {
+              "id": "parasitics-grounding-layout-036",
+              "type": "mcq",
+              "prompt": "What is shielding in the EMI/EMC sense?",
+              "choices": [
+                "A conductive enclosure (like a Faraday cage) that blocks electromagnetic fields from getting in or out",
+                "A software filter applied to the signal",
+                "A thick coat of paint on the board",
+                "Adding more capacitors everywhere"
+              ],
+              "answerIndex": 0,
+              "explanation": "Shielding uses a conductive enclosure (a Faraday cage) to block fields, keeping internal noise in and external interference out. It is a physical/electromagnetic barrier, not a software filter, paint, or extra capacitors."
+            },
+            {
+              "id": "parasitics-grounding-layout-037",
+              "type": "mcq",
+              "prompt": "Why do experienced engineers say a design that \"works in SPICE\" is only half the battle?",
+              "choices": [
+                "Because real performance depends heavily on physical layout - return paths, loops, grounding - which an ideal simulation often ignores",
+                "Because SPICE always gives wrong answers",
+                "Because simulation is illegal for real products",
+                "Because layout never matters in practice"
+              ],
+              "answerIndex": 0,
+              "explanation": "Idealized simulations usually leave out parasitics, return-path geometry, and grounding realities, yet those layout factors decide whether the board actually works and passes EMC. Simulation is still valuable - it just can't capture the physical layout on its own."
             }
           ]
         }
