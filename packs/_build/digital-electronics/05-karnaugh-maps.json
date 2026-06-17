@@ -5,300 +5,636 @@
   "lessons": [
     {
       "id": "karnaugh-maps-lesson-1",
-      "title": "The K-Map as a Geometry of Adjacency",
+      "title": "Why Simplify, and What a K-Map Is",
       "order": 1,
       "difficulty": 1,
-      "content": "A Karnaugh map is just a truth table re-drawn so that **physically adjacent cells differ in exactly one input variable**. That single-variable-change property is the whole trick, and it comes from labelling the axes in **Gray code** ($00, 01, 11, 10$) instead of straight binary ($00, 01, 10, 11$). Walk left-to-right across a row and only one bit flips per step; the same holds top-to-bottom and, crucially, across the wrap-around edges (the map is a torus).\n\nWhy does this matter? Boolean algebra's **combining theorem** says\n\n$$X\\cdot Y + X\\cdot \\overline{Y} = X.$$\n\nTwo minterms that differ in one variable collapse, eliminating that variable. On the map those two minterms are *adjacent cells*, so \"draw a loop around adjacent 1s\" is the visual form of applying that theorem. A 2-variable map is a $2\\times 2$ grid (4 cells), a 3-variable map is $2\\times 4$ (8 cells), and a 4-variable map is $4\\times 4$ (16 cells), one cell per minterm.\n\nEach cell holds the function's output for that input combination. You fill it directly from the truth table or from the canonical SOP minterm list. As an ex-radar tech you already read state tables fluently; the K-map is the same data with the rows shuffled so that the *geometry encodes the algebra*. Get the Gray ordering and the cell-to-minterm mapping reflexive first — every later step (grouping, prime implicants, don't-cares) rides on top of this adjacency structure.",
+      "content": "Imagine you have a logic circuit built from gates (the tiny parts that compute AND, OR, and NOT). Often the first version you write is bigger than it needs to be. **Minimizing** means finding a simpler way to compute the *exact same* output using **fewer and smaller gates**. Fewer gates means a circuit that is cheaper to build, faster to react, and uses less power. So simplifying logic is not just tidiness, it saves real money and energy.\n\nYou already know about **truth tables** (a list of every input combination and the output it should give) and **Boolean algebra** (the rules for AND, OR, NOT). You *can* simplify by juggling algebra rules, but that is fiddly and easy to get wrong.\n\nA **Karnaugh map** (K-map for short, named after Maurice Karnaugh) is a smarter trick: it is just a truth table re-drawn as a **grid**. The grid is arranged so that simplifying becomes **visual**. You look for groups of adjacent 1s, draw a loop around each group, and each loop turns into one simpler term. It is a bit like spotting a pattern by grouping similar things together on a board.\n\nRecap: a K-map is a truth table laid out as a grid so you can simplify logic by *eye* instead of by algebra. The payoff is smaller, cheaper, faster circuits. The next lessons show how the grid is laid out and how the grouping works.",
       "items": [
-        {
-          "id": "karnaugh-maps-1-fc-1",
-          "type": "flashcard",
-          "front": "Why are K-map axes labelled in Gray code instead of straight binary?",
-          "back": "So that any two physically adjacent cells differ in exactly one input variable. That single-bit change is what lets the combining theorem X·Y + X·Y' = X apply to neighboring cells.",
-          "hint": "Think about what must be true of two cells you want to merge into one term."
-        },
-        {
-          "id": "karnaugh-maps-1-fc-2",
-          "type": "flashcard",
-          "front": "How many cells does an n-variable K-map have, and what does each cell represent?",
-          "back": "2^n cells, one per minterm (one row of the truth table). Each cell holds the function's output for that specific input combination."
-        },
-        {
-          "id": "karnaugh-maps-1-fc-3",
-          "type": "flashcard",
-          "front": "State the combining theorem that K-map grouping visualizes.",
-          "back": "X·Y + X·Y' = X. Two product terms identical except for one variable (which appears true in one and complemented in the other) merge, eliminating that variable."
-        },
-        {
-          "id": "karnaugh-maps-1-fc-4",
-          "type": "flashcard",
-          "front": "What is 'wrap-around adjacency' on a K-map?",
-          "back": "The left and right edges are adjacent, and the top and bottom edges are adjacent (the map behaves like a torus). The four corners of a 4-variable map, for example, are all mutually adjacent.",
-          "hint": "The map has no real borders for adjacency purposes."
-        },
-        {
-          "id": "karnaugh-maps-1-fc-5",
-          "type": "flashcard",
-          "front": "Write the Gray-code ordering used along a 4-cell K-map axis.",
-          "back": "00, 01, 11, 10 — each step changes one bit, including the wrap from 10 back to 00."
-        },
         {
           "id": "karnaugh-maps-1-mcq-1",
           "type": "mcq",
-          "prompt": "On a 4-variable K-map, why are minterms m0 (0000) and m8 (1000) considered adjacent even though they sit in different rows?",
+          "prompt": "What does it mean to 'minimize' a logic circuit?",
           "choices": [
-            "They differ in exactly one variable (A), and Gray-code row ordering places them in adjacent (wrap-around) positions",
-            "They have consecutive decimal indices",
-            "They are both in column 00 so any two cells in a column are adjacent regardless of bits",
-            "They are never adjacent; 0000 and 1000 cannot combine"
+            "Find a simpler circuit that produces the exact same output using fewer and smaller gates",
+            "Make the circuit produce a different, easier output",
+            "Shrink the physical size of each individual transistor",
+            "Reduce the number of inputs the circuit is allowed to have"
           ],
           "answerIndex": 0,
-          "explanation": "0000 and 1000 differ only in A. With Gray-coded AB rows (00,01,11,10), AB=00 and AB=10 are adjacent via the top/bottom wrap, so the cells touch and combine to eliminate A."
+          "explanation": "Minimizing keeps the behaviour (the truth table) identical while using fewer/smaller gates. It does not change what the circuit computes, and it is not about transistor size or removing inputs."
         },
         {
           "id": "karnaugh-maps-1-mcq-2",
           "type": "mcq",
-          "prompt": "A 3-variable K-map is most commonly drawn as which grid shape?",
+          "prompt": "Why is using fewer gates a good thing?",
           "choices": [
-            "2 x 4 (8 cells)",
-            "3 x 3 (9 cells)",
-            "4 x 4 (16 cells)",
-            "1 x 8 (8 cells in a single row)"
+            "Fewer gates generally means a cheaper, faster, lower-power circuit",
+            "Fewer gates make the circuit look more complicated",
+            "Fewer gates always change the output for the better",
+            "Fewer gates require a larger power supply"
           ],
           "answerIndex": 0,
-          "explanation": "Three variables give 2^3 = 8 minterms, conventionally arranged as a 2-row by 4-column grid (one variable on rows, two Gray-coded on columns)."
+          "explanation": "Each gate costs money, adds delay, and draws power. Trimming gates saves all three. The output stays the same; that is the whole point of minimizing."
         },
         {
           "id": "karnaugh-maps-1-mcq-3",
           "type": "mcq",
-          "prompt": "If a K-map's columns were labelled 00, 01, 10, 11 (straight binary) instead of Gray code, what breaks?",
+          "prompt": "In one sentence, what is a Karnaugh map?",
           "choices": [
-            "Horizontally adjacent cells would sometimes differ in two variables, so visual grouping would no longer correspond to the combining theorem",
-            "Nothing — the labelling is purely cosmetic",
-            "The map would need twice as many cells",
-            "The function's truth table would change"
+            "A truth table re-drawn as a grid so that logic can be simplified visually",
+            "A list of every gate available in a chip",
+            "A graph of voltage over time",
+            "A circuit that automatically rewires itself"
           ],
           "answerIndex": 0,
-          "explanation": "Between columns 01 and 10, two bits change. Adjacency would no longer guarantee a single-variable difference, so looping neighbors would not legally merge terms. Gray ordering is what makes geometric adjacency equal logical adjacency."
+          "explanation": "A K-map holds exactly the same information as a truth table, just arranged as a grid. The grid layout is what makes simplification something you can see by eye."
         },
         {
           "id": "karnaugh-maps-1-mcq-4",
           "type": "mcq",
-          "prompt": "You fill a K-map directly from a function's canonical SOP form. Where do the 1s go?",
+          "prompt": "On a K-map, how do you actually do the simplifying?",
           "choices": [
-            "In the cells whose minterm numbers appear in the SOP minterm list",
-            "In every cell, then you erase the maxterms",
-            "Only in the four corner cells",
-            "In the cells whose indices are prime numbers"
+            "Circle groups of adjacent 1s; each group becomes one simpler term",
+            "Erase every 1 and keep only the 0s",
+            "Add up the decimal values of all the cells",
+            "Rotate the grid until the 1s line up diagonally"
           ],
           "answerIndex": 0,
-          "explanation": "Canonical SOP is a list of minterms where the function equals 1. Each listed minterm number maps to one cell; place a 1 there and 0 elsewhere."
+          "explanation": "Grouping adjacent 1s and reading each loop as a single term is the core K-map technique. The remaining lessons build up the rules for doing this correctly."
+        },
+        {
+          "id": "karnaugh-maps-1-mcq-5",
+          "type": "mcq",
+          "prompt": "What background does a K-map assume you already have?",
+          "choices": [
+            "Truth tables and basic Boolean algebra (AND, OR, NOT)",
+            "Calculus and differential equations",
+            "How to program a microcontroller in C",
+            "How to solder a circuit board"
+          ],
+          "answerIndex": 0,
+          "explanation": "A K-map is just a re-arranged truth table simplified with Boolean ideas, so truth tables and AND/OR/NOT are the only prerequisites. No higher math or hardware skills are needed."
+        },
+        {
+          "id": "karnaugh-maps-1-mcq-6",
+          "type": "mcq",
+          "prompt": "Compared with simplifying by Boolean algebra alone, the K-map's main advantage is that it is:",
+          "choices": [
+            "Visual, so it is easier and less error-prone for small problems",
+            "The only method that gives a correct answer",
+            "Able to handle thousands of variables by hand",
+            "Faster only because it ignores some of the inputs"
+          ],
+          "answerIndex": 0,
+          "explanation": "Algebra works but is fiddly; the K-map turns the same job into spotting visual groups, which is easier to get right for small circuits. It does not ignore inputs, and it does not scale to huge problems (later lessons cover that limit)."
+        },
+        {
+          "id": "karnaugh-maps-1-mcq-7",
+          "type": "mcq",
+          "prompt": "A K-map and the matching truth table contain:",
+          "choices": [
+            "The same information, just arranged differently",
+            "Completely different information",
+            "Only the inputs, never the outputs",
+            "Only the rows where the output is 0"
+          ],
+          "answerIndex": 0,
+          "explanation": "The K-map is simply a re-layout of the truth table; no information is added or removed. Both list the output for every input combination."
+        },
+        {
+          "id": "karnaugh-maps-1-mcq-8",
+          "type": "mcq",
+          "prompt": "Which everyday picture best captures what K-map grouping feels like?",
+          "choices": [
+            "Spotting a pattern by grouping similar items together on a grid",
+            "Sorting a list of numbers from smallest to largest",
+            "Measuring the length of a wire with a ruler",
+            "Counting how many times a light blinks"
+          ],
+          "answerIndex": 0,
+          "explanation": "Grouping adjacent 1s on a grid is a pattern-spotting activity, much like clustering similar things on a board. That intuition is exactly what the K-map turns into a method."
         }
       ]
     },
     {
       "id": "karnaugh-maps-lesson-2",
-      "title": "Grouping, Prime Implicants & SOP/POS Minimization",
+      "title": "The Grid Layout: Gray-Code Adjacency",
       "order": 2,
-      "difficulty": 2,
-      "content": "Minimization is the art of covering every 1 with the **fewest, largest legal groups**. The rules: a group must be a rectangle of $2^k$ cells ($1, 2, 4, 8, 16$), may wrap around edges, and must contain only 1s (for SOP). A group of $2^k$ cells in an $n$-variable map eliminates $k$ variables, leaving an $(n-k)$-literal product term — so **bigger groups are cheaper**. Always grab the largest group each 1 can belong to.\n\nVocabulary that earns its keep when you read synthesis reports:\n\n- An **implicant** is any legal group (any product term that implies the function).\n- A **prime implicant (PI)** is a group that cannot be enlarged — no bigger legal rectangle contains it.\n- An **essential prime implicant (EPI)** is a PI that is the *only* PI covering some particular 1. EPIs must appear in any minimal cover.\n\nThe algorithm: list all PIs, select every EPI, then cover the remaining 1s with as few additional PIs as possible. See the diagram of a 4-cell group reducing to $B\\cdot D$.\n\n**SOP vs POS** is a duality. To get a minimal product-of-sums, group the **0s** instead of the 1s, read each group as a sum term using complemented logic, and combine with AND. Equivalently, by De Morgan,\n\n$$\\overline{F} = \\sum m(\\text{the 0 cells}), \\quad F = \\overline{\\overline{F}}.$$\n\nChoose whichever has fewer/larger groups: a function dense with 1s often yields a cheaper POS. The minimal SOP and minimal POS describe the *same* function but can differ in gate count, delay, and which hazards appear.",
+      "difficulty": 1,
+      "content": "Here is the clever part of a K-map: the cells are arranged so that any two cells **right next to each other differ in exactly one input variable**. That single-variable difference is what lets two cells merge into one simpler term, so the whole grid is built to make 'next to each other' mean 'almost identical'.\n\nTo get that, we do **not** label the axes in plain counting order ($00, 01, 10, 11$). Notice that going from $01$ to $10$ flips *two* bits at once. Instead we use **Gray code**: $00, 01, 11, 10$. Read across that sequence and only **one bit changes at each step** (00 to 01 flips the last bit, 01 to 11 flips the first, 11 to 10 flips the last). Gray code is just an ordering where neighbours differ by a single bit.\n\nThe smallest map has 2 variables and is a **2 x 2 grid (4 cells)**. A 3-variable map is a **2 x 4 grid (8 cells)**: one variable picks the row, and two Gray-coded variables pick the column. In general an $n$-variable map has $2^n$ cells, one per row of the truth table. Each cell holds the output (a 0 or a 1) for that input combination.\n\nOne more rule that surprises people: the edges **wrap around**. The leftmost column is treated as next to the rightmost column, and the top row as next to the bottom row, because in Gray code those also differ by one bit.\n\nRecap: Gray-code labels make neighbours differ by one variable, and the edges wrap. Get this layout solid; every later step rides on it.",
       "items": [
-        {
-          "id": "karnaugh-maps-2-fc-1",
-          "type": "flashcard",
-          "front": "Define a prime implicant (PI).",
-          "back": "A legal group (rectangle of 2^k cells of 1s) that cannot be enlarged into any bigger legal group. It is a maximal implicant of the function."
-        },
-        {
-          "id": "karnaugh-maps-2-fc-2",
-          "type": "flashcard",
-          "front": "Define an essential prime implicant (EPI) and state why it matters.",
-          "back": "An EPI is a prime implicant that is the only PI covering at least one specific 1-cell. Because nothing else can cover that minterm, every minimal cover must include all EPIs.",
-          "hint": "Look for a 1 that belongs to exactly one prime implicant."
-        },
-        {
-          "id": "karnaugh-maps-2-fc-3",
-          "type": "flashcard",
-          "front": "How many variables does a group of 2^k cells eliminate, and how many literals remain in an n-variable map?",
-          "back": "It eliminates k variables, leaving an (n - k)-literal product term. Larger groups => fewer literals => cheaper logic."
-        },
-        {
-          "id": "karnaugh-maps-2-fc-4",
-          "type": "flashcard",
-          "front": "How do you obtain a minimal POS expression from a K-map?",
-          "back": "Group the 0s (not the 1s) into the largest legal groups, read each group as a sum term (a variable is complemented if it is 1 across the group), and AND the sum terms together. This is the De Morgan dual of SOP grouping."
-        },
-        {
-          "id": "karnaugh-maps-2-fc-5",
-          "type": "flashcard",
-          "front": "What is the recommended order of operations once all prime implicants are listed?",
-          "back": "1) Select all essential prime implicants. 2) Remove the 1s they cover. 3) Cover any remaining 1s with the fewest additional prime implicants (the covering problem)."
-        },
         {
           "id": "karnaugh-maps-2-mcq-1",
           "type": "mcq",
-          "prompt": "On a 4-variable map, a group circles cells {5, 7, 13, 15}. What product term does it represent?",
+          "prompt": "What is special about two cells that sit right next to each other on a K-map?",
           "choices": [
-            "B AND D",
-            "A AND C",
-            "B AND D' ",
-            "A' AND B AND C AND D"
+            "They differ in exactly one input variable",
+            "They always hold the same output value",
+            "Their decimal minterm numbers are always consecutive",
+            "They differ in exactly two input variables"
           ],
           "answerIndex": 0,
-          "explanation": "Across those four cells B=1 and D=1 are constant while A and C take all combinations. The group of 4 eliminates the two varying variables (A, C), leaving B·D.",
-          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/karnaugh-maps-1.svg"
+          "explanation": "The grid is built so adjacency means a one-variable difference. That single-bit change is precisely what lets two neighbouring cells combine into a simpler term.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/karnaugh-maps-3.svg"
         },
         {
           "id": "karnaugh-maps-2-mcq-2",
           "type": "mcq",
-          "prompt": "Which statement about a minimal cover is correct?",
+          "prompt": "Which sequence is Gray code, used to label a 4-position K-map axis?",
           "choices": [
-            "It must contain every essential prime implicant, plus the fewest non-essential PIs needed to cover the rest",
-            "It must contain every prime implicant of the function",
-            "It may never contain a non-essential prime implicant",
-            "It is always unique for any function"
+            "00, 01, 11, 10",
+            "00, 01, 10, 11",
+            "11, 10, 01, 00",
+            "00, 11, 01, 10"
           ],
           "answerIndex": 0,
-          "explanation": "EPIs are mandatory. Remaining 1s are covered by selecting as few additional (non-essential) PIs as possible. Including all PIs would be redundant, and minimal covers are not always unique."
+          "explanation": "Gray code is 00, 01, 11, 10: each step flips just one bit, including the wrap from 10 back to 00. Plain binary (00,01,10,11) flips two bits between 01 and 10, which would break adjacency."
         },
         {
           "id": "karnaugh-maps-2-mcq-3",
           "type": "mcq",
-          "prompt": "A function has 1s in 13 of a 4-variable map's 16 cells. Why might POS be cheaper than SOP here?",
+          "prompt": "Why are the axes NOT labelled in plain binary counting order (00, 01, 10, 11)?",
           "choices": [
-            "Only 3 cells are 0, so grouping the sparse 0s likely yields fewer and larger groups than covering 13 scattered 1s",
-            "POS is always cheaper than SOP regardless of the function",
-            "SOP cannot represent functions with more than 8 ones",
-            "POS uses Gray code while SOP does not"
+            "Because the 01-to-10 step flips two bits, so neighbours would differ in two variables and could not be merged",
+            "Because plain binary cannot represent the number 2",
+            "Because it would need twice as many cells",
+            "Because the output values would change"
           ],
           "answerIndex": 0,
-          "explanation": "Minimization cost scales with the number and size of groups needed. With few 0s, grouping the 0s (POS) tends to need fewer terms than covering many 1s (SOP). Always check both."
+          "explanation": "Going 01 to 10 changes both bits at once. If neighbours differed in two variables, looping them would not match the rule that lets cells merge. Gray code keeps every neighbour one bit apart."
         },
         {
           "id": "karnaugh-maps-2-mcq-4",
           "type": "mcq",
-          "prompt": "A single 1-cell can be grouped with no neighbor (all four neighbors are 0). What does this tell you?",
+          "prompt": "How many cells does an n-variable K-map have, and what does each cell hold?",
           "choices": [
-            "That isolated cell is itself an essential prime implicant and forces a full n-literal product term",
-            "The K-map was filled incorrectly",
-            "The cell can be ignored to save logic",
-            "It means the function is a tautology"
+            "2^n cells, each holding the output for one input combination",
+            "n cells, each holding one input variable",
+            "2n cells, each holding a gate",
+            "n^2 cells, each holding a Gray-code label"
           ],
           "answerIndex": 0,
-          "explanation": "A lone 1 forms a group of size 1 (a 2^0 group), is the only PI covering itself (hence essential), and contributes an unreduced n-literal minterm to the cover."
+          "explanation": "There is one cell per truth-table row, and a truth table for n variables has 2^n rows. Each cell stores that row's output (a 0 or 1)."
+        },
+        {
+          "id": "karnaugh-maps-2-mcq-5",
+          "type": "mcq",
+          "prompt": "What shape is a standard 2-variable K-map?",
+          "choices": [
+            "A 2 x 2 grid (4 cells)",
+            "A 2 x 4 grid (8 cells)",
+            "A 4 x 4 grid (16 cells)",
+            "A single row of 4 cells"
+          ],
+          "answerIndex": 0,
+          "explanation": "Two variables give 2^2 = 4 minterms, drawn as a 2-by-2 grid. The 2x4 (8 cells) is the 3-variable map and 4x4 (16 cells) is the 4-variable map."
+        },
+        {
+          "id": "karnaugh-maps-2-mcq-6",
+          "type": "mcq",
+          "prompt": "A 3-variable K-map is usually drawn as which grid?",
+          "choices": [
+            "A 2 x 4 grid (8 cells): one variable on the row, two Gray-coded on the columns",
+            "A 3 x 3 grid (9 cells)",
+            "A 4 x 4 grid (16 cells)",
+            "A 1 x 8 single row"
+          ],
+          "answerIndex": 0,
+          "explanation": "Three variables give 2^3 = 8 cells. The usual layout puts one variable on two rows and two Gray-coded variables across four columns.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/karnaugh-maps-4.svg"
+        },
+        {
+          "id": "karnaugh-maps-2-mcq-7",
+          "type": "mcq",
+          "prompt": "What does 'wrap-around' adjacency mean on a K-map?",
+          "choices": [
+            "The left edge is treated as next to the right edge, and the top as next to the bottom",
+            "You may only group cells that touch in the middle of the grid",
+            "The grid must be folded into a physical tube before use",
+            "Corner cells can never be grouped with anything"
+          ],
+          "answerIndex": 0,
+          "explanation": "In Gray code the first and last labels also differ by one bit, so the outer edges are neighbours. The leftmost and rightmost columns wrap together, as do the top and bottom rows."
+        },
+        {
+          "id": "karnaugh-maps-2-mcq-8",
+          "type": "mcq",
+          "prompt": "You fill a K-map from a function written as a list of minterms (the input combinations where the output is 1). Where do the 1s go?",
+          "choices": [
+            "In the cells whose minterm numbers appear in that list; all other cells get 0",
+            "In every cell, then you erase the wrong ones at random",
+            "Only in the four corner cells",
+            "In the cells whose numbers are even"
+          ],
+          "answerIndex": 0,
+          "explanation": "A minterm list names exactly the input combinations that give output 1. Place a 1 in each listed cell and 0 everywhere else; that is the K-map of the function."
+        },
+        {
+          "id": "karnaugh-maps-2-mcq-9",
+          "type": "mcq",
+          "prompt": "On a 3-variable map with columns labelled 00, 01, 11, 10, which two columns are neighbours by wrap-around?",
+          "choices": [
+            "The 00 column and the 10 column (the far-left and far-right)",
+            "The 01 column and the 11 column",
+            "No columns wrap on a 3-variable map",
+            "Every column is a neighbour of every other column"
+          ],
+          "answerIndex": 0,
+          "explanation": "00 and 10 differ in just one bit, so the far-left and far-right columns are adjacent even though they sit at opposite ends of the grid. That is wrap-around adjacency."
         }
       ]
     },
     {
       "id": "karnaugh-maps-lesson-3",
-      "title": "Don't-Cares, Quine-McCluskey & Hazard Removal",
+      "title": "Grouping Rules and 4-Variable Maps",
       "order": 3,
-      "difficulty": 3,
-      "content": "**Don't-cares** ($d$ or $X$) are input combinations that never occur or whose output you don't care about (e.g., the invalid codes $1010$-$1111$ in a BCD digit). Treat each $X$ as a free $1$ *only when it enlarges a group*, and as $0$ otherwise. Never cover an $X$ that buys you nothing — it is never required on its own. Exploited well, don't-cares routinely halve literal counts (see the wrap-around corner group in the second diagram).\n\nK-maps run out of steam past 4-5 variables (a 5-var map is two stacked 4-var maps; 6-var is four). The **Quine-McCluskey** tabular method is the algorithmic generalization that gives the *same* prime implicants without geometry: list minterms grouped by bit-count, repeatedly combine terms differing in one bit (marking $-$ for the eliminated variable), and the uncombinable terms are the prime implicants. A **PI chart** then selects EPIs and a minimal cover. It is exact but exponential; real synthesizers use heuristic minimizers like **Espresso**, which trade guaranteed minimality for speed on hundreds of variables.\n\n**Hazard removal:** a minimal cover can still **glitch**. A static-1 hazard occurs when an input change moves between two adjacent 1-cells that lie in *different* groups — momentarily, neither product term holds and the output dips. The fix is to add a **redundant (consensus) product term** that covers the overlap, bridging the two groups. The consensus of $A\\cdot C$ and $\\overline{A}\\cdot B$ is $B\\cdot C$:\n\n$$A\\cdot C + \\overline{A}\\cdot B + B\\cdot C.$$\n\nThe extra term costs a gate but guarantees a glitch-free output — essential for asynchronous logic and any signal feeding an edge-sensitive input.",
+      "difficulty": 2,
+      "content": "Now we put the layout to work. The 4-variable map is a **4 x 4 grid (16 cells)**, with two Gray-coded variables on the rows and two on the columns. It is big enough to show every grouping rule.\n\nTo simplify, you cover all the 1s with loops, following these rules:\n\n- A loop (a **group**) must contain only 1s.\n- A group's size must be a **power of two**: 1, 2, 4, 8, or 16 cells. Never 3, 5, 6, and so on.\n- A group must be a rectangle (a straight block), and it may **wrap around** the edges.\n- **Make every group as big as legally possible**, and use as few groups as you can.\n\nWhy do bigger groups win? Each time a group **doubles** in size, it removes one more variable from that term. Concretely, in an $n$-variable map a group of $2^k$ cells eliminates $k$ variables, leaving a product term with $n-k$ letters. A group of 1 keeps all $n$ letters; a group of 16 covers the whole map and the term disappears entirely (the output is always 1). So a bigger loop equals a shorter, cheaper term. That is why the guiding habit is **largest group first**.\n\nA single isolated 1 (no neighbouring 1s) still must be covered, as a group of size 1.\n\nRecap: cover all the 1s with the fewest, largest power-of-two rectangles, wrapping allowed. Bigger groups drop more variables, giving simpler terms.",
       "items": [
-        {
-          "id": "karnaugh-maps-3-fc-1",
-          "type": "flashcard",
-          "front": "How should a don't-care (X) cell be treated during K-map grouping?",
-          "back": "As a free 1 only when it lets you form a larger group (eliminating more variables); otherwise as a 0. Never form a group whose sole purpose is to cover an X — don't-cares are optional, never required.",
-          "hint": "It is a wildcard, not an obligation."
-        },
-        {
-          "id": "karnaugh-maps-3-fc-2",
-          "type": "flashcard",
-          "front": "Summarize the Quine-McCluskey procedure at a conceptual level.",
-          "back": "Group minterms by number of 1-bits, repeatedly combine pairs that differ in exactly one bit (marking the dropped bit with a dash), and collect terms that can no longer combine — those are the prime implicants. A PI/coverage chart then picks EPIs and a minimal cover."
-        },
-        {
-          "id": "karnaugh-maps-3-fc-3",
-          "type": "flashcard",
-          "front": "What does Espresso do that Quine-McCluskey does not, and what is the trade-off?",
-          "back": "Espresso is a heuristic minimizer used inside real synthesis tools; it scales to hundreds of variables quickly but does not guarantee an absolute minimum. Quine-McCluskey is exact but exponential and impractical for large functions."
-        },
-        {
-          "id": "karnaugh-maps-3-fc-4",
-          "type": "flashcard",
-          "front": "What is a static-1 hazard and what causes it on a K-map?",
-          "back": "A momentary 0-glitch in an output that should stay 1, occurring when a single input change moves between two adjacent 1-cells that belong to different product-term groups — neither term covers the transition instant.",
-          "hint": "Think about two loops that touch but do not overlap."
-        },
-        {
-          "id": "karnaugh-maps-3-fc-5",
-          "type": "flashcard",
-          "front": "How do you remove a static-1 hazard, and what is the cost?",
-          "back": "Add a redundant consensus product term that overlaps both groups straddling the hazard transition, so coverage is continuous through the input change. Cost: one extra gate; the term is logically redundant but eliminates the glitch."
-        },
-        {
-          "id": "karnaugh-maps-3-fc-6",
-          "type": "flashcard",
-          "front": "Give the consensus term of A·C and A'·B.",
-          "back": "B·C. The consensus theorem: A·C + A'·B = A·C + A'·B + B·C, where the added B·C is the redundant term used for hazard cover."
-        },
         {
           "id": "karnaugh-maps-3-mcq-1",
           "type": "mcq",
-          "prompt": "A BCD-input function leaves codes 1010 through 1111 unused. The minimal use of these as don't-cares is to:",
+          "prompt": "Which group size is NOT allowed on a K-map?",
           "choices": [
-            "Mark them X and include any that enlarge a group of the required 1s, ignoring the rest",
-            "Always treat all six as 1 to maximize coverage",
-            "Always treat all six as 0 to be safe",
-            "Remove those six cells from the map entirely"
+            "A group of 3 cells",
+            "A group of 2 cells",
+            "A group of 4 cells",
+            "A group of 8 cells"
           ],
           "answerIndex": 0,
-          "explanation": "Don't-cares are opportunistic: assign each X to 1 only if it grows a group covering real minterms; leave the others effectively 0. Forcing all to 1 can create needless terms; forcing all to 0 forfeits free reduction.",
-          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/karnaugh-maps-2.svg"
+          "explanation": "Group sizes must be powers of two: 1, 2, 4, 8, 16. Three is not a power of two, so a group of 3 is illegal even if three 1s sit in a row."
         },
         {
           "id": "karnaugh-maps-3-mcq-2",
           "type": "mcq",
-          "prompt": "Why does adding a consensus term to a minimal SOP NOT change the function it computes?",
+          "prompt": "On a 4-variable map, a legal group of 4 cells leaves a product term with how many letters?",
           "choices": [
-            "The consensus term is logically redundant — it is already implied by the existing terms, so it only changes timing behavior, not the truth table",
-            "It changes the function but only for don't-care inputs",
-            "It converts the SOP into a POS",
-            "It removes one of the original product terms automatically"
+            "2 letters",
+            "4 letters",
+            "1 letter",
+            "0 letters"
           ],
           "answerIndex": 0,
-          "explanation": "By the consensus theorem the added term is implied by the others, so steady-state output is unchanged. Its only effect is to keep coverage continuous during an input transition, killing the glitch."
+          "explanation": "A group of 4 = 2^2 cells eliminates k=2 variables. In a 4-variable map that leaves 4 - 2 = 2 letters in the term."
         },
         {
           "id": "karnaugh-maps-3-mcq-3",
           "type": "mcq",
-          "prompt": "How is a 5-variable function typically mapped with K-maps, and why is this near the practical limit?",
+          "prompt": "Why do we always try to make each group as large as possible?",
           "choices": [
-            "As two stacked 4-variable maps with adjacency between corresponding cells; tracking inter-map adjacency by eye becomes error-prone, so tabular/automated methods take over",
-            "As a single 5x6 grid with all 32 cells in one rectangle",
-            "It cannot be represented by any K-map at all",
-            "By converting it to decimal first"
+            "A larger group removes more variables, giving a shorter and cheaper term",
+            "A larger group is easier to draw neatly",
+            "A larger group changes the output to all 1s",
+            "Smaller groups are illegal in every K-map"
           ],
           "answerIndex": 0,
-          "explanation": "A 5-variable map is two 4-variable maps; cells in the same position across the maps are adjacent. Beyond 4-5 variables this 3D adjacency is hard to see reliably, which is why Quine-McCluskey / Espresso are used."
+          "explanation": "Each doubling of a group drops one more variable. Bigger loops therefore yield terms with fewer letters, which means fewer/simpler gates. That is the reason for the 'largest group first' habit."
         },
         {
           "id": "karnaugh-maps-3-mcq-4",
           "type": "mcq",
-          "prompt": "In Quine-McCluskey, which terms become the prime implicants?",
+          "prompt": "A group of 8 cells in a 4-variable map leaves a term with how many letters?",
           "choices": [
-            "The terms that can no longer be combined with any other term (left unchecked at the end of all combining passes)",
-            "The terms with the most 1-bits",
-            "The terms appearing in the first column only",
-            "Every minterm that was originally listed"
+            "1 letter",
+            "3 letters",
+            "0 letters",
+            "8 letters"
           ],
           "answerIndex": 0,
-          "explanation": "Combining proceeds until no further pairs differ in exactly one bit. Any term that was never absorbed into a larger combination is maximal — a prime implicant."
+          "explanation": "Eight cells = 2^3, so k = 3 variables are eliminated. In a 4-variable map that leaves 4 - 3 = 1 letter. Bigger group, shorter term."
         },
         {
           "id": "karnaugh-maps-3-mcq-5",
           "type": "mcq",
-          "prompt": "Why does hazard-free covering matter most for asynchronous outputs or signals driving edge-sensitive inputs?",
+          "prompt": "A lone 1 sits with 0s on all four sides. What must you do with it?",
           "choices": [
-            "A transient glitch can be latched as a real edge/level by downstream logic, causing a false trigger that a synchronous register might otherwise have masked",
-            "Asynchronous logic runs slower so glitches last longer",
-            "Edge-sensitive inputs ignore all glitches by design",
-            "Glitches only affect power consumption, never function"
+            "Cover it as a group of size 1, which keeps all four variables in that term",
+            "Ignore it to save gates",
+            "Erase it because it cannot be grouped",
+            "Merge it diagonally with the nearest 1"
           ],
           "answerIndex": 0,
-          "explanation": "Synchronous logic samples on a clock edge, often after glitches settle. But an asynchronous path or an edge-triggered input can capture the spurious transition as a genuine event, so the redundant consensus term is worth its gate."
+          "explanation": "Every 1 must be covered. With no neighbouring 1s the largest legal group is just itself (size 1), which removes zero variables and keeps the full 4-letter term. Diagonal grouping is not allowed."
+        },
+        {
+          "id": "karnaugh-maps-3-mcq-6",
+          "type": "mcq",
+          "prompt": "Can a group legally wrap around from the right edge of the map to the left edge?",
+          "choices": [
+            "Yes, because the left and right edges are adjacent in Gray code",
+            "No, groups must stay inside the visible borders",
+            "Only on a 2-variable map",
+            "Only if the group has exactly 3 cells"
+          ],
+          "answerIndex": 0,
+          "explanation": "Wrap-around adjacency means the outer edges are neighbours, so a group may span from one edge across to the opposite edge. The four corners of a 4-variable map, for instance, can form one group of 4."
+        },
+        {
+          "id": "karnaugh-maps-3-mcq-7",
+          "type": "mcq",
+          "prompt": "Two 1s sit side by side. The group of 2 covering them eliminates how many variables?",
+          "choices": [
+            "1 variable",
+            "2 variables",
+            "0 variables",
+            "4 variables"
+          ],
+          "answerIndex": 0,
+          "explanation": "A group of 2 = 2^1 cells eliminates k = 1 variable, because the two cells differ in exactly that one variable. The variable that changes across the pair drops out of the term."
+        },
+        {
+          "id": "karnaugh-maps-3-mcq-8",
+          "type": "mcq",
+          "prompt": "A group covers all 16 cells of a 4-variable map. What does the term become?",
+          "choices": [
+            "It vanishes; the output is simply 1 for every input",
+            "It keeps all four variables",
+            "It becomes a single-letter term",
+            "It is illegal because 16 is too big"
+          ],
+          "answerIndex": 0,
+          "explanation": "A group of 16 = 2^4 eliminates all 4 variables (4 - 4 = 0 letters). The function is constantly 1. Sixteen is a power of two, so the group is perfectly legal."
+        },
+        {
+          "id": "karnaugh-maps-3-mcq-9",
+          "type": "mcq",
+          "prompt": "Which is the best grouping strategy?",
+          "choices": [
+            "Cover every 1 using the fewest groups, each as large as legally possible",
+            "Use as many tiny groups as you can",
+            "Cover only half the 1s and leave the rest",
+            "Cover the 0s and ignore the 1s"
+          ],
+          "answerIndex": 0,
+          "explanation": "Fewest groups means fewer OR-ed terms; largest groups means fewer letters per term. Both shrink the circuit. Every 1 must be covered, and for a sum-of-products result you group the 1s, not the 0s."
+        }
+      ]
+    },
+    {
+      "id": "karnaugh-maps-lesson-4",
+      "title": "Reading Off the Simplified Expression",
+      "order": 4,
+      "difficulty": 2,
+      "content": "Once your 1s are grouped, you turn the picture back into a formula. The result is in **sum-of-products (SOP)** form: each group becomes one **product term** (variables ANDed together), and then you OR all the product terms together. 'Sum' is the OR, 'product' is the AND.\n\nTo read a single group, ask: **which variables stay constant across every cell in the loop?**\n\n- A variable that is **1** for the whole group appears as itself (for example $A$).\n- A variable that is **0** for the whole group appears **complemented**, written $\\\\overline{A}$ (read 'not A' or 'A-bar').\n- A variable that **changes** within the group has been eliminated, so you drop it.\n\nExample: suppose a group of four cells all share $C=1$ and $D=1$, while $A$ and $B$ each take both values. Then $C$ and $D$ stay constant (so they appear) and $A,B$ vary (so they drop). The term is $C\\\\cdot D$. If another group of two all share $A=1$, $B=0$, $D=0$, that term is $A\\\\cdot\\\\overline{B}\\\\cdot\\\\overline{D}$. The whole simplified function is the OR of the groups:\n$$F = C\\\\cdot D + A\\\\cdot\\\\overline{B}\\\\cdot\\\\overline{D}.$$\n\nRecap: each loop gives one AND term (constant-1 variables plain, constant-0 variables barred, changing variables dropped), and you OR the loops together. That OR-of-ANDs is the minimized SOP expression.",
+      "items": [
+        {
+          "id": "karnaugh-maps-4-mcq-1",
+          "type": "mcq",
+          "prompt": "In a sum-of-products (SOP) expression, what do 'sum' and 'product' mean?",
+          "choices": [
+            "Sum = OR of the terms; product = AND of the variables inside a term",
+            "Sum = ordinary addition; product = ordinary multiplication",
+            "Sum = AND; product = OR",
+            "Sum = NOT; product = XOR"
+          ],
+          "answerIndex": 0,
+          "explanation": "In Boolean form 'product' is AND (variables ANDed within a term) and 'sum' is OR (terms ORed together). So SOP is an OR of AND-terms."
+        },
+        {
+          "id": "karnaugh-maps-4-mcq-2",
+          "type": "mcq",
+          "prompt": "To read a group, you check each variable. A variable that stays 1 across the whole group appears in the term as:",
+          "choices": [
+            "Itself, for example A",
+            "Its complement, A-bar",
+            "Dropped entirely",
+            "A constant 0"
+          ],
+          "answerIndex": 0,
+          "explanation": "A variable held at 1 throughout the group appears uncomplemented (just A). A variable held at 0 would appear barred; a variable that changes is dropped."
+        },
+        {
+          "id": "karnaugh-maps-4-mcq-3",
+          "type": "mcq",
+          "prompt": "A variable that stays 0 across the whole group appears as:",
+          "choices": [
+            "Its complement, written A-bar",
+            "Itself, A",
+            "A 1",
+            "It is removed from the term"
+          ],
+          "answerIndex": 0,
+          "explanation": "Held at 0 means the term is true when that variable is 0, i.e. when its complement is 1, so you write the barred form A-bar. Only variables that CHANGE get removed."
+        },
+        {
+          "id": "karnaugh-maps-4-mcq-4",
+          "type": "mcq",
+          "prompt": "A variable that changes value within the group (1 in some cells, 0 in others) is:",
+          "choices": [
+            "Dropped from that term",
+            "Written as itself",
+            "Written as its complement",
+            "Written twice"
+          ],
+          "answerIndex": 0,
+          "explanation": "A variable that is not constant cannot help define the group, so it is eliminated. This is exactly why bigger groups (more varying variables) give shorter terms."
+        },
+        {
+          "id": "karnaugh-maps-4-mcq-5",
+          "type": "mcq",
+          "prompt": "A group of 4 cells all have C = 1 and D = 1, while A and B take every combination. Circle the right group: what is its term?",
+          "choices": [
+            "C AND D",
+            "A AND B",
+            "C AND D, both complemented",
+            "A AND B AND C AND D"
+          ],
+          "answerIndex": 0,
+          "explanation": "C and D stay constant at 1, so they appear plain; A and B vary, so they drop. The simplified term is C AND D. Because two variables were eliminated, the group must have been size 4.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/karnaugh-maps-5.svg"
+        },
+        {
+          "id": "karnaugh-maps-4-mcq-6",
+          "type": "mcq",
+          "prompt": "A group of 2 cells all have A = 1, B = 0, and D = 0, while C changes. What is the simplified term?",
+          "choices": [
+            "A AND B-bar AND D-bar",
+            "A AND B AND D",
+            "A AND C",
+            "A-bar AND B AND D"
+          ],
+          "answerIndex": 0,
+          "explanation": "A stays 1 (plain A); B stays 0 (B-bar); D stays 0 (D-bar); C varies and drops. The term is A AND B-bar AND D-bar. Three letters remain, matching a group of 2 in a 4-variable map."
+        },
+        {
+          "id": "karnaugh-maps-4-mcq-7",
+          "type": "mcq",
+          "prompt": "You found two groups giving terms C AND D and A AND B-bar AND D-bar. How do you combine them into the final expression?",
+          "choices": [
+            "OR them together: F = (C AND D) OR (A AND B-bar AND D-bar)",
+            "AND them together",
+            "Subtract the smaller term from the larger",
+            "Keep only the term with fewer letters"
+          ],
+          "answerIndex": 0,
+          "explanation": "In SOP form every group is one product term and they are joined with OR. The full minimized function is the OR of all the group terms.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/karnaugh-maps-5.svg"
+        },
+        {
+          "id": "karnaugh-maps-4-mcq-8",
+          "type": "mcq",
+          "prompt": "A group of two cells differs only in variable B (B is 1 in one cell, 0 in the other); both cells have A = 0. What term results?",
+          "choices": [
+            "A-bar (just the single letter A-bar)",
+            "A-bar AND B",
+            "A-bar AND B-bar",
+            "B"
+          ],
+          "answerIndex": 0,
+          "explanation": "A stays 0, giving A-bar; B changes, so it drops. With only those two variables involved the whole term collapses to A-bar. The single varying variable was eliminated."
+        },
+        {
+          "id": "karnaugh-maps-4-mcq-9",
+          "type": "mcq",
+          "prompt": "If a group's term comes out with zero letters (everything varied), what does that tell you?",
+          "choices": [
+            "The group covers the entire map, so the function is always 1",
+            "You made an error and should erase the group",
+            "The function is always 0",
+            "You must add the missing variables back in"
+          ],
+          "answerIndex": 0,
+          "explanation": "Every variable varying means the group spans all 2^n cells, eliminating all variables. The output is constantly 1. (Grouping 1s can never produce a constant 0 result.)"
+        }
+      ]
+    },
+    {
+      "id": "karnaugh-maps-lesson-5",
+      "title": "Prime Implicants, Don't-Cares and Beyond",
+      "order": 5,
+      "difficulty": 3,
+      "content": "A few ideas polish the method. First, vocabulary for picking groups well. A **prime implicant** is a group that is already as large as it can legally be (no bigger legal loop contains it). An **essential prime implicant** is a prime implicant that is the *only* group able to cover some particular 1. Because nothing else can cover that 1, an essential prime implicant **must** appear in the final answer. The practical recipe: pick all the essential prime implicants first, then add the fewest extra prime implicants needed to cover any leftover 1s.\n\nSecond, **don't-care cells** (written $X$). These are input combinations that can never happen, or whose output truly does not matter (for example the unused codes $1010$ to $1111$ in a 4-bit decimal digit). An $X$ is a wildcard: treat it as a $1$ **only when doing so makes a group bigger**, and as a $0$ otherwise. Used well, don't-cares often shrink the result noticeably. Never build a group whose only purpose is to cover an $X$; they are optional, never required.\n\nThird, the limits and the tools. K-maps get unwieldy past 4 or 5 variables. The **Quine-McCluskey** method is a step-by-step table that finds the same prime implicants without a picture, which is what software can automate. Real design tools use fast minimizers (such as Espresso) on huge functions.\n\nFinally, a hazard idea: a minimized circuit can briefly **glitch** when an input changes between two groups that merely touch. Adding one extra **redundant term** that bridges the two groups smooths the transition. It costs a gate but removes the glitch.\n\nRecap: choose essential prime implicants first, exploit don't-cares as free wildcards, lean on Quine-McCluskey/software past a handful of variables, and add a redundant bridging term when a glitch must be prevented.",
+      "items": [
+        {
+          "id": "karnaugh-maps-5-mcq-1",
+          "type": "mcq",
+          "prompt": "What is a prime implicant?",
+          "choices": [
+            "A group that is already as large as it can legally be",
+            "Any single cell containing a 1",
+            "A group made only of 0s",
+            "A group of exactly three cells"
+          ],
+          "answerIndex": 0,
+          "explanation": "A prime implicant is a maximal legal group: no larger legal loop contains it. Making groups as large as possible is exactly the search for prime implicants."
+        },
+        {
+          "id": "karnaugh-maps-5-mcq-2",
+          "type": "mcq",
+          "prompt": "What makes a prime implicant 'essential'?",
+          "choices": [
+            "It is the only group that can cover some particular 1",
+            "It is the smallest group on the map",
+            "It covers only don't-care cells",
+            "It contains the most 0s"
+          ],
+          "answerIndex": 0,
+          "explanation": "If a certain 1 can be covered by just one prime implicant, that prime implicant is essential and must be in the final answer, because nothing else reaches that 1."
+        },
+        {
+          "id": "karnaugh-maps-5-mcq-3",
+          "type": "mcq",
+          "prompt": "What is the recommended order for building the minimal answer?",
+          "choices": [
+            "Pick all essential prime implicants first, then add the fewest extra prime implicants to cover leftover 1s",
+            "Pick the smallest groups first",
+            "Use every prime implicant on the map",
+            "Cover the don't-cares before anything else"
+          ],
+          "answerIndex": 0,
+          "explanation": "Essentials are forced, so take them first; then cover whatever 1s remain with as few additional prime implicants as possible. Using all prime implicants would be wasteful and not minimal."
+        },
+        {
+          "id": "karnaugh-maps-5-mcq-4",
+          "type": "mcq",
+          "prompt": "How should a don't-care (X) cell be treated when grouping?",
+          "choices": [
+            "As a 1 only when it lets you form a bigger group; otherwise as a 0",
+            "Always as a 1, no matter what",
+            "Always as a 0, no matter what",
+            "Removed from the grid entirely"
+          ],
+          "answerIndex": 0,
+          "explanation": "A don't-care is a wildcard. Count it as 1 when it enlarges a useful group (removing more variables); leave it as 0 otherwise. Forcing all to 1 can create needless terms.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/karnaugh-maps-2.svg"
+        },
+        {
+          "id": "karnaugh-maps-5-mcq-5",
+          "type": "mcq",
+          "prompt": "Should you ever make a group whose only job is to cover a don't-care cell?",
+          "choices": [
+            "No, don't-cares are optional and never need covering on their own",
+            "Yes, every don't-care must end up inside some group",
+            "Yes, but only on a 2-variable map",
+            "Only if the don't-care is in a corner"
+          ],
+          "answerIndex": 0,
+          "explanation": "Don't-cares help only when they enlarge a group that is covering real 1s. A group existing solely to cover an X buys nothing and just adds a term, so it is never required."
+        },
+        {
+          "id": "karnaugh-maps-5-mcq-6",
+          "type": "mcq",
+          "prompt": "Why do K-maps stop being practical past about 4 or 5 variables?",
+          "choices": [
+            "The grid and its adjacencies get too large and error-prone to track by eye",
+            "Gray code only works for 4 variables",
+            "Boolean algebra forbids more than 5 variables",
+            "The output values become undefined"
+          ],
+          "answerIndex": 0,
+          "explanation": "More variables mean exponentially more cells and harder-to-see adjacencies (a 5-variable map is two stacked 4-variable maps). Beyond that, people switch to tabular or automated methods."
+        },
+        {
+          "id": "karnaugh-maps-5-mcq-7",
+          "type": "mcq",
+          "prompt": "What is the Quine-McCluskey method, in one line?",
+          "choices": [
+            "A step-by-step table that finds the same prime implicants without drawing a map, easy for software to automate",
+            "A faster way to draw the K-map grid by hand",
+            "A method that only works for 2-variable functions",
+            "A way to add more variables to a truth table"
+          ],
+          "answerIndex": 0,
+          "explanation": "Quine-McCluskey reaches the same prime implicants as a K-map using a systematic table instead of a picture, which is why it scales and why software tools use that style of approach."
+        },
+        {
+          "id": "karnaugh-maps-5-mcq-8",
+          "type": "mcq",
+          "prompt": "A minimized circuit briefly glitches when an input change moves between two groups that only touch. The usual fix is to:",
+          "choices": [
+            "Add one redundant term that bridges the two groups, smoothing the transition",
+            "Delete one of the two groups",
+            "Slow the whole circuit down permanently",
+            "Re-label the axes in plain binary"
+          ],
+          "answerIndex": 0,
+          "explanation": "An extra (logically redundant) term covering the overlap keeps the output steady during the change, removing the glitch. It costs one gate but does not alter the truth table."
+        },
+        {
+          "id": "karnaugh-maps-5-mcq-9",
+          "type": "mcq",
+          "prompt": "Does adding that redundant bridging term change what the circuit computes?",
+          "choices": [
+            "No, the steady output is identical; it only affects timing during a transition",
+            "Yes, it flips several outputs from 1 to 0",
+            "Yes, it converts the circuit to product-of-sums",
+            "Yes, it removes an essential prime implicant"
+          ],
+          "answerIndex": 0,
+          "explanation": "The redundant term is already implied by the others, so the final truth table is unchanged. Its only effect is to keep coverage continuous during an input change, killing the glitch."
+        },
+        {
+          "id": "karnaugh-maps-5-mcq-10",
+          "type": "mcq",
+          "prompt": "A particular 1 can be covered by three different prime implicants. Is that 1's coverage forcing any essential prime implicant?",
+          "choices": [
+            "No, because more than one prime implicant covers it, none of them is forced by that 1 alone",
+            "Yes, all three become essential",
+            "Yes, the largest of the three is essential",
+            "Yes, the smallest of the three is essential"
+          ],
+          "answerIndex": 0,
+          "explanation": "An essential prime implicant is the ONLY one covering some 1. If three can cover this 1, you have a choice, so this 1 does not make any of them essential. Essentials come from 1s covered by exactly one prime implicant."
         }
       ]
     }
