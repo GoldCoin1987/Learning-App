@@ -8,391 +8,518 @@
       "title": "Delays & Flip-Flop Timing Parameters",
       "order": 1,
       "difficulty": 1,
-      "content": "Every gate and wire takes time to respond. **Propagation delay** $t_{pd}$ is the *maximum* time from a stable input change to a stable output; **contamination delay** $t_{cd}$ is the *minimum* time before the output *starts* to change. So after an input edge the output is guaranteed stable only after $t_{pd}$, and guaranteed unchanged only up to $t_{cd}$. Note $t_{cd} \\le t_{pd}$ always.\n\nA flip-flop adds three timing parameters that define a window around its clock edge:\n\n- **Setup time** $t_{su}$ — the input $D$ must be stable for at least $t_{su}$ *before* the active clock edge.\n- **Hold time** $t_{h}$ — $D$ must remain stable for at least $t_{h}$ *after* the edge.\n- **Clock-to-Q delay** $t_{cq}$ — after the edge, $Q$ is valid after $t_{cq}$ (datasheets often give both $t_{cq,max}$ and a $t_{cq,min}$, akin to $t_{pd}$ vs $t_{cd}$ for combinational logic).\n\nViolate $t_{su}$ or $t_{h}$ and the flop may capture a wrong value or go *metastable* (Lesson 4). As a radar tech you measured rise/fall times on a scope; these are the same physics, now abstracted into datasheet numbers your timing tools consume.\n\nThink of a register-to-register path: the launching flop fires ($t_{cq}$), the signal crosses combinational logic ($t_{pd}$), and must arrive at the capturing flop's $D$ before its $t_{su}$. That chain is the seed of every timing constraint in the rest of this subtopic.",
+      "content": "**Hook.** Nothing in electronics happens instantly. When a signal changes, it takes a tiny but real amount of time to travel through a wire and a logic gate before the output settles. And a flip-flop (the one-bit memory you met earlier, which copies its input D to its output Q on the clock edge) only copies its input correctly if that input sits still for a moment around the clock edge. Get the timing wrong and your circuit misbehaves.\n\n**Build.** First, the delay through plain logic. **Propagation delay** $t_{pd}$ is the *longest* time you must wait, after an input changes, before the output is guaranteed to be at its final, steady value. (There is also a *shortest* time before the output even begins to move, called the **contamination delay** $t_{cd}$; it is always smaller, $t_{cd} \\le t_{pd}$. We will use it later.)\n\nNow the flip-flop. Think of jumping onto a train just as the doors close. You must be standing in the doorway *before* the doors start to shut, and you must stay put *until* they finish. A flip-flop has the same two requirements around its clock edge:\n\n- **Setup time** $t_{su}$ — the data input D must already be steady for at least $t_{su}$ *before* the clock edge.\n- **Hold time** $t_{h}$ — D must stay steady for at least $t_{h}$ *after* the clock edge.\n\nAfter the edge, the output isn't ready instantly either. **Clock-to-Q delay** $t_{cq}$ is the time from the clock edge until the new value appears at Q.\n\n**Recap.** Plain logic has a delay $t_{pd}$; a flip-flop needs its data steady for a window ($t_{su}$ before, $t_{h}$ after) and then produces its output after $t_{cq}$. These few numbers control everything that follows.",
       "items": [
-        {
-          "id": "timing-metastability-l1-fc1",
-          "type": "flashcard",
-          "front": "Define propagation delay $t_{pd}$.",
-          "back": "The **maximum** time from an input change until the output is **guaranteed stable** at its new value. It bounds the worst-case (slowest) path.",
-          "hint": "Worst case, output settled."
-        },
-        {
-          "id": "timing-metastability-l1-fc2",
-          "type": "flashcard",
-          "front": "Define contamination delay $t_{cd}$ and its relation to $t_{pd}$.",
-          "back": "The **minimum** time before an output **begins** to change after an input change. Always $t_{cd} \\le t_{pd}$. It bounds the fastest path and matters for hold timing.",
-          "hint": "Earliest the output can move."
-        },
-        {
-          "id": "timing-metastability-l1-fc3",
-          "type": "flashcard",
-          "front": "What is setup time $t_{su}$?",
-          "back": "The minimum time the data input $D$ must be **stable before** the active clock edge for the flip-flop to capture it reliably.",
-          "hint": "Stable before the edge.",
-          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/timing-metastability-1.svg"
-        },
-        {
-          "id": "timing-metastability-l1-fc4",
-          "type": "flashcard",
-          "front": "What is hold time $t_{h}$?",
-          "back": "The minimum time $D$ must remain **stable after** the active clock edge for reliable capture.",
-          "hint": "Stable after the edge."
-        },
-        {
-          "id": "timing-metastability-l1-fc5",
-          "type": "flashcard",
-          "front": "What is clock-to-Q delay $t_{cq}$?",
-          "back": "The delay from the active clock edge until the flip-flop output $Q$ is valid. It is the time the launching flop adds to a register-to-register path.",
-          "hint": "Edge to valid output."
-        },
         {
           "id": "timing-metastability-l1-mc1",
           "type": "mcq",
-          "prompt": "Data must be held stable for a window around the clock edge. Which two parameters bound that window?",
+          "prompt": "What does propagation delay $t_{pd}$ measure?",
           "choices": [
-            "$t_{pd}$ before and $t_{cd}$ after",
-            "$t_{su}$ before and $t_{h}$ after",
-            "$t_{cq}$ before and $t_{su}$ after",
-            "$t_{h}$ before and $t_{su}$ after"
+            "The longest time after an input changes until the output is guaranteed steady at its new value",
+            "The voltage of the output once it settles",
+            "How often the clock ticks",
+            "The time the data must be held after the clock edge"
           ],
-          "answerIndex": 1,
-          "explanation": "Setup time $t_{su}$ is measured before the edge and hold time $t_{h}$ after it; together they form the keep-out window for $D$."
+          "answerIndex": 0,
+          "explanation": "Propagation delay is the worst-case (longest) wait for the output to finish settling after an input change. It is a time, not a voltage, and it has nothing to do with the clock rate or with the flip-flop's hold requirement."
         },
         {
           "id": "timing-metastability-l1-mc2",
           "type": "mcq",
-          "prompt": "Which inequality between a gate's delays is always true?",
+          "prompt": "A flip-flop's data input D must be steady for a short time BEFORE the clock edge. What is that requirement called?",
           "choices": [
-            "$t_{cd} \\ge t_{pd}$",
-            "$t_{cd} = 2 t_{pd}$",
-            "$t_{cd} \\le t_{pd}$",
-            "$t_{cd}$ and $t_{pd}$ are unrelated"
+            "Hold time $t_{h}$",
+            "Clock-to-Q delay $t_{cq}$",
+            "Setup time $t_{su}$",
+            "Contamination delay $t_{cd}$"
           ],
           "answerIndex": 2,
-          "explanation": "The output cannot finish settling ($t_{pd}$) before it even starts to change ($t_{cd}$), so $t_{cd} \\le t_{pd}$."
+          "explanation": "Setup time is the 'be in position before the doors close' requirement: D must be steady for at least $t_{su}$ before the edge. Hold time is the matching 'stay put after' requirement, which comes after the edge.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/timing-metastability-1.svg"
         },
         {
           "id": "timing-metastability-l1-mc3",
           "type": "mcq",
-          "prompt": "On a register-to-register path, which delay does the launching flip-flop contribute before the signal enters the combinational logic?",
+          "prompt": "What does hold time $t_{h}$ require?",
           "choices": [
-            "$t_{su}$",
-            "$t_{h}$",
-            "$t_{cq}$",
-            "$t_{cd}$ of the capturing flop"
+            "That the clock stays high for $t_{h}$",
+            "That the data input D stays steady for $t_{h}$ AFTER the clock edge",
+            "That the output Q appears within $t_{h}$",
+            "That the data changes exactly at the clock edge"
           ],
-          "answerIndex": 2,
-          "explanation": "After the launch edge, $Q$ becomes valid only after $t_{cq}$; that is the launching flop's contribution to the path delay."
+          "answerIndex": 1,
+          "explanation": "Hold time is about staying steady after the edge, so the flip-flop finishes capturing the value. It says nothing about the clock's shape or when Q appears, and the data must NOT change right at the edge."
         },
         {
           "id": "timing-metastability-l1-mc4",
           "type": "mcq",
-          "prompt": "A datasheet lists $t_{cq,max}$ and $t_{cq,min}$. Why distinguish them?",
+          "prompt": "After the clock edge, how long until the new value shows up at the output Q?",
           "choices": [
-            "They are the same number written twice",
-            "$t_{cq,max}$ feeds worst-case (setup) analysis; $t_{cq,min}$ feeds fastest-path (hold) analysis",
-            "$t_{cq,min}$ is used only for power estimation",
-            "$t_{cq,max}$ applies only to the clock tree"
+            "Instantly, with no delay",
+            "After the setup time $t_{su}$",
+            "After the clock-to-Q delay $t_{cq}$",
+            "After the propagation delay of the next gate only"
+          ],
+          "answerIndex": 2,
+          "explanation": "The clock-to-Q delay $t_{cq}$ is the flip-flop's own internal delay from edge to valid output. Output is never instant. Setup time is a requirement on the input before the edge, not the output delay."
+        },
+        {
+          "id": "timing-metastability-l1-mc5",
+          "type": "mcq",
+          "prompt": "Which statement about contamination delay $t_{cd}$ and propagation delay $t_{pd}$ is always true?",
+          "choices": [
+            "$t_{cd}$ is always larger than $t_{pd}$",
+            "$t_{cd}$ is always smaller than or equal to $t_{pd}$",
+            "They are always exactly equal",
+            "They are completely unrelated numbers"
           ],
           "answerIndex": 1,
-          "explanation": "Setup checks use the slowest (max) launch, while hold checks use the fastest (min) launch—analogous to using $t_{pd}$ vs $t_{cd}$ in combinational logic."
+          "explanation": "The output cannot finish settling before it has even started to move, so the earliest-change time $t_{cd}$ is always less than or equal to the fully-settled time $t_{pd}$."
+        },
+        {
+          "id": "timing-metastability-l1-mc6",
+          "type": "mcq",
+          "prompt": "Why is the 'jumping onto a train as the doors close' a good picture of setup and hold time?",
+          "choices": [
+            "Because trains run on a fixed schedule like a clock",
+            "Because you must be in position before the doors start to close (setup) and stay put until they finish (hold)",
+            "Because the train is faster than walking",
+            "Because doors are made of metal like a chip"
+          ],
+          "answerIndex": 1,
+          "explanation": "The analogy maps directly: the closing doors are the clock edge, being in position beforehand is setup time, and not moving until they finish is hold time. The schedule and materials are not the point."
+        },
+        {
+          "id": "timing-metastability-l1-mc7",
+          "type": "mcq",
+          "prompt": "Which of these is the correct order of events for one flip-flop capturing data?",
+          "choices": [
+            "Output appears ($t_{cq}$), then data must be steady ($t_{su}$), then the clock edge",
+            "Data steady before edge ($t_{su}$), clock edge, data still steady after ($t_{h}$), then output appears ($t_{cq}$)",
+            "Clock edge, then data must be steady ($t_{su}$) for the next edge only",
+            "Hold ($t_{h}$) before the edge, setup ($t_{su}$) after the edge"
+          ],
+          "answerIndex": 1,
+          "explanation": "Setup comes before the edge, hold comes just after the edge, and only then does the output emerge after $t_{cq}$. Setup is before the edge (not after) and hold is after (not before)."
+        },
+        {
+          "id": "timing-metastability-l1-mc8",
+          "type": "mcq",
+          "prompt": "A friend says 'a flip-flop copies D to Q the instant the clock rises.' What is the small correction?",
+          "choices": [
+            "The clock must fall, not rise",
+            "It copies only if D is steady through the setup/hold window, and Q appears after $t_{cq}$, not instantly",
+            "Flip-flops never copy D to Q",
+            "D and Q are always the same value at all times"
+          ],
+          "answerIndex": 1,
+          "explanation": "Two refinements: the capture is reliable only if the setup and hold windows are respected, and the result appears after the clock-to-Q delay rather than instantly. The rising edge can indeed be the active edge, so that part isn't the issue."
+        },
+        {
+          "id": "timing-metastability-l1-mc9",
+          "type": "mcq",
+          "prompt": "Why do signals take time to travel through a gate at all?",
+          "choices": [
+            "Because the clock is slow",
+            "Because real transistors and wires need a moment to charge and switch — nothing is instantaneous",
+            "Because the designer chose to add a delay",
+            "Because the data is too large"
+          ],
+          "answerIndex": 1,
+          "explanation": "Delay is physical: transistors switch and wires charge up over a real, finite time. It is not something the designer adds on purpose, nor a side effect of the clock speed or data size."
         }
       ]
     },
     {
       "id": "timing-metastability-l2",
-      "title": "The Setup & Hold Inequalities, f_max, and the Critical Path",
+      "title": "Max Clock Frequency & the Critical Path",
       "order": 2,
       "difficulty": 2,
-      "content": "Consider two flip-flops separated by combinational logic, both on clock period $T_{clk}$. After a launch edge the data is valid at $D$ of the capturing flop at time $t_{cq}+t_{pd}$, and it must arrive at least $t_{su}$ before the *next* edge. That gives the **setup constraint**:\n\n$$t_{cq} + t_{pd,max} + t_{su} \\le T_{clk}$$\n\nSolving for the period sets the **maximum clock frequency**:\n\n$$f_{max} = \\frac{1}{t_{cq} + t_{pd,max} + t_{su}}$$\n\nThe slowest register-to-register path—the **critical path**—is the one that maximizes $t_{cq}+t_{pd,max}$ and therefore caps $f_{max}$. **Slack** is how much margin a path has: $\\text{slack} = T_{clk} - (t_{cq}+t_{pd,max}+t_{su})$; negative slack means a setup failure.\n\nThe **hold constraint** is different—it compares fastest data against the *same* edge:\n\n$$t_{cq,min} + t_{cd} \\ge t_{h}$$\n\nNotice $T_{clk}$ does **not** appear. Hold is **frequency-independent**: the data launched at an edge must not race through and corrupt the capturing flop's input *before* its hold window closes after that same edge. This is why **slowing the clock can fix setup violations but never hold violations**—a classic rust-knocker. Hold failures are fixed by adding delay (buffers) on short paths or fixing skew, not by lowering frequency.",
+      "content": "**Hook.** Now we can answer the big practical question: how fast can a chip be clocked? The clock can't tick faster than the slowest journey a signal has to make in one tick.\n\n**Build.** Picture two flip-flops with some logic between them: flip-flop A launches a value, the value crosses the logic, and flip-flop B must capture it on the *next* clock edge. For B to capture correctly, the value has to arrive and be steady before B's setup window. Add up the journey:\n\n- $t_{cq}$ — time for A's output to appear after the edge,\n- $t_{pd}$ — time to cross the logic,\n- $t_{su}$ — the value must land this much before the next edge.\n\nAll of that must fit inside one clock period $T_{clk}$ (the time between edges):\n\n$$T_{clk} \\ge t_{cq} + t_{pd} + t_{su}$$\n\nThe fastest clock is just the reciprocal of the tightest period:\n\n$$f_{max} = \\frac{1}{t_{cq} + t_{pd} + t_{su}}$$\n\nA real chip has many such flip-flop-to-flip-flop paths. The slowest one — the one with the biggest $t_{cq}+t_{pd}+t_{su}$ — is the **critical path**, and it sets the speed limit for the whole chip. Speeding up any other path doesn't help; you must shorten the critical one.\n\n**Recap.** The clock period must be at least clock-to-Q plus logic delay plus setup time, measured along the slowest (critical) path. That single slowest path caps the maximum clock frequency.",
       "items": [
-        {
-          "id": "timing-metastability-l2-fc1",
-          "type": "flashcard",
-          "front": "State the setup (max-delay) constraint for a register-to-register path.",
-          "back": "$t_{cq} + t_{pd,max} + t_{su} \\le T_{clk}$. The launched data plus worst-case logic plus setup must fit inside one clock period.",
-          "hint": "Everything must fit in $T_{clk}$."
-        },
-        {
-          "id": "timing-metastability-l2-fc2",
-          "type": "flashcard",
-          "front": "Give the formula for $f_{max}$ from setup timing (zero skew).",
-          "back": "$f_{max} = \\dfrac{1}{t_{cq} + t_{pd,max} + t_{su}}$, set by the critical (slowest) path.",
-          "hint": "Reciprocal of the longest path period."
-        },
-        {
-          "id": "timing-metastability-l2-fc3",
-          "type": "flashcard",
-          "front": "State the hold (min-delay) constraint and note what is absent.",
-          "back": "$t_{cq,min} + t_{cd} \\ge t_{h}$. **No $T_{clk}$ term**—hold is frequency-independent.",
-          "hint": "Fastest data vs. the same edge."
-        },
-        {
-          "id": "timing-metastability-l2-fc4",
-          "type": "flashcard",
-          "front": "Define the critical path.",
-          "back": "The register-to-register path with the largest $t_{cq}+t_{pd,max}$; it has the least setup slack and therefore determines $f_{max}$.",
-          "hint": "Slowest path = lowest slack."
-        },
-        {
-          "id": "timing-metastability-l2-fc5",
-          "type": "flashcard",
-          "front": "Why can't you fix a hold violation by slowing the clock?",
-          "back": "The hold inequality $t_{cq,min}+t_{cd} \\ge t_{h}$ has no $T_{clk}$ term. It's a race against the *same* edge, so a longer period does nothing—you must add path delay or fix skew.",
-          "hint": "No period in the equation."
-        },
         {
           "id": "timing-metastability-l2-mc1",
           "type": "mcq",
-          "prompt": "Given $t_{cq}=0.3\\,\\text{ns}$, $t_{pd,max}=4.2\\,\\text{ns}$, $t_{su}=0.5\\,\\text{ns}$ and zero skew, what is $f_{max}$?",
+          "prompt": "Which three delays must fit inside one clock period on a flip-flop-to-flip-flop path?",
           "choices": [
-            "About 200 MHz",
-            "About 238 MHz",
-            "About 500 MHz",
-            "About 100 MHz"
+            "$t_{cq}$ + $t_{pd}$ + $t_{su}$",
+            "$t_{su}$ + $t_{h}$ + $t_{cq}$",
+            "$t_{pd}$ + $t_{cd}$ + $t_{h}$",
+            "$t_{cq}$ + $t_{h}$ + $t_{pd}$"
           ],
           "answerIndex": 0,
-          "explanation": "Sum $= 0.3+4.2+0.5 = 5.0\\,\\text{ns}$, so $f_{max} = 1/5\\,\\text{ns} = 200\\,\\text{MHz}$."
+          "explanation": "The journey is: output appears ($t_{cq}$), crosses the logic ($t_{pd}$), and must land before the next setup window ($t_{su}$). Hold time and contamination delay belong to a different check, covered in the next lesson.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/timing-metastability-4.svg"
         },
         {
           "id": "timing-metastability-l2-mc2",
           "type": "mcq",
-          "prompt": "A path has $T_{clk}=8\\,\\text{ns}$, $t_{cq}=0.4$, $t_{pd,max}=6.0$, $t_{su}=0.6\\,\\text{ns}$. What is the setup slack?",
+          "prompt": "A path has $t_{cq}=0.3\\,\\text{ns}$, $t_{pd}=4.2\\,\\text{ns}$, and $t_{su}=0.5\\,\\text{ns}$. What is the maximum clock frequency?",
           "choices": [
-            "$-1.0\\,\\text{ns}$ (fails)",
-            "$+1.0\\,\\text{ns}$",
-            "$+2.0\\,\\text{ns}$",
-            "$0\\,\\text{ns}$"
+            "About 100 MHz",
+            "About 200 MHz",
+            "About 238 MHz",
+            "About 500 MHz"
           ],
           "answerIndex": 1,
-          "explanation": "Slack $= T_{clk} - (t_{cq}+t_{pd,max}+t_{su}) = 8 - (0.4+6.0+0.6) = 8 - 7.0 = +1.0\\,\\text{ns}$."
+          "explanation": "Add the delays: $0.3+4.2+0.5 = 5.0\\,\\text{ns}$. The fastest clock is $1 / 5.0\\,\\text{ns} = 200\\,\\text{MHz}$. The trap answer 238 MHz comes from forgetting to add one of the terms."
         },
         {
           "id": "timing-metastability-l2-mc3",
           "type": "mcq",
-          "prompt": "Which variable does NOT appear in the hold-time inequality?",
+          "prompt": "What is the 'critical path' in a digital circuit?",
           "choices": [
-            "$t_{cq,min}$",
-            "$t_{cd}$",
-            "$t_{h}$",
-            "$T_{clk}$"
+            "The path that uses the most power",
+            "The slowest flip-flop-to-flip-flop path, which sets the maximum clock speed",
+            "The shortest path between two gates",
+            "The path that carries the clock signal"
           ],
-          "answerIndex": 3,
-          "explanation": "Hold is $t_{cq,min}+t_{cd} \\ge t_{h}$; the clock period is absent, which is exactly why hold is frequency-independent."
+          "answerIndex": 1,
+          "explanation": "The critical path is the one with the largest total delay; because the clock must wait for it, it caps the whole chip's speed. The shortest path matters for hold (next lesson), and the clock's own path is a separate idea."
         },
         {
           "id": "timing-metastability-l2-mc4",
           "type": "mcq",
-          "prompt": "A design fails hold on a short path between two adjacent flops. What is a valid fix?",
+          "prompt": "You speed up a path that was NOT the critical path. What happens to the maximum clock frequency?",
           "choices": [
-            "Lower the clock frequency",
-            "Add buffer/delay on the data path or fix the skew",
-            "Increase $t_{su}$ of the capturing flop",
-            "Remove pipeline registers"
+            "It increases, because every speedup helps",
+            "It stays the same, because the critical path still sets the limit",
+            "It decreases",
+            "The clock stops working"
           ],
           "answerIndex": 1,
-          "explanation": "Hold violations need more minimum data delay (buffers) or skew correction; period changes have no effect because $T_{clk}$ is not in the inequality."
+          "explanation": "The speed limit is set by the single slowest path. Improving a faster path leaves the bottleneck untouched, so $f_{max}$ doesn't change. You must shorten the critical path itself."
+        },
+        {
+          "id": "timing-metastability-l2-mc5",
+          "type": "mcq",
+          "prompt": "Why does the clock period have to be at least as long as the slowest path?",
+          "choices": [
+            "Because the clock needs time to rise and fall",
+            "Because the launched value must travel through the logic and be steady at the next flip-flop before its setup window",
+            "Because slower clocks save power",
+            "Because the data is too large to move quickly"
+          ],
+          "answerIndex": 1,
+          "explanation": "If the next edge arrives before the value has crossed the logic and settled, the capturing flip-flop won't see a steady input in time. The period must cover that whole journey plus setup."
+        },
+        {
+          "id": "timing-metastability-l2-mc6",
+          "type": "mcq",
+          "prompt": "Two paths exist: Path X totals 6 ns, Path Y totals 9 ns. What is the smallest clock period the chip can use?",
+          "choices": [
+            "6 ns",
+            "9 ns",
+            "3 ns",
+            "15 ns"
+          ],
+          "answerIndex": 1,
+          "explanation": "The period must be at least as long as the slowest path, which is Path Y at 9 ns. Path Y is the critical path. You cannot use 6 ns or Path Y would fail; you do not add the two paths together."
+        },
+        {
+          "id": "timing-metastability-l2-mc7",
+          "type": "mcq",
+          "prompt": "If you make the combinational logic between two flip-flops simpler (smaller $t_{pd}$), what happens to $f_{max}$ for that path?",
+          "choices": [
+            "$f_{max}$ goes up, because the total delay is smaller",
+            "$f_{max}$ goes down",
+            "$f_{max}$ is unaffected by logic delay",
+            "The flip-flops stop working"
+          ],
+          "answerIndex": 0,
+          "explanation": "Since $f_{max} = 1 / (t_{cq}+t_{pd}+t_{su})$, reducing $t_{pd}$ shrinks the denominator and raises the maximum frequency. Less logic between flip-flops means a faster possible clock."
+        },
+        {
+          "id": "timing-metastability-l2-mc8",
+          "type": "mcq",
+          "prompt": "A path has $t_{cq}=0.4\\,\\text{ns}$, $t_{pd}=7.6\\,\\text{ns}$, $t_{su}=1.0\\,\\text{ns}$. What is the minimum clock period and roughly $f_{max}$?",
+          "choices": [
+            "9.0 ns, about 111 MHz",
+            "8.0 ns, about 125 MHz",
+            "7.6 ns, about 132 MHz",
+            "5.0 ns, about 200 MHz"
+          ],
+          "answerIndex": 0,
+          "explanation": "Sum the delays: $0.4+7.6+1.0 = 9.0\\,\\text{ns}$, the minimum period. Then $1/9.0\\,\\text{ns} \\approx 111\\,\\text{MHz}$. Leaving out a term gives the smaller, wrong periods."
+        },
+        {
+          "id": "timing-metastability-l2-mc9",
+          "type": "mcq",
+          "prompt": "What does $f_{max}$ stand for, and how is it related to the clock period?",
+          "choices": [
+            "The maximum data value; unrelated to the period",
+            "The maximum clock frequency; it is 1 divided by the minimum clock period",
+            "The maximum flip-flop count; equal to the period",
+            "The fastest gate delay; the same as $t_{pd}$"
+          ],
+          "answerIndex": 1,
+          "explanation": "Frequency and period are reciprocals: a shorter minimum period means a higher maximum frequency, $f_{max} = 1/T_{clk,min}$. It is a clock speed, not a data value or a gate delay."
         }
       ]
     },
     {
       "id": "timing-metastability-l3",
-      "title": "Clock Skew, Jitter, and Pipelining",
+      "title": "Hold Violations, Clock Skew, Jitter & Pipelining",
       "order": 3,
       "difficulty": 2,
-      "content": "**Clock skew** is the difference in clock arrival time between the launching and capturing flops, $t_{skew} = t_{clk,capture} - t_{clk,launch}$. Skew shifts both constraints. With skew the setup constraint becomes\n\n$$t_{cq} + t_{pd,max} + t_{su} \\le T_{clk} + t_{skew}$$\n\nPositive skew (clock reaches the capture flop *later*) *relaxes* setup—it effectively lends time. But the same positive skew *tightens* hold:\n\n$$t_{cq,min} + t_{cd} \\ge t_{h} + t_{skew}$$\n\nSo skew is a double-edged sword; tools budget it carefully, and uncontrolled skew (e.g., from gating a clock) is dangerous.\n\n**Jitter** is cycle-to-cycle variation in the clock edge position—random (phase noise) and deterministic. Unlike static skew, jitter is uncertain, so it eats directly into your timing budget: subtract it from the period for setup. Your radar phase-noise intuition transfers exactly—jitter is phase noise in the time domain.\n\n**Pipelining** raises throughput by inserting registers to chop one long combinational path into shorter stages. If a path of delay $D$ is split into $k$ balanced stages, each stage is $\\approx D/k$, so $f_{max}$ rises (ideally by $\\approx k\\times$, minus the added $t_{cq}+t_{su}$ per stage). The cost is **latency**: results now take $k$ cycles to emerge, and you must add matching pipeline delays to side signals. Pipelining is the standard answer when a critical path won't meet timing—central to FPGA radar DSP, where deep MAC pipelines run at line rate.",
+      "content": "**Hook.** There is a second, sneakier timing problem that slowing the clock will *never* fix. Understanding it separates people who can debug real hardware from those who can't.\n\n**Build.** The setup check (last lesson) worries that data arrives too *late* for the next edge. The **hold check** worries about the opposite: data arriving too *early* and racing through to the capturing flip-flop while it is still trying to hold the *current* value from this same edge. The condition is that the fastest the new value can arrive ($t_{cq,min} + t_{cd}$) must still be no sooner than the hold time:\n\n$$t_{cq,min} + t_{cd} \\ge t_{h}$$\n\nNotice the clock period $T_{clk}$ is nowhere in this. A hold violation is a race against the *same* edge, so making the clock slower changes nothing. The fix is to *add* a little delay on the too-fast path (extra buffers), never to slow the clock.\n\n**Clock skew** is when the clock edge reaches one flip-flop slightly later than another (the clock wires aren't the same length). **Jitter** is the clock edge wobbling earlier or later from tick to tick. Both eat into your timing margin and can turn a healthy design marginal.\n\n**Pipelining** is the standard trick to go faster: take one long combinational path and break it into shorter stages with flip-flops between them, like adding rest stops on a long road. Each shorter stage allows a faster clock. The cost is that a result now takes several clock cycles to come out the end (more latency), but the chip processes more work per second (more throughput).\n\n**Recap.** Hold violations are frequency-independent — fix them with delay, not a slower clock. Skew and jitter shrink your margins. Pipelining breaks a long path into stages so the clock can run faster.",
       "items": [
-        {
-          "id": "timing-metastability-l3-fc1",
-          "type": "flashcard",
-          "front": "Define clock skew.",
-          "back": "$t_{skew} = t_{clk,capture} - t_{clk,launch}$: the difference in clock arrival time between the capturing and launching flip-flops.",
-          "hint": "Capture-edge arrival minus launch-edge arrival."
-        },
-        {
-          "id": "timing-metastability-l3-fc2",
-          "type": "flashcard",
-          "front": "How does positive skew affect the setup and hold constraints?",
-          "back": "Positive skew **relaxes setup** ($\\dots \\le T_{clk}+t_{skew}$) but **tightens hold** ($t_{cq,min}+t_{cd} \\ge t_{h}+t_{skew}$). It's a trade-off, not free time.",
-          "hint": "Helps one, hurts the other."
-        },
-        {
-          "id": "timing-metastability-l3-fc3",
-          "type": "flashcard",
-          "front": "How does clock jitter differ from skew, and how is it budgeted?",
-          "back": "Skew is a fixed spatial offset; jitter is random/cycle-to-cycle uncertainty in edge timing. Jitter is subtracted from the usable period for setup analysis. It is phase noise viewed in the time domain.",
-          "hint": "Static vs. uncertain."
-        },
-        {
-          "id": "timing-metastability-l3-fc4",
-          "type": "flashcard",
-          "front": "What does pipelining do to $f_{max}$ and to latency?",
-          "back": "Splitting a path into $k$ balanced stages raises $f_{max}$ by up to $\\approx k\\times$ (minus per-stage $t_{cq}+t_{su}$), but increases latency to $k$ cycles before the first result emerges.",
-          "hint": "Higher throughput, more cycles of delay."
-        },
-        {
-          "id": "timing-metastability-l3-fc5",
-          "type": "flashcard",
-          "front": "When pipelining a datapath, what must you do to parallel/side signals?",
-          "back": "Delay them by matching pipeline registers so they stay aligned with the data they accompany; otherwise control/data become misaligned by the pipeline depth.",
-          "hint": "Keep everything in step, stage for stage."
-        },
         {
           "id": "timing-metastability-l3-mc1",
           "type": "mcq",
-          "prompt": "With positive clock skew $t_{skew}$, the setup constraint becomes:",
+          "prompt": "Your design has a hold-time violation. Which fix will work?",
           "choices": [
-            "$t_{cq}+t_{pd,max}+t_{su} \\le T_{clk} - t_{skew}$",
-            "$t_{cq}+t_{pd,max}+t_{su} \\le T_{clk} + t_{skew}$",
-            "$t_{cq}+t_{pd,max}+t_{su} \\ge T_{clk} + t_{skew}$",
-            "$t_{cq}+t_{pd,max} \\le t_{h} + t_{skew}$"
+            "Slow down the clock (use a longer period)",
+            "Add a little delay (buffers) on the too-fast path",
+            "Speed up the clock",
+            "Remove the setup-time requirement"
           ],
           "answerIndex": 1,
-          "explanation": "Positive skew delays the capture edge, effectively adding $t_{skew}$ to the available period and relaxing setup."
+          "explanation": "A hold violation is data racing through too fast against the same edge, so adding delay on that short path fixes it. The clock period does not appear in the hold condition, so changing clock speed has no effect."
         },
         {
           "id": "timing-metastability-l3-mc2",
           "type": "mcq",
-          "prompt": "A 12 ns combinational path is pipelined into 3 balanced stages of 4 ns each (ignore added $t_{cq}/t_{su}$). The new throughput period is roughly:",
+          "prompt": "Why does slowing the clock NOT fix a hold violation, even though it fixes setup violations?",
           "choices": [
-            "12 ns (unchanged)",
-            "4 ns",
-            "36 ns",
-            "1.3 ns"
+            "Because hold violations are imaginary",
+            "Because the hold condition $t_{cq,min}+t_{cd} \\ge t_{h}$ contains no clock period $T_{clk}$ — it is a race against the same edge",
+            "Because slowing the clock also slows the data by the same amount",
+            "Because hold time gets larger when the clock slows down"
           ],
           "answerIndex": 1,
-          "explanation": "Each stage is now the critical path at ~4 ns, so the clock period drops to ~4 ns even though end-to-end latency is still ~12 ns (3 cycles)."
+          "explanation": "Setup is about fitting work before the NEXT edge, so a longer period helps. Hold is about the SAME edge and has no $T_{clk}$ term, so a longer period changes nothing. The hold time itself is fixed by the device."
         },
         {
           "id": "timing-metastability-l3-mc3",
           "type": "mcq",
-          "prompt": "Why is gating a clock with an AND-enable considered bad practice for timing?",
+          "prompt": "What is clock skew?",
           "choices": [
-            "It saves too much power",
-            "It introduces uncontrolled skew/glitches on the clock and complicates timing closure",
-            "It increases $t_{su}$ of every flop",
-            "It is the only way to reduce hold violations"
+            "The clock edge arriving at one flip-flop slightly later than at another",
+            "The clock changing frequency over time",
+            "The data arriving before the clock",
+            "A flip-flop that has stopped working"
           ],
-          "answerIndex": 1,
-          "explanation": "Logic in the clock path adds skew and can glitch the clock; use a synchronous clock-enable on the flop instead."
+          "answerIndex": 0,
+          "explanation": "Skew is a difference in clock arrival time between flip-flops, usually because the clock wires have different lengths. A clock changing frequency or wobbling tick-to-tick is jitter, a separate idea."
         },
         {
           "id": "timing-metastability-l3-mc4",
           "type": "mcq",
-          "prompt": "Clock jitter most directly hurts which budget?",
+          "prompt": "What is clock jitter?",
           "choices": [
-            "It only affects power consumption",
-            "It relaxes the setup budget",
-            "It eats into the effective period, tightening the setup budget",
-            "It has no effect on synchronous timing"
+            "A permanent difference in wire length between two clock paths",
+            "The clock edge arriving a little early or late, varying from one tick to the next",
+            "The data signal being too large",
+            "The flip-flop output appearing instantly"
+          ],
+          "answerIndex": 1,
+          "explanation": "Jitter is the tick-to-tick wobble in when the clock edge actually arrives. A fixed, permanent offset between two clock paths is skew instead. Both reduce timing margin."
+        },
+        {
+          "id": "timing-metastability-l3-mc5",
+          "type": "mcq",
+          "prompt": "What does pipelining do to a long combinational path?",
+          "choices": [
+            "It deletes the logic to make it shorter",
+            "It breaks the path into shorter stages with flip-flops between them so a faster clock can be used",
+            "It slows the clock to be safe",
+            "It removes all the flip-flops"
+          ],
+          "answerIndex": 1,
+          "explanation": "Pipelining inserts registers to chop one long path into several short stages, like rest stops on a road. Each short stage permits a faster clock; it adds flip-flops rather than removing them."
+        },
+        {
+          "id": "timing-metastability-l3-mc6",
+          "type": "mcq",
+          "prompt": "Pipelining raises throughput but has a cost. What is that cost?",
+          "choices": [
+            "The chip uses no power",
+            "Higher latency — a result now takes several clock cycles to come out the end",
+            "The clock must slow down",
+            "The data becomes incorrect"
+          ],
+          "answerIndex": 1,
+          "explanation": "Splitting into stages means a value passes through several registers before emerging, so the delay from input to first result (latency) grows. In exchange, more results stream out per second (throughput). It does not corrupt data or force a slower clock."
+        },
+        {
+          "id": "timing-metastability-l3-mc7",
+          "type": "mcq",
+          "prompt": "A 12 ns combinational block is pipelined into 3 equal stages of 4 ns each (ignore the small extra delays). What clock period can the pipeline now run at?",
+          "choices": [
+            "12 ns (unchanged)",
+            "36 ns",
+            "About 4 ns",
+            "1.3 ns"
           ],
           "answerIndex": 2,
-          "explanation": "Because the next edge may arrive early, jitter is subtracted from the usable period, shrinking setup margin (just as phase noise degrades a radar's coherence)."
+          "explanation": "Each stage is now about 4 ns, so the slowest stage — and thus the clock period — drops to roughly 4 ns. The end-to-end latency is still about 12 ns (3 cycles), but the clock is three times faster."
+        },
+        {
+          "id": "timing-metastability-l3-mc8",
+          "type": "mcq",
+          "prompt": "Setup violations and hold violations differ in one key way. Which statement is correct?",
+          "choices": [
+            "Both are fixed by slowing the clock",
+            "Setup can be fixed by slowing the clock; hold cannot, because hold has no clock-period term",
+            "Hold can be fixed by slowing the clock; setup cannot",
+            "Neither has anything to do with the clock"
+          ],
+          "answerIndex": 1,
+          "explanation": "Setup is about reaching the next edge in time, so a longer period helps. Hold is a same-edge race with no period in its condition, so a slower clock does nothing for it — you add path delay instead."
+        },
+        {
+          "id": "timing-metastability-l3-mc9",
+          "type": "mcq",
+          "prompt": "Engineers warn against 'gating the clock' (running it through an AND gate with an enable). Why?",
+          "choices": [
+            "It makes the clock too fast",
+            "It adds uncontrolled skew and can create glitches on the clock; use a synchronous clock-enable on the flip-flop instead",
+            "It is the only way to fix hold violations",
+            "It increases the setup time of every flip-flop"
+          ],
+          "answerIndex": 1,
+          "explanation": "Putting logic in the clock path delays and can glitch the clock, hurting timing. The clean approach is a clock-enable input on the flip-flop, which keeps the clock itself untouched."
         }
       ]
     },
     {
       "id": "timing-metastability-l4",
-      "title": "Metastability, Synchronizers, CDC & Reset",
+      "title": "Metastability, Synchronizers & Crossing Clock Domains",
       "order": 4,
       "difficulty": 3,
-      "content": "When a flip-flop's setup/hold window is violated—inevitable when sampling a signal asynchronous to the clock—its output can hover between logic levels for an unbounded time before resolving randomly. This is **metastability**. It is a physical bistable-circuit phenomenon (a ball balanced on a hill), so it can never be fully eliminated, only made statistically rare.\n\nThe figure of merit is **mean time between failures**:\n\n$$\\text{MTBF} = \\frac{e^{\\,t_{r}/\\tau}}{f_{clk}\\, f_{data}\\, T_{0}}$$\n\nwhere $t_{r}$ is the resolution time allowed before the value is used, $\\tau$ and $T_0$ are device constants, and $f_{clk}$, $f_{data}$ are the clock and data-event rates. MTBF grows *exponentially* with the resolution time $t_{r}$—the lever we control.\n\nThe **two-flop synchronizer** buys one full clock of resolution time: FF1 samples the async input (and may go metastable), and FF2 resamples FF1's output one cycle later, by which time it has almost certainly resolved. That single-bit recipe is the foundation of **clock-domain crossing (CDC)**.\n\nMulti-bit buses can't use parallel two-flop synchronizers—bits would resolve on different cycles, producing illegal intermediate values. Instead: encode counters in **Gray code** (only one bit changes per step, so at most one bit is mid-transition), use a **handshake** (req/ack with the data held stable), or use an **asynchronous FIFO** (the standard for streaming data, combining Gray-coded pointers and dual-clock RAM).\n\nFinally, **reset strategy**: prefer **asynchronous assert, synchronous de-assert**. Assert reset immediately regardless of clock, but release it synchronized to the destination clock so flops don't exit reset near a clock edge and go metastable—the same synchronizer reasoning applied to the reset line itself.",
+      "content": "**Hook.** What actually happens if you break the setup/hold rule? The flip-flop can get stuck, briefly, unable to decide whether its output is a 0 or a 1. This in-between state is called **metastability**, and it is the cause of many baffling 'it works most of the time' hardware bugs.\n\n**Build.** Imagine trying to grab a spinning coin the instant it lands — for a moment it teeters on its edge before falling heads or tails. A flip-flop whose input changed right inside its setup/hold window can teeter the same way: its output hovers between voltage levels for an unpredictable time before finally settling on a random 0 or 1. It always resolves eventually, but you can't say exactly when.\n\nWhen does this risk arise? Whenever you sample a signal that isn't lined up with your clock — for example, an input from a button, a sensor, or another part of the chip running on a *different* clock. Because that signal can change at any instant, sooner or later it will change right at the bad moment.\n\nYou can't eliminate metastability, only make it astronomically unlikely. The measure of how rare failures are is **MTBF** (Mean Time Between Failures) — literally the average time you'd wait between one slip-through and the next; bigger is better.\n\nThe standard fix is the **two-flop synchronizer**: two flip-flops in a row on the receiving clock. The first one samples the wild signal and is *allowed* to go metastable; it then has a full clock cycle to settle before the second flip-flop reads it, so the second one almost always sees a clean 0 or 1.\n\nMoving signals between two different clocks is called **clock-domain crossing (CDC)**. A two-flop synchronizer handles one bit. A whole bus of bits can't just use parallel synchronizers (the bits would resolve on different cycles, giving garbage); instead engineers use tricks like Gray-code counters or an asynchronous FIFO (a small dual-clock memory). One related detail: a reset signal is usually applied immediately but *released* in step with the clock, so flip-flops don't leave reset right at an edge and go metastable.\n\n**Recap.** Sampling a signal that isn't aligned to your clock risks metastability — a brief undecided output. You make it rare (high MTBF) with a two-flop synchronizer, the cornerstone of safely crossing between clock domains.",
       "items": [
-        {
-          "id": "timing-metastability-l4-fc1",
-          "type": "flashcard",
-          "front": "What is metastability and why is it unavoidable?",
-          "back": "A flip-flop output stuck between valid logic levels for an unbounded time after a setup/hold violation. It's an intrinsic bistable-circuit phenomenon (unstable equilibrium), so it can only be made rare, never eliminated.",
-          "hint": "Ball balanced on a hill."
-        },
-        {
-          "id": "timing-metastability-l4-fc2",
-          "type": "flashcard",
-          "front": "Write the metastability MTBF expression and name the lever you control.",
-          "back": "$\\text{MTBF} = \\dfrac{e^{\\,t_{r}/\\tau}}{f_{clk}\\,f_{data}\\,T_{0}}$. The controllable lever is the resolution time $t_{r}$; MTBF grows **exponentially** with it.",
-          "hint": "Exponential in resolution time."
-        },
-        {
-          "id": "timing-metastability-l4-fc3",
-          "type": "flashcard",
-          "front": "How does a two-flop synchronizer reduce failure rate?",
-          "back": "FF1 samples the async signal and may go metastable; FF2 resamples FF1's output a full clock later, giving ~one period of resolution time ($t_r$), which raises MTBF exponentially.",
-          "hint": "Second flop buys settling time.",
-          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/timing-metastability-2.svg"
-        },
-        {
-          "id": "timing-metastability-l4-fc4",
-          "type": "flashcard",
-          "front": "Why can't you synchronize a multi-bit bus with parallel two-flop synchronizers?",
-          "back": "Individual bits may resolve on different cycles, yielding illegal transient combinations. Use Gray-coded counters, a handshake, or an async FIFO instead.",
-          "hint": "Bits resolve out of step."
-        },
-        {
-          "id": "timing-metastability-l4-fc5",
-          "type": "flashcard",
-          "front": "State the recommended reset strategy and its rationale.",
-          "back": "**Asynchronous assert, synchronous de-assert**: assert reset immediately, but release it synchronized to the destination clock so flops don't exit reset near an edge and go metastable.",
-          "hint": "Assert now, release in sync."
-        },
-        {
-          "id": "timing-metastability-l4-fc6",
-          "type": "flashcard",
-          "front": "Why is Gray code used for CDC counter (e.g., FIFO pointer) crossings?",
-          "back": "Only one bit changes between consecutive Gray-code values, so at most one bit can be mid-transition when sampled—any captured value is either the old or new count, never an illegal in-between.",
-          "hint": "One-bit-change-per-step property."
-        },
         {
           "id": "timing-metastability-l4-mc1",
           "type": "mcq",
-          "prompt": "In the MTBF expression, increasing which quantity raises MTBF exponentially?",
+          "prompt": "What is metastability in a flip-flop?",
           "choices": [
-            "The data toggle rate $f_{data}$",
-            "The clock frequency $f_{clk}$",
-            "The available resolution time $t_{r}$",
-            "The device constant $T_{0}$"
+            "The output settling instantly to the correct value",
+            "The output hovering between 0 and 1 for an unpredictable time before settling on a random value",
+            "The clock running too fast",
+            "The flip-flop permanently breaking"
           ],
-          "answerIndex": 2,
-          "explanation": "MTBF $\\propto e^{t_r/\\tau}$; only $t_r$ sits in the exponent. The rate terms in the denominator make MTBF worse as they grow."
+          "answerIndex": 1,
+          "explanation": "Metastability is the brief, undecided in-between state, like a coin teetering on its edge, that follows a setup/hold violation. It always resolves eventually and doesn't permanently damage the part, but the timing and outcome are unpredictable."
         },
         {
           "id": "timing-metastability-l4-mc2",
           "type": "mcq",
-          "prompt": "What is the role of the FIRST flop in a two-flop synchronizer?",
+          "prompt": "When is a flip-flop most at risk of going metastable?",
           "choices": [
-            "It guarantees a glitch-free output immediately",
-            "It samples the async input and absorbs the (possible) metastable event, giving FF2 a full cycle to see a resolved value",
-            "It performs Gray-to-binary decoding",
-            "It generates the destination clock"
+            "When its input is generated by the same clock and always meets setup/hold",
+            "When it samples a signal that is NOT aligned to its clock, such as a button or another clock domain",
+            "When the clock is perfectly clean",
+            "When the output is never read"
           ],
           "answerIndex": 1,
-          "explanation": "FF1 is the one allowed to go metastable; the design relies on it resolving within one clock so FF2 captures a clean level."
+          "explanation": "An unrelated signal can change at any instant, so eventually it changes right inside the setup/hold window. A signal that always respects setup/hold (same clock) is safe."
         },
         {
           "id": "timing-metastability-l4-mc3",
           "type": "mcq",
-          "prompt": "You must stream a wide data word from a fast ADC clock domain to a slower processing domain. Best mechanism?",
+          "prompt": "Why is the spinning-coin image a good picture of metastability?",
           "choices": [
-            "Parallel two-flop synchronizers on every data bit",
-            "A single-bit synchronizer on bit 0 only",
-            "An asynchronous (dual-clock) FIFO with Gray-coded pointers",
-            "Gate the source clock with an enable"
+            "Because coins are made of metal",
+            "Because a coin can teeter on its edge before randomly falling heads or tails, just as the output teeters before settling to a random 0 or 1",
+            "Because a coin flip is always fair",
+            "Because coins are round like a clock face"
           ],
-          "answerIndex": 2,
-          "explanation": "Streaming multi-bit data across domains is exactly what an async FIFO solves: data RAM is dual-clock and the read/write pointers cross safely via Gray code."
+          "answerIndex": 1,
+          "explanation": "The teetering, undecided moment and the random final result are the point of the analogy. The shape or material of the coin, and the fairness of the flip, are not relevant."
         },
         {
           "id": "timing-metastability-l4-mc4",
           "type": "mcq",
-          "prompt": "Why de-assert reset synchronously even when asserting it asynchronously?",
+          "prompt": "Can metastability be completely eliminated by good design?",
           "choices": [
-            "To make reset assertion slower",
-            "So flops don't release from reset too close to a clock edge and risk metastability",
-            "Because asynchronous assert is forbidden by all tools",
-            "To save the global reset routing resources"
+            "Yes, a fast enough clock removes it entirely",
+            "No, but it can be made astronomically unlikely (very high MTBF)",
+            "Yes, by using more flip-flops you reach zero risk",
+            "No, and nothing can be done to reduce it"
           ],
           "answerIndex": 1,
-          "explanation": "Async assert guarantees immediate reset regardless of clock state, while synchronized de-assert ensures all flops leave reset on a clean edge, avoiding a metastable exit."
+          "explanation": "Because it is a physical effect, it can never be driven to exactly zero — but a synchronizer makes the failure rate so low that it effectively never happens. Saying it can't be reduced at all is also wrong."
+        },
+        {
+          "id": "timing-metastability-l4-mc5",
+          "type": "mcq",
+          "prompt": "What does MTBF (Mean Time Between Failures) tell you about a synchronizer?",
+          "choices": [
+            "How fast the clock runs",
+            "The average time you would wait between metastability slip-throughs — bigger is better",
+            "How many flip-flops are on the chip",
+            "The voltage of the output"
+          ],
+          "answerIndex": 1,
+          "explanation": "MTBF is the average spacing between rare failures; a larger MTBF means failures are more spread out and the design is safer. It is not a clock speed, a count, or a voltage."
+        },
+        {
+          "id": "timing-metastability-l4-mc6",
+          "type": "mcq",
+          "prompt": "In a two-flop synchronizer, what is the role of the FIRST flip-flop?",
+          "choices": [
+            "It guarantees a clean output instantly",
+            "It samples the unaligned signal and is allowed to go metastable, then has a full clock cycle to settle",
+            "It generates the clock",
+            "It converts the signal to Gray code"
+          ],
+          "answerIndex": 1,
+          "explanation": "The first flop is the one permitted to teeter; the design counts on it settling within one clock so the second flop reads a clean level. It does not produce an instantly clean output — that's what the second flop is for.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/timing-metastability-2.svg"
+        },
+        {
+          "id": "timing-metastability-l4-mc7",
+          "type": "mcq",
+          "prompt": "Why does the SECOND flip-flop in a two-flop synchronizer usually see a clean 0 or 1?",
+          "choices": [
+            "Because it samples a full clock cycle later, after the first flop has almost certainly settled",
+            "Because it ignores the clock",
+            "Because it is faster than the first flop",
+            "Because it adds the two values together"
+          ],
+          "answerIndex": 0,
+          "explanation": "The whole clock period between the two flops gives the first flop time to resolve any metastability, so the second flop captures a settled value. The second flop is an ordinary flop, not faster or special."
+        },
+        {
+          "id": "timing-metastability-l4-mc8",
+          "type": "mcq",
+          "prompt": "What is 'clock-domain crossing' (CDC)?",
+          "choices": [
+            "Two clocks merging into one",
+            "Moving a signal from a part of the chip on one clock to a part on a different clock",
+            "Slowing a single clock down",
+            "Removing the clock entirely"
+          ],
+          "answerIndex": 1,
+          "explanation": "CDC is exactly the act of passing a signal between two regions running on different clocks — the situation that creates metastability risk and calls for a synchronizer. It is not about merging or removing clocks."
+        },
+        {
+          "id": "timing-metastability-l4-mc9",
+          "type": "mcq",
+          "prompt": "Why can't you safely cross a whole multi-bit bus by putting a separate two-flop synchronizer on each bit?",
+          "choices": [
+            "It would use too little power",
+            "Different bits could resolve on different cycles, producing a garbled in-between value",
+            "Two-flop synchronizers only work on the clock signal",
+            "Buses never cross clock domains"
+          ],
+          "answerIndex": 1,
+          "explanation": "Each bit might settle a cycle apart, so the receiving side could briefly read a mix of old and new bits — an illegal value. That's why buses use Gray-code counters or an asynchronous FIFO instead."
+        },
+        {
+          "id": "timing-metastability-l4-mc10",
+          "type": "mcq",
+          "prompt": "A common reset strategy applies reset immediately but RELEASES it in step with the clock. Why release it synchronously?",
+          "choices": [
+            "To make reset slower for no reason",
+            "So flip-flops don't leave reset right at a clock edge and go metastable",
+            "Because reset must always be ignored",
+            "To save wiring on the chip"
+          ],
+          "answerIndex": 1,
+          "explanation": "Releasing reset in sync with the clock keeps all flip-flops from exiting reset at a bad moment near an edge, which would risk metastability — the same synchronizer reasoning applied to the reset line."
         }
       ]
     }
