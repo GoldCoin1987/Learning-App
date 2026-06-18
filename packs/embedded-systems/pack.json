@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "id": "embedded-systems",
   "title": "Embedded Systems",
-  "version": "1.11.0",
+  "version": "1.12.0",
   "description": "Embedded systems from scratch (beginner rework in progress): 15 sub-topics from the bare-metal memory map through RTOS, real-time, and DSP-on-MCU. Beginner-first readings, diagrams, tiered easy to hard.",
   "requires": [
     "digital-electronics"
@@ -6028,323 +6028,563 @@
       "lessons": [
         {
           "id": "real-time-determinism-real-time-determinism-lesson-1",
-          "title": "What 'Real-Time' and 'Deterministic' Actually Mean",
+          "title": "What 'Real-Time' Really Means",
           "order": 1,
           "difficulty": 1,
-          "content": "As a radar tech you already lived this: a return that arrives *correct but late* is worthless. That intuition is the whole subject. **Real-time** is not \"fast\" — it is **bounded**. A system is real-time when its correctness depends on producing a result *within a deadline*, not merely on producing the right value eventually.\n\nThree flavors:\n\n- **Hard real-time:** missing a deadline is a system failure. Airbag deployment, motor commutation, a radar range gate. Late = wrong.\n- **Firm real-time:** a late result is useless and discarded, but an occasional miss is tolerable (it just degrades quality). A dropped video frame.\n- **Soft real-time:** late results still have *some* value that decays with lateness. A UI update, audio buffering with slack.\n\nThe load-bearing word is **deterministic**, and it does *not* mean \"always the same\" or \"fast on average.\" It means the **worst-case behavior is bounded and known**. A path that runs in 2 µs on average but occasionally takes 900 µs is *non-deterministic* for any deadline under 900 µs — even though it's blazing fast almost always.\n\nThis is the core mindset shift from application programming. On a desktop you optimize the **average case** and tolerate the rare hiccup; the OS, the GC, and the cache all trade worst-case for throughput. In hard real-time you do the opposite: you accept a slower average to *cap the maximum*. A predictable 10 µs beats a usually-1 µs-but-sometimes-1 ms path every time. \"Will this *ever* exceed the deadline?\" is the only question that matters.",
+          "content": "Imagine a train that must leave the station at exactly 9:00. Leaving at 9:00 sharp is what counts. A train that *could* go very fast but pulls out at 9:05 has still failed its job. That is the whole idea behind **real-time**.\n\n**Real-time does not mean fast. It means reliably on time.** A real-time system must finish its job by a fixed point in time called a **deadline** — every single time, not just usually. A program that is lightning quick on average but occasionally late is *not* a good real-time system.\n\nThink of a car airbag. When a crash happens, the airbag has only a few **milliseconds** (thousandths of a second) to inflate. If it inflates on time, it saves you. If it inflates a moment too late, it is useless — even if it was 'fast'. The deadline is what matters.\n\nNot every deadline is equally serious, so engineers sort real-time systems into three kinds:\n\n- **Hard real-time:** missing the deadline is a *failure*. Someone could get hurt or something breaks. Example: an airbag, or the controller that keeps an electric motor spinning smoothly.\n- **Soft real-time:** missing the deadline now and then is *annoying but okay*. The result is still a bit useful even if late. Example: a video that stutters for a frame — you notice, but nothing breaks.\n- **Firm real-time:** a late result is *thrown away* (it is no good once it is late), but an occasional miss is tolerable. Example: a streaming frame that arrives too late to display, so it is simply dropped.\n\n**Recap:** real-time = finishing by a deadline, dependably. 'Fast' helps, but being *on time, every time* is the goal. Hard means a miss is a failure; soft means a miss is tolerable; firm means a late result is discarded but rare misses are okay.",
           "items": [
-            {
-              "id": "real-time-determinism-1-fc-1",
-              "type": "flashcard",
-              "front": "What does it mean for a real-time system to be 'deterministic'?",
-              "back": "Its worst-case behavior (e.g. worst-case latency) is bounded and known — NOT that it is always identical or fast on average.",
-              "hint": "Think bounds, not speed."
-            },
-            {
-              "id": "real-time-determinism-1-fc-2",
-              "type": "flashcard",
-              "front": "Hard vs soft vs firm real-time — what distinguishes them?",
-              "back": "Hard: a missed deadline is a system failure (late = wrong). Firm: a late result is useless and discarded, but occasional misses are tolerable. Soft: late results retain some value that decays with lateness.",
-              "hint": "What is the cost of being late in each?"
-            },
-            {
-              "id": "real-time-determinism-1-fc-3",
-              "type": "flashcard",
-              "front": "Why is a path that runs in 2 µs on average but rarely takes 900 µs a problem for a 100 µs deadline?",
-              "back": "Real-time correctness is about the worst case, not the average. The 900 µs tail event blows the deadline, so the path is non-deterministic with respect to that deadline regardless of how good the average is.",
-              "hint": "Which case does the deadline care about?"
-            },
-            {
-              "id": "real-time-determinism-1-fc-4",
-              "type": "flashcard",
-              "front": "How does the optimization goal differ between desktop/application programming and hard real-time?",
-              "back": "Desktop optimizes the average case and tolerates rare hiccups. Hard real-time accepts a worse average if necessary to cap and bound the worst case.",
-              "hint": "Average vs maximum."
-            },
             {
               "id": "real-time-determinism-1-mcq-1",
               "type": "mcq",
-              "prompt": "A system discards any sensor reading that arrives after its deadline, but an occasional dropped reading only slightly degrades output quality. What real-time class is this?",
+              "prompt": "What does it mean for a system to be 'real-time'?",
               "choices": [
-                "Hard real-time",
-                "Firm real-time",
-                "Soft real-time",
-                "Non-real-time"
+                "It runs as fast as the hardware possibly allows",
+                "It reliably finishes its job by a deadline, every time",
+                "It uses the newest, fastest processor available",
+                "It never uses interrupts or an operating system"
               ],
               "answerIndex": 1,
-              "explanation": "A late result being useless (discarded) but occasional misses being tolerable is the definition of firm real-time. Hard would treat any miss as failure; soft would still extract decaying value from the late result."
+              "explanation": "Real-time is about timing reliability, not raw speed: the job must be done by its deadline every time. A blazing-fast system that is occasionally late is not a good real-time system. Speed alone is not the point."
             },
             {
               "id": "real-time-determinism-1-mcq-2",
               "type": "mcq",
-              "prompt": "Which statement best captures 'deterministic' in a real-time context?",
+              "prompt": "A train must depart at exactly 9:00. A fast train that departs at 9:05 has failed. What real-time idea does this illustrate?",
               "choices": [
-                "The code executes in exactly the same number of cycles every single time",
-                "The average execution time is very low",
-                "The worst-case execution time is bounded and known",
-                "The code never uses interrupts"
+                "Throughput matters more than latency",
+                "Being on time beats simply being fast",
+                "Deadlines can always be ignored if you are quick",
+                "Soft real-time and hard real-time are the same"
               ],
-              "answerIndex": 2,
-              "explanation": "Determinism means a known, bounded worst case. Execution need not be byte-for-byte identical each run, nor merely fast on average; what matters is that the maximum is provably capped."
+              "answerIndex": 1,
+              "explanation": "The train shows that meeting the scheduled time (the deadline) is what counts, not how fast the train *could* go. On time beats fast. A capable-but-late result still misses the goal."
             },
             {
               "id": "real-time-determinism-1-mcq-3",
               "type": "mcq",
-              "prompt": "For a hard real-time deadline of 50 µs, which of these implementations is preferable?",
+              "prompt": "A car airbag must fully inflate within a few milliseconds of a crash, or it cannot protect the occupant. What kind of real-time system is this?",
               "choices": [
-                "Usually 5 µs, but occasionally 200 µs under cache pressure",
-                "Predictably 30 µs every time",
-                "Usually 2 µs, worst case unmeasured",
-                "Averages 8 µs with an unbounded tail"
+                "Soft real-time, because a small delay is fine",
+                "Firm real-time, because a late result is just discarded",
+                "Hard real-time, because missing the deadline is a failure",
+                "Not real-time at all"
               ],
-              "answerIndex": 1,
-              "explanation": "A predictable 30 µs is fully inside the 50 µs budget with a known bound. The others either exceed the deadline in the worst case or have an unknown/unbounded worst case, which is unacceptable for hard real-time."
+              "answerIndex": 2,
+              "explanation": "If a late airbag means injury, missing the deadline is a true failure — that is the definition of hard real-time. Soft would mean a late result is merely annoying, and firm would mean the late result is simply thrown away with no harm."
             },
             {
               "id": "real-time-determinism-1-mcq-4",
               "type": "mcq",
-              "prompt": "Why is average-case latency the wrong metric for a hard real-time path?",
+              "prompt": "A video player occasionally stutters for one frame during heavy load, but the video keeps playing and you barely notice. This is an example of:",
               "choices": [
-                "Average latency is impossible to measure on an MCU",
-                "A single rare deadline miss can constitute a system failure, so the maximum governs correctness",
-                "Averages are always higher than worst case",
-                "The CPU cannot compute averages in real time"
+                "Hard real-time",
+                "Soft real-time",
+                "A complete system failure",
+                "A system with no deadlines"
               ],
               "answerIndex": 1,
-              "explanation": "In hard real-time a single missed deadline is a failure, so correctness is governed by the worst-case latency. The average can look excellent while a rare tail event still violates the deadline."
+              "explanation": "An occasional late frame is annoying but tolerable and nothing breaks — that is soft real-time. Hard real-time would treat any miss as a failure. The deadline still exists; it is just not safety-critical."
+            },
+            {
+              "id": "real-time-determinism-1-mcq-5",
+              "type": "mcq",
+              "prompt": "In a 'firm' real-time system, what happens to a result that arrives after its deadline?",
+              "choices": [
+                "It is used anyway, because late data is better than none",
+                "It is thrown away, because a late result is no longer useful (but a rare miss is tolerable)",
+                "It causes the whole system to crash immediately",
+                "It is automatically made to arrive on time"
+              ],
+              "answerIndex": 1,
+              "explanation": "Firm real-time discards a late result — once it is late it has no value — yet an occasional miss is acceptable. This sits between hard (any miss is a failure) and soft (a late result still has some value)."
+            },
+            {
+              "id": "real-time-determinism-1-mcq-6",
+              "type": "mcq",
+              "prompt": "Which statement is TRUE about real-time systems?",
+              "choices": [
+                "A real-time system is always the fastest possible system",
+                "A slow-but-always-on-time system can be a perfectly good real-time system",
+                "Real-time systems never have deadlines",
+                "Only soft real-time systems have deadlines"
+              ],
+              "answerIndex": 1,
+              "explanation": "What matters is meeting the deadline dependably, so a steady, slower system that is always on time can be an excellent real-time system. Raw speed is not the requirement, and all real-time classes (hard, soft, firm) involve deadlines."
+            },
+            {
+              "id": "real-time-determinism-1-mcq-7",
+              "type": "mcq",
+              "prompt": "A controller adjusts an electric motor at a fixed rhythm; if an adjustment is late the motor jerks or the hardware can be damaged. How should this be classified, and why?",
+              "choices": [
+                "Soft real-time, because motors are forgiving",
+                "Hard real-time, because a missed deadline causes a real failure",
+                "Firm real-time, because the late adjustment is discarded harmlessly",
+                "Non-real-time, because motors do not need timing"
+              ],
+              "answerIndex": 1,
+              "explanation": "A missed deadline that jerks or damages the hardware is a genuine failure, which makes this hard real-time. The penalty for lateness, not the device itself, decides the class."
+            },
+            {
+              "id": "real-time-determinism-1-mcq-8",
+              "type": "mcq",
+              "prompt": "Why is 'it works fine almost every time' not good enough for a hard real-time system?",
+              "choices": [
+                "Because hard real-time systems do not allow any code at all",
+                "Because in hard real-time even a single missed deadline counts as a failure",
+                "Because almost-every-time means the average speed is too low",
+                "Because hard real-time only cares about throughput"
+              ],
+              "answerIndex": 1,
+              "explanation": "Hard real-time judges correctness by whether *every* deadline is met, so one rare miss is a failure. 'Almost always' leaves room for the one disastrous late case, which is exactly what hard real-time cannot tolerate."
+            },
+            {
+              "id": "real-time-determinism-1-mcq-9",
+              "type": "mcq",
+              "prompt": "Which everyday situation best matches a HARD real-time deadline?",
+              "choices": [
+                "A weather app that updates every few minutes",
+                "A music player that buffers a few seconds ahead",
+                "An anti-lock brake controller that must react within a tight, fixed time",
+                "A photo gallery that loads thumbnails when it can"
+              ],
+              "answerIndex": 2,
+              "explanation": "Anti-lock brakes must respond within a strict deadline or braking fails — a true failure, hence hard real-time. The weather app, buffered music, and lazy thumbnail loading all tolerate delays, making them soft or non-real-time.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/real-time-determinism-2.svg"
+            },
+            {
+              "id": "real-time-determinism-1-mcq-10",
+              "type": "mcq",
+              "prompt": "Using the three-way comparison, which ordering correctly ranks the cost of being late, from most severe to least severe?",
+              "choices": [
+                "Soft → Firm → Hard",
+                "Hard → Firm → Soft",
+                "Firm → Soft → Hard",
+                "They all have exactly the same cost"
+              ],
+              "answerIndex": 1,
+              "explanation": "Hard is most severe (a miss is a failure), firm is in the middle (the late result is discarded but rare misses are okay), and soft is least severe (a late result still has some value). They are clearly not all the same.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/real-time-determinism-3.svg"
             }
           ]
         },
         {
           "id": "real-time-determinism-real-time-determinism-lesson-2",
-          "title": "Latency, Jitter, WCET, and the Enemies of Determinism",
+          "title": "Latency, Jitter, and Measuring Timing",
           "order": 2,
           "difficulty": 2,
-          "content": "To engineer determinism you need three distinct measurements, and confusing them is a classic mistake.\n\n- **Latency:** time from a triggering event (interrupt fires) to the response (handler completes / output asserted).\n- **Throughput:** events or bytes processed per unit time. High throughput does *not* imply low latency — a deep DMA pipeline maximizes throughput while *adding* latency.\n- **Jitter:** the *variation* in latency across many events — the spread of the distribution. For a hard deadline, jitter is often the real enemy: a fixed large latency can be designed around; a wandering one cannot.\n\n**WCET (worst-case execution time)** is the upper bound on how long a piece of code can take. You estimate it analytically and confirm it empirically — you never *assume* it. Its enemies are exactly the hardware features that make average case fast:\n\n- **Cache misses:** a hit is a few cycles, a miss is tens to hundreds. WCET must assume misses.\n- **Branch misprediction:** flushes the pipeline; variable cost.\n- **Variable-time instructions:** hardware **division** and some multiplies take data-dependent cycles; this bites in tight ISRs.\n- **DMA / bus contention:** a DMA burst stalls the CPU when both want the same bus matrix path — your code slows down through no fault of its own.\n- **Interrupt storms:** a flood of interrupts preempts your task repeatedly, inflating *observed* latency without your code changing.\n- **The heap:** `malloc`/`free` have data-dependent, fragmentation-dependent, effectively unbounded timing. This is why dynamic allocation is banned in real-time paths.\n\n**Measuring jitter** the right way: toggle a GPIO at ISR entry and exit (or at task start/end), capture thousands of events on a logic analyzer or scope, and build the **distribution**. Report the **maximum and the spread**, not the mean. The tail of that histogram — not its peak — is what decides whether you meet a hard deadline.",
+          "content": "To talk about timing carefully we need a few plain words. Picture pressing a doorbell. The moment you press is an **event**. The chime that follows is the **response**.\n\n- **Latency** is the wait between the event and the response — how long from the button press to the chime. Short latency means a quick reaction.\n- **Throughput** is how *much* work gets done per second — how many chimes per minute the bell could manage. Throughput and latency are different! A system can do a huge amount of work per second (high throughput) yet still make each single response wait a while (high latency). Doing a lot is not the same as reacting quickly.\n- **Jitter** is how much the latency *varies* from one event to the next. If the chime comes 0.1 seconds after every press, jitter is tiny and predictable. If it sometimes comes after 0.1 s and sometimes after 0.5 s, jitter is high.\n\nFor deadlines, **jitter is often the real enemy.** A latency that is always the same, even if a bit long, is easy to plan around — you just set the deadline beyond it. But a latency that wanders unpredictably is hard to trust. You can never be sure the next one will make the deadline.\n\nSo how do you actually *measure* this on real hardware, where you cannot see inside the chip? A classic trick: **toggle a pin.** Right before the code does its work, set an output pin **HIGH**; right after it finishes, set it **LOW**. Now connect that pin to an **oscilloscope** (a 'scope' — an instrument that draws a graph of a signal's voltage over time). The pin produces a pulse, and the **width of the pulse is exactly how long the code took.** Flipping one pin is almost free, so it barely disturbs the timing you are trying to measure.\n\nDo this for thousands of events, not just one. You want to catch the *longest* pulse, not a typical one — because, as we will see, the worst case is what decides a deadline.\n\n**Recap:** latency = the wait; throughput = the amount of work per second; jitter = the variation in the wait. Measure timing by toggling a pin and reading the pulse width on a scope, and look for the worst case, not the average.",
           "items": [
-            {
-              "id": "real-time-determinism-2-fc-1",
-              "type": "flashcard",
-              "front": "Define latency, throughput, and jitter.",
-              "back": "Latency: time from triggering event to response. Throughput: events/bytes processed per unit time. Jitter: the variation (spread) in latency across many events.",
-              "hint": "One time, one rate, one variation."
-            },
-            {
-              "id": "real-time-determinism-2-fc-2",
-              "type": "flashcard",
-              "front": "Can a system have high throughput but poor (high) latency?",
-              "back": "Yes. Deep pipelining and DMA double-buffering raise throughput by batching work, which often *adds* latency. The two metrics are independent.",
-              "hint": "Think of a DMA streaming pipeline."
-            },
-            {
-              "id": "real-time-determinism-2-fc-3",
-              "type": "flashcard",
-              "front": "What is WCET, and how do you obtain it?",
-              "back": "Worst-Case Execution Time: the upper bound on how long code can take to run. You estimate it analytically (assuming cache misses, mispredicts, max-iteration loops) and confirm it empirically by measurement — never by assuming the observed best case.",
-              "hint": "Bound, then measure."
-            },
-            {
-              "id": "real-time-determinism-2-fc-4",
-              "type": "flashcard",
-              "front": "Name the main enemies of WCET / determinism on a modern MCU.",
-              "back": "Cache misses, branch misprediction, variable-time instructions (e.g. hardware division), DMA/bus contention, interrupt storms, and the heap (malloc/free).",
-              "hint": "Six things, mostly 'average-case' speedups."
-            },
-            {
-              "id": "real-time-determinism-2-fc-5",
-              "type": "flashcard",
-              "front": "What is the correct way to measure jitter, and what do you report?",
-              "back": "Toggle a GPIO at ISR/task entry and exit, capture thousands of events on a scope/logic analyzer, and build the latency distribution. Report the maximum and the spread (the tail), not the mean.",
-              "hint": "Histogram, and which part of it matters."
-            },
             {
               "id": "real-time-determinism-2-mcq-1",
               "type": "mcq",
-              "prompt": "Why is hardware integer division a hazard in a tight, deadline-critical ISR?",
+              "prompt": "What does 'latency' measure?",
               "choices": [
-                "It is always slower than software division",
-                "It takes a data-dependent, variable number of cycles, inflating WCET unpredictably",
-                "It disables interrupts automatically",
-                "It cannot run in handler mode"
+                "How many events are handled per second",
+                "The wait between a triggering event and the system's response",
+                "How much the timing varies between events",
+                "How fast the CPU clock runs"
               ],
               "answerIndex": 1,
-              "explanation": "Division on many cores is a variable-time, data-dependent instruction. Variable timing is exactly what undermines a bounded WCET, so it is risky in tight real-time paths."
+              "explanation": "Latency is the delay from event to response — like the wait from a doorbell press to the chime. The amount of work per second is throughput, and the variation in the wait is jitter; those are different ideas."
             },
             {
               "id": "real-time-determinism-2-mcq-2",
               "type": "mcq",
-              "prompt": "When estimating WCET analytically, how should you treat the cache?",
+              "prompt": "What does 'jitter' describe?",
               "choices": [
-                "Assume every access is a cache hit, since that is most common",
-                "Assume the worst case: cache misses on the critical accesses",
-                "Ignore the cache because it averages out",
-                "Disable the cache so it cannot affect timing in any way"
+                "The average latency over a long run",
+                "How much the latency varies from one event to the next",
+                "The total number of events processed",
+                "The voltage of the output pin"
               ],
               "answerIndex": 1,
-              "explanation": "WCET is an upper bound, so you must assume cache misses on the relevant accesses. Assuming hits gives a best case, not a worst case. (Disabling the cache is one mitigation but is a design choice, not how you *estimate* WCET.)"
+              "explanation": "Jitter is the variation in latency — sometimes the response is quick, sometimes slow. It is not the average (that would just be a single latency number) nor a count of events."
             },
             {
               "id": "real-time-determinism-2-mcq-3",
               "type": "mcq",
-              "prompt": "You measure an ISR's latency over 100,000 events. Which figure most directly tells you whether a hard deadline is safe?",
+              "prompt": "Can a system have high throughput (lots of work per second) but still have high latency (slow individual responses)?",
               "choices": [
-                "The mean latency",
-                "The median latency",
-                "The maximum observed latency (and the tail of the distribution)",
-                "The minimum latency"
+                "No, high throughput always means low latency",
+                "Yes, the two are different and can move independently",
+                "No, latency and throughput are the same measurement",
+                "Only if the system has no deadlines"
               ],
-              "answerIndex": 2,
-              "explanation": "Hard deadlines are governed by the worst case, so the maximum and the tail of the distribution are decisive. Mean, median, and minimum can all look fine while a rare tail event violates the deadline."
+              "answerIndex": 1,
+              "explanation": "Throughput and latency are separate. A system that batches lots of work can push high total volume per second while each single response still waits a while. Getting a lot done is not the same as reacting quickly."
             },
             {
               "id": "real-time-determinism-2-mcq-4",
               "type": "mcq",
-              "prompt": "Why is dynamic heap allocation (malloc/free) discouraged in real-time code?",
+              "prompt": "For meeting a deadline, why is high jitter often more dangerous than a latency that is simply large?",
               "choices": [
-                "It uses too much flash",
-                "Its execution time is data- and fragmentation-dependent and effectively unbounded",
-                "It requires an MMU that MCUs lack",
-                "It only works in privileged mode"
+                "Because large latency cannot be measured",
+                "Because a steady latency can be planned around, but a wandering one cannot be trusted to make the deadline",
+                "Because jitter makes the CPU run hotter",
+                "Because high jitter always means low throughput"
               ],
               "answerIndex": 1,
-              "explanation": "Allocator timing depends on heap state and fragmentation and has no useful upper bound, which destroys WCET guarantees. Real-time designs prefer static allocation, pools, and ring buffers."
+              "explanation": "A fixed latency, even a long one, lets you set the deadline beyond it with confidence. Jitter means the next response might be much later than usual, so you can never be sure a deadline will be met."
             },
             {
               "id": "real-time-determinism-2-mcq-5",
               "type": "mcq",
-              "prompt": "An ISR's code is unchanged, yet its measured response time suddenly spikes during heavy peripheral activity. The most likely cause is:",
+              "prompt": "A common way to measure how long a piece of code takes is to:",
               "choices": [
-                "The compiler re-optimized the ISR at runtime",
-                "DMA/bus contention or an interrupt storm preempting/stalling the path",
-                "The heap grew larger",
-                "The CPU clock increased"
+                "Guess based on the number of lines of code",
+                "Set an output pin HIGH at the start and LOW at the end, then read the pulse width on a scope",
+                "Count the comments in the source file",
+                "Ask the compiler for the exact runtime"
               ],
               "answerIndex": 1,
-              "explanation": "Bus contention from DMA bursts and preemption from interrupt storms inflate observed latency without any change to the ISR code itself — both are classic external enemies of determinism."
+              "explanation": "Toggling a pin turns the code's duration into a pulse whose width you can read directly on an oscilloscope. Line counts and comments tell you nothing about runtime, and the compiler cannot know real hardware timing."
             },
             {
-              "id": "real-time-determinism-2-fc-6",
-              "type": "flashcard",
-              "front": "In a measured latency histogram, which part of the distribution decides whether a hard deadline is met — and where is the jitter? (see diagram)",
-              "back": "The long tail toward the worst case decides it, not the tall average peak. Jitter is the spread between the average and the worst case. A deadline must sit beyond the worst-case tail, not beyond the average.",
-              "hint": "Look at the tail, not the peak.",
-              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/real-time-determinism-1.svg"
+              "id": "real-time-determinism-2-mcq-6",
+              "type": "mcq",
+              "prompt": "On the scope, what does the WIDTH of the pulse created by the pin-toggle trick represent?",
+              "choices": [
+                "The voltage of the signal",
+                "How long the code ran (the time between HIGH and LOW)",
+                "The number of events that occurred",
+                "The CPU temperature"
+              ],
+              "answerIndex": 1,
+              "explanation": "The pin goes HIGH when the work starts and LOW when it ends, so the time the pin stays HIGH — the pulse width — is exactly the code's run time. Voltage height is not the measurement here.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/real-time-determinism-5.svg"
+            },
+            {
+              "id": "real-time-determinism-2-mcq-7",
+              "type": "mcq",
+              "prompt": "Why is toggling a single pin a good way to measure timing without ruining the measurement?",
+              "choices": [
+                "Because flipping one pin takes so little time it barely disturbs the code being measured",
+                "Because pins do not consume any power",
+                "Because the scope corrects all errors automatically",
+                "Because it stops all interrupts while measuring"
+              ],
+              "answerIndex": 0,
+              "explanation": "A single pin write is extremely cheap, so it adds almost nothing to the time you are trying to measure. A heavy method (like printing text) would slow the code and distort the very timing you want."
+            },
+            {
+              "id": "real-time-determinism-2-mcq-8",
+              "type": "mcq",
+              "prompt": "When you capture pin-toggle pulses for thousands of events, which pulse should you care about most for a hard deadline?",
+              "choices": [
+                "The shortest pulse you saw",
+                "A typical, middle-of-the-road pulse",
+                "The longest pulse you saw (the worst case)",
+                "The very first pulse only"
+              ],
+              "answerIndex": 2,
+              "explanation": "A hard deadline must survive even the slowest run, so the longest pulse — the worst case — is decisive. The shortest or typical pulse can look great while a rare long one still blows the deadline."
+            },
+            {
+              "id": "real-time-determinism-2-mcq-9",
+              "type": "mcq",
+              "prompt": "Events arrive steadily, but the response sometimes comes quickly and sometimes much later. Which term best describes this behavior?",
+              "choices": [
+                "High throughput",
+                "Low latency",
+                "High jitter",
+                "Zero latency"
+              ],
+              "answerIndex": 2,
+              "explanation": "Responses that vary in their delay from event to event is the definition of high jitter. It is not about how much work is done (throughput) or about a single short delay (low latency).",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/real-time-determinism-4.svg"
+            },
+            {
+              "id": "real-time-determinism-2-mcq-10",
+              "type": "mcq",
+              "prompt": "An instrument that draws a graph of a signal's voltage over time, used to view the timing pulses, is called a:",
+              "choices": [
+                "Compiler",
+                "Oscilloscope (scope)",
+                "Multimeter that only shows one number",
+                "Heap"
+              ],
+              "answerIndex": 1,
+              "explanation": "An oscilloscope ('scope') plots voltage versus time, so you can see the rising and falling edges of your timing pulse and read its width. A compiler builds code, and a single-number meter cannot show the shape of a pulse over time."
             }
           ]
         },
         {
           "id": "real-time-determinism-real-time-determinism-lesson-3",
-          "title": "Designing for the Worst Case: Budgets, Scheduling, and Robustness",
+          "title": "Determinism and Its Enemies",
           "order": 3,
-          "difficulty": 3,
-          "content": "Knowing your WCETs lets you *design* for the worst case instead of hoping.\n\n**CPU budgeting.** For each periodic task compute utilization **U = C / T** (worst-case execution time C over period T) and sum across tasks. If ΣU > 1 the system is overcommitted and *will* miss deadlines under load. Leave headroom — a 100%-loaded MCU has no margin for the tail events of Lesson 2.\n\n**Rate-monotonic (RM) intuition.** Under fixed-priority preemptive scheduling, assign priorities by *rate*: the more frequent task (shorter period) gets the higher priority. RM is provably optimal among fixed-priority schemes. The classic sufficient bound for *n* tasks is ΣU ≤ n(2^(1/n) − 1), which tends to **~0.69** as n grows — a useful rule of thumb that a fixed-priority set comfortably below ~69% utilization is schedulable, though specific task sets can go higher. **Deadline analysis** is the rigorous check: for each task verify that its worst-case response time (its own C plus all preemption from higher-priority tasks) is ≤ its deadline.\n\n**The dangerous patterns** — each silently destroys determinism:\n\n- **Disabling interrupts** for long stretches: every interrupt's latency now includes that critical-section duration. Keep critical sections *tiny and bounded*; never do real work with interrupts off.\n- **Busy-waiting / spin loops** in a critical path: burns CPU and, worse, can wait an unbounded time on an external condition.\n- **Unbounded loops:** a `while (!flag)` with no timeout, or a loop whose iteration count is data-dependent, has no WCET. Cap every loop.\n\n**Robustness backstops.** Even with budgets, things go wrong. The **watchdog timer** catches a hung or deadlocked system: if the code stops \"kicking\" it within a bounded window, it resets the MCU — turning a silent hang into a recoverable reboot. The **MPU** (memory protection unit) catches stack overflows and stray writes by faulting on illegal accesses, converting silent corruption into a diagnosable fault. Neither makes you faster; both make worst-case *failure* bounded and detectable — the same philosophy as the rest of this module.",
+          "difficulty": 2,
+          "content": "We keep saying a real-time system must be on time *every* time. The word for that quality is **determinism**.\n\n**Determinism means the timing is predictable and bounded** — you can name a worst case and promise the system will never go past it. It does *not* mean 'always the exact same' and it does *not* mean 'fast on average'. A path that usually runs in 2 microseconds (millionths of a second) but once in a while takes 900 microseconds is **non-deterministic** for any deadline below 900, no matter how quick it usually is. The rare slow case is the one that breaks the promise.\n\nSo what makes timing wander and become unpredictable? These are the common **enemies of determinism** — and you have met several of them in the interrupts and RTOS sub-topics:\n\n- **Turning interrupts off for too long.** Interrupts let the chip react to events right away. While they are switched off, an event simply *waits*. A brief, bounded pause is fine; a long one means events can be left waiting an unpredictable amount of time.\n- **Doing too much work inside an interrupt handler (an ISR).** An ISR is the small piece of code that runs the instant an event fires. It is meant to be short — note the event, then leave. If it does heavy work, it hogs the processor and delays everything else.\n- **Blocking or busy-waiting.** 'Blocking' means the code stops and waits for something to happen. 'Busy-waiting' is spinning in a tight loop checking 'is it ready yet? is it ready yet?' If there is no limit on how long it waits, the wait time is unpredictable — which is exactly what determinism cannot have.\n- **Operations that take a varying amount of time.** Some calculations finish in a fixed number of steps; others take longer depending on the numbers involved. Anything whose duration depends on the data makes the worst case harder to pin down.\n\nThe common thread: each enemy makes the *worst case* either large or unknown. Determinism is about keeping that worst case small **and** known.\n\n**Recap:** determinism = predictable, bounded timing with a guaranteed worst case (not 'identical' and not 'fast on average'). Its enemies — long interrupt-off stretches, heavy ISRs, unbounded blocking or busy-waiting, and variable-time operations — all stretch or hide the worst case.",
           "items": [
-            {
-              "id": "real-time-determinism-3-fc-1",
-              "type": "flashcard",
-              "front": "How do you compute a periodic task's CPU utilization, and what does summing them tell you?",
-              "back": "U = C / T (worst-case execution time over period). Sum across all tasks: if ΣU > 1 the CPU is overcommitted and deadlines will be missed under load. Leave headroom for tail events.",
-              "hint": "Work-per-period as a fraction; then add up."
-            },
-            {
-              "id": "real-time-determinism-3-fc-2",
-              "type": "flashcard",
-              "front": "What is the rate-monotonic priority assignment rule?",
-              "back": "Under fixed-priority preemptive scheduling, give the task with the shorter period (higher rate) the higher priority. RM is provably optimal among fixed-priority schemes.",
-              "hint": "Faster rate -> higher priority."
-            },
-            {
-              "id": "real-time-determinism-3-fc-3",
-              "type": "flashcard",
-              "front": "What is the rate-monotonic utilization bound, and what is its limiting value?",
-              "back": "ΣU ≤ n(2^(1/n) − 1) is a sufficient condition for n tasks; it decreases toward about 0.69 (69%) as n grows. Staying comfortably below ~69% utilization is a safe fixed-priority rule of thumb.",
-              "hint": "It converges near 0.69."
-            },
-            {
-              "id": "real-time-determinism-3-fc-4",
-              "type": "flashcard",
-              "front": "Why are long interrupt-disabled critical sections dangerous in real-time code?",
-              "back": "While interrupts are disabled, every pending interrupt's latency grows by the length of that critical section. It directly inflates worst-case interrupt latency, so critical sections must be tiny and bounded.",
-              "hint": "What happens to interrupt latency while they're off?"
-            },
-            {
-              "id": "real-time-determinism-3-fc-5",
-              "type": "flashcard",
-              "front": "What does a watchdog timer do for real-time robustness?",
-              "back": "If the firmware fails to 'kick'/refresh it within a bounded window (because it hung, deadlocked, or overran), the watchdog resets the MCU — converting a silent hang into a recoverable, bounded reboot.",
-              "hint": "Stop kicking it and the chip resets."
-            },
-            {
-              "id": "real-time-determinism-3-fc-6",
-              "type": "flashcard",
-              "front": "How does an MPU contribute to determinism/robustness on an MCU?",
-              "back": "It faults on illegal memory accesses (e.g. stack overflow, stray writes), turning silent memory corruption — which has unbounded, unpredictable consequences — into an immediate, diagnosable fault.",
-              "hint": "Catches stack overflow / stray writes by faulting."
-            },
             {
               "id": "real-time-determinism-3-mcq-1",
               "type": "mcq",
-              "prompt": "Three periodic tasks have utilizations 0.30, 0.30, and 0.35 (ΣU = 0.95). What does this imply under fixed-priority scheduling?",
+              "prompt": "What does 'determinism' mean in a real-time system?",
               "choices": [
-                "Always schedulable, since ΣU < 1",
-                "It exceeds the ~0.69 RM rule-of-thumb bound, so schedulability is not guaranteed and there is almost no margin for tail events",
-                "It is unschedulable because ΣU > 0.5",
-                "Utilization is irrelevant to schedulability"
+                "The code runs in the exact same number of steps every single time",
+                "The timing is predictable and bounded — there is a known worst case it will never exceed",
+                "The average speed is very high",
+                "The system never uses an operating system"
               ],
               "answerIndex": 1,
-              "explanation": "ΣU = 0.95 is below 1 but well above the ~0.69 RM sufficient bound, so the simple test does not guarantee schedulability (you'd need full response-time analysis), and 95% load leaves essentially no headroom for the worst-case tail events."
+              "explanation": "Determinism is a guaranteed, known worst case — you can promise the system will not go past it. It does not require byte-for-byte identical runs, and a great average is not enough if a rare run is slow."
             },
             {
               "id": "real-time-determinism-3-mcq-2",
               "type": "mcq",
-              "prompt": "Under rate-monotonic scheduling, a 1 kHz task and a 100 Hz task share a CPU. Which gets higher priority?",
+              "prompt": "A code path runs in 2 microseconds almost always, but rarely takes 900 microseconds. For a deadline of 100 microseconds, this path is:",
               "choices": [
-                "The 100 Hz task, because it is less frequent",
-                "The 1 kHz task, because it has the shorter period / higher rate",
-                "Whichever has the longer execution time",
-                "They must have equal priority"
+                "Deterministic, because it is usually very fast",
+                "Non-deterministic, because its worst case (900 µs) blows the 100 µs deadline",
+                "Deterministic, because the average is under 100 µs",
+                "Irrelevant, because averages are all that matter"
               ],
               "answerIndex": 1,
-              "explanation": "RM assigns priority by rate: the shorter-period (1 kHz) task gets the higher priority. Period, not execution time, drives the RM assignment."
+              "explanation": "The rare 900 µs run exceeds the 100 µs deadline, so the worst case fails and the path is non-deterministic for that deadline. A fast average does not rescue it — the worst case is what the deadline tests."
             },
             {
               "id": "real-time-determinism-3-mcq-3",
               "type": "mcq",
-              "prompt": "What does worst-case response-time deadline analysis for a task account for that simple utilization summing does not?",
+              "prompt": "Why does keeping interrupts switched off for a long time hurt determinism?",
               "choices": [
-                "The task's own execution time only",
-                "The task's execution time plus all preemption it can suffer from higher-priority tasks, checked against its deadline",
-                "Only the heap usage of the task",
-                "The average-case latency of the whole system"
+                "It permanently disables the interrupts",
+                "Events that arrive while interrupts are off must wait, adding unpredictable delay to their response",
+                "It makes the CPU clock slow down",
+                "It uses up all the system's memory"
               ],
               "answerIndex": 1,
-              "explanation": "Response-time analysis sums a task's own C with the interference (preemption) from all higher-priority tasks and verifies the result is within the deadline — a sharper, per-task check than the aggregate utilization bound."
+              "explanation": "While interrupts are off, an incoming event cannot be serviced and just waits, so its response time grows by however long the interrupts stayed off. A long, variable off-time makes the worst-case response unpredictable."
             },
             {
               "id": "real-time-determinism-3-mcq-4",
               "type": "mcq",
-              "prompt": "Why is an unbounded loop like `while (!flag) { }` (no timeout) a determinism hazard?",
+              "prompt": "An ISR (interrupt handler) is supposed to be short. Why is doing heavy work inside one bad for determinism?",
               "choices": [
-                "It always uses too much flash",
-                "Its iteration count is data/event dependent, so it has no WCET and can stall the path indefinitely",
-                "It cannot be compiled with optimization",
-                "It automatically disables the MPU"
+                "ISRs are not allowed to contain any code",
+                "A long ISR hogs the processor and delays other events from being handled",
+                "ISRs run only once and then disappear",
+                "Heavy ISRs use less power, which is undesirable"
               ],
               "answerIndex": 1,
-              "explanation": "A loop waiting on an external condition with no bound has no worst-case execution time and can block indefinitely, destroying any timing guarantee. Critical-path loops must have a bounded iteration count or a timeout."
+              "explanation": "An interrupt handler runs immediately and can hold off other work while it executes. If it does a lot, it stretches how long everything else must wait, inflating worst-case latency. The fix is to keep ISRs tiny: note the event and leave."
             },
             {
               "id": "real-time-determinism-3-mcq-5",
               "type": "mcq",
-              "prompt": "A watchdog and an MPU share what design philosophy with the rest of real-time engineering?",
+              "prompt": "What is 'busy-waiting'?",
               "choices": [
-                "They make the average case faster",
-                "They bound and make detectable the worst-case failure, rather than improving speed",
-                "They eliminate the need for WCET analysis",
-                "They remove all jitter from the system"
+                "Letting the CPU sleep until an event wakes it",
+                "Spinning in a tight loop repeatedly checking whether something is ready yet",
+                "Saving data to flash memory",
+                "Running two tasks at the same time"
               ],
               "answerIndex": 1,
-              "explanation": "Neither speeds anything up; both bound worst-case failure — a hang becomes a timed reset, corruption becomes a fault — mirroring the module's theme of bounding the worst case rather than optimizing the average."
+              "explanation": "Busy-waiting is looping and constantly re-checking a condition instead of doing useful work or sleeping. If there is no limit on the wait, the time spent is unpredictable — bad for determinism and wasteful of CPU."
+            },
+            {
+              "id": "real-time-determinism-3-mcq-6",
+              "type": "mcq",
+              "prompt": "Why are operations whose duration depends on the data (taking longer for some inputs) a problem for determinism?",
+              "choices": [
+                "They always crash the program",
+                "Their varying run time makes the worst case harder to know and can be much larger than the typical case",
+                "They use the wrong kind of memory",
+                "They only work when interrupts are off"
+              ],
+              "answerIndex": 1,
+              "explanation": "If how long something takes depends on the values it processes, the worst-case time is harder to pin down and may be far above the usual case. Determinism needs a small, known worst case, so data-dependent timing works against it."
+            },
+            {
+              "id": "real-time-determinism-3-mcq-7",
+              "type": "mcq",
+              "prompt": "Which statement about determinism is correct?",
+              "choices": [
+                "Determinism means every run takes an identical number of cycles",
+                "Determinism means the worst-case timing is bounded and known",
+                "Determinism means the average time is as low as possible",
+                "Determinism means the system has no deadlines"
+              ],
+              "answerIndex": 1,
+              "explanation": "Determinism is about a guaranteed bound on the worst case, not identical runs and not a low average. Two runs can differ slightly and still be deterministic as long as neither exceeds the known worst-case limit."
+            },
+            {
+              "id": "real-time-determinism-3-mcq-8",
+              "type": "mcq",
+              "prompt": "What do all the 'enemies of determinism' (long interrupt-off stretches, heavy ISRs, unbounded waiting, variable-time operations) have in common?",
+              "choices": [
+                "They all save memory",
+                "They each make the worst-case timing either larger or unknown",
+                "They each make the average case slower but the worst case better",
+                "They all require a faster CPU clock"
+              ],
+              "answerIndex": 1,
+              "explanation": "Every one of these stretches or hides the worst case, which is exactly what determinism cannot tolerate. Determinism depends on a worst case that is both small and known."
+            },
+            {
+              "id": "real-time-determinism-3-mcq-9",
+              "type": "mcq",
+              "prompt": "A handler that simply needs to record that an event happened is instead made to do a long calculation before returning. What is the best fix to protect determinism?",
+              "choices": [
+                "Disable interrupts for even longer to be safe",
+                "Keep the handler short — just note the event — and do the long calculation elsewhere later",
+                "Add a busy-wait loop with no timeout",
+                "Make the calculation depend on the input data"
+              ],
+              "answerIndex": 1,
+              "explanation": "The handler should do the bare minimum and hand off heavy work to be done afterward, keeping its run time short and bounded. The other options each introduce a known enemy of determinism."
+            },
+            {
+              "id": "real-time-determinism-3-mcq-10",
+              "type": "mcq",
+              "prompt": "True or false: a system that is fast on average is automatically deterministic.",
+              "choices": [
+                "True — a good average guarantees determinism",
+                "False — determinism is about a bounded worst case, which a good average does not guarantee",
+                "True — average and worst case are the same thing",
+                "False — deterministic systems are always slow"
+              ],
+              "answerIndex": 1,
+              "explanation": "A good average says nothing about rare slow runs, and it is those worst-case runs that determinism must bound. Average and worst case are different, and being deterministic does not mean being slow."
+            }
+          ]
+        },
+        {
+          "id": "real-time-determinism-real-time-determinism-lesson-4",
+          "title": "Designing for the Worst Case",
+          "order": 4,
+          "difficulty": 3,
+          "content": "Here is the mindset that ties this whole topic together: in real-time work, **you design for the worst case, not the average.**\n\nOn an ordinary computer you usually try to make the *typical* case fast and shrug off a rare hiccup — a webpage that occasionally loads slowly is no disaster. Real-time flips that around. You accept a slightly slower average if it means you can *guarantee* the slowest run still beats the deadline. A path that is dependably 30 microseconds every time is far better, for a 50-microsecond deadline, than one that is usually 5 microseconds but sometimes 200. Predictable-and-bounded wins over fast-but-occasionally-terrible.\n\n**Why the average isn't enough.** A deadline is a promise about *every* run. Imagine timing a task thousands of times and drawing a chart of the results: most runs cluster around a fast typical value, but a few stretch out into a long 'tail' of slow runs. The deadline must sit beyond that **tail**, not beyond the average. If you only check the average, you have proven nothing about the rare slow runs — and those are the ones that miss.\n\n**The CPU budget.** A processor only has so much time each second. Every task you add uses up a slice of it. Add up all the slices: if they sum to more than 100% of the available time, the processor is **overcommitted** and something *will* miss its deadline. So you keep the total well under 100% and leave **headroom** — spare capacity that absorbs the rare slow moments (the worst-case tail). Running a chip at 100% load leaves nothing for the bad day.\n\n**Two habits that quietly wreck the worst case** (and connect back to the enemies of determinism):\n\n- **Asking the system for memory while it is running** ('dynamic memory' from a pool called the **heap**). The time this takes depends on the memory's current state, so it has no dependable worst case. Real-time designs prefer to set aside all their memory up front.\n- **Loops with no limit.** A loop like 'keep going until some signal arrives', with nothing capping how many times it can run, has no worst case at all — it could run a few times or run forever. In a real-time path, every loop needs a bound.\n\n**Recap:** design for the worst case, because a deadline is a promise about every run, not the average. Keep a CPU budget with headroom, and avoid the things — run-time memory requests and unbounded loops — that destroy a knowable worst case.",
+          "items": [
+            {
+              "id": "real-time-determinism-4-mcq-1",
+              "type": "mcq",
+              "prompt": "In real-time design, which case should you design around?",
+              "choices": [
+                "The average (typical) case, since it happens most often",
+                "The worst case, because the deadline must be met on every run",
+                "The best case, to look as fast as possible",
+                "It does not matter which case you pick"
+              ],
+              "answerIndex": 1,
+              "explanation": "A deadline is a promise about every single run, so you must design around the slowest possible run — the worst case. Optimizing the average leaves the rare slow runs unproven, and those are the ones that miss."
+            },
+            {
+              "id": "real-time-determinism-4-mcq-2",
+              "type": "mcq",
+              "prompt": "For a hard deadline of 50 microseconds, which implementation is the safest choice?",
+              "choices": [
+                "Usually 5 µs, but sometimes 200 µs",
+                "Dependably 30 µs every time",
+                "Usually 2 µs, worst case never measured",
+                "Averages 8 µs but with no known upper limit"
+              ],
+              "answerIndex": 1,
+              "explanation": "A steady 30 µs is comfortably under the 50 µs deadline with a known bound, so it meets the promise every time. The others either exceed the deadline in their worst case or have an unknown worst case, which is unacceptable for a hard deadline."
+            },
+            {
+              "id": "real-time-determinism-4-mcq-3",
+              "type": "mcq",
+              "prompt": "On the chart of many timing measurements, which part decides whether a hard deadline is met?",
+              "choices": [
+                "The tall peak near the typical (average) value",
+                "The long tail of rare slow runs",
+                "The number of measurements taken",
+                "The color of the bars"
+              ],
+              "answerIndex": 1,
+              "explanation": "The deadline must sit beyond the tail of slow runs, because those rare long runs are the ones that can miss. The tall average peak can look perfectly fine while the tail still violates the deadline.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/real-time-determinism-1.svg"
+            },
+            {
+              "id": "real-time-determinism-4-mcq-4",
+              "type": "mcq",
+              "prompt": "What is a 'CPU budget' in real-time design?",
+              "choices": [
+                "The money spent buying the processor",
+                "Adding up the slice of processor time each task uses to check it stays under 100%",
+                "The amount of memory each task uses",
+                "The clock speed of the CPU in megahertz"
+              ],
+              "answerIndex": 1,
+              "explanation": "A CPU budget tallies how much of the available processor time all the tasks consume. If the total goes over 100%, the chip is overcommitted and a deadline will be missed. It is about time, not money, memory, or clock speed."
+            },
+            {
+              "id": "real-time-determinism-4-mcq-5",
+              "type": "mcq",
+              "prompt": "Why should you leave 'headroom' instead of loading the processor to 100%?",
+              "choices": [
+                "To make the average case slower on purpose",
+                "To leave spare time that absorbs the rare slow (worst-case) moments",
+                "Because processors cannot physically reach 100%",
+                "To reduce the amount of memory used"
+              ],
+              "answerIndex": 1,
+              "explanation": "Headroom is spare CPU time that covers the occasional worst-case spike, so deadlines still hold on a bad day. A chip pinned at 100% has nothing left to absorb those spikes."
+            },
+            {
+              "id": "real-time-determinism-4-mcq-6",
+              "type": "mcq",
+              "prompt": "What happens if the tasks' CPU usage adds up to more than 100% of the available time?",
+              "choices": [
+                "Nothing, the CPU simply tries harder",
+                "The processor is overcommitted and at least one task will miss its deadline",
+                "The average latency improves",
+                "All deadlines become hard real-time"
+              ],
+              "answerIndex": 1,
+              "explanation": "There is only so much processor time per second; demanding more than 100% means the work cannot all fit, so something must miss its deadline. The CPU cannot create extra time by trying harder."
+            },
+            {
+              "id": "real-time-determinism-4-mcq-7",
+              "type": "mcq",
+              "prompt": "Why is asking for memory at run time (dynamic allocation from the heap) discouraged in real-time code?",
+              "choices": [
+                "It always runs out of memory immediately",
+                "The time it takes depends on the memory's current state, so it has no dependable worst case",
+                "It can only be done while interrupts are off",
+                "It makes the average case slower but the worst case faster"
+              ],
+              "answerIndex": 1,
+              "explanation": "How long a run-time memory request takes varies with the state of the heap, giving it no reliable upper bound — which destroys the knowable worst case real-time needs. That is why real-time designs set memory aside up front instead."
+            },
+            {
+              "id": "real-time-determinism-4-mcq-8",
+              "type": "mcq",
+              "prompt": "Why does a loop with no limit on how many times it can run hurt determinism?",
+              "choices": [
+                "It uses too much flash memory",
+                "It has no worst case — it could finish quickly or run essentially forever",
+                "It automatically turns off the CPU",
+                "Loops are never allowed in any program"
+              ],
+              "answerIndex": 1,
+              "explanation": "If nothing caps the iterations, there is no upper bound on the loop's run time, so it has no worst case at all. Real-time paths require every loop to be bounded so its longest possible run is known."
+            },
+            {
+              "id": "real-time-determinism-4-mcq-9",
+              "type": "mcq",
+              "prompt": "How does the optimization goal differ between an ordinary desktop program and a hard real-time program?",
+              "choices": [
+                "They are identical — both only care about the average",
+                "Desktop tunes the average and tolerates rare hiccups; hard real-time accepts a worse average to guarantee a bounded worst case",
+                "Hard real-time only cares about using the least memory",
+                "Desktop programs care only about the worst case"
+              ],
+              "answerIndex": 1,
+              "explanation": "Desktop software optimizes the typical case and shrugs off the rare slow run, while hard real-time will accept a slightly slower average if that caps the worst case and protects every deadline. The priorities are essentially reversed."
+            },
+            {
+              "id": "real-time-determinism-4-mcq-10",
+              "type": "mcq",
+              "prompt": "A task averages 8 microseconds but its worst case has never been measured. Why is this risky for a hard deadline?",
+              "choices": [
+                "Because 8 µs is too slow for any system",
+                "Because the deadline depends on the worst case, and an unknown worst case might exceed it",
+                "Because averages cannot be measured on real hardware",
+                "Because it means the task uses no CPU time"
+              ],
+              "answerIndex": 1,
+              "explanation": "A hard deadline is judged by the slowest run, so an unmeasured worst case is an unknown that could quietly violate it. A good average gives false comfort — you must know and bound the worst case.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/real-time-determinism-6.svg"
             }
           ]
         }
