@@ -4,400 +4,709 @@
   "order": 2,
   "lessons": [
     {
-      "id": "filesystem-permissions-lesson-fhs",
-      "title": "The Filesystem Hierarchy Standard (FHS)",
+      "id": "filesystem-permissions-lesson-tree",
+      "title": "One Big Tree of Folders",
       "order": 1,
       "difficulty": 1,
-      "content": "Linux presents a single tree rooted at `/`. There are no drive letters; storage devices are *mounted* onto directories. The Filesystem Hierarchy Standard (FHS) tells you what each top-level directory is for, so you know where to look when something breaks.\n\nThe essentials:\n\n- `/bin`, `/sbin`, `/lib`  -  core binaries and libraries needed early in boot (`/sbin` = system/admin tools).\n- `/usr`  -  the bulk of installed software: `/usr/bin`, `/usr/sbin`, `/usr/lib`. (MODERN) The **`/usr` merge** makes `/bin`, `/sbin`, `/lib` symlinks into `/usr`, so the split is now historical on most distros.\n- `/etc`  -  system-wide configuration (text files, no binaries).\n- `/var`  -  variable data: logs (`/var/log`), spools, caches. `/tmp` is cleared on reboot; `/var/tmp` persists across reboots.\n- `/home`, `/root`  -  user home directories, and root's home.\n- `/opt`, `/srv`  -  add-on third-party packages, and data served by the machine.\n- `/boot`  -  kernel and bootloader. `/dev`, `/proc`, `/sys`, `/run`  -  virtual/runtime filesystems (devices, kernel introspection, tmpfs state).\n- `/mnt`, `/media`  -  manual and removable mount points.\n\n```bash\nls -l /            # see top-level dirs; / merge shows /bin -> usr/bin\nfindmnt /usr       # what device backs /usr\nstat -f /          # filesystem-level info for the root mount\n```\n\nThe payoff: a coherent map. Config? `/etc`. Logs? `/var/log`. Why a peripheral isn't seen? `/dev` and `/sys`.",
+      "content": "**Hook.** On Windows you might keep files on the C: drive and a USB stick on D:. Linux does something simpler: there is just *one* big tree of folders, and everything lives somewhere inside it.\n\n**Build.** That tree starts at a single folder called the **root**, written as a plain slash: `/`. (\"Folder\" and \"directory\" mean the same thing; Linux usually says *directory*.) Every other folder branches off from `/`. So `/home` is the folder named `home` that sits directly inside the root, and `/home/alice` is the folder `alice` inside `home`.\n\nThere are no drive letters. When you plug in a USB stick or add a second disk, Linux *mounts* it onto some folder in the tree, so its contents simply appear at a path like `/media/usb`. From your point of view it is all one tree.\n\nThink of it like a building directory in a lobby: a single map that tells you which floor holds what, so you never wander. The root `/` is the lobby; the top-level folders are the floors.\n\n```bash\nls /            # list the top-level folders inside the root\ncd /home/alice  # move into alice's home folder\npwd             # \"print working directory\": shows where you are now\n```\n\nA path that starts with `/` is an **absolute path**: it spells out the route all the way from the root, so it means the same thing no matter where you currently are.\n\n**Recap.** Linux organizes all files as one tree starting at `/` (the root). No drive letters; extra disks are mounted onto folders inside that one tree.",
       "items": [
         {
-          "id": "filesystem-permissions-fhs-fc-etc",
-          "type": "flashcard",
-          "front": "What kind of content belongs in /etc?",
-          "back": "System-wide configuration files  -  plain text, no binaries. Per-host config lives here so it survives package upgrades of the software in /usr.",
-          "hint": "Think configuration, not executables."
-        },
-        {
-          "id": "filesystem-permissions-fhs-fc-tmp",
-          "type": "flashcard",
-          "front": "What is the difference between /tmp and /var/tmp?",
-          "back": "/tmp is for transient files and is typically cleared on every reboot (often a tmpfs in RAM). /var/tmp is for temporary files that must persist across reboots.",
-          "hint": "One survives a reboot, one doesn't."
-        },
-        {
-          "id": "filesystem-permissions-fhs-fc-usrmerge",
-          "type": "flashcard",
-          "front": "What is the '/usr merge' on modern Linux distributions?",
-          "back": "/bin, /sbin, /lib (and /lib64) become symlinks pointing into /usr/bin, /usr/sbin, /usr/lib. The original split (early-boot vs the rest) is now historical; everything effectively lives under /usr.",
-          "hint": "Some top-level dirs are now just symlinks."
-        },
-        {
-          "id": "filesystem-permissions-fhs-fc-virtualfs",
-          "type": "flashcard",
-          "front": "Name three virtual (kernel-backed, non-disk) filesystems in the FHS and what each exposes.",
-          "back": "/proc = process and kernel state; /sys = the device/driver/bus model; /dev = device nodes (devtmpfs). /run is a tmpfs holding volatile runtime state since boot.",
-          "hint": "None of them are stored on your disk."
-        },
-        {
-          "id": "filesystem-permissions-fhs-mcq-logs",
+          "id": "filesystem-permissions-tree-mcq-root",
           "type": "mcq",
-          "prompt": "A service is misbehaving and you want its log files. Which directory should you check first?",
+          "prompt": "In Linux, what does a single forward slash `/` by itself refer to?",
           "choices": [
-            "/etc/log",
-            "/var/log",
-            "/usr/log",
-            "/proc/log"
+            "The user's home folder",
+            "The root: the single top folder that the whole tree starts from",
+            "A network drive",
+            "The current folder you are in"
           ],
           "answerIndex": 1,
-          "explanation": "Variable runtime data, including logs, lives under /var  -  specifically /var/log. /etc holds config, /usr holds installed software, /proc is kernel/process introspection."
+          "explanation": "`/` is the root, the one folder at the very top of the tree. Everything else lives somewhere inside it. The current folder is `.` and your home folder is written `~`."
         },
         {
-          "id": "filesystem-permissions-fhs-mcq-sbin",
+          "id": "filesystem-permissions-tree-mcq-driveletters",
           "type": "mcq",
-          "prompt": "What distinguishes /sbin (and /usr/sbin) from /bin (and /usr/bin)?",
+          "prompt": "How does Linux differ from Windows when it comes to disks like C: and D:?",
           "choices": [
-            "/sbin holds shared libraries; /bin holds executables",
-            "/sbin holds system/administration binaries, typically run by root",
-            "/sbin is for static binaries; /bin is for dynamic ones",
-            "/sbin is removable; /bin is permanent"
+            "Linux uses drive letters too, just lowercase",
+            "Linux has no drive letters; every disk appears as a folder inside the one tree",
+            "Linux can only use one disk at a time",
+            "Linux hides all disks from the user"
           ],
           "answerIndex": 1,
-          "explanation": "The 's' is for system/superuser  -  administrative tools like fdisk, ip, and mkfs live in sbin and are generally meant for root, though the directories are merged content-wise in the /usr merge."
+          "explanation": "Linux has no drive letters. A second disk or USB stick is mounted onto a folder (a mount point), so its files just show up at a path like /media/usb inside the single tree."
         },
         {
-          "id": "filesystem-permissions-fhs-mcq-thirdparty",
+          "id": "filesystem-permissions-tree-mcq-path",
           "type": "mcq",
-          "prompt": "Per the FHS, where is the conventional place to install a self-contained third-party application bundle?",
+          "prompt": "What does the path `/home/alice` describe?",
           "choices": [
-            "/srv",
-            "/opt",
-            "/var/opt only",
-            "/home/app"
+            "A folder named alice, inside a folder named home, inside the root",
+            "Three separate disks",
+            "A file called home.alice",
+            "A command that creates a user"
+          ],
+          "answerIndex": 0,
+          "explanation": "Reading left to right from the root: `/` then `home` then `alice`. Each slash separates one level of folder from the next, so this is the alice folder inside home inside the root."
+        },
+        {
+          "id": "filesystem-permissions-tree-mcq-mount",
+          "type": "mcq",
+          "prompt": "You plug in a USB stick and its files appear at `/media/usb`. What happened?",
+          "choices": [
+            "The stick was given the drive letter U:",
+            "The stick was mounted onto the /media/usb folder so its contents appear there in the tree",
+            "Linux copied the files into your home folder",
+            "The stick replaced the root folder"
           ],
           "answerIndex": 1,
-          "explanation": "/opt is for add-on application software packages that ship as a self-contained tree. /srv holds data served by the system (e.g. a web root), not the application binaries themselves."
+          "explanation": "Mounting attaches a disk's contents onto a folder in the existing tree. After mounting at /media/usb, browsing that folder shows the stick's files. There is still just one tree."
         },
         {
-          "id": "filesystem-permissions-fhs-mcq-mount",
+          "id": "filesystem-permissions-tree-mcq-absolute",
           "type": "mcq",
-          "prompt": "How does Linux make a second disk available compared to Windows drive letters?",
+          "prompt": "Why is a path that starts with `/`, such as `/etc/hosts`, called an absolute path?",
           "choices": [
-            "It assigns it a letter like D:",
-            "It mounts the disk onto a directory in the single / tree",
-            "It places it under /dev permanently and you read it raw",
-            "It creates a new root for it"
+            "Because it can never be deleted",
+            "Because it spells out the full route from the root, so it means the same thing wherever you are",
+            "Because it is the fastest kind of path",
+            "Because only the root user can read it"
           ],
           "answerIndex": 1,
-          "explanation": "Linux has one unified tree rooted at /. Devices are mounted onto directories (mount points) such as /mnt/data, so the same disk can appear anywhere in the tree."
+          "explanation": "An absolute path begins at the root `/` and lists every step from there, so it is unambiguous no matter your current folder. A path that does NOT start with `/` is relative to wherever you currently are."
         },
         {
-          "id": "filesystem-permissions-fhs-fc-boot",
-          "type": "flashcard",
-          "front": "What lives in /boot?",
-          "back": "The kernel image (vmlinuz), the initramfs/initrd, and bootloader files (e.g. GRUB config). It is sometimes its own small partition so the bootloader can find the kernel before the root filesystem is mounted.",
-          "hint": "Whatever the bootloader needs before root is mounted."
+          "id": "filesystem-permissions-tree-mcq-pwd",
+          "type": "mcq",
+          "prompt": "Which command tells you which folder you are currently sitting in?",
+          "choices": [
+            "ls",
+            "cd",
+            "pwd",
+            "mkdir"
+          ],
+          "answerIndex": 2,
+          "explanation": "`pwd` means \"print working directory\" and prints your current location as an absolute path. `ls` lists contents, `cd` moves you, and `mkdir` makes a new folder."
+        },
+        {
+          "id": "filesystem-permissions-tree-mcq-analogy",
+          "type": "mcq",
+          "prompt": "The lesson compares the filesystem to a building directory in a lobby. What is that analogy getting at?",
+          "choices": [
+            "Files are heavy like a building",
+            "There is one shared map starting from a single point, so you always know where to look",
+            "Every folder needs a key",
+            "Linux is only for large companies"
+          ],
+          "answerIndex": 1,
+          "explanation": "Like one lobby directory listing what is on each floor, the tree gives a single, predictable map starting at the root, so you know where things live instead of guessing."
+        },
+        {
+          "id": "filesystem-permissions-tree-mcq-cd",
+          "type": "mcq",
+          "prompt": "What does `cd /home/alice` do?",
+          "choices": [
+            "Deletes the alice folder",
+            "Copies alice's files to the root",
+            "Moves you into the /home/alice folder so it becomes your current location",
+            "Lists everything in alice's folder"
+          ],
+          "answerIndex": 2,
+          "explanation": "`cd` means \"change directory\": it moves your current location to the folder you name. To see what is inside afterward you would run `ls`."
         }
       ]
     },
     {
-      "id": "filesystem-permissions-lesson-inodes",
-      "title": "Everything Is a File: Inodes, Hard Links & Symlinks",
+      "id": "filesystem-permissions-lesson-fhs",
+      "title": "The Standard Map: Where Things Live",
       "order": 2,
-      "difficulty": 2,
-      "content": "In Linux the *file* is the inode  -  a kernel data structure holding metadata (owner, permissions, timestamps, size, link count) and pointers to data blocks. Crucially, **the filename is not part of the inode**. A directory is just a table mapping names to inode numbers (a *dentry* in the path-resolution layer). This separation explains links.\n\nA **hard link** is another directory entry pointing at the *same inode*. The inode's link count tracks how many names refer to it; the data is freed only when the count reaches zero (and no process holds it open). Hard links share identical metadata, cannot span filesystems (inode numbers are filesystem-local), and traditionally cannot target directories.\n\nA **symbolic link** is a separate tiny file whose contents are a path string. It points by *name*, so it can cross filesystems and target directories, but it dangles if the target is removed or moved.\n\n```bash\necho hi > a.txt\nln a.txt hard.txt        # hard link: same inode\nln -s a.txt soft.txt     # symlink: stores the path \"a.txt\"\nls -li a.txt hard.txt soft.txt\nstat a.txt               # see Links: 2 and the inode number\nrm a.txt                 # hard.txt still has the data; soft.txt now dangles\nreadlink soft.txt        # prints the stored target path\n```\n\nMental model: a hard link is a second true name for the data; a symlink is a signpost to a name. \"Everything is a file\" also extends to devices (`/dev`), pipes, and sockets  -  all reachable through the same file API.",
+      "difficulty": 1,
+      "content": "**Hook.** Now that everything is one tree, you need to know which top-level folder holds what. Happily, Linux follows a *standard map* (its official name is the Filesystem Hierarchy Standard, or FHS) so the layout is the same across systems. Learn the map once and you will know where to look on any Linux machine.\n\n**Build.** Here are the top-level folders you will meet most often:\n\n- `/home` -- your personal files. Each user gets a folder here, like `/home/alice`.\n- `/etc` -- system **configuration**: plain-text settings files for the whole machine. (Say it \"et-see\".)\n- `/bin` and `/usr/bin` -- **programs** (the actual command files like `ls` and `cp`). \"bin\" is short for *binaries*, meaning runnable programs.\n- `/usr` -- the bulk of installed software lives under here.\n- `/var` -- data that **changes** over time, especially logs in `/var/log` (a diary of what the system has been doing).\n- `/tmp` -- a scratch space for temporary files; usually wiped when the machine restarts.\n- `/dev` -- your hardware **devices**, presented as files (more on that next lesson).\n- `/boot` -- the files needed to start the computer.\n- `/proc` -- not real files on a disk, but a live window into what the system is doing right now.\n\n```bash\nls /etc       # peek at system config files\nls /var/log   # the system's log files (its diary)\nwhich ls      # shows the program file behind a command, e.g. /usr/bin/ls\n```\n\n**Recap.** Config goes in `/etc`, your stuff in `/home`, programs in `/bin` and `/usr/bin`, logs in `/var/log`. When something breaks, the map tells you where to look.",
       "items": [
         {
-          "id": "filesystem-permissions-inode-fc-inode",
-          "type": "flashcard",
-          "front": "What information does an inode hold  -  and what does it notably NOT hold?",
-          "back": "It holds metadata: owner UID/GID, permission bits, timestamps, size, link count, and pointers to the data blocks. It does NOT hold the filename  -  names live in directory entries that map a name to an inode number.",
-          "hint": "The name is stored somewhere else."
-        },
-        {
-          "id": "filesystem-permissions-inode-fc-hardlink",
-          "type": "flashcard",
-          "front": "What is a hard link, in terms of inodes?",
-          "back": "A second directory entry pointing at the same inode. Both names are equal peers; the inode's link count increments. The data persists until the link count hits zero (and no process holds it open).",
-          "hint": "Same inode, another name."
-        },
-        {
-          "id": "filesystem-permissions-inode-fc-symlink",
-          "type": "flashcard",
-          "front": "How does a symbolic link differ structurally from a hard link?",
-          "back": "A symlink is its own small file whose data is a path string pointing to a target by name. It can cross filesystems and link to directories, but becomes a dangling link if the target is removed or renamed.",
-          "hint": "It stores a path, not an inode reference."
-        },
-        {
-          "id": "filesystem-permissions-inode-fc-rmcount",
-          "type": "flashcard",
-          "front": "Why does the rm command really just decrement a count?",
-          "back": "rm removes a directory entry and decrements the inode's link count (unlink). The data blocks are only reclaimed when the link count reaches zero AND no open file descriptor still references the inode.",
-          "hint": "Think 'unlink', plus open file descriptors."
-        },
-        {
-          "id": "filesystem-permissions-inode-mcq-crossfs",
+          "id": "filesystem-permissions-fhs-img-tree",
           "type": "mcq",
-          "prompt": "Why can a hard link NOT span two different filesystems?",
+          "prompt": "Using the map above, where would you look for the system's log files?",
           "choices": [
-            "Permissions forbid it",
-            "Inode numbers are only unique within a single filesystem, so an entry on FS-A can't reference an inode on FS-B",
-            "Hard links are encrypted per-filesystem",
-            "The kernel disables it for performance"
+            "/etc/log",
+            "/var/log",
+            "/home/log",
+            "/boot/log"
           ],
           "answerIndex": 1,
-          "explanation": "A hard link is a directory entry referencing an inode number, and inode numbers are scoped to a single filesystem. A symlink stores a path string instead, so it can cross filesystem boundaries."
+          "explanation": "Logs are data that keeps changing as the system runs, so they live under /var (variable data), specifically /var/log. /etc holds configuration, not logs.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/filesystem-permissions-2.svg"
         },
         {
-          "id": "filesystem-permissions-inode-mcq-dangling",
+          "id": "filesystem-permissions-fhs-mcq-config",
           "type": "mcq",
-          "prompt": "You create `ln -s /data/file.txt link` then delete /data/file.txt. What is the state of `link`?",
+          "prompt": "Which top-level folder holds system-wide configuration (settings) files?",
           "choices": [
-            "link still contains the original data via the inode",
-            "link is automatically deleted too",
-            "link is a dangling symlink pointing to a now-missing path",
-            "link is converted into a hard link"
-          ],
-          "answerIndex": 2,
-          "explanation": "A symlink stores the target path by name. Deleting the target leaves the symlink pointing at a non-existent path  -  a dangling link. A hard link, by contrast, would still hold the data."
-        },
-        {
-          "id": "filesystem-permissions-inode-mcq-lscmd",
-          "type": "mcq",
-          "prompt": "Which command shows inode numbers so you can confirm two names share one inode?",
-          "choices": [
-            "ls -l",
-            "ls -li",
-            "ls -a",
-            "ls -h"
+            "/var",
+            "/etc",
+            "/bin",
+            "/tmp"
           ],
           "answerIndex": 1,
-          "explanation": "The -i flag adds the inode number to ls output. Two hard links will show the identical inode number; a symlink will show its own distinct inode and an arrow to its target."
+          "explanation": "/etc is the home of system configuration: plain-text settings files for the machine. /bin holds programs, /var holds changing data like logs, and /tmp is scratch space."
         },
         {
-          "id": "filesystem-permissions-inode-mcq-eaf",
+          "id": "filesystem-permissions-fhs-mcq-home",
           "type": "mcq",
-          "prompt": "What does the 'everything is a file' philosophy practically buy you?",
+          "prompt": "Where do an ordinary user's personal files live?",
           "choices": [
-            "All files are the same size",
-            "Devices, pipes, and sockets are reachable through the same read/write/open file API",
-            "Files cannot be hidden",
-            "The kernel stores everything on one disk"
+            "In /etc, under their username",
+            "In /home, in a folder named after them, like /home/alice",
+            "In /bin",
+            "In /proc"
           ],
           "answerIndex": 1,
-          "explanation": "Devices in /dev, named pipes, and sockets are all accessed through the uniform open/read/write/close interface, so the same tools and syscalls work across radically different resources."
+          "explanation": "Each user gets a personal folder under /home, such as /home/alice. /etc is for system config, /bin for programs, and /proc is a live view of the running system."
         },
         {
-          "id": "filesystem-permissions-inode-fc-statlinks",
-          "type": "flashcard",
-          "front": "In `stat file.txt`, what does the 'Links:' field tell you?",
-          "back": "The inode's hard-link count  -  how many directory entries (names) point at this inode. A normal file shows 1; each additional hard link increments it.",
-          "hint": "It's the inode reference count."
+          "id": "filesystem-permissions-fhs-mcq-bin",
+          "type": "mcq",
+          "prompt": "The word \"bin\" in /bin and /usr/bin is short for what, and what do those folders hold?",
+          "choices": [
+            "\"bin\" = backup; they hold backups",
+            "\"bin\" = binaries (runnable programs); they hold the actual command files like ls and cp",
+            "\"bin\" = bytes; they hold raw data",
+            "\"bin\" = bind; they hold network settings"
+          ],
+          "answerIndex": 1,
+          "explanation": "\"bin\" stands for binaries, meaning runnable program files. When you type ls, the system runs the program file found in a bin folder such as /usr/bin/ls."
+        },
+        {
+          "id": "filesystem-permissions-fhs-mcq-tmp",
+          "type": "mcq",
+          "prompt": "What is special about files placed in /tmp?",
+          "choices": [
+            "They are encrypted automatically",
+            "They are scratch/temporary files and are usually cleared when the machine restarts",
+            "They can only be read by the root user",
+            "They are backed up every night"
+          ],
+          "answerIndex": 1,
+          "explanation": "/tmp is a temporary scratch area; its contents are typically wiped on reboot. Do not keep anything important there. Long-lived data belongs in /home or /var."
+        },
+        {
+          "id": "filesystem-permissions-fhs-mcq-boot",
+          "type": "mcq",
+          "prompt": "Which folder holds the files the computer needs in order to start up?",
+          "choices": [
+            "/start",
+            "/boot",
+            "/etc",
+            "/run"
+          ],
+          "answerIndex": 1,
+          "explanation": "/boot contains the startup files, including the Linux kernel image and the bootloader's files, that get the machine going before the rest of the tree is available."
+        },
+        {
+          "id": "filesystem-permissions-fhs-mcq-which",
+          "type": "mcq",
+          "prompt": "You run `which ls` and it prints `/usr/bin/ls`. What did that tell you?",
+          "choices": [
+            "That ls is broken",
+            "The actual program file behind the ls command lives at /usr/bin/ls",
+            "That you have no permission to run ls",
+            "That ls is a folder"
+          ],
+          "answerIndex": 1,
+          "explanation": "`which` reports the location of the program file that runs when you type a command. Here the ls command is the program file /usr/bin/ls, confirming programs live in bin folders."
+        },
+        {
+          "id": "filesystem-permissions-fhs-mcq-broken",
+          "type": "mcq",
+          "prompt": "A service is misbehaving. Based on the standard map, where do you look FIRST to see what it has been doing?",
+          "choices": [
+            "/home, for the user's files",
+            "/var/log, where the system keeps its logs",
+            "/bin, where programs live",
+            "/tmp, the scratch space"
+          ],
+          "answerIndex": 1,
+          "explanation": "Logs are the system's diary of events and errors, and they live in /var/log. Knowing the map turns \"where do I even look?\" into a quick, confident answer."
+        }
+      ]
+    },
+    {
+      "id": "filesystem-permissions-lesson-eaf",
+      "title": "Everything Is a File",
+      "order": 3,
+      "difficulty": 2,
+      "content": "**Hook.** Here is one of Linux's most surprising ideas: almost everything looks like a file, even your hardware. Your keyboard, your disk, even a stream of random numbers, all show up as file-like things you can open and read.\n\n**Build.** A normal file is just a named bundle of data. Linux extends that idea: devices appear as special files under `/dev`. For example `/dev/null` is a \"trash can\" file that throws away anything written to it, and `/dev/zero` hands out endless zeros. The payoff is that the same simple tools, opening, reading, and writing, work on a text file, a disk, or a device. You do not need a different toolset for each.\n\nUnderneath a filename, Linux stores the real file as an **inode** (think: index node) -- a small record holding the file's details: who owns it, its permissions, its size, timestamps, and where the data sits. Interestingly, the *name* is not stored in the inode. A folder is really just a list that pairs names with inodes.\n\nBecause names and inodes are separate, you can give one file a second name. A **hard link** is a second name pointing at the very same inode. A **symbolic link** (or *symlink*) is different: it is a tiny signpost file that just stores a path to another file by name; if you delete the target, the signpost dangles and points at nothing.\n\n```bash\nls -l /dev/null        # a device shown as a file\necho hi > note.txt\nln -s note.txt link    # symlink: a signpost pointing at note.txt\nls -l link             # shows  link -> note.txt\n```\n\n**Recap.** \"Everything is a file\" means devices use the same read/write tools as text. Names live in folders; the real file is an inode. A hard link is a second name; a symlink is a signpost storing a path.",
+      "items": [
+        {
+          "id": "filesystem-permissions-eaf-mcq-idea",
+          "type": "mcq",
+          "prompt": "What does the phrase \"everything is a file\" practically mean in Linux?",
+          "choices": [
+            "Every file is the same size",
+            "Even devices like disks and keyboards can be accessed with the same open/read/write tools as ordinary files",
+            "You can only store text, never images",
+            "All files must live in one folder"
+          ],
+          "answerIndex": 1,
+          "explanation": "Devices, and other resources, appear as file-like objects (mostly under /dev), so the same simple tools work everywhere. That uniformity is the whole point; it is not about file sizes."
+        },
+        {
+          "id": "filesystem-permissions-eaf-mcq-dev",
+          "type": "mcq",
+          "prompt": "Which folder is where hardware devices show up as special files?",
+          "choices": [
+            "/etc",
+            "/dev",
+            "/var",
+            "/home"
+          ],
+          "answerIndex": 1,
+          "explanation": "/dev (short for devices) is where Linux presents hardware as files. /etc holds config, /var holds changing data, and /home holds personal files."
+        },
+        {
+          "id": "filesystem-permissions-eaf-mcq-null",
+          "type": "mcq",
+          "prompt": "What is `/dev/null` commonly used for?",
+          "choices": [
+            "Storing important backups",
+            "A trash can: anything written to it is silently discarded",
+            "Listing all users",
+            "Holding the system clock"
+          ],
+          "answerIndex": 1,
+          "explanation": "/dev/null is a special device file that throws away everything written to it, handy when you want to discard output you do not care about. It does not store anything."
+        },
+        {
+          "id": "filesystem-permissions-eaf-mcq-inode",
+          "type": "mcq",
+          "prompt": "What is an inode?",
+          "choices": [
+            "The text inside a file",
+            "A small record holding a file's details (owner, permissions, size, where the data lives) -- but not its name",
+            "A type of network cable",
+            "The folder a file is stored in"
+          ],
+          "answerIndex": 1,
+          "explanation": "An inode is the behind-the-scenes record of a file's metadata and where its data sits. Notably, the filename is NOT in the inode; names are kept in folders that map a name to an inode."
+        },
+        {
+          "id": "filesystem-permissions-eaf-mcq-folder",
+          "type": "mcq",
+          "prompt": "If a filename is not stored in the inode, where is it kept?",
+          "choices": [
+            "In the file's data blocks",
+            "In a folder, which is really a list pairing names with inodes",
+            "In /etc/names",
+            "Nowhere; files have no names"
+          ],
+          "answerIndex": 1,
+          "explanation": "A folder (directory) is essentially a table that pairs each name with an inode number. That separation of name from inode is exactly what makes links possible."
+        },
+        {
+          "id": "filesystem-permissions-eaf-mcq-hardlink",
+          "type": "mcq",
+          "prompt": "What is a hard link?",
+          "choices": [
+            "A copy of the file's data in a new location",
+            "A second name that points at the very same inode as the original",
+            "A shortcut that stores the path to another file",
+            "A link that only root can follow"
+          ],
+          "answerIndex": 1,
+          "explanation": "A hard link is just another name for the same inode, so both names refer to one identical file. (A symlink, by contrast, only stores a path to a name.)"
+        },
+        {
+          "id": "filesystem-permissions-eaf-mcq-symlink",
+          "type": "mcq",
+          "prompt": "You run `ln -s note.txt link`, then delete note.txt. What is the state of `link`?",
+          "choices": [
+            "link still holds the original data",
+            "link is a dangling symlink: a signpost now pointing at a path that no longer exists",
+            "link is automatically deleted as well",
+            "link turns into a hard link"
+          ],
+          "answerIndex": 1,
+          "explanation": "A symlink only stores the path \"note.txt\" by name. Delete the target and the signpost dangles, pointing at nothing. A hard link would have kept the data, since it shares the inode."
+        },
+        {
+          "id": "filesystem-permissions-eaf-mcq-symvshard",
+          "type": "mcq",
+          "prompt": "What is the key difference between a symbolic link and a hard link?",
+          "choices": [
+            "A symlink stores a path to another name; a hard link is a second name for the same inode",
+            "There is no difference; they are two words for the same thing",
+            "A hard link can only point to folders",
+            "A symlink uses twice the disk space of the original file"
+          ],
+          "answerIndex": 0,
+          "explanation": "A symlink is a signpost holding a path (so it can break if the target moves). A hard link shares the actual inode, so it is a true equal second name for the same file data."
         }
       ]
     },
     {
       "id": "filesystem-permissions-lesson-permmodel",
-      "title": "The Permission Model: ugo/rwx, Octal & Special Bits",
-      "order": 3,
+      "title": "Owners and Permissions: rwx for user, group, other",
+      "order": 4,
       "difficulty": 2,
-      "content": "Every inode carries permissions for three classes  -  **user (owner)**, **group**, **other**  -  each with **read (r)**, **write (w)**, **execute (x)**. On a regular file r/w/x mean read content, modify content, run it. On a **directory** they mean something different: `r` = list names, `w` = create/delete/rename entries, and **`x` = traverse** (enter the directory / use it in a path). You can `cd` into a directory you can't list if you have `x` but not `r`.\n\n**Octal vs symbolic.** Each rwx triad is a 3-bit number: r=4, w=2, x=1. So `rwxr-xr-x` = `755`. Symbolic mode edits relatively: `chmod u+x`, `chmod go-w`, `chmod a=r`.\n\n```bash\nchmod 644 file        # rw-r--r--\nchmod u+x,go-w file   # add owner execute, remove group/other write\nchown alice:devs file # set owner and group (chgrp sets only group)\numask                 # mask removing default bits; 022 -> dirs 755, files 644\n```\n\n**Special bits** add a fourth leading octal digit (4=setuid, 2=setgid, 1=sticky):\n\n- **setuid (u+s)** on an executable: it runs with the *file owner's* identity (e.g. `passwd` runs as root).\n- **setgid (g+s)** on an executable runs as the file's group; on a **directory** it makes new files inherit the directory's group  -  ideal for shared project dirs.\n- **sticky (o+t)** on a directory (e.g. `/tmp`): only a file's owner (or root) may delete it, even though everyone can write.\n\nIn `ls -l` a setuid/setgid/sticky bit replaces the `x` in its triad: lowercase (`s`/`t`) if x is also set, uppercase (`S`/`T`) if not.",
+      "content": "**Hook.** Picture a shared document with sharing settings: some people can view, some can edit, others have no access. Linux gives every file the same kind of settings, and this is the foundation of Linux security.\n\n**Build.** Every file has an **owner** (a user) and a **group** (a named set of users). Permissions are then set for three audiences: the **user** (owner), the **group**, and **other** (everyone else). Each audience gets three switches:\n\n- **r** = read (look at the contents)\n- **w** = write (change the contents)\n- **x** = execute (run it, if it is a program)\n\nRun `ls -l` and you will see a string like `-rwxr-xr--`. The first character is the type (`-` for a file, `d` for a directory). The next nine are three groups of three: owner, then group, then other. So `-rwxr-xr--` means: owner can read/write/run, group can read and run, everyone else can only read.\n\nOne classic gotcha: on a **folder**, `x` does not mean \"run\". It means \"may enter / pass through this folder\". Without `x` on a folder you cannot `cd` into it or reach anything inside, even if you can see its name.\n\n```bash\nls -l file.txt        # shows the permission string and owner\nchmod u+x script.sh   # give the owner permission to run it\nchmod g-w file.txt    # take write away from the group\nchown alice file.txt  # make alice the owner (admin only)\n```\n\n`chmod` (change mode) edits the r/w/x switches; `chown` (change owner) sets who owns the file.\n\n**Recap.** Owner, group, other each get read/write/execute. Read the string left to right in groups of three. On a folder, `x` means \"enter it\", not \"run it\".",
       "items": [
         {
-          "id": "filesystem-permissions-perm-fc-diragram",
-          "type": "flashcard",
-          "front": "On a directory, what does the execute (x) bit actually grant?",
-          "back": "Traverse / search permission: the right to enter the directory and access entries by name (use it in a path). Without x you cannot cd into it or stat files inside, even if you can read the listing.",
-          "hint": "It's about traversal, not running."
-        },
-        {
-          "id": "filesystem-permissions-perm-img-bitfield",
-          "type": "flashcard",
-          "front": "Permission bit field: type + ugo/rwx triads with special-bit (s/t) callouts and the octal mapping.",
-          "back": "Review the diagram above.",
-          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/filesystem-permissions-1.svg"
-        },
-        {
-          "id": "filesystem-permissions-perm-fc-octal",
-          "type": "flashcard",
-          "front": "Convert rwxr-x--- to octal.",
-          "back": "750. Owner rwx = 4+2+1 = 7; group r-x = 4+0+1 = 5; other --- = 0. So 750.",
-          "hint": "r=4, w=2, x=1 per triad."
-        },
-        {
-          "id": "filesystem-permissions-perm-fc-umask",
-          "type": "flashcard",
-          "front": "How does umask 022 affect newly created files and directories?",
-          "back": "umask is subtracted from the base permissions (666 for files, 777 for dirs). 666-022 = 644 (rw-r--r--) for files; 777-022 = 755 (rwxr-xr-x) for directories. It removes write for group/other by default.",
-          "hint": "It masks bits OFF from 666/777."
-        },
-        {
-          "id": "filesystem-permissions-perm-fc-setgiddir",
-          "type": "flashcard",
-          "front": "Why put setgid on a shared project directory?",
-          "back": "setgid on a directory makes every newly created file/subdir inherit the directory's group (instead of the creator's primary group), so all team members in that group can collaborate on the files. Pair with g+w and often the sticky bit.",
-          "hint": "Group inheritance for collaboration."
-        },
-        {
-          "id": "filesystem-permissions-perm-mcq-decode",
+          "id": "filesystem-permissions-perm-img-decode",
           "type": "mcq",
-          "prompt": "Decode the string `drwxr-sr-t`. Which statement is TRUE?",
+          "prompt": "Decode the permission string `-rwxr-xr--`. Which statement is TRUE?",
           "choices": [
-            "It is a regular file with setuid set",
-            "It is a directory with setgid set (group has s with x present) and the sticky bit set",
-            "It is a symlink with the sticky bit",
-            "It is a directory with setuid and setgid but no sticky bit"
+            "It is a folder; the owner can only read it",
+            "It is a file: the owner can read/write/run, the group can read and run, and everyone else can only read",
+            "It is a file that everyone can edit",
+            "It is a file; the owner has no permissions at all"
           ],
           "answerIndex": 1,
-          "explanation": "Leading d = directory. Owner rwx. Group r-s: the 's' (lowercase) replaces group execute, so setgid is set AND group x is present. Other r-t: lowercase 't' is the sticky bit with other-x present. Octal: special 3 (setgid 2 + sticky 1), then 7 5 5 -> chmod 3755."
+          "explanation": "First char `-` means a regular file. Then in threes: owner `rwx` (read+write+run), group `r-x` (read+run, a dash means that switch is off), other `r--` (read only). Read it left to right in groups of three.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/filesystem-permissions-3.svg"
         },
         {
-          "id": "filesystem-permissions-perm-mcq-uppercaseS",
+          "id": "filesystem-permissions-perm-mcq-three",
           "type": "mcq",
-          "prompt": "In `ls -l` you see `-rwSr--r--` on a file. What does the uppercase S mean?",
+          "prompt": "Permissions are set for three audiences. What are they?",
           "choices": [
-            "setuid is set and the owner execute bit is also set",
-            "setuid is set but the owner execute bit is NOT set (likely a misconfiguration)",
-            "It is a symbolic link",
-            "The sticky bit is set on a file"
+            "Admin, guest, and visitor",
+            "User (the owner), group, and other (everyone else)",
+            "Read, write, and execute",
+            "Local, remote, and network"
           ],
           "answerIndex": 1,
-          "explanation": "Uppercase S means the setuid bit is on but the underlying owner-execute bit is off. The case encodes the x bit: lowercase s = special bit + x present; uppercase S = special bit set but x absent (usually not what you want for an executable)."
+          "explanation": "The three audiences are the owning user, the file's group, and other (everyone else). Read/write/execute are the three permissions each audience can be granted, not the audiences themselves."
         },
         {
-          "id": "filesystem-permissions-perm-mcq-sticky",
+          "id": "filesystem-permissions-perm-mcq-rwx",
           "type": "mcq",
-          "prompt": "Why does /tmp have the sticky bit set (drwxrwxrwt)?",
+          "prompt": "On an ordinary file, what do r, w, and x mean?",
           "choices": [
-            "So files in /tmp execute faster",
-            "So that even though anyone can write, a user can only delete or rename files they own",
-            "So /tmp is cleared on reboot",
-            "So new files inherit the tmp group"
+            "read, wipe, extend",
+            "read (view contents), write (change contents), execute (run it as a program)",
+            "receive, wait, exit",
+            "remote, web, external"
           ],
           "answerIndex": 1,
-          "explanation": "The sticky bit on a world-writable directory restricts deletion/renaming to the file's owner (or root). It stops one user from deleting another user's files in a shared scratch space like /tmp."
+          "explanation": "r = read the contents, w = write/change the contents, x = execute (run) the file as a program. A dash in place of any letter means that permission is switched off."
         },
         {
-          "id": "filesystem-permissions-perm-mcq-setuidpasswd",
+          "id": "filesystem-permissions-perm-mcq-firstchar",
           "type": "mcq",
-          "prompt": "Why is /usr/bin/passwd typically setuid root?",
+          "prompt": "In an `ls -l` listing, the permission string begins with `d`, as in `drwxr-xr-x`. What does that leading `d` tell you?",
           "choices": [
-            "So any user can read /etc/shadow freely",
-            "So that when an ordinary user runs it, it executes with root's identity to update the protected /etc/shadow",
-            "Because root must own all binaries",
-            "To make it run faster for root"
+            "The file is dangerous",
+            "The item is a directory (folder), not a regular file",
+            "The owner is named 'd'",
+            "The file is disabled"
           ],
           "answerIndex": 1,
-          "explanation": "setuid root lets an unprivileged user momentarily run passwd with the file owner's (root's) privileges so it can write to /etc/shadow. This is the classic setuid scenario  -  and exactly what capabilities aim to make safer."
+          "explanation": "The first character is the type: `-` for a regular file and `d` for a directory. The nine characters after it are the owner/group/other permissions."
         },
         {
-          "id": "filesystem-permissions-perm-fc-chownchgrp",
-          "type": "flashcard",
-          "front": "Difference between chown and chgrp (and chown's combined form)?",
-          "back": "chown sets the owning user (and can set group with `chown user:group`). chgrp sets only the group. Only root can give a file away to another user; a regular owner can change a file's group to a group they belong to.",
-          "hint": "One does owner (and optionally group), one does only group."
+          "id": "filesystem-permissions-perm-mcq-dirx",
+          "type": "mcq",
+          "prompt": "What does the execute (x) permission mean on a FOLDER, as opposed to a file?",
+          "choices": [
+            "It lets you run the folder as a program",
+            "It lets you enter (traverse into) the folder and reach things inside it",
+            "It lets you rename the folder",
+            "It has no effect on folders"
+          ],
+          "answerIndex": 1,
+          "explanation": "This is the classic gotcha: on a folder, x means \"may enter / pass through\". Without x you cannot cd into the folder or reach files inside, even if you can read its listing."
+        },
+        {
+          "id": "filesystem-permissions-perm-mcq-chmod",
+          "type": "mcq",
+          "prompt": "Which command changes a file's read/write/execute permissions?",
+          "choices": [
+            "chown",
+            "chmod",
+            "chgrp",
+            "ls -l"
+          ],
+          "answerIndex": 1,
+          "explanation": "chmod (\"change mode\") edits the r/w/x switches. chown changes who owns the file, chgrp changes the group, and ls -l only displays the permissions."
+        },
+        {
+          "id": "filesystem-permissions-perm-mcq-chown",
+          "type": "mcq",
+          "prompt": "What does `chown alice file.txt` do?",
+          "choices": [
+            "Gives alice read permission only",
+            "Makes alice the owner of file.txt",
+            "Deletes file.txt if alice owns it",
+            "Runs file.txt as alice"
+          ],
+          "answerIndex": 1,
+          "explanation": "chown (\"change owner\") sets who owns the file, here making alice the owner. Handing a file to another user normally requires administrator (root) privileges."
+        },
+        {
+          "id": "filesystem-permissions-perm-mcq-uplus",
+          "type": "mcq",
+          "prompt": "You wrote a program file and want only its owner to be allowed to run it. Which command adds that permission?",
+          "choices": [
+            "chmod o+x script.sh",
+            "chmod u+x script.sh",
+            "chmod a-x script.sh",
+            "chown root script.sh"
+          ],
+          "answerIndex": 1,
+          "explanation": "In symbolic form, u = user (owner), g = group, o = other, a = all. `u+x` adds execute for the owner only. `o+x` would add it for everyone else, and `a-x` would remove it from all."
+        },
+        {
+          "id": "filesystem-permissions-perm-mcq-security",
+          "type": "mcq",
+          "prompt": "Why are owners and permissions described as the foundation of Linux security?",
+          "choices": [
+            "They make files load faster",
+            "They control who can read, change, or run each file, keeping users from interfering with each other's and the system's files",
+            "They encrypt every file by default",
+            "They hide files from the owner"
+          ],
+          "answerIndex": 1,
+          "explanation": "Permissions decide who may read, write, or run a file. That is how Linux keeps one user out of another's files and protects system files, the everyday basis of its security."
         }
       ]
     },
     {
-      "id": "filesystem-permissions-lesson-aclcap",
-      "title": "Beyond ugo/rwx: ACLs, Capabilities & Extended Attributes",
-      "order": 4,
+      "id": "filesystem-permissions-lesson-octalspecial",
+      "title": "Number Shortcuts and Special Bits",
+      "order": 5,
       "difficulty": 3,
-      "content": "Classic ugo/rwx only names one owner and one group. When you need finer control, Linux offers three modern layers.\n\n**POSIX ACLs** let you grant rights to *additional* named users or groups without touching ownership. A `+` after the permission string in `ls -l` signals an ACL is present.\n\n```bash\nsetfacl -m u:bob:rwx report.txt   # grant bob rwx specifically\nsetfacl -m g:audit:r-- report.txt # grant the audit group read\ngetfacl report.txt                # view all ACL entries + the mask\nsetfacl -x u:bob report.txt       # remove bob's entry\n```\n\n**Capabilities** (MODERN) split root's omnipotence into discrete privileges, so a binary can hold *exactly* the one power it needs instead of full setuid root. `ping` needs raw sockets, so grant `cap_net_raw` rather than setuid root  -  a compromise of that binary then yields only raw-socket access, not the whole system.\n\n```bash\nsetcap cap_net_raw+ep /usr/bin/ping   # grant just raw-socket capability\ngetcap /usr/bin/ping                  # inspect file capabilities\n# Why safer: cap_net_raw alone cannot read /etc/shadow or write system files\n```\n\n**Extended attributes (xattr)** store arbitrary key/value metadata in namespaces (`user.`, `security.`, `system.`, `trusted.`). Capabilities and SELinux labels live in xattrs.\n\n```bash\nsetfattr -n user.author -v alice report.txt\ngetfattr -d report.txt\n```\n\n**chattr** sets filesystem-level flags independent of permissions: `chattr +i file` makes a file *immutable*  -  even root cannot modify, rename, or delete it until `chattr -i` clears the flag; `lsattr` shows the flags. Useful for protecting critical config from accidental change.",
+      "content": "**Hook.** Typing `chmod u+x,g+r,o+r` gets tedious. Linux offers a shorthand: a three-digit number that captures all nine permission switches at once. You will see numbers like `755` everywhere, so it helps to read them.\n\n**Build.** The trick is to give each switch a value: **r = 4, w = 2, x = 1**. For one audience, add up the switches that are on. So `rwx` = 4+2+1 = 7, `r-x` = 4+0+1 = 5, `r--` = 4. Do this for owner, group, and other and you get three digits.\n\nThat is why `rwxr-xr-x` is **755**: owner 7, group 5, other 5. A common file setting is **644** (`rw-r--r--`): owner can read and write, everyone else read only. You apply it with `chmod 755 file` or `chmod 644 file`. This is just another way to write the same thing as the symbolic `u+x` style from the last lesson.\n\n```bash\nchmod 755 script.sh   # rwxr-xr-x  (owner full; others read+run)\nchmod 644 notes.txt   # rw-r--r--  (owner read/write; others read)\n```\n\n**Special bits (light touch).** A few folders use extra bits beyond rwx. The most common is the **sticky bit** on `/tmp`: because everyone can write there, the sticky bit adds a rule that you may only delete *your own* files, not other people's. There are also **setuid** and **setgid** bits that let a program run with its owner's or group's powers; you will see these occasionally but rarely set them yourself as a beginner.\n\n**Recap.** r=4, w=2, x=1; add per audience to get a digit; three digits set everything. 755 = rwxr-xr-x, 644 = rw-r--r--. Special bits like the sticky bit on /tmp add a few extra safety rules.",
       "items": [
         {
-          "id": "filesystem-permissions-acl-fc-whatacl",
-          "type": "flashcard",
-          "front": "What problem do POSIX ACLs solve that plain ugo/rwx cannot?",
-          "back": "They let you grant permissions to additional named users or groups beyond the single owner/group/other model  -  e.g. give one extra user access without changing ownership or adding everyone to a group.",
-          "hint": "More than one named user/group."
-        },
-        {
-          "id": "filesystem-permissions-acl-fc-plus",
-          "type": "flashcard",
-          "front": "In `ls -l` output, what does a trailing '+' on the permission string mean?",
-          "back": "An ACL is present on that file or directory beyond the standard mode bits. Use getfacl to see the full set of ACL entries (and the mask).",
-          "hint": "Look at the character right after rwxrwxrwx."
-        },
-        {
-          "id": "filesystem-permissions-acl-fc-capvssetuid",
-          "type": "flashcard",
-          "front": "Why is granting cap_net_raw safer than making a binary setuid root?",
-          "back": "Capabilities split root's power into discrete pieces. cap_net_raw grants only the right to open raw sockets. If the binary is compromised, the attacker gets raw-socket access  -  not the ability to read /etc/shadow, write system files, or otherwise act as full root.",
-          "hint": "Least privilege  -  one power vs all of root."
-        },
-        {
-          "id": "filesystem-permissions-acl-fc-chattri",
-          "type": "flashcard",
-          "front": "What does `chattr +i file` do, and how is it different from removing write permission?",
-          "back": "It sets the immutable filesystem flag: the file cannot be modified, renamed, deleted, or linked  -  even by root  -  until `chattr -i` clears it. Unlike chmod, root can normally override permission bits, but root must explicitly clear +i first.",
-          "hint": "Even root is blocked until the flag is cleared."
-        },
-        {
-          "id": "filesystem-permissions-acl-fc-xattrns",
-          "type": "flashcard",
-          "front": "Name the four extended-attribute namespaces and give an example use.",
-          "back": "user.* (arbitrary user metadata), security.* (SELinux labels, file capabilities), system.* (used by the kernel, e.g. ACLs), trusted.* (visible only to CAP_SYS_ADMIN). File capabilities are stored in security.capability.",
-          "hint": "user, security, system, trusted."
-        },
-        {
-          "id": "filesystem-permissions-acl-mcq-setfacl",
+          "id": "filesystem-permissions-octal-img-755",
           "type": "mcq",
-          "prompt": "You must give exactly one extra user, bob, read+write on report.txt without changing its group or owner. Which command?",
+          "prompt": "Using r=4, w=2, x=1, what three-digit number equals `rwxr-xr-x`?",
+          "choices": [
+            "777",
+            "755",
+            "644",
+            "751"
+          ],
+          "answerIndex": 1,
+          "explanation": "Owner rwx = 4+2+1 = 7; group r-x = 4+0+1 = 5; other r-x = 4+0+1 = 5. So rwxr-xr-x is 755. 777 would be rwx for everyone; 644 is rw-r--r--.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/filesystem-permissions-4.svg"
+        },
+        {
+          "id": "filesystem-permissions-octal-mcq-values",
+          "type": "mcq",
+          "prompt": "In the number shortcut, what value does each permission have?",
+          "choices": [
+            "r=1, w=2, x=3",
+            "r=4, w=2, x=1",
+            "r=2, w=4, x=8",
+            "r=3, w=2, x=1"
+          ],
+          "answerIndex": 1,
+          "explanation": "read = 4, write = 2, execute = 1. You add up the ones that are on for each audience. These specific values let every combination map to a unique digit from 0 to 7."
+        },
+        {
+          "id": "filesystem-permissions-octal-mcq-7",
+          "type": "mcq",
+          "prompt": "For one audience, the digit 7 means which permissions are on?",
+          "choices": [
+            "Read only",
+            "Read and write, but not execute",
+            "Read, write, and execute (all three)",
+            "Execute only"
+          ],
+          "answerIndex": 2,
+          "explanation": "7 = 4 + 2 + 1 = read + write + execute, so all three switches are on. That is the rwx triad fully enabled."
+        },
+        {
+          "id": "filesystem-permissions-octal-mcq-644",
+          "type": "mcq",
+          "prompt": "What does `chmod 644 notes.txt` set the permissions to?",
+          "choices": [
+            "rwxr--r--",
+            "rw-r--r--  (owner read/write; group and other read only)",
+            "rw-rw-rw-",
+            "r--r--r--"
+          ],
+          "answerIndex": 1,
+          "explanation": "Owner 6 = 4+2 = rw-; group 4 = r--; other 4 = r--. So 644 is rw-r--r--: the owner can read and write, everyone else can only read. A very common setting for documents."
+        },
+        {
+          "id": "filesystem-permissions-octal-mcq-r-x",
+          "type": "mcq",
+          "prompt": "What single digit represents the permissions `r-x`?",
+          "choices": [
+            "4",
+            "5",
+            "6",
+            "7"
+          ],
+          "answerIndex": 1,
+          "explanation": "r = 4 and x = 1, and w is off (0), so 4 + 0 + 1 = 5. (6 would be rw-, and 7 would be rwx.)"
+        },
+        {
+          "id": "filesystem-permissions-octal-mcq-equiv",
+          "type": "mcq",
+          "prompt": "How does the number form (like 755) relate to the symbolic form (like u+x) from the previous lesson?",
+          "choices": [
+            "They control different things entirely",
+            "They are two ways of expressing the same read/write/execute permissions",
+            "The number form only works for folders",
+            "The symbolic form is more powerful and the number form is fake"
+          ],
+          "answerIndex": 1,
+          "explanation": "Both set the same r/w/x switches. Numbers set all nine at once to an exact state; symbolic mode (u+x, g-w) nudges individual switches up or down. Use whichever is clearer for the task."
+        },
+        {
+          "id": "filesystem-permissions-octal-mcq-sticky",
+          "type": "mcq",
+          "prompt": "Why does the shared /tmp folder use the sticky bit?",
+          "choices": [
+            "So files in /tmp run faster",
+            "So that even though everyone can write there, you may only delete your own files, not other people's",
+            "So /tmp is cleared on reboot",
+            "So only root can use /tmp"
+          ],
+          "answerIndex": 1,
+          "explanation": "/tmp is writable by everyone, which would normally let anyone delete anyone's files. The sticky bit adds the rule that only a file's owner (or root) can delete it, protecting people's scratch files from each other."
+        },
+        {
+          "id": "filesystem-permissions-octal-mcq-setuid",
+          "type": "mcq",
+          "prompt": "At a beginner level, what is the rough idea of the setuid bit on a program?",
+          "choices": [
+            "It makes the program invisible",
+            "It lets the program run with the powers of the program's owner, rather than the person running it",
+            "It deletes the program after one use",
+            "It doubles the program's speed"
+          ],
+          "answerIndex": 1,
+          "explanation": "setuid lets a program run with its owner's privileges, so an ordinary user can perform a tightly controlled task that normally needs more power. You will see it occasionally; you rarely need to set it yourself early on."
+        },
+        {
+          "id": "filesystem-permissions-octal-mcq-777",
+          "type": "mcq",
+          "prompt": "Someone runs `chmod 777 secret.txt`. Why is that usually a bad idea?",
+          "choices": [
+            "777 is not a valid permission number",
+            "777 gives read, write, AND execute to everyone, so any user on the system can change the file",
+            "It makes the file unreadable",
+            "It deletes the file"
+          ],
+          "answerIndex": 1,
+          "explanation": "777 = rwx for owner, group, and other, meaning everyone can read, modify, and run it. That is wide open and rarely what you want for a file with private contents."
+        }
+      ]
+    },
+    {
+      "id": "filesystem-permissions-lesson-beyond",
+      "title": "Beyond the Basics: ACLs and Capabilities",
+      "order": 6,
+      "difficulty": 3,
+      "content": "**Hook.** The owner/group/other model is simple, but sometimes too simple. What if you want to share one file with exactly one extra person, who is not the owner and not in the group? For situations like that, Linux has a few extra tools. You will not need these every day, but it helps to know they exist.\n\n**Build.** First, **ACLs** (Access Control Lists). The plain model names only one owner and one group. An ACL lets you add extra named people or groups with their own permissions, without disturbing the owner or group. You add an entry with `setfacl` and view them with `getfacl`. A clue that a file has ACLs: in `ls -l` you will see a small `+` at the end of its permission string.\n\n```bash\nsetfacl -m u:bob:rw report.txt   # also let bob read and write\ngetfacl report.txt               # list all the extra permission entries\n```\n\nSecond, **capabilities**. Traditionally, a program that needed one special power had to run as the all-powerful root user, which is risky: if it is tricked, an attacker gets *everything*. Capabilities split root's power into many small, separate powers, so a program can be granted just the one it needs (for example, the ability to send a network ping) and nothing more. This is the modern, safer alternative to giving a program full root powers. You inspect them with `getcap` and set them with `setcap`.\n\n```bash\ngetcap /usr/bin/ping   # see which single power ping was granted\n```\n\n**Recap.** ACLs add extra named users/groups beyond owner/group/other (look for the `+` in `ls -l`). Capabilities hand a program one specific power instead of all of root, which is safer. Both are tools to reach for only when the basic model is not enough.",
+      "items": [
+        {
+          "id": "filesystem-permissions-beyond-mcq-aclwhy",
+          "type": "mcq",
+          "prompt": "What can an ACL do that the basic owner/group/other model cannot?",
+          "choices": [
+            "Encrypt the file",
+            "Grant permissions to extra named users or groups, beyond the single owner and group",
+            "Make the file run faster",
+            "Hide the file from the owner"
+          ],
+          "answerIndex": 1,
+          "explanation": "The basic model names only one owner and one group. An ACL lets you add more named users or groups with their own permissions, perfect for sharing with one extra person without changing ownership."
+        },
+        {
+          "id": "filesystem-permissions-beyond-mcq-plus",
+          "type": "mcq",
+          "prompt": "In `ls -l`, a file's permission string ends with a `+`, like `-rw-r--r--+`. What does that signal?",
+          "choices": [
+            "The file is being downloaded",
+            "An ACL is present, granting extra permissions beyond the basic ones shown",
+            "The file is read-only",
+            "The owner is the root user"
+          ],
+          "answerIndex": 1,
+          "explanation": "A trailing `+` means the file has an ACL with extra entries beyond the standard nine bits. Use getfacl to see the full set of who-can-do-what."
+        },
+        {
+          "id": "filesystem-permissions-beyond-mcq-setfacl",
+          "type": "mcq",
+          "prompt": "You must give exactly one extra user, bob, read and write on report.txt, without changing its owner or group. Which command fits?",
           "choices": [
             "chmod o+rw report.txt",
             "chown bob report.txt",
             "setfacl -m u:bob:rw report.txt",
-            "usermod -aG report bob"
+            "chmod 777 report.txt"
           ],
           "answerIndex": 2,
-          "explanation": "setfacl -m u:bob:rw adds an ACL entry for bob only. chmod o+rw would open it to everyone, chown changes ownership entirely, and usermod alters group membership broadly."
+          "explanation": "setfacl -m u:bob:rw adds an ACL entry for bob alone. chmod o+rw would open the file to everyone, chown would hand the whole file to bob, and 777 opens it to all."
         },
         {
-          "id": "filesystem-permissions-acl-mcq-getcap",
+          "id": "filesystem-permissions-beyond-mcq-getfacl",
           "type": "mcq",
-          "prompt": "Which command inspects the file capabilities attached to /usr/bin/ping?",
+          "prompt": "Which command shows all the ACL entries on a file?",
+          "choices": [
+            "getfacl",
+            "getcap",
+            "chmod",
+            "ls -a"
+          ],
+          "answerIndex": 0,
+          "explanation": "getfacl lists every ACL entry (the owner/group/other lines plus any extra named users or groups). getcap is for capabilities, and chmod changes basic permissions."
+        },
+        {
+          "id": "filesystem-permissions-beyond-mcq-capidea",
+          "type": "mcq",
+          "prompt": "What problem do capabilities solve?",
+          "choices": [
+            "They make files load faster",
+            "They split root's all-or-nothing power into small pieces, so a program can get just the one power it needs",
+            "They replace passwords",
+            "They compress large files"
+          ],
+          "answerIndex": 1,
+          "explanation": "Instead of running a program as full root (which is risky), capabilities grant just one specific power. If the program is compromised, the damage is limited to that single power."
+        },
+        {
+          "id": "filesystem-permissions-beyond-mcq-capsafer",
+          "type": "mcq",
+          "prompt": "Why is granting a program one capability safer than running it as full root?",
+          "choices": [
+            "Because root is slower",
+            "Because if the program is tricked, an attacker gets only that one narrow power, not control of the whole system",
+            "Because capabilities cannot be inspected",
+            "Because root cannot read files"
+          ],
+          "answerIndex": 1,
+          "explanation": "Full root means full control of the machine, so a compromised root program is a disaster. A single capability limits the blast radius to just that one ability."
+        },
+        {
+          "id": "filesystem-permissions-beyond-mcq-getcap",
+          "type": "mcq",
+          "prompt": "Which command lets you inspect the capabilities granted to a program like /usr/bin/ping?",
           "choices": [
             "getfacl /usr/bin/ping",
             "getcap /usr/bin/ping",
-            "lsattr /usr/bin/ping",
-            "stat /usr/bin/ping"
+            "chmod /usr/bin/ping",
+            "ls -l /usr/bin/ping"
           ],
           "answerIndex": 1,
-          "explanation": "getcap reads file capabilities (stored in the security.capability xattr). getfacl reads ACLs, lsattr reads chattr flags, and stat shows generic inode metadata  -  none of those show capabilities."
+          "explanation": "getcap reads a program's capabilities. getfacl reads ACLs, chmod changes basic permissions, and ls -l shows the rwx bits but not the capabilities."
         },
         {
-          "id": "filesystem-permissions-acl-mcq-epflag",
+          "id": "filesystem-permissions-beyond-mcq-whenuse",
           "type": "mcq",
-          "prompt": "In `setcap cap_net_raw+ep /usr/bin/ping`, what do the 'e' and 'p' flags request?",
+          "prompt": "As a beginner, when should you reach for ACLs and capabilities?",
           "choices": [
-            "encrypted and persistent",
-            "effective and permitted  -  the capability is permitted to the file and raised effective at exec",
-            "executable and protected",
-            "extended and private"
+            "On every single file, always",
+            "Only when the basic owner/group/other model and ordinary permissions are not enough for the job",
+            "Never; they do not work",
+            "Only on the root user's files"
           ],
           "answerIndex": 1,
-          "explanation": "Capability sets include permitted (p), effective (e), and inheritable (i). +ep means the capability is in the file's permitted set and is made effective when the program runs, so ping gets cap_net_raw active without further code."
-        },
-        {
-          "id": "filesystem-permissions-acl-mcq-immutdelete",
-          "type": "mcq",
-          "prompt": "root tries `rm /etc/critical.conf` and gets 'Operation not permitted', though root owns it with write perms. Likely cause?",
-          "choices": [
-            "The file is on a read-only mount only",
-            "The immutable attribute is set (chattr +i); clear it with chattr -i first",
-            "root cannot delete files in /etc",
-            "The sticky bit is preventing deletion"
-          ],
-          "answerIndex": 1,
-          "explanation": "The immutable flag (chattr +i) blocks modification/deletion even for root regardless of mode bits or ownership. Running chattr -i /etc/critical.conf clears it, after which rm succeeds. lsattr would show the 'i' flag."
-        },
-        {
-          "id": "filesystem-permissions-acl-fc-mask",
-          "type": "flashcard",
-          "front": "What is the ACL 'mask' entry and why does it matter?",
-          "back": "The mask is the maximum effective permission granted to all named users, named groups, and the owning group. Even if an ACL entry grants rwx, the effective access is the intersection with the mask  -  so a restrictive mask can quietly limit granted entries.",
-          "hint": "It's an upper bound on named/group entries."
+          "explanation": "The basic model handles most needs. ACLs and capabilities are extra tools for the less common cases (sharing with one extra person, or granting one narrow power) and are good to know exist."
         }
       ]
     }
