@@ -8,360 +8,580 @@
       "title": "UART/USART: Asynchronous Framing, Baud, and Flow Control",
       "order": 1,
       "difficulty": 1,
-      "content": "UART is the oldest and simplest of the four buses, and the one you have almost certainly seen as a serial console. It is **asynchronous**: there is no shared clock wire. Both ends agree on a **baud rate** beforehand, and the receiver re-syncs on every frame using the start bit.\n\nA frame is: an idle-HIGH line, a **start bit** (one bit-time LOW), 5-9 **data bits** (LSB first), an optional **parity bit**, then 1-2 **stop bits** (HIGH). The classic shorthand `8N1` means 8 data bits, no parity, 1 stop bit. The receiver samples each bit near its center; because each side runs its own clock, accumulated drift across a frame must stay under roughly half a bit-time. That tolerance is about +/-2-3% per side for 8N1, which is why integer-divisible baud rates and a stable clock source matter.\n\n**Flow control**: software (XON/XOFF) or hardware **RTS/CTS**, where the receiver de-asserts RTS to tell the transmitter to pause before its FIFO overruns. Without it, a slow consumer drops bytes silently.\n\nA critical distinction for an EE: **UART is the protocol/logic-block; RS-232 and RS-485 are physical layers.** A microcontroller UART speaks 0/3.3V logic. RS-232 uses bipolar +/-3 to +/-15V (a level shifter like a MAX232 is required) for point-to-point links up to ~15 m. RS-485 is **differential** (A/B pair), multi-drop (up to 32+ nodes), and good for hundreds of meters in noise — but it is half-duplex and needs a direction-enable line. The async framing is identical across all three; only the wires and voltages change.\n\nCommon uses: debug console, GPS modules, cellular/Bluetooth modems, and board-to-board links.",
+      "content": "Chips need to talk: a microcontroller (the small computer on a circuit board) sends data to sensors, displays, and other chips. The simplest way is to send the bits one at a time over a single wire. That is what \"serial\" means. The opposite, \"parallel,\" uses one wire per bit so a whole byte arrives at once -- fast, but it eats up many pins. Serial trades a little speed for far fewer wires, which is why almost everything uses it.\n\n**UART** (Universal Asynchronous Receiver/Transmitter) is the oldest and simplest serial method. Think of a **walkie-talkie**: two people talk over one channel, and it only works if both set their radios to the same agreed setting beforehand. For UART that setting is the **baud rate** -- the number of bits sent per second (for example 9600 or 115200). It uses two data wires: **TX** (transmit, the talking wire) and **RX** (receive, the listening wire). One chip's TX connects to the other's RX.\n\nUART is **asynchronous**, which means there is no separate clock wire telling the receiver when each bit arrives. Instead both sides already agreed on the baud rate, so the receiver knows how long each bit lasts. The wire rests HIGH when idle. A message (a \"frame\") begins with one **start bit** (a LOW pulse) that wakes the receiver, then the **data bits** (usually 8), then 1 or 2 **stop bits** (HIGH). The popular shorthand **8N1** means 8 data bits, No parity, 1 stop bit. The receiver sees the start bit fall, then samples each following bit in the middle of its time slot.\n\nIf one side talks faster than the other can process, bytes can be lost. **Flow control** prevents that: with hardware RTS/CTS lines, the receiver can signal \"pause\" until it catches up. UART itself is just the logic-level signaling (0 and 3.3V); to push it over long cables people use **RS-232** (higher voltages, point-to-point) or **RS-485** (a noise-resistant differential pair for long runs and many devices) -- same framing, different wires.\n\nRecap: UART = a simple two-wire \"direct phone line\" where both ends agree on a speed (baud) and frame each byte with start and stop bits.",
       "items": [
         {
-          "id": "serial-protocols-uart-fc-1",
-          "type": "flashcard",
-          "front": "What does the shorthand \"8N1\" describe for a UART link?",
-          "back": "8 data bits, No parity, 1 stop bit. (Plus the implicit start bit and idle-HIGH line.)",
-          "hint": "Data bits, parity, stop bits."
-        },
-        {
-          "id": "serial-protocols-uart-fc-2",
-          "type": "flashcard",
-          "front": "Why does UART not need a clock wire, and how does the receiver stay in sync?",
-          "back": "It is asynchronous: both ends are preconfigured to the same baud rate. The receiver resynchronizes on each frame's falling start bit, then samples each subsequent bit near its center based on its own local clock.",
-          "hint": "What event begins every frame?"
-        },
-        {
-          "id": "serial-protocols-uart-fc-3",
-          "type": "flashcard",
-          "front": "Distinguish UART from RS-232 and RS-485.",
-          "back": "UART is the asynchronous serial protocol/peripheral (logic-level, 0/3.3V). RS-232 is a single-ended bipolar (+/-3..15V) point-to-point physical layer. RS-485 is a differential, multi-drop physical layer for long, noisy runs. Same framing; different electrical layer.",
-          "hint": "Protocol vs physical/electrical layer."
-        },
-        {
-          "id": "serial-protocols-uart-fc-4",
-          "type": "flashcard",
-          "front": "What is the purpose of RTS/CTS hardware flow control?",
-          "back": "It lets the receiver throttle the transmitter: the receiver de-asserts RTS (read as CTS by the sender) before its FIFO overflows, so the sender pauses. Without it, a slow consumer drops bytes silently.",
-          "hint": "Prevents a fast sender overrunning a slow receiver."
-        },
-        {
-          "id": "serial-protocols-uart-fc-5",
-          "type": "flashcard",
-          "front": "Roughly how much clock mismatch can an 8N1 UART tolerate, and why?",
-          "back": "About +/-2-3% per side. Drift accumulates across the ~10 bit-times of a frame, and the last bit must still be sampled within its window (under ~half a bit of total error). Faster baud or a poor clock source eats this margin.",
-          "hint": "Error accumulates over the whole frame until the last sample point drifts out of its bit window."
+          "id": "serial-protocols-uart-img-1",
+          "type": "mcq",
+          "prompt": "Look at the diagram of a UART frame. The TX line rests HIGH when idle, then drops LOW for one bit. What is that first LOW bit called, and what is its job?",
+          "choices": [
+            "The stop bit; it ends the previous message",
+            "The start bit; it tells the receiver a new frame is beginning so it can sync up",
+            "The parity bit; it checks for errors",
+            "The clock bit; it carries the shared timing signal"
+          ],
+          "answerIndex": 1,
+          "explanation": "The frame begins with a single LOW start bit. Because UART has no clock wire, the receiver watches for this HIGH-to-LOW edge to know exactly when a frame begins, then times the following bits using the agreed baud rate. The stop bit comes at the end (HIGH), and parity (if used) sits between data and stop.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-3.svg"
         },
         {
           "id": "serial-protocols-uart-mcq-1",
           "type": "mcq",
-          "prompt": "You configure a board's UART RX as an interrupt-driven ring buffer at 115200 baud and occasionally lose bytes under bursty load, with no framing errors. What is the most likely fix?",
+          "prompt": "What is the difference between \"serial\" and \"parallel\" data transfer?",
           "choices": [
-            "Lower the baud rate until the clock tolerance improves",
-            "Add hardware RTS/CTS flow control (or move to DMA RX) so the producer pauses or the CPU is offloaded",
-            "Switch from 8N1 to 8E1 to add parity",
-            "Use RS-485 transceivers for better noise immunity"
+            "Serial sends all bits at once on many wires; parallel sends one bit at a time",
+            "Serial sends bits one at a time over few wires; parallel sends many bits at once over many wires",
+            "Serial is only for displays; parallel is only for sensors",
+            "They are two names for the exact same thing"
           ],
           "answerIndex": 1,
-          "explanation": "No framing errors means the bits are decoded fine; bytes are lost because the consumer cannot keep up (FIFO/ring overrun). Flow control throttles the sender; DMA RX into a circular buffer removes the per-byte ISR bottleneck. Parity detects errors but does not prevent overruns, and noise/baud are not the issue here."
+          "explanation": "Serial means bits travel one after another over just a wire or two, saving pins. Parallel uses one wire per bit so a whole byte moves at once -- faster but pin-hungry. UART, SPI, I2C, and CAN are all serial protocols.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-6.svg"
         },
         {
           "id": "serial-protocols-uart-mcq-2",
           "type": "mcq",
-          "prompt": "Which statement about RS-485 versus a plain logic-level UART is correct?",
+          "prompt": "Why does UART not need a separate clock wire?",
           "choices": [
-            "RS-485 uses a differential pair, supports multi-drop, and tolerates long noisy runs, but is typically half-duplex needing a direction-enable",
-            "RS-485 changes the asynchronous framing to a synchronous, clocked scheme",
-            "RS-485 is single-ended like RS-232 but at 3.3V logic levels",
-            "RS-485 is full-duplex point-to-point only, like RS-232"
+            "Because it sends bits in parallel, so timing does not matter",
+            "Because both sides agreed on the same baud rate in advance, so the receiver knows how long each bit lasts",
+            "Because the start bit contains the clock frequency encoded inside it",
+            "Because UART can only send one byte ever, so timing is irrelevant"
           ],
-          "answerIndex": 0,
-          "explanation": "RS-485 keeps the same UART async framing but moves it onto a differential A/B pair: multi-drop, long-distance, noise-immune, usually half-duplex with a DE/RE direction control. It is not single-ended (that is RS-232) and does not add a clock."
+          "answerIndex": 1,
+          "explanation": "UART is asynchronous: there is no shared clock line. Both ends are preconfigured to the same baud rate (bits per second), so once the receiver sees the start bit it can time every following bit on its own. This is why a wrong baud setting produces garbage.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-3.svg"
         },
         {
           "id": "serial-protocols-uart-mcq-3",
           "type": "mcq",
-          "prompt": "A UART link works at 9600 baud but produces consistent framing errors and garbage at 921600 baud on the same hardware. The most likely root cause is:",
+          "prompt": "The shorthand \"8N1\" describes a UART link. What does it mean?",
           "choices": [
-            "Missing pull-up resistors on the TX/RX lines",
-            "Parity is disabled on one side",
-            "The baud-rate divisor cannot represent 921600 accurately from the peripheral clock, so the actual rate error exceeds tolerance",
-            "The stop bit count differs between ends"
+            "8 stop bits, No data, 1 parity bit",
+            "8 data bits, No parity, 1 stop bit",
+            "8 wires, No clock, 1 device",
+            "8000 baud, No flow control, 1 byte buffer"
+          ],
+          "answerIndex": 1,
+          "explanation": "8N1 = 8 data bits, No parity, 1 stop bit. It is the most common UART setting. (There is also always an implicit start bit, and the line idles HIGH between frames.) Both ends must use the same framing or they will misread each other.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-3.svg"
+        },
+        {
+          "id": "serial-protocols-uart-mcq-4",
+          "type": "mcq",
+          "prompt": "What are the TX and RX wires used for in a UART connection?",
+          "choices": [
+            "TX is the clock; RX is the chip-select",
+            "TX transmits data out; RX receives data in. One chip's TX connects to the other chip's RX",
+            "TX and RX are both ground wires",
+            "TX is power; RX is the data line"
+          ],
+          "answerIndex": 1,
+          "explanation": "TX = transmit (the talking wire), RX = receive (the listening wire). For two chips to talk, TX on one goes to RX on the other and vice versa. A common beginner mistake is wiring TX-to-TX, which means neither side ever hears the other.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-3.svg"
+        },
+        {
+          "id": "serial-protocols-uart-mcq-5",
+          "type": "mcq",
+          "prompt": "Two devices are connected by UART. One is set to 9600 baud and the other to 115200 baud. What happens?",
+          "choices": [
+            "It works fine; baud rates auto-negotiate",
+            "The receiver mistimes every bit and reads garbage, because the bit durations no longer match",
+            "Only the faster device can send; the slower one is muted",
+            "The data is correct but arrives twice as fast"
+          ],
+          "answerIndex": 1,
+          "explanation": "Because UART has no clock wire, both ends MUST agree on the baud rate. If they disagree, the receiver samples at the wrong moments and decodes nonsense. Matching the baud rate on both sides is the first thing to check when a UART link prints garbage.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-3.svg"
+        },
+        {
+          "id": "serial-protocols-uart-mcq-6",
+          "type": "mcq",
+          "prompt": "What problem does hardware flow control (RTS/CTS) solve?",
+          "choices": [
+            "It encrypts the data on the wire",
+            "It lets a busy receiver tell the sender to pause, so bytes are not lost when the receiver cannot keep up",
+            "It increases the baud rate automatically",
+            "It adds a clock wire to make UART synchronous"
+          ],
+          "answerIndex": 1,
+          "explanation": "If a sender talks faster than the receiver can process, the receiver's small buffer overflows and bytes vanish silently. Flow control adds signal lines (RTS/CTS) so the receiver can say \"pause\" until it catches up. It does not change speed or add a clock.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-3.svg"
+        },
+        {
+          "id": "serial-protocols-uart-mcq-7",
+          "type": "mcq",
+          "prompt": "How are UART and RS-485 related?",
+          "choices": [
+            "RS-485 replaces UART framing with a completely different, clocked scheme",
+            "They are unrelated; RS-485 is a type of WiFi",
+            "UART is the data framing (start/data/stop bits); RS-485 is just a tougher set of wires/voltages that can carry that same framing over long, noisy distances",
+            "RS-485 is slower than UART because it uses more wires"
           ],
           "answerIndex": 2,
-          "explanation": "At high baud, the integer baud-rate divider often cannot hit the target exactly; the resulting percentage error blows past the ~2-3% tolerance and every frame mis-samples. Choosing a peripheral clock that divides evenly (or oversampling-by-8 mode) fixes it. UART is push-pull, so pull-ups are irrelevant; that is an I2C gotcha."
+          "explanation": "UART describes the logic-level framing of the bytes. RS-232 and RS-485 are physical layers -- different voltages and wiring -- that carry the same async framing. RS-485 uses a differential pair (two wires with opposite signals) so it survives long runs and electrical noise, and it can connect many devices.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-3.svg"
+        },
+        {
+          "id": "serial-protocols-uart-mcq-8",
+          "type": "mcq",
+          "prompt": "Which everyday job is UART a natural fit for?",
+          "choices": [
+            "Driving a high-resolution color display at 60 frames per second",
+            "A simple point-to-point link like a debug console, a GPS module, or a Bluetooth/cellular modem",
+            "Connecting 50 temperature sensors to one chip using as few wires as possible",
+            "A rugged network inside a car that survives heavy electrical noise"
+          ],
+          "answerIndex": 1,
+          "explanation": "UART shines for simple two-device links: a serial console, a GPS receiver, or a modem. High-speed displays favor SPI; many low-speed sensors on few wires favor I2C; a noisy automotive network favors CAN. Matching the bus to the job is a recurring theme.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-6.svg"
+        },
+        {
+          "id": "serial-protocols-uart-mcq-9",
+          "type": "mcq",
+          "prompt": "After the data bits in an 8N1 frame, the line goes HIGH for the stop bit and stays HIGH. Why does the idle line rest HIGH?",
+          "choices": [
+            "So the next start bit's HIGH-to-LOW drop is a clear, detectable edge that signals a new frame",
+            "Because HIGH uses less power than LOW",
+            "Because the stop bit is actually the clock",
+            "Because a HIGH line means the cable is disconnected"
+          ],
+          "answerIndex": 0,
+          "explanation": "The idle and stop levels are HIGH precisely so the next frame's start bit (a drop to LOW) stands out as a clean falling edge the receiver can detect. If the line idled LOW, the receiver could not tell idle from a start bit.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-3.svg"
         }
       ]
     },
     {
       "id": "serial-protocols-lesson-spi",
-      "title": "SPI: Full-Duplex, CPOL/CPHA Modes, Chip Select, Daisy-Chain",
+      "title": "SPI: Full-Duplex, Clock + Chip Select, and Why It Is Fast",
       "order": 2,
       "difficulty": 2,
-      "content": "SPI is a **synchronous, full-duplex, master-driven** bus. The master generates **SCLK** and drives **MOSI** (controller-out) while simultaneously reading **MISO** (controller-in); every clock shifts one bit out and one bit in at once. A dedicated **chip-select (CS/SS)**, usually active-LOW, frames each transaction and selects one slave. SPI is push-pull and fast (tens of MHz; no pull-ups needed) but **pin-hungry**: 3 shared lines plus one CS per slave.\n\nThe single biggest SPI gotcha is the **clock mode**, defined by two bits:\n\n- **CPOL** (clock polarity): idle clock level. 0 = idle LOW, 1 = idle HIGH.\n- **CPHA** (clock phase): which edge samples data. 0 = sample on the *leading* (first) edge, change on trailing; 1 = sample on the *trailing* edge.\n\nThe four combinations give modes 0-3:\n\n| Mode | CPOL | CPHA |\n|------|------|------|\n| 0 | 0 | 0 |\n| 1 | 0 | 1 |\n| 2 | 1 | 0 |\n| 3 | 1 | 1 |\n\n**A CPOL/CPHA mismatch is the classic silent failure.** If master and slave disagree, the receiver latches on the wrong edge, so every byte is sampled half a clock off — you read garbage, bytes shifted by a bit, or all 0x00/0xFF, with no error flag. Always read the sensor datasheet's timing diagram and match the mode exactly; mode 0 and mode 3 are the most common.\n\n**Daisy-chaining** wires slaves in series (MOSI -> device 1 -> device 2 -> MISO) sharing one CS, clocking a long shift register; it saves CS pins but needs device support. The usual alternative is one CS per slave.\n\nTransfers can be polled (simplest), interrupt-driven, or **DMA-driven**, which is the standard choice for large blocks like display framebuffers or flash reads where per-byte CPU involvement would stall everything.",
+      "content": "**SPI** (Serial Peripheral Interface) is the fast cousin of UART. Picture a **conveyor belt synced by a metronome**: a steady beat keeps both sides perfectly in step, so data can fly by very quickly. That metronome is a real wire called the **clock** (SCLK), and it is what makes SPI **synchronous** -- unlike UART, there is no guessing about timing, because the clock literally tells the other side when to read each bit.\n\nSPI has one boss, the **master** (usually the microcontroller), and one or more **devices** (sensors, displays, memory chips). It uses these lines:\n\n- **SCLK** -- the clock wire (the metronome), driven by the master.\n- **MOSI** -- Master Out, device In: data the master sends.\n- **MISO** -- Master In, device Out: data the device sends back.\n- **CS** (chip-select, sometimes SS) -- one per device, usually active-LOW.\n\nBecause there are separate wires for sending (MOSI) and receiving (MISO), data flows **both ways at the same time** on every clock tick. That two-way-at-once behavior is called **full-duplex**.\n\nThe **chip-select** is how the master picks which device to talk to. SCLK, MOSI, and MISO are shared by all devices, but each device gets its own CS line. To talk to a device, the master pulls that device's CS LOW; the others ignore the bus. This is the key SPI rule: **SPI needs a separate chip-select line per device.** That is also why SPI is called \"pin-hungry\" -- three shared wires plus one extra pin for every device you add.\n\nSPI's upside is raw speed (tens of millions of bits per second, no waiting) and simplicity (no addresses, no acknowledgments). Its downside is the pin count and the lack of any built-in error signal -- if something is wrong, you just read wrong data with no warning.\n\nThere is one timing detail to match: the master and device must agree on which clock edge reads the data (this is set by two settings called clock polarity and clock phase, giving four \"modes\" 0-3). If they disagree, every byte comes out as garbage with no error flag, so you check the device's datasheet for the right mode.\n\nRecap: SPI = a fast, clock-synced bus with separate send/receive wires (full-duplex) and one chip-select per device.",
       "items": [
         {
           "id": "serial-protocols-spi-img-1",
-          "type": "flashcard",
-          "front": "Study the SPI Mode 0 timing diagram (CPOL=0, CPHA=0): note the clock idling LOW, CS framing the transfer, and data being sampled on the rising leading edge. Where would a CPHA mismatch cause the receiver to latch?",
-          "back": "With CPOL=0/CPHA=0 the receiver samples on the rising (leading) edge while data changes on the falling (trailing) edge. If the slave expected CPHA=1 it would sample on the trailing edge -- half a clock off -- latching the previous/next bit and returning garbage with no error flag.",
-          "hint": "Compare the red sample dots to the data-change edges.",
-          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-1.svg"
-        },
-        {
-          "id": "serial-protocols-spi-fc-1",
-          "type": "flashcard",
-          "front": "What do CPOL and CPHA each control in SPI?",
-          "back": "CPOL = clock polarity = the idle level of SCLK (0 = idle LOW, 1 = idle HIGH). CPHA = clock phase = which edge samples data (0 = sample on leading edge, 1 = sample on trailing edge). Together they define modes 0-3.",
-          "hint": "Polarity = idle level; Phase = sampling edge."
-        },
-        {
-          "id": "serial-protocols-spi-fc-2",
-          "type": "flashcard",
-          "front": "What happens electrically/logically when master and slave use mismatched SPI CPOL/CPHA?",
-          "back": "The receiver samples on the wrong clock edge, so data is latched half a clock off. You get garbage, bit-shifted bytes, or constant 0x00/0xFF -- and there is NO error flag. It is a silent failure you must diagnose with a logic analyzer or the datasheet timing diagram.",
-          "hint": "There is no ACK/error bit in SPI to warn you."
-        },
-        {
-          "id": "serial-protocols-spi-fc-3",
-          "type": "flashcard",
-          "front": "Why is SPI called full-duplex, and what moves on each clock edge?",
-          "back": "Master and slave each have a shift register connected in a ring via MOSI and MISO. On every clock, one bit shifts out on MOSI and one bit shifts in on MISO simultaneously -- data flows both directions at once.",
-          "hint": "Two data lines, two shift registers, one clock."
-        },
-        {
-          "id": "serial-protocols-spi-fc-4",
-          "type": "flashcard",
-          "front": "Map the four SPI modes to CPOL/CPHA.",
-          "back": "Mode 0: CPOL=0, CPHA=0. Mode 1: CPOL=0, CPHA=1. Mode 2: CPOL=1, CPHA=0. Mode 3: CPOL=1, CPHA=1. Modes 0 and 3 are the most common in practice.",
-          "hint": "Count in binary: mode = (CPOL<<1) | CPHA."
-        },
-        {
-          "id": "serial-protocols-spi-fc-5",
-          "type": "flashcard",
-          "front": "What is the role of chip-select (CS/SS), and why is SPI considered pin-hungry?",
-          "back": "CS (usually active-LOW) frames a transaction and selects exactly one slave; deasserting it resets the slave's bit counter. SPI is pin-hungry because beyond the 3 shared lines (SCLK/MOSI/MISO) it needs a separate CS per slave (unless daisy-chained).",
-          "hint": "One dedicated line per device, plus three shared."
+          "type": "mcq",
+          "prompt": "Study the SPI wiring diagram: one master connects to two devices. SCLK, MOSI, and MISO are shared, but each device has its own CS line. How does the master choose which device to talk to?",
+          "choices": [
+            "It sends the device's address on the MOSI line",
+            "It pulls that device's chip-select (CS) line LOW, while the other devices ignore the bus",
+            "It changes the clock frequency to match the device",
+            "It uses a different MOSI wire for each device"
+          ],
+          "answerIndex": 1,
+          "explanation": "SPI selects a device by pulling its dedicated CS line LOW (active-low). Only the selected device responds; the rest stay quiet. SPI has no addressing scheme (that is I2C), which is exactly why it needs one CS pin per device.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-4.svg"
         },
         {
           "id": "serial-protocols-spi-mcq-1",
           "type": "mcq",
-          "prompt": "You bring up a new SPI accelerometer. The bus toggles correctly on the logic analyzer, CS frames each byte, but the WHO_AM_I register reads 0x00 instead of the expected 0x33. The first thing to check is:",
+          "prompt": "What makes SPI a synchronous bus, and what is the benefit?",
           "choices": [
-            "Add 4.7k pull-ups to MOSI and MISO",
-            "Verify CPOL/CPHA match the sensor datasheet's timing diagram (mode mismatch sampling on the wrong edge)",
-            "Reduce the baud rate divisor to slow the clock",
-            "Switch the bus to multi-master arbitration"
+            "It has a dedicated clock wire (SCLK) driven by the master, so both sides stay in step and can go very fast",
+            "Both sides guess the timing from an agreed baud rate",
+            "It synchronizes using the start and stop bits in each frame",
+            "It uses the chip-select line as a clock"
           ],
-          "answerIndex": 1,
-          "explanation": "Clean clocking with a wrong/zeroed read is the textbook CPOL/CPHA mismatch: the controller samples on the wrong edge and latches garbage. SPI has no ACK to flag it. Pull-ups are an I2C concern; SPI is push-pull. Multi-master is not an SPI feature. Slowing the clock only helps signal-integrity issues, not a phase mismatch."
+          "answerIndex": 0,
+          "explanation": "SPI is synchronous because the master drives a real clock wire, SCLK, like a metronome. Each tick shifts one bit, so there is no timing guesswork and the bus can run very fast. UART, by contrast, is asynchronous and relies on a pre-agreed baud rate.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-1.svg"
         },
         {
           "id": "serial-protocols-spi-mcq-2",
           "type": "mcq",
-          "prompt": "For streaming a 320x240 16-bit framebuffer to an SPI display every frame, the best transfer mode is:",
+          "prompt": "What do MOSI and MISO carry in an SPI link?",
           "choices": [
-            "Polled byte-by-byte in a tight loop",
-            "One interrupt per byte to keep the CPU responsive",
-            "DMA-driven, so the controller moves the buffer with minimal CPU involvement",
-            "Clock-stretching to pace the slave"
+            "MOSI is the clock; MISO is the chip-select",
+            "MOSI carries data from the master to the device; MISO carries data from the device back to the master",
+            "They are two redundant ground wires",
+            "MOSI is power out; MISO is power in"
           ],
-          "answerIndex": 2,
-          "explanation": "A framebuffer is ~150 KB; polling or per-byte interrupts would saturate the CPU. DMA streams the block with one setup and a completion interrupt. Clock stretching is an I2C feature, not SPI."
+          "answerIndex": 1,
+          "explanation": "MOSI = Master Out, Slave/device In. MISO = Master In, Slave/device Out. Having separate wires for each direction is what lets SPI send and receive at the same time (full-duplex). SCLK is the clock and CS is the chip-select.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-4.svg"
         },
         {
           "id": "serial-protocols-spi-mcq-3",
           "type": "mcq",
-          "prompt": "Which is a correct trade-off statement about SPI daisy-chaining versus one-CS-per-slave?",
+          "prompt": "SPI is described as \"full-duplex.\" What does that mean?",
           "choices": [
-            "Daisy-chaining requires more CS pins but is faster",
-            "Daisy-chaining shares a single CS and clocks devices as one long shift register, saving pins but requiring device support and full-chain clocking",
-            "Daisy-chaining converts SPI into a multi-drop addressed bus like I2C",
-            "One-CS-per-slave eliminates the shared SCLK and MOSI lines"
+            "It can connect to a maximum of two devices",
+            "Data flows in both directions at the same time, because there are separate send (MOSI) and receive (MISO) wires",
+            "It sends each byte twice for reliability",
+            "It only works when both devices are powered fully"
           ],
           "answerIndex": 1,
-          "explanation": "Daisy-chaining ties slaves in series under one CS, forming a long shift register: you save CS pins but must clock through the entire chain and the devices must support pass-through. It does not add addressing (that is not SPI), and the independent-CS topology still shares SCLK/MOSI."
+          "explanation": "Full-duplex means simultaneous two-way traffic. On every clock tick the master shifts a bit out on MOSI and shifts a bit in on MISO at the same instant. Separate wires for each direction make this possible; UART and I2C are not full-duplex in this way.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-4.svg"
+        },
+        {
+          "id": "serial-protocols-spi-mcq-4",
+          "type": "mcq",
+          "prompt": "You want to connect three SPI devices to one microcontroller. How many chip-select lines do you need, and why?",
+          "choices": [
+            "One CS total, shared by all three devices",
+            "Three CS lines, one per device, because SPI selects a device by pulling its own CS LOW",
+            "Zero, because SPI uses addresses instead of chip-selects",
+            "Six, two per device"
+          ],
+          "answerIndex": 1,
+          "explanation": "SPI has no addressing, so it picks a device using a dedicated chip-select. Three devices need three CS pins (plus the shared SCLK/MOSI/MISO). This per-device pin cost is why SPI is called pin-hungry. (Daisy-chaining can share one CS, but only with devices that support it.)",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-4.svg"
+        },
+        {
+          "id": "serial-protocols-spi-mcq-5",
+          "type": "mcq",
+          "prompt": "Why is SPI considered \"pin-hungry\" compared to I2C?",
+          "choices": [
+            "Because it needs a power wire for every device",
+            "Because beyond the three shared wires it needs an extra chip-select pin for each device, while I2C uses just two shared wires for everyone",
+            "Because SPI uses 16-bit addresses",
+            "Because SPI requires pull-up resistors on every line"
+          ],
+          "answerIndex": 1,
+          "explanation": "SPI shares SCLK/MOSI/MISO but adds one CS pin per device, so wiring grows with each device. I2C keeps just two shared wires (SDA/SCL) no matter how many devices, using addresses instead of select lines. That is the classic pins-versus-speed trade between them.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-6.svg"
+        },
+        {
+          "id": "serial-protocols-spi-mcq-6",
+          "type": "mcq",
+          "prompt": "You bring up a new SPI sensor. The clock and chip-select look correct on a logic analyzer, but the sensor's ID register reads back as all zeros instead of the expected value. What is the most likely cause?",
+          "choices": [
+            "Missing pull-up resistors on MOSI and MISO",
+            "The clock polarity/phase (SPI mode) does not match the sensor's datasheet, so bits are sampled on the wrong edge and come out as garbage",
+            "The baud rate is set too low",
+            "The sensor needs its own address assigned"
+          ],
+          "answerIndex": 1,
+          "explanation": "Clean clocking but a wrong/zeroed read is the classic SPI mode mismatch: master and device disagree on which clock edge reads the data, so every bit is captured at the wrong moment. SPI gives no error flag for this -- you fix it by matching the mode from the datasheet. Pull-ups and addresses are I2C concerns.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-1.svg"
+        },
+        {
+          "id": "serial-protocols-spi-mcq-7",
+          "type": "mcq",
+          "prompt": "An SPI link reads wrong data, yet there is no error or warning bit anywhere. Why does SPI not warn you?",
+          "choices": [
+            "Because SPI has no built-in acknowledgment or error-check mechanism; it just shifts bits with no handshake",
+            "Because the master disabled error reporting by default",
+            "Because the chip-select line suppresses error flags",
+            "Because errors are only reported over a separate UART"
+          ],
+          "answerIndex": 0,
+          "explanation": "SPI is deliberately bare: it shifts bits in and out with no addressing, acknowledgment, or error bit. That simplicity is part of why it is fast, but it means problems like a mode mismatch show up only as wrong data. You debug with a logic analyzer and the datasheet.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-1.svg"
+        },
+        {
+          "id": "serial-protocols-spi-mcq-8",
+          "type": "mcq",
+          "prompt": "For which job is SPI the best fit among the four buses?",
+          "choices": [
+            "A simple two-wire debug console to a PC",
+            "Streaming a lot of data fast to a nearby device, like refreshing a display or reading a flash memory chip",
+            "Connecting 30 slow sensors with the fewest possible wires",
+            "A rugged car network that must survive heavy electrical noise over long cables"
+          ],
+          "answerIndex": 1,
+          "explanation": "SPI's strength is raw speed over short distances, making it ideal for displays, flash/SD storage, and fast sensors. A simple console is UART's job; many slow sensors on few wires is I2C; a noisy long-distance network is CAN.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-6.svg"
         }
       ]
     },
     {
       "id": "serial-protocols-lesson-i2c",
-      "title": "I2C: Two-Wire Open-Drain, Addressing, ACK/Clock-Stretch, Failure Modes",
+      "title": "I2C: Two Shared Wires, Addresses, ACK, and Pull-Ups",
       "order": 3,
       "difficulty": 2,
-      "content": "I2C trades SPI's speed and pin count for a **two-wire**, addressable, multi-drop bus: **SDA** (data) and **SCL** (clock), shared by every device. Both lines are **open-drain**: a device can only pull a line LOW; a HIGH happens passively through **external pull-up resistors** (commonly 4.7k at 100 kHz standard mode, lower for 400 kHz fast mode). This wired-AND scheme is what enables multiple talkers without contention.\n\n**Missing or wrong-value pull-ups is the number-one I2C failure.** With no pull-ups the lines never reach a valid HIGH: the master cannot generate a START, every transfer NACKs or hangs, and a scope shows the lines sitting near 0V or with sloppy RC edges. Too-weak pull-ups round the rising edges and corrupt data at speed; too-strong exceed the pin's sink current.\n\nA transaction: **START** (SDA falls while SCL is HIGH), a **7-bit address** + R/W bit, an **ACK** (addressed slave pulls SDA LOW on the 9th clock), data bytes each with an ACK/NACK, then **STOP** (SDA rises while SCL HIGH). Data on SDA may only change while SCL is LOW. A **NACK** means \"not present,\" \"can't accept more,\" or (from a master reading) \"last byte.\"\n\n**Clock stretching**: a slow slave holds SCL LOW to pause the master until it is ready — the master must tolerate this (some hardware engines and bit-bang masters handle it poorly).\n\n**Multi-master arbitration**: masters monitor SDA while driving; a master that drives HIGH but reads LOW lost arbitration and backs off — non-destructively, because the bus is wired-AND.\n\nOther failure modes: a **stuck bus** when a slave was reset mid-byte and holds SDA LOW (recover by manually clocking up to 9 SCL pulses then a STOP); wrong **7-bit vs 8-bit address** confusion (datasheets sometimes list the pre-shifted 8-bit value).",
+      "content": "**I2C** (Inter-Integrated Circuit, said \"I-squared-C\") solves a different problem than SPI: how do you connect lots of devices using as few wires as possible? Its trick is to use just **two shared wires** for everything:\n\n- **SDA** -- the data line.\n- **SCL** -- the clock line.\n\nEvery device hangs off the same two wires. So how does the master reach just one of them? Think of an old **telephone party line** where everyone shares one line and you call a specific person by name. In I2C, each device has its own **address** (a small number, usually 7 bits). The master announces an address on the bus; only the matching device responds.\n\nHere is the part beginners must not miss. The two wires are **open-drain**, which means any device can pull a wire LOW, but nobody actively drives it HIGH. To return to HIGH, the wires rely on two small **pull-up resistors** (commonly around 4.7k ohms) connecting SDA and SCL up to the supply voltage. This is the most important I2C rule: **I2C needs pull-up resistors on SDA and SCL.** Without them the lines can never reach a valid HIGH, and the bus simply does not work -- no device ever answers. (This is exactly the opposite of SPI, whose rule is one chip-select per device.)\n\nA message works like this: the master sends a **START** signal, then the device's **address** plus a bit saying read or write. The addressed device replies with an **ACK** (acknowledge) by briefly pulling SDA LOW -- its way of saying \"that's me, I'm here.\" If no device answers, that is a **NACK** (no acknowledge). Data bytes follow, each also acknowledged, and the master ends with a **STOP** signal.\n\nTwo more handy ideas: a slow device can hold the clock line LOW to say \"wait, I need a moment\" -- this is called **clock stretching**, and the master must pause for it. And if two masters talk at once, they sort out who goes first without corrupting data (arbitration), thanks to the open-drain wired behavior.\n\nThe trade-off versus SPI: I2C uses far fewer wires and supports many devices, but it is slower and has more rules. \n\nRecap: I2C = two shared wires, each device addressed by name, with pull-up resistors providing the HIGH and an ACK confirming each byte.",
       "items": [
         {
           "id": "serial-protocols-i2c-img-1",
-          "type": "flashcard",
-          "front": "Study the I2C transaction diagram: identify the START (SDA falls while SCL HIGH), the address + R/W bits, the slave ACK on the 9th clock, and the STOP. What does the diagram imply happens with no pull-ups?",
-          "back": "START requires SDA to fall from a valid HIGH while SCL is HIGH. With no pull-ups the open-drain lines never reach HIGH, so no START is ever generated, the slave never sees its address, and every transfer NACKs / the bus looks stuck LOW.",
-          "hint": "Both lines must idle HIGH for START/STOP edges to be valid.",
-          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-2.svg"
-        },
-        {
-          "id": "serial-protocols-i2c-fc-1",
-          "type": "flashcard",
-          "front": "Why does I2C require external pull-up resistors, and what defines a logic HIGH on the bus?",
-          "back": "SDA and SCL are open-drain: devices can only actively pull LOW. A HIGH is produced passively by pull-ups (e.g. 4.7k). This wired-AND lets many devices share two wires without driving against each other. No pull-ups means no valid HIGH and the bus never works.",
-          "hint": "Open-drain can only sink, not source."
-        },
-        {
-          "id": "serial-protocols-i2c-fc-2",
-          "type": "flashcard",
-          "front": "Define the I2C START and STOP conditions.",
-          "back": "START: SDA transitions HIGH->LOW while SCL is HIGH. STOP: SDA transitions LOW->HIGH while SCL is HIGH. These are the only times SDA legally changes while SCL is high; during data, SDA changes only while SCL is LOW.",
-          "hint": "Both are SDA edges that occur while the clock is held high."
-        },
-        {
-          "id": "serial-protocols-i2c-fc-3",
-          "type": "flashcard",
-          "front": "What is I2C clock stretching and who does it?",
-          "back": "A slave that needs more time holds SCL LOW after an ACK or byte, pausing the master until it releases the line. The master must wait for SCL to actually go high (not just assume its own timing). Some hardware/bit-bang masters handle stretching poorly.",
-          "hint": "The slave forces a pause via the clock line."
-        },
-        {
-          "id": "serial-protocols-i2c-fc-4",
-          "type": "flashcard",
-          "front": "What is an ACK vs NACK in I2C, and how is each produced?",
-          "back": "On the 9th clock of each byte, the receiver drives SDA: LOW = ACK (received/present), letting SDA float HIGH = NACK. A NACK means absent device, cannot accept more data, or (master reading) end of transfer.",
-          "hint": "The 9th bit, pulled low or left to float high."
-        },
-        {
-          "id": "serial-protocols-i2c-fc-5",
-          "type": "flashcard",
-          "front": "How does non-destructive multi-master arbitration work on I2C?",
-          "back": "Each master reads SDA while driving it. Because the bus is wired-AND, a master driving HIGH that reads back LOW knows another master drove LOW (a dominant 0) and has won the bit; the loser stops driving and retries later. No data is corrupted.",
-          "hint": "Wired-AND: a 0 always wins over a 1; the loser sees the mismatch."
-        },
-        {
-          "id": "serial-protocols-i2c-fc-6",
-          "type": "flashcard",
-          "front": "How do you recover a stuck I2C bus where a slave holds SDA LOW?",
-          "back": "The slave was likely reset mid-byte and is still trying to drive a 0. Manually toggle SCL up to 9 clock pulses (clocking the slave past its byte) until SDA releases HIGH, then issue a STOP. Then reinitialize the peripheral.",
-          "hint": "Clock it out: up to 9 pulses plus a STOP."
+          "type": "mcq",
+          "prompt": "Look at the I2C bus diagram: two pull-up resistors connect SDA and SCL to the supply, and several addressed devices share those two wires. What happens if you forget the pull-up resistors?",
+          "choices": [
+            "The bus runs twice as fast",
+            "The lines can never reach a valid HIGH, so no device ever responds and the bus does not work",
+            "Only the first device works; the rest are disabled",
+            "The data is fine but the clock stops"
+          ],
+          "answerIndex": 1,
+          "explanation": "I2C lines are open-drain: devices can only pull LOW, so the pull-up resistors are what create the HIGH level. With no pull-ups the lines sit stuck low, the master can never even generate a proper START, and every transfer fails. Missing pull-ups is the number-one I2C mistake.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-5.svg"
         },
         {
           "id": "serial-protocols-i2c-mcq-1",
           "type": "mcq",
-          "prompt": "You wire a BME280 to a Nucleo's I2C pins, but every address scan NACKs and a scope shows SDA/SCL sitting near 0.3V with rounded, sloppy transitions. The most likely cause is:",
+          "prompt": "How many signal wires does I2C use, and what are they?",
           "choices": [
-            "CPOL/CPHA mode mismatch",
-            "Missing (or far too weak) pull-up resistors on SDA and SCL",
-            "The slave is clock-stretching forever",
-            "Wrong SPI chip-select polarity"
+            "Three: SCLK, MOSI, and MISO",
+            "Two: SDA (data) and SCL (clock), shared by every device",
+            "Four: TX, RX, RTS, and CTS",
+            "One: a single combined data-and-clock wire"
           ],
           "answerIndex": 1,
-          "explanation": "Lines that cannot reach a clean HIGH (low DC level, rounded edges, universal NACK) are the signature of missing/insufficient pull-ups -- open-drain lines have nothing to source the HIGH. CPOL/CPHA and chip-select are SPI concepts; clock stretching would hold SCL low but SDA would still idle high with proper pull-ups."
+          "explanation": "I2C uses just two shared wires, SDA (data) and SCL (clock). Every device connects to those same two lines, which is what lets many devices share very few pins. SCLK/MOSI/MISO are SPI; TX/RX are UART.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-5.svg"
         },
         {
           "id": "serial-protocols-i2c-mcq-2",
           "type": "mcq",
-          "prompt": "A datasheet lists a sensor's address as 0xEC, but your driver expects a 7-bit address. What should you program, and why?",
+          "prompt": "With many devices on the same two wires, how does the I2C master reach just one specific device?",
           "choices": [
-            "0xEC directly, because addresses are always 8 bits",
-            "0x76, because 0xEC is the pre-shifted 8-bit value (address in bits 7:1) and the 7-bit address is 0xEC >> 1",
-            "0xD8, by masking the low nibble",
-            "0xEC | 0x01 to set the read bit"
+            "It pulls that device's chip-select line LOW",
+            "It sends the device's unique address on the bus; only the matching device responds",
+            "It changes the clock speed to match the device",
+            "It is impossible; I2C can only have one device"
           ],
           "answerIndex": 1,
-          "explanation": "Many datasheets quote the 8-bit value with the R/W bit already in bit 0. The 7-bit address is 0xEC >> 1 = 0x76. 7-bit vs 8-bit address confusion is a classic I2C bring-up bug. The R/W bit is appended by the peripheral, not pre-OR'd into a 7-bit address."
+          "explanation": "I2C is like a party line: each device has its own address, and the master announces an address so only that device answers. This addressing is why I2C does not need a select wire per device the way SPI does.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-5.svg"
         },
         {
           "id": "serial-protocols-i2c-mcq-3",
           "type": "mcq",
-          "prompt": "Which statement about I2C clock stretching is correct?",
+          "prompt": "Why does I2C need external pull-up resistors on SDA and SCL?",
           "choices": [
-            "The master stretches the clock to slow down a fast slave",
-            "A slave holds SCL LOW to pause the master until it is ready; a correct master must wait for SCL to actually go high",
-            "Clock stretching is the same mechanism as multi-master arbitration",
-            "Stretching is done on SDA, not SCL"
+            "To make the bus run faster",
+            "Because the lines are open-drain: devices can only pull LOW, so the resistors are what pull the lines back up to HIGH",
+            "To protect the devices from too much current",
+            "Because every device must have its own resistor to get an address"
           ],
           "answerIndex": 1,
-          "explanation": "Clock stretching is a slave-side flow-control mechanism: it holds the clock line SCL low to delay the master. A robust master polls for SCL actually rising rather than trusting its own timing. Arbitration is a separate, SDA-based mechanism among masters."
+          "explanation": "Open-drain means a device can sink a line to LOW but cannot source it to HIGH. The pull-up resistors provide the HIGH level. This shared scheme lets many devices share the wires without fighting each other, but it means no pull-ups equals no working bus.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-5.svg"
+        },
+        {
+          "id": "serial-protocols-i2c-mcq-4",
+          "type": "mcq",
+          "prompt": "On I2C, after the master sends a device's address, the addressed device briefly pulls SDA LOW. What is this called and what does it mean?",
+          "choices": [
+            "A NACK, meaning the device is busy",
+            "An ACK (acknowledge), the device's way of saying \"that's my address, I'm here\"",
+            "A STOP condition, ending the message",
+            "Clock stretching, asking the master to slow down"
+          ],
+          "answerIndex": 1,
+          "explanation": "Pulling SDA LOW at the acknowledge moment is an ACK: the addressed device confirms it received the byte and is present. If no device pulls it low (it floats high), that is a NACK, meaning no one answered or the device cannot accept more.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-2.svg"
+        },
+        {
+          "id": "serial-protocols-i2c-mcq-5",
+          "type": "mcq",
+          "prompt": "What is I2C clock stretching, and who does it?",
+          "choices": [
+            "The master speeds up the clock to push a slow device",
+            "A device holds the SCL clock line LOW to pause the master until it is ready; the master must wait",
+            "The master stretches the data line to send bigger bytes",
+            "Two devices share one clock to save power"
+          ],
+          "answerIndex": 1,
+          "explanation": "Clock stretching is a device's way of asking for time: it holds SCL LOW so the master cannot start the next clock pulse until the device releases it. A correct master waits for SCL to actually rise. It is a device-side pause, not a master action.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-2.svg"
+        },
+        {
+          "id": "serial-protocols-i2c-mcq-6",
+          "type": "mcq",
+          "prompt": "You wire up a new I2C sensor, but scanning for it finds nothing, and a scope shows SDA and SCL sitting near 0V with no clean HIGH. What is the most likely cause?",
+          "choices": [
+            "A clock polarity/phase mode mismatch",
+            "Missing or far-too-weak pull-up resistors on SDA and SCL",
+            "The chip-select line has the wrong polarity",
+            "The baud rate is set too high"
+          ],
+          "answerIndex": 1,
+          "explanation": "Lines that never reach a clean HIGH (stuck low, rounded edges, nothing responding) are the signature of missing or insufficient pull-ups, since open-drain lines have nothing else to source the HIGH. Mode mismatch and chip-select are SPI concepts; baud rate is UART.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-5.svg"
+        },
+        {
+          "id": "serial-protocols-i2c-mcq-7",
+          "type": "mcq",
+          "prompt": "Which statement best captures the trade-off between I2C and SPI?",
+          "choices": [
+            "I2C is faster and uses more wires; SPI is slower and uses fewer wires",
+            "I2C uses fewer wires and supports many addressed devices but is slower; SPI is faster but needs a chip-select pin per device",
+            "They are identical except for the connector shape",
+            "SPI uses addresses while I2C uses chip-selects"
+          ],
+          "answerIndex": 1,
+          "explanation": "I2C wins on wire count and device count (two shared wires, addressing) at the cost of speed and extra rules like pull-ups and ACKs. SPI wins on speed and simplicity but spends a chip-select pin per device. Remember: I2C needs pull-ups; SPI needs a CS per device.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-6.svg"
+        },
+        {
+          "id": "serial-protocols-i2c-mcq-8",
+          "type": "mcq",
+          "prompt": "What does a START condition followed by an address tell the devices on an I2C bus?",
+          "choices": [
+            "That the bus is being powered off",
+            "That a new message is beginning and which device it is meant for; only the device with that address will respond",
+            "That every device should reply at once",
+            "That the master is switching to SPI mode"
+          ],
+          "answerIndex": 1,
+          "explanation": "The START signal wakes the bus for a new transaction, and the address right after it names the target device. All devices hear the address, but only the one whose address matches will ACK and take part. A STOP later ends the transaction.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-2.svg"
+        },
+        {
+          "id": "serial-protocols-i2c-mcq-9",
+          "type": "mcq",
+          "prompt": "For which job is I2C the most natural choice?",
+          "choices": [
+            "Streaming a full-screen video to a display at high speed",
+            "Connecting several low-speed on-board sensors (temperature, humidity, a small OLED) using as few wires as possible",
+            "A simple two-wire console link to a laptop",
+            "A 40-meter noisy industrial network with priority messages"
+          ],
+          "answerIndex": 1,
+          "explanation": "I2C is ideal for several modest-speed chips on the same board where saving pins matters. Fast displays favor SPI, a console favors UART, and a long noisy network with priorities favors CAN. Picking the right bus for the job is the recurring skill.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-6.svg"
         }
       ]
     },
     {
       "id": "serial-protocols-lesson-can",
-      "title": "CAN / CAN FD, and Choosing a Bus + Transfer Mode",
+      "title": "CAN, and Choosing a Bus + Transfer Mode",
       "order": 4,
       "difficulty": 3,
-      "content": "**CAN** is a robust, multi-drop, **differential** bus built for noisy automotive/industrial environments. Two wires, CANH and CANL, are driven by a **transceiver**: a **dominant** bit pulls them apart, a **recessive** bit lets them relax together. The bus is wired-AND in the sense that dominant (0) always overrides recessive (1). Both ends of the bus need **120-ohm termination** matching the cable impedance; missing or wrong termination causes reflections and errors.\n\nCAN is **message-oriented, not address-oriented**: frames carry an **identifier**, not a destination. Every node hears every frame and filters by ID. The same ID field drives **priority arbitration**: when multiple nodes start transmitting, each monitors the bus while sending its ID; a node that sends a recessive bit but reads dominant has lost and backs off. The lower-numbered ID wins **non-destructively** — the winner's frame is undisturbed, so the highest-priority message suffers zero latency penalty. This is the killer feature for real-time control.\n\nA classic frame has SOF, the 11-bit (or 29-bit extended) ID, control bits, 0-8 data bytes, a CRC, an ACK slot, and EOF. Built-in error detection (CRC, bit-stuffing, ACK, form/frame checks) and automatic retransmission make it very reliable; a faulty node escalates through error-active -> error-passive -> bus-off states. **CAN FD** extends payloads to 64 bytes and switches to a higher bit rate during the data phase, greatly raising throughput while keeping the arbitration scheme.\n\n**Choosing a bus** — match the job:\n\n| Need | Pick |\n|------|------|\n| Long distance, noise immunity, multi-node real-time | CAN / RS-485 |\n| Highest throughput, short reach, few devices | SPI |\n| Many low-speed devices, fewest pins, on-board | I2C |\n| Simple point-to-point console / GPS / modem | UART |\n\n**Transfer mode** applies to all four: **polled** (simplest, wastes CPU, fine for low rate), **interrupt-driven** (event-per-byte/frame, good general default), and **DMA-driven** (offloads bulk/streaming so the CPU is free and jitter is low — essential at high baud or for framebuffers and continuous acquisition).",
+      "content": "**CAN** (Controller Area Network) is built for tough, noisy places -- it is literally **the network inside your car**, and it is common in factories and machines too. Where UART, SPI, and I2C are happy on a quiet circuit board, CAN is designed to survive long cables and heavy electrical noise from motors and ignition systems.\n\nIts secret is **differential** signaling. Instead of one wire carrying a voltage measured against ground, CAN uses **two wires, CANH and CANL**, that carry opposite signals. A receiver looks at the *difference* between them. When electrical noise hits the cable, it hits both wires almost equally, so the difference stays clean and the noise cancels out. A small chip called a **transceiver** converts the microcontroller's signals to and from this two-wire pair. Both ends of the cable get a **120-ohm termination resistor** to absorb the signal and prevent echoes (reflections) that would corrupt data.\n\nCAN is **message-based, not address-based**. A message does not say \"to device 5\"; instead it carries an **ID** describing what the message *is* (for example \"engine RPM\"). Every node hears every message and keeps the ones it cares about. That ID also sets **priority**: if two nodes try to talk at once, the one with the lower-numbered ID automatically wins, and -- crucially -- the winner's message is not damaged at all. This non-destructive **priority arbitration** guarantees that urgent messages (like brakes) always get through first. **CAN FD** is a newer version that carries more data per message and runs faster.\n\n**Choosing among the four buses** comes down to matching the job:\n\n- **UART** -- a simple point-to-point link (console, GPS, modem).\n- **SPI** -- fastest, short distance, few devices (displays, flash).\n- **I2C** -- many low-speed devices, fewest pins, on one board.\n- **CAN** -- many devices over long, noisy distances with message priority (cars, industrial).\n\nFinally, no matter which bus you use, the chip can move the data three ways. **Polled**: the processor keeps checking \"any data yet?\" in a loop -- simplest, but wastes effort. **Interrupt-driven**: the hardware taps the processor on the shoulder only when something arrives -- a good general default. **DMA** (Direct Memory Access): a helper engine moves blocks of data straight to memory without bothering the processor at all -- best for high speed or large transfers, because the processor stays free.\n\nRecap: CAN = a rugged differential bus where messages carry IDs that set priority, ideal for noisy multi-device networks; and you move data by polling, interrupts, or DMA depending on how busy you want the processor to be.",
       "items": [
         {
-          "id": "serial-protocols-can-fc-1",
-          "type": "flashcard",
-          "front": "How does CAN signal a dominant vs recessive bit electrically, and why differential?",
-          "back": "A transceiver drives CANH/CANL apart for a dominant (0) bit and lets them relax to a common level for recessive (1). Differential signaling rejects common-mode noise, which is why CAN survives the automotive/industrial electrical environment.",
-          "hint": "Two wires driven apart vs released together."
-        },
-        {
-          "id": "serial-protocols-can-fc-2",
-          "type": "flashcard",
-          "front": "Explain CAN priority arbitration and why it is non-destructive.",
-          "back": "Nodes start sending their ID simultaneously and monitor the bus. Dominant (0) overrides recessive (1); a node that sends recessive but reads dominant lost and stops. The lowest ID (highest priority) wins with its frame completely intact -- the winner sees no collision or latency penalty.",
-          "hint": "Lowest ID wins; loser backs off bit-by-bit with no corruption."
-        },
-        {
-          "id": "serial-protocols-can-fc-3",
-          "type": "flashcard",
-          "front": "Why does a CAN bus need 120-ohm termination at both ends?",
-          "back": "The 120-ohm resistors match the twisted-pair characteristic impedance, absorbing the signal at each end to prevent reflections. Missing termination (or only one) causes ringing/reflections and bit errors, especially at higher rates or longer cables.",
-          "hint": "Impedance matching to kill reflections."
-        },
-        {
-          "id": "serial-protocols-can-fc-4",
-          "type": "flashcard",
-          "front": "What does CAN FD add over classic CAN?",
-          "back": "Flexible Data-rate: payloads up to 64 bytes (vs 8) and a higher bit rate during the data phase while keeping the standard (slower) arbitration phase. This raises throughput substantially without changing the priority-arbitration scheme.",
-          "hint": "More data bytes and a faster data-phase bit rate."
-        },
-        {
-          "id": "serial-protocols-can-fc-5",
-          "type": "flashcard",
-          "front": "How is CAN addressing fundamentally different from I2C/SPI?",
-          "back": "CAN is message-oriented: frames carry an identifier describing the message/content, not a destination address. Every node receives every frame and uses hardware acceptance filters on the ID to decide what to process; the ID also sets priority.",
-          "hint": "It labels the message, not the recipient."
-        },
-        {
-          "id": "serial-protocols-can-fc-6",
-          "type": "flashcard",
-          "front": "Contrast polled, interrupt-driven, and DMA-driven transfers.",
-          "back": "Polled: CPU spins checking status flags -- simplest, but wastes cycles and blocks; fine at low rates. Interrupt-driven: an event per byte/frame wakes a short ISR -- good general default. DMA-driven: hardware moves the data block with one setup and a completion interrupt -- frees the CPU and minimizes jitter; essential at high throughput or continuous streaming.",
-          "hint": "Spin, vs per-event ISR, vs hardware block move."
+          "id": "serial-protocols-can-img-1",
+          "type": "mcq",
+          "prompt": "Study the CAN bus diagram: two wires (CANH and CANL) carry opposite signals, with a 120-ohm resistor at each end and several nodes attached. Why does CAN use two wires with opposite signals (differential signaling)?",
+          "choices": [
+            "To double the data rate",
+            "So that electrical noise hits both wires equally and cancels out when the receiver looks at the difference, making the bus noise-resistant",
+            "So each wire can carry a different message at once",
+            "Because one wire is for power and one is for data"
+          ],
+          "answerIndex": 1,
+          "explanation": "Differential signaling means the receiver reads the difference between CANH and CANL. Noise picked up along the cable affects both wires almost identically, so it cancels in the difference. That is why CAN survives the harsh electrical environment of a car or factory.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-7.svg"
         },
         {
           "id": "serial-protocols-can-mcq-1",
           "type": "mcq",
-          "prompt": "Two CAN nodes begin transmitting in the same bit time, one with ID 0x080 and one with ID 0x100. What happens?",
+          "prompt": "Where is CAN most commonly used, and why is it suited to that environment?",
           "choices": [
-            "A collision corrupts both frames; both retransmit after a random backoff",
-            "ID 0x080 wins arbitration non-destructively and transmits; 0x100 backs off and retries when the bus is idle",
-            "ID 0x100 wins because higher numeric IDs are higher priority",
-            "Both frames are sent simultaneously on separate differential pairs"
+            "Inside a single quiet circuit board, because it is the simplest bus",
+            "In cars and industrial machines, because its differential wiring resists electrical noise over long cables",
+            "Only between a PC and a single sensor, like a debug console",
+            "For the fastest possible short-distance memory transfers"
           ],
           "answerIndex": 1,
-          "explanation": "Lower ID = higher priority. As the IDs are shifted out MSB-first, 0x080 sends a dominant bit where 0x100 sends recessive; the 0x100 node reads back dominant, detects it lost, and stops -- without corrupting 0x080's frame. CAN arbitration is non-destructive, unlike Ethernet CSMA/CD."
+          "explanation": "CAN was designed for vehicles and industrial systems: many nodes, long noisy cabling, and a need for reliable real-time messaging. Its differential signaling and error handling make it rugged. On a quiet board you would more likely use I2C or SPI.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-7.svg"
         },
         {
           "id": "serial-protocols-can-mcq-2",
           "type": "mcq",
-          "prompt": "You need to connect ~20 sensor/actuator nodes spread across a 30 m noisy factory machine with hard real-time priority on a few control messages. Best bus choice?",
+          "prompt": "How is CAN addressing different from I2C addressing?",
           "choices": [
-            "I2C, because it is multi-drop and uses only two wires",
-            "SPI, because it is the fastest option",
-            "CAN, for differential noise immunity, multi-drop over distance, and priority arbitration that guarantees the critical messages win",
-            "Plain logic-level UART point-to-point between every pair of nodes"
+            "CAN messages carry an ID describing the message itself, not a destination device; every node hears every message and keeps the ones it wants",
+            "CAN assigns each device a chip-select line instead of an address",
+            "CAN has no IDs at all; messages are anonymous",
+            "CAN addresses are exactly the same as I2C 7-bit addresses"
           ],
-          "answerIndex": 2,
-          "explanation": "Distance + noise + many nodes + real-time priority is exactly CAN's design center: differential signaling, multi-drop, and non-destructive ID arbitration that bounds latency for high-priority frames. I2C is short-range board-level and not noise-hardened; SPI is short-reach point-to-point-ish and pin-hungry; meshing UART links does not scale."
+          "answerIndex": 0,
+          "explanation": "CAN is message-oriented: the ID labels the content (\"engine RPM\"), not a recipient. Every node receives every frame and filters for what it cares about. I2C, by contrast, addresses a specific device. This is a fundamental difference in how the two buses think.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-7.svg"
         },
         {
           "id": "serial-protocols-can-mcq-3",
           "type": "mcq",
-          "prompt": "For continuously streaming an ADC into a buffer at high sample rate with minimal CPU load and low jitter, which transfer mode and rationale is best?",
+          "prompt": "Two CAN nodes start sending at the same instant: one message has ID 0x080, the other has ID 0x100. What happens?",
           "choices": [
-            "Polled, because it is the most deterministic",
-            "Interrupt-per-sample, because ISRs are always lowest latency",
-            "DMA into a circular/double buffer, because the hardware moves samples without per-sample CPU work and signals half/full completion",
-            "Bit-bang in software for full control of timing"
+            "Both messages collide and are destroyed; both retry randomly",
+            "The lower ID (0x080) wins automatically and sends without damage; the other node backs off and retries when the bus is free",
+            "The higher ID (0x100) wins because bigger numbers are higher priority",
+            "Both messages are sent at once on separate wires"
+          ],
+          "answerIndex": 1,
+          "explanation": "CAN uses non-destructive priority arbitration: the lower-numbered ID has higher priority and wins, while its message stays completely intact. The losing node simply waits and retries. This guarantees urgent low-ID messages get through first with no delay -- unlike Ethernet, where collisions destroy data.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-7.svg"
+        },
+        {
+          "id": "serial-protocols-can-mcq-4",
+          "type": "mcq",
+          "prompt": "Why does a CAN bus need a 120-ohm resistor at each end?",
+          "choices": [
+            "To limit the current so devices do not burn out",
+            "To absorb the signal at the ends of the cable and prevent reflections (echoes) that would corrupt data",
+            "To set each device's address",
+            "To boost the voltage for long cables"
+          ],
+          "answerIndex": 1,
+          "explanation": "The 120-ohm terminators match the cable's characteristic impedance, soaking up the signal at each end so it does not bounce back as reflections. Missing or wrong termination causes ringing and bit errors, especially on long or fast buses.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-7.svg"
+        },
+        {
+          "id": "serial-protocols-can-mcq-5",
+          "type": "mcq",
+          "prompt": "What is the job of the CAN transceiver chip?",
+          "choices": [
+            "It stores all the messages on the bus",
+            "It converts the microcontroller's logic signals to and from the differential CANH/CANL voltages on the bus",
+            "It assigns IDs to each message",
+            "It supplies power to every node"
+          ],
+          "answerIndex": 1,
+          "explanation": "The transceiver sits between the MCU's CAN controller and the physical bus, translating ordinary logic-level signals into the differential CANH/CANL pair and back. Without it the MCU cannot drive the rugged differential bus.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-7.svg"
+        },
+        {
+          "id": "serial-protocols-can-mcq-6",
+          "type": "mcq",
+          "prompt": "You must connect about 20 sensor and actuator nodes spread across a 30-meter, electrically noisy factory machine, with a few control messages that must always get through first. Which bus fits best?",
+          "choices": [
+            "I2C, because it uses only two wires",
+            "SPI, because it is the fastest",
+            "CAN, because its differential wiring resists noise over distance, it handles many nodes, and its priority arbitration guarantees the critical messages win",
+            "A separate UART link between every pair of nodes"
           ],
           "answerIndex": 2,
-          "explanation": "DMA with a circular (ping-pong) buffer moves each sample without CPU intervention, raising only half-/full-transfer interrupts; this frees the CPU and keeps jitter low. Polling and per-sample interrupts both burn CPU proportional to sample rate and add jitter; bit-banging is worse still."
+          "explanation": "Long distance plus noise plus many nodes plus guaranteed priority is exactly CAN's design center. I2C is short-range board-level and not noise-hardened; SPI is short-reach and pin-hungry; wiring UART between every pair does not scale. Matching the bus to the job points clearly to CAN.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-6.svg"
+        },
+        {
+          "id": "serial-protocols-can-mcq-7",
+          "type": "mcq",
+          "prompt": "You only need to connect one GPS module to a microcontroller over a short, simple link. Which bus is the most sensible choice?",
+          "choices": [
+            "CAN, because it is the most rugged",
+            "UART, because it is a simple two-wire point-to-point link, which is exactly what a GPS module uses",
+            "I2C, because GPS needs an address",
+            "SPI, because it requires a chip-select"
+          ],
+          "answerIndex": 1,
+          "explanation": "A single point-to-point device like a GPS module is the textbook UART use case: just TX and RX at an agreed baud rate. Reaching for CAN here adds needless complexity and hardware; the simplest bus that does the job is the right one.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-6.svg"
+        },
+        {
+          "id": "serial-protocols-can-mcq-8",
+          "type": "mcq",
+          "prompt": "What is the main difference between polled and interrupt-driven data transfers?",
+          "choices": [
+            "Polling uses a clock wire; interrupts do not",
+            "In polling the processor repeatedly checks for new data in a loop; with interrupts the hardware notifies the processor only when data arrives, freeing it to do other work meanwhile",
+            "Polling is only for SPI; interrupts are only for I2C",
+            "They are two names for the same technique"
+          ],
+          "answerIndex": 1,
+          "explanation": "Polling means the CPU keeps asking \"is there data yet?\", which wastes cycles. Interrupts flip it around: the hardware signals the CPU only when there is something to handle, so the CPU can do other work in between. Interrupt-driven is the common general-purpose default.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-6.svg"
+        },
+        {
+          "id": "serial-protocols-can-mcq-9",
+          "type": "mcq",
+          "prompt": "You need to continuously stream a large, fast flow of data into memory while keeping the processor as free as possible. Which transfer method is best, and why?",
+          "choices": [
+            "Polling, because checking in a loop is the most efficient",
+            "An interrupt for every single byte, because interrupts are always fastest",
+            "DMA, because a dedicated engine moves blocks of data straight to memory without involving the processor for each byte",
+            "Sending the data twice to be safe"
+          ],
+          "answerIndex": 2,
+          "explanation": "DMA (Direct Memory Access) uses a helper engine to move whole blocks of data to memory on its own, only notifying the processor when a block is done. That keeps the CPU free and avoids the overhead of polling or one interrupt per byte, which is why DMA is the choice for high-throughput streaming.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/serial-protocols-6.svg"
         }
       ]
     }
