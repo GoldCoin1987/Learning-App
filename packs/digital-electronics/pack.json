@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "id": "digital-electronics",
   "title": "Digital Electronics",
-  "version": "1.11.0",
+  "version": "1.12.0",
   "description": "Digital electronics from scratch (beginner rework in progress): 14 sub-topics from number systems through HDL and FPGAs. Beginner-first readings, diagrams, tiered easy to hard.",
   "requires": [
     "analog-electronics"
@@ -7229,279 +7229,710 @@
       "order": 12,
       "lessons": [
         {
-          "id": "clocking-plls-oscillators-stability",
-          "title": "Clock Sources & Frequency Stability",
+          "id": "clocking-plls-the-clock",
+          "title": "The Clock: A Digital System's Heartbeat",
           "order": 1,
           "difficulty": 1,
-          "content": "A synchronous system is only as good as its **clock source**. Several technologies trade cost against accuracy.\n\nThe **Pierce crystal oscillator** uses a quartz resonator — a mechanically vibrating crystal with an extremely high quality factor ($Q$ often $>10{,}000$) — as the frequency-selective element in an inverter-based loop. Quartz is piezoelectric, so its sharp mechanical resonance sets the frequency far more tightly than any LC tank. **Ceramic resonators** are cheaper, smaller, and start faster, but are looser (hundreds of ppm). **MEMS oscillators** use a micromachined silicon resonator plus an on-chip PLL/fractional divider; they are shock-robust and programmable but historically noisier. **RC oscillators** (the internal MCU clock) need no external parts but drift wildly with voltage and temperature — fine for a UART-free blink loop, useless for precise timing.\n\nAccuracy is quoted in **parts per million**. A frequency error $\\Delta f$ gives\n\n$$\\text{ppm} = \\frac{\\Delta f}{f_0}\\times 10^{6}.$$\n\nA $\\pm 20$ ppm crystal at $25\\,\\text{MHz}$ drifts up to $\\pm 500\\,\\text{Hz}$. A plain crystal varies over temperature in a parabola; a **TCXO** adds temperature compensation ($\\sim\\pm 0.5$–$2$ ppm), and an **OCXO** holds the crystal in a tiny heated oven for $\\sim\\pm 0.01$ ppm — the precision reference your radar timing chain would demand. **Startup time** matters too: high-$Q$ crystals can take milliseconds to reach full amplitude, which firmware must wait out before trusting the clock.",
+          "content": "## Hook\n\nImagine a band playing together. If everyone keeps their own time, the music falls apart. A **drummer** sets a steady beat so the whole band stays in step. A digital system needs the same thing: a steady, regular **tick** called the **clock**.\n\n## Build\n\nIn earlier lessons you saw that a **flip-flop** (a one-bit memory cell) only updates on a clock **edge** — the instant the clock signal jumps from low to high. The clock is just a signal that goes up, down, up, down, over and over, forever: **HIGH, LOW, HIGH, LOW**. Each full up-and-down is one **cycle** (one tick).\n\nWe measure how fast it ticks with **frequency**, in **hertz (Hz)** — ticks per second. One million ticks per second is a **megahertz (MHz)**; one billion is a **gigahertz (GHz)**. A typical small chip might run at 25 MHz (25 million ticks every second).\n\nThe time for one tick is the **period**. Period and frequency are opposites: $T = 1/f$. At 25 MHz, one tick lasts $1 / 25{,}000{,}000 = 40$ nanoseconds (40 billionths of a second).\n\nWhy does the clock need to be *steady*? Because every flip-flop in the chip acts on the same beat. If the beat speeds up and slows down randomly, parts of the chip fall out of step and data gets corrupted — just like a band losing the drummer.\n\n## Recap\n\nThe clock is the drummer for a digital system: a steady on/off tick that keeps every part in step. Frequency (Hz) counts ticks per second; the period is the time for one tick.",
           "items": [
             {
-              "id": "clocking-plls-oscillators-stability-001",
-              "type": "flashcard",
-              "front": "Why does a quartz crystal set frequency far more precisely than an LC tank?",
-              "back": "Quartz is a piezoelectric mechanical resonator with a very high quality factor $Q$ (often $>10{,}000$). The sharp, stable mechanical resonance gives tight frequency selectivity and low drift, far better than the modest $Q$ of an LC circuit.",
-              "hint": "Think mechanical resonance and Q."
-            },
-            {
-              "id": "clocking-plls-oscillators-stability-002",
-              "type": "flashcard",
-              "front": "Name the four clock-source technologies in order of typical accuracy, worst to best.",
-              "back": "RC oscillator (worst, percent-level drift) -> ceramic resonator (hundreds of ppm) -> quartz crystal (tens of ppm) -> TCXO/OCXO (sub-ppm, best).",
-              "hint": "Internal RC at one end, oven-controlled at the other."
-            },
-            {
-              "id": "clocking-plls-oscillators-stability-003",
-              "type": "flashcard",
-              "front": "What is the formula relating a frequency error to ppm?",
-              "back": "$\\text{ppm} = \\dfrac{\\Delta f}{f_0}\\times 10^{6}$. So a 500 Hz error on a 25 MHz clock is $\\dfrac{500}{25\\times10^{6}}\\times10^{6} = 20$ ppm.",
-              "hint": "Fractional error times one million."
-            },
-            {
-              "id": "clocking-plls-oscillators-stability-004",
-              "type": "flashcard",
-              "front": "What does a TCXO add over a bare crystal, and an OCXO over a TCXO?",
-              "back": "A TCXO adds temperature compensation (correcting the crystal's parabolic temp curve) for ~$\\pm0.5$-$2$ ppm. An OCXO holds the crystal in a heated oven at a fixed temperature for ~$\\pm0.01$ ppm, at higher power and cost.",
-              "hint": "Compensate vs. control the temperature."
-            },
-            {
-              "id": "clocking-plls-oscillators-stability-005",
-              "type": "flashcard",
-              "front": "Why must firmware wait after enabling a crystal oscillator before using its clock?",
-              "back": "High-$Q$ crystals build amplitude slowly; startup can take milliseconds. Until the oscillation reaches full amplitude the clock is unreliable, so MCUs gate the system clock behind a 'clock ready/stable' flag.",
-              "hint": "High Q means slow buildup."
-            },
-            {
-              "id": "clocking-plls-oscillators-stability-006",
-              "type": "flashcard",
-              "front": "What are the tradeoffs of a MEMS oscillator versus a quartz crystal?",
-              "back": "MEMS uses a micromachined silicon resonator plus an on-chip PLL/divider: very shock- and vibration-robust, programmable frequency, small. Downsides are historically higher close-in phase noise/jitter and reliance on the internal PLL.",
-              "hint": "Silicon resonator + PLL; rugged but noisier."
-            },
-            {
-              "id": "clocking-plls-oscillators-stability-007",
+              "id": "clocking-plls-the-clock-001",
               "type": "mcq",
-              "prompt": "A datasheet specifies a $\\pm25$ ppm crystal at a nominal $48\\,\\text{MHz}$. What is the worst-case absolute frequency error?",
+              "prompt": "Study this diagram of a clock signal.",
               "choices": [
-                "$\\pm 25\\,\\text{Hz}$",
-                "$\\pm 120\\,\\text{Hz}$",
-                "$\\pm 1.2\\,\\text{kHz}$",
-                "$\\pm 12\\,\\text{kHz}$"
+                "It is a steady square wave that repeats HIGH then LOW, over and over",
+                "It is a single pulse that happens once and stops",
+                "It is a random noise signal with no pattern",
+                "It is a slowly rising voltage that never comes back down"
               ],
-              "answerIndex": 2,
-              "explanation": "$\\Delta f = \\text{ppm}\\times 10^{-6}\\times f_0 = 25\\times10^{-6}\\times 48\\times10^{6} = 1200\\,\\text{Hz} = \\pm1.2\\,\\text{kHz}$."
+              "answerIndex": 0,
+              "explanation": "A clock is a repeating square wave: HIGH, LOW, HIGH, LOW, with equal-length periods. It is not a one-time pulse, not random, and not a slow ramp — its whole job is to give a regular, repeating beat.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/clocking-plls-3.svg"
             },
             {
-              "id": "clocking-plls-oscillators-stability-008",
+              "id": "clocking-plls-the-clock-002",
               "type": "mcq",
-              "prompt": "Which clock source is the right choice for a precision frequency reference in a coherent radar timing chain?",
+              "prompt": "In the band analogy, what does the clock play the role of?",
               "choices": [
-                "The MCU's internal RC oscillator",
-                "A ceramic resonator",
-                "An OCXO (oven-controlled crystal oscillator)",
-                "An undivided ring oscillator on the FPGA fabric"
-              ],
-              "answerIndex": 2,
-              "explanation": "An OCXO holds the crystal at a controlled temperature for ~$\\pm0.01$ ppm stability and low close-in phase noise — exactly what coherent radar needs. RC and ceramic are far too loose; a fabric ring oscillator is the worst, with large temperature/voltage drift and high jitter."
-            },
-            {
-              "id": "clocking-plls-oscillators-stability-009",
-              "type": "mcq",
-              "prompt": "An MCU boots on its internal RC oscillator instead of the external crystal. The most likely consequence for a UART link is:",
-              "choices": [
-                "Lower power consumption with no functional impact",
-                "Baud-rate error large enough to corrupt the serial link",
-                "Improved timing accuracy because RC has no startup delay",
-                "Immediate metastability on every flip-flop"
+                "The singer who improvises freely",
+                "The drummer who sets a steady beat to keep everyone in step",
+                "The audience that listens",
+                "The lyrics of the song"
               ],
               "answerIndex": 1,
-              "explanation": "RC oscillators drift by percent-level over voltage and temperature. UART tolerates only a few percent total baud error, so an uncalibrated RC clock readily pushes the bit timing out of range and corrupts characters. This is a classic 'works on the bench, fails hot/cold' bug."
+              "explanation": "The clock is like the drummer: it provides a steady, regular beat so every part of the system acts together. A singer who improvises (no fixed timing) is the opposite of what a clock does."
+            },
+            {
+              "id": "clocking-plls-the-clock-003",
+              "type": "mcq",
+              "prompt": "What does the frequency of a clock tell you?",
+              "choices": [
+                "How many volts the signal swings between",
+                "How many ticks (cycles) happen per second",
+                "How long the wires are inside the chip",
+                "How much power the chip uses"
+              ],
+              "answerIndex": 1,
+              "explanation": "Frequency, measured in hertz (Hz), counts ticks per second. 25 MHz means 25 million ticks every second. Voltage swing, wire length, and power are separate things."
+            },
+            {
+              "id": "clocking-plls-the-clock-004",
+              "type": "mcq",
+              "prompt": "A clock runs at 1 MHz. How many ticks is that per second?",
+              "choices": [
+                "One thousand",
+                "One million",
+                "One billion",
+                "One hundred"
+              ],
+              "answerIndex": 1,
+              "explanation": "The prefix 'mega' means one million, so 1 MHz = one million ticks per second. 'Kilo' is a thousand and 'giga' is a billion."
+            },
+            {
+              "id": "clocking-plls-the-clock-005",
+              "type": "mcq",
+              "prompt": "The clock period is the time for one tick. How is it related to frequency?",
+              "choices": [
+                "Period equals frequency (they are the same number)",
+                "Period is one divided by frequency ($T = 1/f$)",
+                "Period is frequency times two",
+                "Period has nothing to do with frequency"
+              ],
+              "answerIndex": 1,
+              "explanation": "Period and frequency are opposites: $T = 1/f$. A higher frequency means more ticks per second, so each tick (the period) is shorter."
+            },
+            {
+              "id": "clocking-plls-the-clock-006",
+              "type": "mcq",
+              "prompt": "A clock runs at 25 MHz. About how long is one tick (its period)?",
+              "choices": [
+                "40 nanoseconds",
+                "25 seconds",
+                "40 seconds",
+                "1 millisecond"
+              ],
+              "answerIndex": 0,
+              "explanation": "Period $T = 1/f = 1 / 25{,}000{,}000 = 40$ nanoseconds (40 billionths of a second). Because the frequency is very high, each tick is extremely short."
+            },
+            {
+              "id": "clocking-plls-the-clock-007",
+              "type": "mcq",
+              "prompt": "Why is it important that the clock ticks at a STEADY, regular rate?",
+              "choices": [
+                "So the chip looks nicer on an oscilloscope",
+                "So every flip-flop acts on the same beat and stays in step; an unsteady beat corrupts data",
+                "Steadiness lowers the cost of the chip",
+                "It is not important; the rate can wander freely"
+              ],
+              "answerIndex": 1,
+              "explanation": "Every flip-flop updates on the shared clock edge. If the beat wanders, parts of the chip fall out of step and data is lost or corrupted — like a band losing its drummer. A steady beat keeps everything coordinated."
+            },
+            {
+              "id": "clocking-plls-the-clock-008",
+              "type": "mcq",
+              "prompt": "On which part of the clock signal does an edge-triggered flip-flop update its stored value?",
+              "choices": [
+                "Whenever the clock is sitting at HIGH",
+                "On the clock edge, when the signal jumps from low to high",
+                "Only once when the chip is first powered on",
+                "Continuously, at every instant"
+              ],
+              "answerIndex": 1,
+              "explanation": "An edge-triggered flip-flop captures its input on the rising edge — the instant the clock jumps from low to high. It does not respond to the steady level or update continuously; the edge is the 'beat' it acts on."
             }
           ]
         },
         {
-          "id": "clocking-plls-pll-synthesis",
-          "title": "PLLs, Frequency Synthesis & Loop Bandwidth",
+          "id": "clocking-plls-crystal-oscillators",
+          "title": "Where the Tick Comes From: Crystal Oscillators",
           "order": 2,
-          "difficulty": 2,
-          "content": "A **phase-locked loop** generates a high, programmable output frequency from a stable reference. Trace the loop in the diagram: the **phase-frequency detector (PFD)** compares the reference edge against the divided-down feedback edge and emits up/down pulses proportional to the phase error. A **charge pump** converts those pulses into current, which the **loop filter** (a low-pass RC network) integrates into a smooth control voltage. That voltage tunes the **VCO**, whose output is fed back through a **divider** ($\\div N$) to the PFD.\n\nIn lock, the PFD sees zero phase error, so the divided VCO output equals the reference. With a reference predivider $\\div M$ and feedback $\\div N$:\n\n$$f_{out}=\\frac{N}{M}\\,f_{ref}.$$\n\nThis is **frequency synthesis** — a $25\\,\\text{MHz}$ crystal becomes a $150\\,\\text{MHz}$ core clock with $N/M = 6$. **Fractional-N** PLLs dither $N$ to hit non-integer ratios for fine resolution.\n\nThe **loop bandwidth** (set by the loop filter) is the central tradeoff. A *wide* loop locks fast and tracks reference cleanly, suppressing VCO noise but passing reference noise; a *narrow* loop filters reference spurs and gives a cleaner far-out spectrum but locks slowly and lets the VCO's own noise through close to the carrier. **Lock time** scales inversely with loop bandwidth. You place the crossover where the reference and VCO phase-noise curves intersect to minimize total integrated noise.\n\nA **DLL** is a cousin: instead of a VCO it uses a voltage-controlled *delay line* to align phase, so it cannot multiply frequency, only deskew or phase-shift — but it has no accumulating phase error and is unconditionally stable (first order).",
+          "difficulty": 1,
+          "content": "## Hook\n\nThe clock has to come from *somewhere*. A quartz watch keeps near-perfect time for years on a tiny battery. The secret is a **quartz crystal** — and the very same trick gives computers their steady clock.\n\n## Build\n\nA circuit that makes a repeating signal all by itself is an **oscillator**. The question is: how steady and accurate is it?\n\nA **crystal oscillator** uses a tiny sliver of **quartz**. Quartz is **piezoelectric**: squeeze it and it makes a little voltage; apply a voltage and it physically flexes. A quartz crystal vibrates at one very precise frequency, like a tuning fork that always rings the same note. Because that mechanical vibration is so sharp and stable, the clock built from it is **extremely steady and accurate** — that is why quartz watches and computers keep good time.\n\nWe describe accuracy in **parts per million (ppm)** — how far the frequency can drift out of every million. A $\\pm 20$ ppm crystal can be off by at most 20 parts in a million, which is excellent: at 25 MHz that is only about 500 Hz of wander.\n\nNot every clock needs a crystal. Cheaper, looser options exist:\n\n- **Ceramic resonator** — like a crystal but cheaper and less accurate (hundreds of ppm).\n- **RC oscillator** — built from a resistor (R) and capacitor (C), often already inside a chip. It needs no extra parts but drifts a lot with temperature and voltage. Fine for blinking an LED; bad for precise timing.\n- **MEMS oscillator** — a tiny vibrating beam carved out of silicon. Rugged and shock-resistant, programmable, but historically a bit noisier than quartz.\n\nFor extra-stable clocks, two upgraded crystals exist: a **TCXO** (temperature-compensated) corrects for temperature change, and an **OCXO** keeps the crystal in a tiny heated oven so its temperature never changes at all — the most stable of all.\n\n## Recap\n\nAn oscillator makes the tick. A quartz crystal makes an exceptionally steady, accurate one (measured in ppm) — which is why it powers watches and computers. RC, ceramic, and MEMS sources trade accuracy for cost or ruggedness.",
           "items": [
             {
-              "id": "clocking-plls-pll-synthesis-001",
-              "type": "flashcard",
-              "front": "Study this diagram.",
-              "back": "A charge-pump PLL: PFD compares reference and divided feedback, charge pump + loop filter make a control voltage, VCO generates the output, and a $\\div N$ divider closes the loop. In lock $f_{out}=N\\,f_{ref}$.",
-              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/clocking-plls-1.svg"
-            },
-            {
-              "id": "clocking-plls-pll-synthesis-002",
-              "type": "flashcard",
-              "front": "List the five blocks of a charge-pump PLL and each one's job.",
-              "back": "1) PFD - measures phase/frequency error, emits up/down pulses. 2) Charge pump - turns pulses into current. 3) Loop filter - low-passes current into a smooth control voltage. 4) VCO - converts voltage to frequency. 5) Divider $\\div N$ - scales output back for comparison.",
-              "hint": "PFD, pump, filter, VCO, divider."
-            },
-            {
-              "id": "clocking-plls-pll-synthesis-003",
-              "type": "flashcard",
-              "front": "What is the output frequency of a PLL with reference predivider M and feedback divider N?",
-              "back": "$f_{out}=\\dfrac{N}{M}\\,f_{ref}$. The PFD drives the divided feedback to equal the divided reference, so the VCO must run at $N/M$ times the reference.",
-              "hint": "Feedback divider multiplies, reference divider divides."
-            },
-            {
-              "id": "clocking-plls-pll-synthesis-004",
-              "type": "flashcard",
-              "front": "What does a fractional-N PLL do that an integer-N PLL cannot?",
-              "back": "It dithers/modulates the feedback divider between integer values (often with a delta-sigma modulator) so the *average* divide ratio is fractional, giving very fine output frequency resolution without needing a tiny reference frequency. The cost is added fractional spurs/noise.",
-              "hint": "Average a changing N to get a fraction."
-            },
-            {
-              "id": "clocking-plls-pll-synthesis-005",
-              "type": "flashcard",
-              "front": "How does a DLL differ structurally from a PLL, and what can it not do?",
-              "back": "A DLL replaces the VCO with a voltage-controlled delay line and aligns phase rather than frequency. It cannot multiply frequency (no oscillator), only deskew or phase-shift an existing clock. It has no accumulating phase error and is unconditionally (first-order) stable.",
-              "hint": "Delay line, not oscillator."
-            },
-            {
-              "id": "clocking-plls-pll-synthesis-006",
-              "type": "flashcard",
-              "front": "Why is the loop filter the component that sets PLL loop bandwidth?",
-              "back": "The loop filter integrates and low-passes the charge-pump current into the VCO control voltage. Its pole/zero locations set how fast the control voltage can respond, which is exactly the loop's bandwidth and the dominant factor in stability and lock time.",
-              "hint": "It shapes the control-voltage response."
-            },
-            {
-              "id": "clocking-plls-pll-synthesis-007",
+              "id": "clocking-plls-crystal-oscillators-001",
               "type": "mcq",
-              "prompt": "You need a $156.25\\,\\text{MHz}$ clock from a $25\\,\\text{MHz}$ reference. Using $f_{out}=\\frac{N}{M}f_{ref}$, which $(N, M)$ works?",
+              "prompt": "What is an oscillator?",
               "choices": [
-                "$N=6,\\ M=1$",
-                "$N=25,\\ M=8$",
-                "$N=25,\\ M=4$",
-                "$N=125,\\ M=25$"
-              ],
-              "answerIndex": 2,
-              "explanation": "Need $N/M = 156.25/25 = 6.25 = 25/4$, so $N=25, M=4$ gives $\\frac{25}{4}\\times25=156.25\\,\\text{MHz}$. $6/1$ gives 150 MHz, $25/8$ gives $\\approx78\\,\\text{MHz}$, and $125/25=5$ gives 125 MHz."
-            },
-            {
-              "id": "clocking-plls-pll-synthesis-008",
-              "type": "mcq",
-              "prompt": "Choosing a NARROW PLL loop bandwidth (relative to a wide one) primarily results in:",
-              "choices": [
-                "Faster lock and better suppression of VCO close-in phase noise",
-                "Slower lock, better filtering of reference spurs, but more VCO close-in noise passes through",
-                "Higher output frequency for the same divider settings",
-                "Elimination of the need for a loop filter"
+                "A circuit that stores one bit of data",
+                "A circuit that makes a repeating (oscillating) signal by itself",
+                "A circuit that only amplifies an incoming signal",
+                "A circuit that converts light into electricity"
               ],
               "answerIndex": 1,
-              "explanation": "A narrow loop filters reference-side noise/spurs well and gives a clean far-from-carrier spectrum, but locks slowly and does little to suppress the VCO's own close-in phase noise (the loop can't correct what it can't track fast). Lock time scales inversely with loop bandwidth."
+              "explanation": "An oscillator generates a repeating signal on its own — that repeating signal becomes the clock tick. Storing a bit is a flip-flop's job; an amplifier only boosts an existing signal."
             },
             {
-              "id": "clocking-plls-pll-synthesis-009",
+              "id": "clocking-plls-crystal-oscillators-002",
               "type": "mcq",
-              "prompt": "A design must phase-align (deskew) an incoming clock to internal logic but does NOT need a different frequency. The best choice is:",
+              "prompt": "Why does a quartz crystal make such a steady, accurate clock?",
               "choices": [
-                "An integer-N PLL with N=1",
-                "A DLL (delay-locked loop)",
-                "A free-running ring oscillator",
-                "A fractional-N PLL"
+                "Quartz is the cheapest material available",
+                "Quartz vibrates at one very precise, stable frequency, like a tuning fork that always rings the same note",
+                "Quartz glows when current passes through it",
+                "Quartz can store a large amount of charge"
               ],
               "answerIndex": 1,
-              "explanation": "A DLL uses a voltage-controlled delay line to align phase without changing frequency, is unconditionally stable, and adds no VCO phase noise. A PLL would work but is overkill and adds VCO jitter; deskew at the same frequency is precisely the DLL's job."
+              "explanation": "Quartz is piezoelectric and vibrates at one sharp, stable mechanical frequency — like a tuning fork. That precise vibration sets the clock frequency very tightly, which is why quartz watches and computers keep accurate time."
+            },
+            {
+              "id": "clocking-plls-crystal-oscillators-003",
+              "type": "mcq",
+              "prompt": "An everyday device famous for keeping accurate time with a quartz crystal is:",
+              "choices": [
+                "A wind-up mechanical clock with gears only",
+                "A quartz wristwatch",
+                "A sundial",
+                "An hourglass"
+              ],
+              "answerIndex": 1,
+              "explanation": "A quartz wristwatch uses a vibrating quartz crystal as its timekeeper, which is why it stays accurate for years. Sundials, hourglasses, and gear-only clocks have no crystal and are far less precise."
+            },
+            {
+              "id": "clocking-plls-crystal-oscillators-004",
+              "type": "mcq",
+              "prompt": "What does 'parts per million (ppm)' describe for a clock?",
+              "choices": [
+                "How many transistors the oscillator contains",
+                "How far the frequency may drift, measured in parts out of every million",
+                "How many millimeters wide the crystal is",
+                "How much current the oscillator draws"
+              ],
+              "answerIndex": 1,
+              "explanation": "ppm measures accuracy as parts out of a million. A 20 ppm clock can be off by at most 20 parts in a million — a small fraction. It is a measure of frequency error, not size, current, or transistor count."
+            },
+            {
+              "id": "clocking-plls-crystal-oscillators-005",
+              "type": "mcq",
+              "prompt": "WHY would you pick a crystal oscillator over a simple RC oscillator for a clock that must keep accurate time?",
+              "choices": [
+                "The RC oscillator uses too many external parts",
+                "The crystal is far more stable and accurate; an RC oscillator drifts a lot with temperature and voltage",
+                "The crystal is always cheaper than an RC oscillator",
+                "Only a crystal can produce a square wave"
+              ],
+              "answerIndex": 1,
+              "explanation": "The key reason is accuracy: a crystal's mechanical resonance holds the frequency very tightly (tens of ppm), while an RC oscillator drifts a lot as temperature and voltage change. RC needs FEWER parts (often none external) and is usually cheaper — but that is exactly why it is less accurate. Both can make a square wave."
+            },
+            {
+              "id": "clocking-plls-crystal-oscillators-006",
+              "type": "mcq",
+              "prompt": "Which clock source needs no extra external parts but drifts the most with temperature and voltage?",
+              "choices": [
+                "A quartz crystal",
+                "An RC oscillator built into the chip",
+                "An OCXO",
+                "A ceramic resonator"
+              ],
+              "answerIndex": 1,
+              "explanation": "An RC (resistor-capacitor) oscillator is often built into the chip and needs no external parts, but its frequency wanders a lot with temperature and supply voltage. Crystals, ceramic resonators, and especially OCXOs are far more stable."
+            },
+            {
+              "id": "clocking-plls-crystal-oscillators-007",
+              "type": "mcq",
+              "prompt": "A MEMS oscillator's main advantage over a quartz crystal is that it is:",
+              "choices": [
+                "Always perfectly noise-free",
+                "Made of a tiny vibrating silicon beam, making it rugged and shock-resistant",
+                "Powered without any electricity",
+                "Guaranteed to be more accurate than any crystal"
+              ],
+              "answerIndex": 1,
+              "explanation": "A MEMS oscillator uses a tiny silicon beam, making it rugged against shock and vibration (and it is programmable). It is not noise-free — historically it is a bit noisier than quartz — and not automatically more accurate."
+            },
+            {
+              "id": "clocking-plls-crystal-oscillators-008",
+              "type": "mcq",
+              "prompt": "How does an OCXO achieve even better stability than a plain crystal?",
+              "choices": [
+                "It uses two crystals wired in parallel",
+                "It keeps the crystal in a tiny heated oven so its temperature never changes",
+                "It replaces the quartz with plastic",
+                "It runs the crystal at a much lower frequency"
+              ],
+              "answerIndex": 1,
+              "explanation": "An OCXO (oven-controlled crystal oscillator) holds the crystal at a constant temperature in a small oven, so temperature drift is nearly eliminated — giving the best stability. A TCXO instead compensates for temperature changes. Neither uses plastic or parallel crystals to do this."
+            },
+            {
+              "id": "clocking-plls-crystal-oscillators-009",
+              "type": "mcq",
+              "prompt": "Rank these from LEAST accurate to MOST accurate.",
+              "choices": [
+                "OCXO, crystal, ceramic resonator, RC oscillator",
+                "RC oscillator, ceramic resonator, crystal, OCXO",
+                "Crystal, RC oscillator, OCXO, ceramic resonator",
+                "Ceramic resonator, OCXO, RC oscillator, crystal"
+              ],
+              "answerIndex": 1,
+              "explanation": "From loosest to tightest: an RC oscillator drifts the most, a ceramic resonator is better (hundreds of ppm), a plain crystal is better still (tens of ppm), and an OCXO (oven-controlled crystal) is the most stable of all."
             }
           ]
         },
         {
-          "id": "clocking-plls-jitter-distribution",
-          "title": "Jitter, Phase Noise, Clock Distribution & FPGA Resources",
+          "id": "clocking-plls-clock-distribution",
+          "title": "Delivering the Tick: Clock Distribution & Skew",
           "order": 3,
-          "difficulty": 3,
-          "content": "A clock's *timing imperfection* shows up two ways. In the **time domain** it is **jitter**: **period jitter** (variation of one cycle's length), **cycle-to-cycle jitter** (adjacent-period difference), and **long-term/accumulated jitter**. In the **frequency domain** the same imperfection is **phase noise** $\\mathcal{L}(f)$, the power in skirts around the carrier, in dBc/Hz. The two are Fourier duals: integrating phase noise over a band yields RMS jitter.\n\nWhy an EE who built radars cares: clock jitter directly caps converter performance. For a sine input at $f_{in}$ sampled by an ADC with RMS aperture jitter $t_j$, the jitter-limited SNR is\n\n$$\\text{SNR}_{jitter}=-20\\log_{10}\\!\\left(2\\pi f_{in}\\,t_j\\right)\\ \\text{dB}.$$\n\nAt high IF this can dominate over quantization noise — capping the ENOB you computed in Module 11. In **radar**, oscillator phase noise sets the **Doppler/clutter floor**: close-in phase noise masks slow-moving targets near strong clutter, and pulse-to-pulse jitter blurs coherent integration. Phase coherence is everything for MTI/Doppler processing.\n\n**Clock distribution** must deliver this clock with minimal **skew** (arrival-time difference between endpoints). Designs use balanced **clock trees** (H-trees) and matched buffers so every flip-flop sees the edge together; skew eats directly into the setup/hold budget from Module 8.\n\nOn an **FPGA**, you do not route clocks on ordinary fabric. Dedicated **clock-capable input pins** feed **global clock buffers** (low-skew spines) and **MMCM/PLL** blocks (the 'clock wizard') that synthesize, phase-shift, and deskew derived clocks. **Spread-spectrum clocking** deliberately dithers the frequency slightly to spread EMI energy — helpful for compliance, but it adds jitter you must not feed into a sampling clock.",
+          "difficulty": 2,
+          "content": "## Hook\n\nA drummer in a huge stadium has a problem: sound takes time to travel, so musicians far away hear the beat slightly late and drift out of time. A chip has the exact same problem — the clock tick has to reach thousands of flip-flops, and it cannot arrive everywhere at once.\n\n## Build\n\nOne oscillator makes the clock. But inside a chip that single tick must be copied and carried over wires to every flip-flop. Sending one signal out to many destinations is called **clock distribution**.\n\nThe trouble is that signals take a tiny amount of time to travel down a wire. If one flip-flop sits at the end of a short wire and another at the end of a long wire, they receive the same edge at slightly different moments. That arrival-time difference is called **clock skew**.\n\nSkew is a problem because the whole point of a clock is to make everything act *together*. If flip-flop A gets the tick noticeably before flip-flop B, data passing between them can arrive too early or too late and be captured wrong. Earlier you saw that flip-flops have **setup** and **hold** timing rules; skew eats directly into the margin those rules give you.\n\nThe fix is to make every path the same length. Engineers use a balanced **clock tree** — often shaped like the letter **H** nested inside itself (an **H-tree**) — so the wire from the source to *every* flip-flop is equally long. Special **clock buffers** (drivers built just for clocks) boost the signal along the way so it stays sharp. Equal paths mean the edge reaches everyone at nearly the same instant: low skew.\n\n## Recap\n\nDistribution carries one clock to many flip-flops. Because wires have delay, edges can arrive at different times — that is skew, and it steals from the setup/hold budget. Balanced clock trees and dedicated buffers keep skew low so everything stays in step.",
           "items": [
             {
-              "id": "clocking-plls-jitter-distribution-001",
-              "type": "flashcard",
-              "front": "Study this diagram.",
-              "back": "A 25 MHz crystal feeds a PLL/MMCM that multiplies it (x6 -> 150 MHz); a global clock buffer drives a balanced H-tree so the clock reaches every flip-flop with minimal skew.",
+              "id": "clocking-plls-clock-distribution-001",
+              "type": "mcq",
+              "prompt": "What does 'clock distribution' mean?",
+              "choices": [
+                "Choosing what frequency the oscillator runs at",
+                "Carrying the one clock signal out to all the flip-flops that need it",
+                "Turning the clock off to save power",
+                "Converting the clock from analog to digital"
+              ],
+              "answerIndex": 1,
+              "explanation": "Distribution is the job of copying and carrying one clock to the many flip-flops across a chip. Picking the frequency is the oscillator/PLL's job, not distribution."
+            },
+            {
+              "id": "clocking-plls-clock-distribution-002",
+              "type": "mcq",
+              "prompt": "What is clock skew?",
+              "choices": [
+                "The difference in arrival time of the clock edge at different flip-flops",
+                "The number of flip-flops in the design",
+                "The voltage of the clock signal",
+                "The temperature of the crystal"
+              ],
+              "answerIndex": 0,
+              "explanation": "Skew is the difference in WHEN the clock edge arrives at different points, caused by signals taking time to travel down wires of different lengths. It is not about voltage, temperature, or count."
+            },
+            {
+              "id": "clocking-plls-clock-distribution-003",
+              "type": "mcq",
+              "prompt": "Why does the clock edge NOT reach every flip-flop at the exact same instant?",
+              "choices": [
+                "Flip-flops randomly ignore some edges",
+                "Signals take a tiny amount of time to travel down a wire, and wires have different lengths",
+                "The oscillator changes frequency for each flip-flop",
+                "Each flip-flop has its own separate crystal"
+              ],
+              "answerIndex": 1,
+              "explanation": "A signal takes a small but real time to travel along a wire. Flip-flops at the ends of different-length wires get the edge at slightly different moments. One oscillator feeds them all; the delay comes from the wiring."
+            },
+            {
+              "id": "clocking-plls-clock-distribution-004",
+              "type": "mcq",
+              "prompt": "Why is clock skew a problem?",
+              "choices": [
+                "It uses up the chip's memory",
+                "If the edge reaches flip-flops at different times, data between them can be captured at the wrong moment",
+                "It makes the clock frequency higher than intended",
+                "It is never a problem and can be ignored"
+              ],
+              "answerIndex": 1,
+              "explanation": "The clock's purpose is to make everything act together. If one flip-flop ticks noticeably before another, data passing between them can land too early or too late and be captured incorrectly. Skew steals from the setup/hold timing margin."
+            },
+            {
+              "id": "clocking-plls-clock-distribution-005",
+              "type": "mcq",
+              "prompt": "Study this diagram of one crystal feeding many flip-flops. What is the balanced H-tree for?",
+              "choices": [
+                "To make the clock run at a higher frequency",
+                "To make every path from the source to a flip-flop the same length, so the edge arrives at nearly the same time everywhere",
+                "To store data inside the clock tree",
+                "To convert the clock into a sine wave"
+              ],
+              "answerIndex": 1,
+              "explanation": "An H-tree equalizes the wire length from the source to every flip-flop, so each one gets the edge at almost the same instant — keeping skew low. It does not change frequency or store data.",
               "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/clocking-plls-2.svg"
             },
             {
-              "id": "clocking-plls-jitter-distribution-002",
-              "type": "flashcard",
-              "front": "Distinguish period jitter, cycle-to-cycle jitter, and long-term jitter.",
-              "back": "Period jitter: deviation of a single clock period from ideal. Cycle-to-cycle jitter: difference between two adjacent periods (rate of change). Long-term/accumulated jitter: phase error built up over many cycles relative to an ideal clock.",
-              "hint": "One period, adjacent periods, many periods."
-            },
-            {
-              "id": "clocking-plls-jitter-distribution-003",
-              "type": "flashcard",
-              "front": "How are jitter (time domain) and phase noise (frequency domain) related?",
-              "back": "They are Fourier duals of the same imperfection. Phase noise $\\mathcal{L}(f)$ is power in skirts around the carrier (dBc/Hz); integrating it over a frequency band and converting yields the RMS jitter in that band.",
-              "hint": "Integrate phase noise to get RMS jitter."
-            },
-            {
-              "id": "clocking-plls-jitter-distribution-004",
-              "type": "flashcard",
-              "front": "Give the jitter-limited SNR of an ADC and explain why high input frequency hurts.",
-              "back": "$\\text{SNR}_{jitter}=-20\\log_{10}(2\\pi f_{in} t_j)$ dB, where $t_j$ is RMS aperture jitter. SNR falls as $f_{in}$ rises because a fixed timing error $t_j$ produces a larger voltage error on a faster-slewing signal ($\\Delta V \\approx t_j \\cdot dV/dt$).",
-              "hint": "Error voltage scales with slew rate, which scales with f_in."
-            },
-            {
-              "id": "clocking-plls-jitter-distribution-005",
-              "type": "flashcard",
-              "front": "Why does radar care intensely about oscillator phase noise?",
-              "back": "Coherent (MTI/Doppler) processing relies on stable pulse-to-pulse phase. Close-in phase noise raises the clutter/Doppler floor, masking slow targets near strong returns, and jitter smears coherent integration — degrading detection and velocity accuracy.",
-              "hint": "Phase coherence sets the Doppler/clutter floor."
-            },
-            {
-              "id": "clocking-plls-jitter-distribution-006",
-              "type": "flashcard",
-              "front": "What is clock skew and how do FPGAs minimize it?",
-              "back": "Skew is the difference in clock arrival time between endpoints. FPGAs route clocks on dedicated low-skew global clock buffers/spines (fed by clock-capable pins) and balanced trees, not ordinary fabric routing, so all flip-flops see the edge nearly simultaneously.",
-              "hint": "Arrival-time difference; use dedicated global buffers."
-            },
-            {
-              "id": "clocking-plls-jitter-distribution-007",
-              "type": "flashcard",
-              "front": "What is spread-spectrum clocking and why can it be a problem for sampling?",
-              "back": "SSC deliberately dithers the clock frequency slightly to spread EMI energy over a band, lowering peak emissions for compliance. But the intentional frequency modulation is added jitter, so you must not use an SSC clock as an ADC/DAC sampling clock where timing purity sets SNR.",
-              "hint": "Smears EMI peaks, but adds jitter."
-            },
-            {
-              "id": "clocking-plls-jitter-distribution-008",
+              "id": "clocking-plls-clock-distribution-006",
               "type": "mcq",
-              "prompt": "An ADC samples a $70\\,\\text{MHz}$ IF with $0.5\\,\\text{ps}$ RMS aperture jitter. Approximately what jitter-limited SNR results? (Use $\\text{SNR}=-20\\log_{10}(2\\pi f_{in}t_j)$.)",
+              "prompt": "What is a clock buffer's job in a distribution network?",
               "choices": [
-                "About 33 dB",
-                "About 53 dB",
-                "About 73 dB",
-                "About 93 dB"
+                "To store the clock value for later",
+                "To drive and boost the clock signal so it stays strong and sharp as it travels to many destinations",
+                "To slow the clock down on purpose",
+                "To convert the clock to a different voltage standard for the outside world"
+              ],
+              "answerIndex": 1,
+              "explanation": "A clock buffer is a driver that strengthens the clock so it can reach many flip-flops without weakening or smearing. Its job is to deliver a strong, clean edge, not to store or deliberately slow the clock."
+            },
+            {
+              "id": "clocking-plls-clock-distribution-007",
+              "type": "mcq",
+              "prompt": "The stadium-drummer analogy illustrates skew because:",
+              "choices": [
+                "The drummer plays different songs for different people",
+                "Sound takes time to travel, so distant musicians hear the same beat slightly late and drift out of time",
+                "The drummer changes tempo constantly",
+                "The musicians cannot see the drummer"
+              ],
+              "answerIndex": 1,
+              "explanation": "Sound travels at a finite speed, so a beat reaches far-off players later than near ones — they get the same beat at different times, just like clock edges arriving at flip-flops at different times. That arrival-time spread is skew."
+            },
+            {
+              "id": "clocking-plls-clock-distribution-008",
+              "type": "mcq",
+              "prompt": "Which approach keeps clock skew LOW across a chip?",
+              "choices": [
+                "Use one short wire to the nearest flip-flop and long random wires to the rest",
+                "Use a balanced tree (like an H-tree) so every path is the same length, plus dedicated clock buffers",
+                "Use a different oscillator for every flip-flop",
+                "Send the clock through the slowest, longest possible path"
+              ],
+              "answerIndex": 1,
+              "explanation": "Equal-length paths mean the edge reaches every flip-flop at nearly the same time, minimizing skew; a balanced H-tree with clock buffers does exactly this. Random or deliberately long paths make skew worse, and separate oscillators would not even be in step."
+            }
+          ]
+        },
+        {
+          "id": "clocking-plls-jitter-phase-noise",
+          "title": "When the Tick Wobbles: Jitter & Phase Noise",
+          "order": 4,
+          "difficulty": 2,
+          "content": "## Hook\n\nEven a great drummer is not a perfect machine — each beat lands a hair early or late. A real clock is the same: its edges never arrive *exactly* on time. That tiny timing wobble has a name: **jitter**.\n\n## Build\n\nImagine the ideal clock edges as evenly spaced marks on a ruler. A real clock's edges land *close* to those marks but each one is slightly off — a little early or a little late. **Jitter** is that timing error: how far the edges wander from where they should be.\n\nThere are a few ways to describe it:\n\n- **Period jitter** — how much a single tick's length varies from the ideal.\n- **Cycle-to-cycle jitter** — how much one tick differs from the very next tick.\n- **Long-term jitter** — how far off the timing has drifted after many ticks.\n\nLess jitter means a cleaner, more trustworthy clock. Why care? Some circuits use the clock edge to *measure* time. For example, an **analog-to-digital converter** (a circuit that samples a real-world signal) grabs a value at each clock edge. If the edge wobbles, it samples at the wrong instant and adds error — so a noisy clock directly hurts how cleanly that signal is captured.\n\nThere is a second way to describe the very same imperfection. Instead of looking at edges wobbling in *time*, you can look at the clock's *frequency*. A perfect clock would be one pure frequency; a real one has a little fuzzy spread of nearby frequencies around it. That spread is called **phase noise**. Jitter (time view) and phase noise (frequency view) are two descriptions of the same wobble — keep this conceptual for now: low phase noise means low jitter.\n\n## Recap\n\nReal clocks wobble. Jitter is how far the edges drift from their ideal times (period, cycle-to-cycle, long-term). Phase noise is the same wobble seen as a fuzzy spread in frequency. Less jitter and lower phase noise mean a cleaner clock and cleaner sampling.",
+          "items": [
+            {
+              "id": "clocking-plls-jitter-phase-noise-001",
+              "type": "mcq",
+              "prompt": "Study this comparison of a clean clock and a jittery clock. What does the jittery one show?",
+              "choices": [
+                "Edges that land exactly on the ideal time marks every cycle",
+                "Edges that arrive a little early or late, drifting off the ideal time marks",
+                "A signal that never changes from HIGH",
+                "A clock running at a completely different frequency"
+              ],
+              "answerIndex": 1,
+              "explanation": "The jittery clock's edges wobble — arriving slightly before or after the dashed ideal-time marks. The clean clock's edges land on the marks. Jitter is exactly this drift of edges off their ideal positions.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/clocking-plls-4.svg"
+            },
+            {
+              "id": "clocking-plls-jitter-phase-noise-002",
+              "type": "mcq",
+              "prompt": "What is clock jitter?",
+              "choices": [
+                "The voltage level of the clock",
+                "The tiny timing error in when each clock edge arrives, compared to its ideal time",
+                "The number of flip-flops driven by the clock",
+                "The cost of the oscillator"
+              ],
+              "answerIndex": 1,
+              "explanation": "Jitter is the small timing wobble — how far each edge arrives from where it ideally should. It is a timing imperfection, not a voltage, a count, or a price."
+            },
+            {
+              "id": "clocking-plls-jitter-phase-noise-003",
+              "type": "mcq",
+              "prompt": "In the drummer analogy, jitter is like:",
+              "choices": [
+                "The drummer playing a completely different song",
+                "Each beat landing a hair early or late instead of perfectly on time",
+                "The drummer stopping entirely",
+                "The drummer getting louder over time"
+              ],
+              "answerIndex": 1,
+              "explanation": "Even a skilled drummer isn't a perfect metronome; beats land slightly early or late. That small timing scatter is exactly what jitter is for a clock."
+            },
+            {
+              "id": "clocking-plls-jitter-phase-noise-004",
+              "type": "mcq",
+              "prompt": "Cycle-to-cycle jitter specifically measures:",
+              "choices": [
+                "How much one tick differs from the very next tick",
+                "The total drift after a million ticks",
+                "The clock's average frequency",
+                "How many volts the clock swings"
+              ],
+              "answerIndex": 0,
+              "explanation": "Cycle-to-cycle jitter compares one period to the immediately following period — the change from one tick to the next. Drift built up over many ticks is long-term jitter; average frequency and voltage are different measures."
+            },
+            {
+              "id": "clocking-plls-jitter-phase-noise-005",
+              "type": "mcq",
+              "prompt": "Why does clock jitter hurt an analog-to-digital converter (a circuit that samples a signal at each clock edge)?",
+              "choices": [
+                "It increases the converter's supply voltage",
+                "A wobbling edge samples the signal at the wrong instant, adding error to the captured value",
+                "Jitter makes the converter run cooler",
+                "Jitter has no effect on sampling"
+              ],
+              "answerIndex": 1,
+              "explanation": "The converter grabs a value exactly at the clock edge. If the edge arrives early or late (jitter), it samples at the wrong moment and the captured value is off — so a noisy clock directly degrades how cleanly the signal is captured."
+            },
+            {
+              "id": "clocking-plls-jitter-phase-noise-006",
+              "type": "mcq",
+              "prompt": "What is phase noise?",
+              "choices": [
+                "The same timing wobble as jitter, but described as a fuzzy spread of frequencies around the clock instead of edges moving in time",
+                "Audible noise the chip makes",
+                "The number of phases in a multi-phase clock",
+                "A complete loss of the clock signal"
+              ],
+              "answerIndex": 0,
+              "explanation": "Phase noise is the frequency-domain view of the very same imperfection that jitter describes in the time domain: a perfect clock would be one pure frequency, but a real one has a small fuzzy spread around it. Low phase noise means low jitter."
+            },
+            {
+              "id": "clocking-plls-jitter-phase-noise-007",
+              "type": "mcq",
+              "prompt": "How are jitter and phase noise related?",
+              "choices": [
+                "They are unrelated; one is about voltage and one is about current",
+                "They are two ways of describing the same clock imperfection — jitter in time, phase noise in frequency",
+                "Jitter only affects crystals; phase noise only affects RC oscillators",
+                "Phase noise is always good while jitter is always bad"
+              ],
+              "answerIndex": 1,
+              "explanation": "Jitter (edges wobbling in time) and phase noise (a fuzzy spread of frequencies) are two views of the same underlying wobble. A clock with low phase noise also has low jitter."
+            },
+            {
+              "id": "clocking-plls-jitter-phase-noise-008",
+              "type": "mcq",
+              "prompt": "Between two clocks, which is the cleaner, more trustworthy one?",
+              "choices": [
+                "The one with MORE jitter, because its edges move around more",
+                "The one with LESS jitter, because its edges land closer to their ideal times",
+                "They are equally good regardless of jitter",
+                "The one with the larger voltage swing, regardless of jitter"
+              ],
+              "answerIndex": 1,
+              "explanation": "Less jitter means edges arrive closer to where they should, giving cleaner, more reliable timing and cleaner sampling. More jitter is worse. Voltage swing is a separate matter from timing quality."
+            }
+          ]
+        },
+        {
+          "id": "clocking-plls-pll-basics",
+          "title": "The Frequency Factory: PLLs",
+          "order": 5,
+          "difficulty": 3,
+          "content": "## Hook\n\nA chip often has just one crystal — say 25 MHz — but its different parts need different speeds: maybe 100 MHz for the processor and 48 MHz for the USB port. How do you get many frequencies from one crystal? With a clever circuit called a **PLL**.\n\n## Build\n\n**PLL** stands for **phase-locked loop**. Its job is to take one steady reference clock and produce a new clock at a different frequency, usually a multiple of the reference — and keep it perfectly in step (**locked**) with that reference.\n\nThink of tuning an old radio. You turn the knob until the station comes in clearly, then it 'locks on' and stays there. A PLL does this automatically and electronically.\n\nA PLL is a loop of four parts working together:\n\n1. **Phase detector** — compares the reference clock with the PLL's own fed-back clock and asks: are we ahead or behind?\n2. **Loop filter** — smooths that comparison into a steady control voltage (a gentle 'speed up' or 'slow down' command).\n3. **VCO** (voltage-controlled oscillator) — an oscillator whose frequency is set by that control voltage. More voltage, faster; less voltage, slower.\n4. **Divider** — divides the VCO's fast output down, then feeds it back to the phase detector for comparison.\n\nHere is the trick. Suppose we want **100 MHz out of a 25 MHz reference** — a multiply by 4. We put a **divide-by-4** in the feedback path. The loop keeps adjusting the VCO until the divided-down feedback (VCO ÷ 4) exactly matches the 25 MHz reference. If VCO ÷ 4 = 25 MHz, then the VCO must be running at **100 MHz**. The loop has multiplied the frequency by 4. Change the divider, get a different multiple — that is **frequency synthesis**. Dividing the reference too lets you make non-integer ratios.\n\nWhen the fed-back clock and the reference line up and stop drifting apart, the PLL is **locked**.\n\n## Recap\n\nA PLL turns one reference clock into another frequency and locks onto it, like tuning a radio. Phase detector, loop filter, VCO, and a feedback divider form a loop; the divider value sets the multiplication — a divide-by-4 in the feedback turns 25 MHz into 100 MHz.",
+          "items": [
+            {
+              "id": "clocking-plls-pll-basics-001",
+              "type": "mcq",
+              "prompt": "What does a PLL (phase-locked loop) do?",
+              "choices": [
+                "Stores many bits of data",
+                "Takes one reference clock and produces a new clock at a different frequency, locked in step with the reference",
+                "Converts a clock into a steady DC voltage",
+                "Removes the clock entirely to save power"
+              ],
+              "answerIndex": 1,
+              "explanation": "A PLL generates a new frequency from a reference clock and keeps it locked (in step) with that reference. It does not store data, produce DC, or remove the clock."
+            },
+            {
+              "id": "clocking-plls-pll-basics-002",
+              "type": "mcq",
+              "prompt": "Why is a PLL useful when a chip has only one crystal?",
+              "choices": [
+                "It makes the crystal more accurate",
+                "It can create the several different frequencies the chip's parts need from that one crystal",
+                "It replaces the need for any flip-flops",
+                "It cools the crystal down"
+              ],
+              "answerIndex": 1,
+              "explanation": "Different parts of a chip need different speeds. A PLL takes the one crystal's frequency and multiplies/divides it to make the various clocks needed, so you do not need a separate crystal for each."
+            },
+            {
+              "id": "clocking-plls-pll-basics-003",
+              "type": "mcq",
+              "prompt": "Study this PLL block diagram. What is the role of the divide-by-4 block in the feedback path?",
+              "choices": [
+                "It slows the final output clock down to 25 MHz before it leaves the chip",
+                "It divides the VCO output so the loop can compare it against the 25 MHz reference; matching them forces the VCO to 100 MHz",
+                "It stores the previous clock value",
+                "It converts the clock from digital to analog"
+              ],
+              "answerIndex": 1,
+              "explanation": "The feedback divider takes the VCO's output and divides it (by 4 here) so it can be compared to the reference. The loop pushes VCO÷4 to equal 25 MHz, which forces the VCO itself to 100 MHz. The output stays at 100 MHz; only the feedback copy is divided.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/clocking-plls-5.svg"
+            },
+            {
+              "id": "clocking-plls-pll-basics-004",
+              "type": "mcq",
+              "prompt": "A PLL has a 25 MHz reference and a divide-by-4 in its feedback path. What output frequency does it produce?",
+              "choices": [
+                "6.25 MHz",
+                "25 MHz",
+                "100 MHz",
+                "29 MHz"
               ],
               "answerIndex": 2,
-              "explanation": "$2\\pi f_{in} t_j = 2\\pi(70\\times10^{6})(0.5\\times10^{-12}) \\approx 2.20\\times10^{-4}$. $-20\\log_{10}(2.20\\times10^{-4}) \\approx 73\\,\\text{dB}$. At higher IF the same 0.5 ps would cap SNR even lower, limiting ENOB."
+              "explanation": "The loop forces (output ÷ 4) to equal the 25 MHz reference. So output = 25 × 4 = 100 MHz. The PLL multiplied the reference by 4. (6.25 MHz would be 25 ÷ 4, the wrong direction.)"
             },
             {
-              "id": "clocking-plls-jitter-distribution-009",
+              "id": "clocking-plls-pll-basics-005",
               "type": "mcq",
-              "prompt": "On a Xilinx-style FPGA, the correct way to derive a 200 MHz processing clock from a 50 MHz board oscillator is to:",
+              "prompt": "Which part of the PLL is an oscillator whose frequency is set by a control voltage?",
               "choices": [
-                "Build a ring oscillator from LUTs and divide it on the fabric",
-                "Bring the oscillator in on a clock-capable pin and use an MMCM/PLL (clock wizard) onto global clock buffers",
-                "Route the 50 MHz clock through general fabric and gate it with an enable to multiply it",
-                "Use a combinational counter to AND the clock with itself"
+                "The phase detector",
+                "The loop filter",
+                "The VCO (voltage-controlled oscillator)",
+                "The feedback divider"
               ],
-              "answerIndex": 1,
-              "explanation": "Clocks enter on dedicated clock-capable input pins, feed an MMCM/PLL to synthesize the derived frequency, and distribute on low-skew global clock buffers. Fabric ring oscillators are jittery and uncontrolled; you cannot 'gate to multiply,' and gating clocks on fabric wrecks skew/timing (Module 8's rule)."
+              "answerIndex": 2,
+              "explanation": "The VCO is the voltage-controlled oscillator: more control voltage makes it run faster, less makes it slower. The phase detector compares, the loop filter smooths, and the divider scales the feedback."
             },
             {
-              "id": "clocking-plls-jitter-distribution-010",
+              "id": "clocking-plls-pll-basics-006",
               "type": "mcq",
-              "prompt": "Two clock domains in an FPGA come from the SAME MMCM with related, phase-aligned outputs. Compared to two independent oscillators, this means:",
+              "prompt": "What does the phase detector in a PLL do?",
               "choices": [
-                "Crossing between them never needs any synchronizer",
-                "The clocks are synchronous/related, so timing can often be constrained and analyzed statically rather than treated as a true asynchronous crossing",
-                "Skew is irrelevant because they share an MMCM",
-                "Jitter is automatically zero on both outputs"
+                "It compares the reference clock with the fed-back clock to see if the PLL is running ahead or behind",
+                "It sets the output voltage of the chip",
+                "It stores the clock frequency in memory",
+                "It generates the crystal's vibration"
+              ],
+              "answerIndex": 0,
+              "explanation": "The phase detector compares the reference against the fed-back clock and reports whether the loop is ahead or behind, so the rest of the loop can correct. It does not store data or drive the crystal."
+            },
+            {
+              "id": "clocking-plls-pll-basics-007",
+              "type": "mcq",
+              "prompt": "Generating a needed frequency by multiplying/dividing a reference with a PLL is called:",
+              "choices": [
+                "Frequency synthesis",
+                "Clock gating",
+                "Quantization",
+                "Decoupling"
+              ],
+              "answerIndex": 0,
+              "explanation": "Producing a desired frequency from a reference by choosing divider values is frequency synthesis. Clock gating (turning a clock on/off), quantization (rounding a sampled value), and decoupling (power-supply filtering) are unrelated ideas."
+            },
+            {
+              "id": "clocking-plls-pll-basics-008",
+              "type": "mcq",
+              "prompt": "What does it mean for a PLL to be 'locked'?",
+              "choices": [
+                "The PLL has been physically sealed shut",
+                "The fed-back clock and the reference line up and stop drifting apart, like a radio tuned exactly onto a station",
+                "The output clock has been switched off",
+                "The crystal has stopped vibrating"
               ],
               "answerIndex": 1,
-              "explanation": "Outputs of one MMCM are frequency- and phase-related, so the tool can analyze paths between them with static timing rather than as a metastability-prone asynchronous crossing. Truly independent oscillators are asynchronous and still require synchronizers/async FIFOs. Shared MMCM does not zero out skew or jitter."
+              "explanation": "Lock means the loop has settled: the fed-back clock matches the reference and stays there, just like a radio that has locked onto a station. It is a state of the loop, not a physical seal or a powered-off clock."
+            },
+            {
+              "id": "clocking-plls-pll-basics-009",
+              "type": "mcq",
+              "prompt": "Tuning an old radio until a station comes in clearly and 'locks on' is a good analogy for which part of a PLL's behavior?",
+              "choices": [
+                "Storing data in flip-flops",
+                "Automatically adjusting until the output matches the target and then staying locked",
+                "Converting analog signals to digital",
+                "Distributing the clock to many flip-flops"
+              ],
+              "answerIndex": 1,
+              "explanation": "Just as you turn the radio knob until the station is clear and it holds, a PLL adjusts the VCO until the feedback matches the reference and then stays locked. The other options describe different circuits entirely."
+            }
+          ]
+        },
+        {
+          "id": "clocking-plls-on-chip-clocking",
+          "title": "Putting It Together: On-Chip Clock Generation",
+          "order": 6,
+          "difficulty": 3,
+          "content": "## Hook\n\nLet's connect the whole story. A modern chip starts with a single crystal on the board and ends up with several clean, fast internal clocks reaching thousands of flip-flops — all generated on-chip. Here is how the pieces fit.\n\n## Build\n\nThe journey of a clock inside a chip:\n\n1. **One crystal** outside the chip provides a steady, accurate reference — say 25 MHz (Lesson 2).\n2. That reference enters the chip and feeds one or more **PLLs**, which multiply and divide it into the various frequencies different blocks need — 100 MHz here, 48 MHz there (Lesson 5). This is **on-chip clock generation**: one crystal in, many internal clocks out.\n3. Each generated clock is handed to a **clock distribution** network — a balanced tree with buffers — so it reaches every flip-flop with low **skew** (Lesson 3).\n4. Along the way, every stage adds a little **jitter**, so designers pick low-noise PLLs and clean references where timing matters most, such as for a converter's sampling clock (Lesson 4).\n\nIn programmable chips called **FPGAs**, this clocking hardware is built in and ready to use: dedicated clock input pins, special low-skew distribution lines, and built-in PLL blocks you configure to synthesize the frequencies you want. You do not wire it from scratch — you set it up.\n\nOne more real-world trick: **spread-spectrum clocking**. A perfectly steady clock concentrates its energy at one frequency, which can radiate as **electromagnetic interference (EMI)** — radio-style noise that bothers other electronics. Spread-spectrum clocking deliberately wiggles the clock frequency by a tiny amount so its energy is smeared over a small band instead of one sharp spike, lowering the peak interference. The catch: that intentional wiggle is a form of jitter, so you avoid it on clocks that must be ultra-clean (like a converter's sampling clock).\n\n## Recap\n\nA chip turns one crystal into many internal clocks: crystal → PLL (synthesis) → distribution tree (low skew) → flip-flops, with jitter managed throughout. FPGAs provide this clocking hardware ready to configure, and spread-spectrum clocking trades a little jitter to reduce EMI.",
+          "items": [
+            {
+              "id": "clocking-plls-on-chip-clocking-001",
+              "type": "mcq",
+              "prompt": "In a modern chip, what is the usual order of the clock's journey?",
+              "choices": [
+                "Distribution tree, then crystal, then PLL, then flip-flops",
+                "Crystal reference, then PLL to synthesize frequencies, then distribution tree, then flip-flops",
+                "Flip-flops, then PLL, then crystal",
+                "PLL first, then crystal, then distribution"
+              ],
+              "answerIndex": 1,
+              "explanation": "The clock starts at the crystal (reference), gets multiplied/divided by a PLL into the needed frequencies, is carried by a distribution tree with low skew, and finally reaches the flip-flops."
+            },
+            {
+              "id": "clocking-plls-on-chip-clocking-002",
+              "type": "mcq",
+              "prompt": "What does 'on-chip clock generation' mean?",
+              "choices": [
+                "Using a separate crystal for every clock the chip needs",
+                "Taking one crystal reference and generating the several internal clocks the chip needs, on the chip itself",
+                "Generating clocks only outside the chip on the circuit board",
+                "Turning all clocks off to save power"
+              ],
+              "answerIndex": 1,
+              "explanation": "On-chip clock generation means one crystal comes in and the chip's internal circuitry (PLLs and dividers) produces the various internal clocks. It avoids needing a separate crystal for each frequency."
+            },
+            {
+              "id": "clocking-plls-on-chip-clocking-003",
+              "type": "mcq",
+              "prompt": "On an FPGA (a programmable chip), the clocking hardware (clock pins, low-skew lines, PLL blocks) is:",
+              "choices": [
+                "Something you must build yourself from individual transistors",
+                "Built into the chip and ready for you to configure",
+                "Not available at all; FPGAs have no clocks",
+                "Located only on a separate companion chip"
+              ],
+              "answerIndex": 1,
+              "explanation": "FPGAs include dedicated clock input pins, special low-skew distribution lines, and built-in PLL blocks. You configure them rather than wiring them from scratch."
+            },
+            {
+              "id": "clocking-plls-on-chip-clocking-004",
+              "type": "mcq",
+              "prompt": "What is spread-spectrum clocking?",
+              "choices": [
+                "Running the clock at the highest possible frequency",
+                "Deliberately wiggling the clock frequency by a tiny amount to smear its energy over a small band and reduce peak EMI",
+                "Splitting the clock into many separate crystals",
+                "Removing all jitter from the clock"
+              ],
+              "answerIndex": 1,
+              "explanation": "Spread-spectrum clocking intentionally varies the frequency slightly so the clock's energy is spread over a band instead of one sharp spike, lowering peak electromagnetic interference (EMI)."
+            },
+            {
+              "id": "clocking-plls-on-chip-clocking-005",
+              "type": "mcq",
+              "prompt": "What is the downside of spread-spectrum clocking?",
+              "choices": [
+                "It uses far more power than a normal clock",
+                "The intentional frequency wiggle is a form of jitter, so it should be avoided on clocks that must be ultra-clean",
+                "It makes the chip physically larger",
+                "It permanently lowers the clock frequency by half"
+              ],
+              "answerIndex": 1,
+              "explanation": "The deliberate wiggling adds jitter. That is fine for reducing EMI on ordinary clocks, but you avoid spread-spectrum on clocks that must be very clean, such as a converter's sampling clock."
+            },
+            {
+              "id": "clocking-plls-on-chip-clocking-006",
+              "type": "mcq",
+              "prompt": "EMI (electromagnetic interference) that spread-spectrum clocking helps reduce is best described as:",
+              "choices": [
+                "Heat produced by the chip",
+                "Radio-style noise radiated by the chip that can disturb other electronics",
+                "Errors stored in the chip's memory",
+                "The cost of the crystal"
+              ],
+              "answerIndex": 1,
+              "explanation": "EMI is unwanted electromagnetic (radio-style) energy a circuit radiates, which can interfere with nearby electronics. A sharp, single-frequency clock radiates a strong spike; spreading it lowers that peak."
+            },
+            {
+              "id": "clocking-plls-on-chip-clocking-007",
+              "type": "mcq",
+              "prompt": "A chip has one 25 MHz crystal but needs both a 100 MHz processor clock and a 48 MHz USB clock. The cleanest way to get both is to:",
+              "choices": [
+                "Add two more crystals, one per frequency",
+                "Feed the 25 MHz reference into PLL(s) on the chip to synthesize both 100 MHz and 48 MHz",
+                "Run everything at 25 MHz and ignore the other frequencies",
+                "Use spread-spectrum clocking to create the frequencies"
+              ],
+              "answerIndex": 1,
+              "explanation": "PLLs multiply and divide the single reference into whatever frequencies the blocks need, so one crystal can serve many clocks. Adding crystals is wasteful, running everything at 25 MHz ignores the requirement, and spread-spectrum does not synthesize new target frequencies."
+            },
+            {
+              "id": "clocking-plls-on-chip-clocking-008",
+              "type": "mcq",
+              "prompt": "Why do designers prefer a low-noise PLL and a clean reference for a converter's sampling clock specifically?",
+              "choices": [
+                "Because the converter draws less power that way",
+                "Because jitter on the sampling clock directly adds error to the sampled signal, so a cleaner clock means cleaner sampling",
+                "Because the converter cannot work above 25 MHz",
+                "Because clean clocks are always cheaper"
+              ],
+              "answerIndex": 1,
+              "explanation": "A converter samples at each clock edge, so any jitter makes it sample at the wrong instant and adds error (Lesson 4). A low-noise PLL and clean reference minimize jitter, giving the cleanest capture. This is unrelated to power or cost."
             }
           ]
         }
