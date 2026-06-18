@@ -5,256 +5,701 @@
   "lessons": [
     {
       "id": "devices-udev-drivers-lesson-1",
-      "title": "Device Files: /dev, char vs block, major/minor & mknod",
+      "title": "Hardware as Files: Meet /dev",
       "order": 1,
       "difficulty": 1,
-      "content": "In Unix \"everything is a file,\" and device files in `/dev` are the handles user space uses to talk to hardware. Two flavors matter:\n\n- **Character devices** (`c`): unbuffered, byte-stream, no random seek granularity guaranteed -- think a UART, `/dev/ttyUSB0`, `/dev/random`. This is the model closest to your radar serial/register world.\n- **Block devices** (`b`): fixed-size blocks with a buffer cache and seeking -- disks like `/dev/sda`, `/dev/nvme0n1`.\n\nRun `ls -l /dev` and the first column shows `c` or `b`, and where size would be you instead see two numbers: the **major** and **minor**. The major identifies the *driver*; the minor identifies *which device* that driver handles (or a sub-function). The kernel routes a syscall on `/dev/X` to the driver registered for that major number.\n\n```bash\nls -l /dev/null /dev/sda /dev/ttyS0\n# crw-rw-rw- 1 root root  1, 3 ... /dev/null   (char, major 1 minor 3)\n# brw-rw---- 1 root disk  8, 0 ... /dev/sda    (block, major 8 minor 0)\n```\n\nHistorically you created nodes by hand with **`mknod`** (a node is just an inode carrying type + major/minor; it holds no data):\n\n```bash\nsudo mknod /dev/mychardev c 240 0\n```\n\nThe stock pseudo-devices are worth memorizing: `/dev/null` (discard), `/dev/zero` (infinite zeros), `/dev/random` & `/dev/urandom` (entropy), `/dev/full` (always ENOSPC, great for testing error paths), `/dev/tty` (your controlling terminal), and `/dev/loop*` (mount a file as a block device). On modern systems you rarely run `mknod` -- nodes appear automatically, which the next lesson explains.",
+      "content": "You already learned a big Linux idea: **everything is a file**. That includes your hardware. When you want to talk to a disk, a USB stick, or a serial port, Linux hands you a special file to read from and write to.\n\nThese special files live in one folder: **`/dev`** (short for \"devices\"). Each file there stands in for a piece of hardware. For example:\n\n- `/dev/sda` is usually the first hard disk.\n- `/dev/ttyUSB0` is a USB serial adapter.\n- `/dev/null` is a magic \"trash can\" (more on that below).\n\nThe nice part: programs do not need special hardware commands. They just `open`, `read`, and `write` these files like any other file, and the system takes care of the rest.\n\n```bash\nls /dev          # look at the device files on your machine\nls -l /dev/sda   # details for the first disk\n```\n\nSome files in `/dev` are not real hardware at all. They are handy \"pretend\" devices the kernel provides:\n\n- **`/dev/null`** throws away anything you write to it, and gives nothing back when read. It is a bottomless trash can. People send unwanted output there: `command > /dev/null`.\n- **`/dev/zero`** gives you an endless stream of zero bytes when you read it. Useful for filling or wiping space.\n- **`/dev/random`** gives you random bytes, handy for passwords and keys.\n\n```bash\necho \"junk I do not want to see\" > /dev/null   # discarded silently\nhead -c 10 /dev/zero | wc -c                   # reads 10 zero bytes\n```\n\n**Recap:** Linux represents hardware as files inside `/dev`, so you can use familiar read/write operations. A few of those files (`/dev/null`, `/dev/zero`, `/dev/random`) are useful fakes rather than real devices.",
       "items": [
-        {
-          "id": "devices-udev-drivers-fc-1",
-          "type": "flashcard",
-          "front": "In `ls -l /dev`, what does the leading `c` vs `b` tell you, and what replaces the size field?",
-          "back": "`c` = character device (byte stream, e.g. tty, random), `b` = block device (buffered, seekable, e.g. disk). In place of a size you see two numbers: the major and minor device numbers."
-        },
-        {
-          "id": "devices-udev-drivers-fc-2",
-          "type": "flashcard",
-          "front": "What do the major and minor numbers identify, respectively?",
-          "back": "The major number identifies the driver responsible for the device (the kernel uses it to route operations). The minor number identifies which specific device/instance that driver should handle."
-        },
-        {
-          "id": "devices-udev-drivers-fc-3",
-          "type": "flashcard",
-          "front": "What does `mknod /dev/foo c 240 0` create, and does it allocate storage?",
-          "back": "It creates a character device node with major 240, minor 0. A device node is just an inode recording type + major/minor; it stores no data and does not by itself connect to a working driver.",
-          "hint": "Think inode metadata, not a file with contents."
-        },
-        {
-          "id": "devices-udev-drivers-fc-4",
-          "type": "flashcard",
-          "front": "What is `/dev/full` and why is it useful?",
-          "back": "A pseudo-device that always returns ENOSPC (\"No space left on device\") on write while reading as zeros. It's used to test how programs handle disk-full / write-error conditions."
-        },
-        {
-          "id": "devices-udev-drivers-fc-5",
-          "type": "flashcard",
-          "front": "Difference between `/dev/random` and `/dev/urandom` on modern Linux?",
-          "back": "Both draw from the same CSPRNG. Classically `/dev/random` could block waiting for entropy; on modern kernels (post-getrandom) it only blocks until the pool is initialized once, then behaves like `/dev/urandom`. For nearly all uses `urandom` is correct."
-        },
         {
           "id": "devices-udev-drivers-mcq-1",
           "type": "mcq",
-          "prompt": "A syscall is issued on `/dev/sda` (major 8). How does the kernel decide which code handles it?",
+          "prompt": "In Linux, where do the special files that represent hardware devices live?",
           "choices": [
-            "It matches the filename string `sda` against registered driver names",
-            "It uses the major number to look up the driver registered for that major",
-            "It uses the minor number to find the correct driver",
-            "It reads the file's contents to find a driver header"
+            "In the /dev folder",
+            "In the /home folder",
+            "In the /etc folder",
+            "Inside each program's own folder"
           ],
-          "answerIndex": 1,
-          "explanation": "The major number selects the driver; the minor then tells that driver which device/instance. The filename is just a convenient label on the inode."
+          "answerIndex": 0,
+          "explanation": "Device files live in /dev (short for \"devices\"). /home holds users' personal files and /etc holds configuration, so neither is where hardware is represented."
         },
         {
           "id": "devices-udev-drivers-mcq-2",
           "type": "mcq",
-          "prompt": "Which statement about character vs block devices is correct?",
+          "prompt": "What is /dev/null mainly used for?",
           "choices": [
-            "Block devices are unbuffered byte streams; character devices use the page/buffer cache",
-            "Character devices are typically byte-stream oriented; block devices use fixed-size blocks and a buffer cache",
-            "Only block devices can have major/minor numbers",
-            "Character devices cannot be created with mknod"
+            "Storing a backup copy of important data",
+            "Discarding any output written to it (a bottomless trash can)",
+            "Listing every device on the system",
+            "Speeding up the hard disk"
           ],
           "answerIndex": 1,
-          "explanation": "Character devices (`c`) are byte-stream oriented (ttys, random); block devices (`b`) deal in fixed-size, randomly-addressable blocks through a buffer cache (disks)."
+          "explanation": "Writing to /dev/null silently throws the data away, which is why people redirect unwanted output there with `> /dev/null`. It stores nothing, so it cannot hold a backup."
         },
         {
           "id": "devices-udev-drivers-mcq-3",
           "type": "mcq",
-          "prompt": "Why do you rarely need `mknod` on a modern desktop Linux system?",
+          "prompt": "Because hardware is represented as files in /dev, how does a normal program usually interact with a device?",
           "choices": [
-            "Because /dev no longer uses device nodes at all",
-            "Because devtmpfs + udev create and remove nodes automatically as devices appear",
-            "Because all devices are now block devices managed by systemd",
-            "Because the kernel forbids manual node creation for security"
+            "By sending it electrical signals directly",
+            "By rebooting the computer first",
+            "By opening, reading, and writing the device file like any other file",
+            "By editing the kernel source code"
+          ],
+          "answerIndex": 2,
+          "explanation": "The whole point of \"everything is a file\" is that programs use the same open/read/write operations on devices as on ordinary files. They do not touch the hardware electrically themselves; the system handles that underneath."
+        },
+        {
+          "id": "devices-udev-drivers-mcq-4",
+          "type": "mcq",
+          "prompt": "You read from /dev/zero. What do you get?",
+          "choices": [
+            "An error, because the file is empty",
+            "An endless stream of zero bytes",
+            "A list of all disks",
+            "Random characters"
           ],
           "answerIndex": 1,
-          "explanation": "The kernel's devtmpfs populates /dev automatically when drivers register devices, and udev manages permissions, ownership and symlinks on top -- so manual mknod is mostly historical."
+          "explanation": "/dev/zero produces an unlimited supply of zero bytes, useful for filling or wiping space. Random characters come from /dev/random instead."
+        },
+        {
+          "id": "devices-udev-drivers-mcq-5",
+          "type": "mcq",
+          "prompt": "Which device file would you read from to get random bytes, for example to help generate a password?",
+          "choices": [
+            "/dev/null",
+            "/dev/zero",
+            "/dev/random",
+            "/dev/sda"
+          ],
+          "answerIndex": 2,
+          "explanation": "/dev/random supplies random bytes. /dev/null discards data, /dev/zero gives only zeros, and /dev/sda is a real disk."
+        },
+        {
+          "id": "devices-udev-drivers-mcq-6",
+          "type": "mcq",
+          "prompt": "On many systems, what does /dev/sda usually represent?",
+          "choices": [
+            "The first hard disk",
+            "The system clock",
+            "The network connection",
+            "The screen brightness"
+          ],
+          "answerIndex": 0,
+          "explanation": "/dev/sda is typically the first disk drive. Device files like this let programs reach storage hardware as if it were a file."
+        },
+        {
+          "id": "devices-udev-drivers-mcq-7",
+          "type": "mcq",
+          "prompt": "Why are /dev/null, /dev/zero, and /dev/random sometimes called \"pretend\" or pseudo devices?",
+          "choices": [
+            "They only work on weekends",
+            "They are not real hardware; the kernel provides their behavior in software",
+            "They are broken devices that should be deleted",
+            "They are copies of /dev/sda"
+          ],
+          "answerIndex": 1,
+          "explanation": "These files behave like devices you can read and write, but there is no physical hardware behind them; the kernel simply produces the behavior (discard, zeros, randomness)."
+        },
+        {
+          "id": "devices-udev-drivers-mcq-8",
+          "type": "mcq",
+          "prompt": "Which command lists the device files present on your machine?",
+          "choices": [
+            "ls /dev",
+            "cd /home",
+            "echo /dev",
+            "reboot"
+          ],
+          "answerIndex": 0,
+          "explanation": "`ls /dev` shows the device files. `cd` only changes your current folder, `echo` just prints text, and `reboot` restarts the machine."
+        },
+        {
+          "id": "devices-udev-drivers-mcq-9",
+          "type": "mcq",
+          "prompt": "What is a good real-world way to picture a device file in /dev?",
+          "choices": [
+            "A photograph of the hardware",
+            "A labeled handle or doorway that programs use to reach a device",
+            "A backup of the hardware's data",
+            "A password that unlocks the device"
+          ],
+          "answerIndex": 1,
+          "explanation": "A device file is like a labeled handle or doorway: opening and using it lets a program reach the device. It is not a photo, a backup, or a password."
+        },
+        {
+          "id": "devices-udev-drivers-img-1",
+          "type": "mcq",
+          "prompt": "(See the diagram.) In the picture, a hard disk maps to /dev/sda and a USB serial adapter maps to /dev/ttyUSB0. What is the diagram showing overall?",
+          "choices": [
+            "That each piece of hardware appears as a file in /dev",
+            "That all hardware shares one single file",
+            "That /dev files store the hardware's electricity",
+            "That hardware must be unplugged to appear in /dev"
+          ],
+          "answerIndex": 0,
+          "explanation": "The mapping shows that each device is represented by its own file in /dev, so programs can reach it through that file.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/devices-udev-drivers-2.svg"
         }
       ]
     },
     {
       "id": "devices-udev-drivers-lesson-2",
-      "title": "The Dynamic /dev: devtmpfs, udev rules & persistent naming",
+      "title": "Two Kinds of Device File, and the Numbers Behind Them",
       "order": 2,
-      "difficulty": 2,
-      "content": "Static `/dev` (thousands of pre-made nodes) is gone. Today the flow is **kernel -> devtmpfs -> udev**:\n\n1. A driver registers a device. The kernel mounts **`devtmpfs`** on `/dev` and creates a bare node immediately (so early boot has working nodes).\n2. The kernel broadcasts a **uevent** over a netlink socket.\n3. **`systemd-udevd`** receives it, applies rules, and sets ownership/permissions, adds symlinks, runs helpers, and tags the device.\n\nInspect any device and the attributes you can match on:\n\n```bash\nudevadm info --query=all --name=/dev/ttyUSB0\nudevadm info --attribute-walk --name=/dev/ttyUSB0   # walk up the parent chain\nudevadm monitor --udev --property                   # watch events live (hotplug a device)\n```\n\nRules live in **`/etc/udev/rules.d/`** (your overrides) and `/lib/udev/rules.d/` (distro defaults); they're processed in lexical order, so prefix with a number like `99-`. A rule is comma-separated *match* keys (`==`) and *assignment* keys (`=`, `+=`). Match on `SUBSYSTEM`, `KERNEL`, the device's own `ATTR{...}`, or a parent's `ATTRS{...}` / `ENV{...}`. A persistent, **reboot-surviving** symlink for a specific FTDI USB-serial adapter:\n\n```bash\n# /etc/udev/rules.d/99-radar.rules\nSUBSYSTEM==\"tty\", ATTRS{idVendor}==\"0403\", ATTRS{idProduct}==\"6001\", ATTRS{serial}==\"AB12CD\", SYMLINK+=\"radar0\", MODE=\"0660\", GROUP=\"dialout\"\n```\n\nReload and re-trigger without rebooting:\n\n```bash\nsudo udevadm control --reload\nsudo udevadm trigger --subsystem-match=tty\n```\n\nNow `/dev/radar0` always points at *that* adapter regardless of enumeration order. This is the same mechanism behind predictable NIC names (`enp3s0`) and persistent disk paths in `/dev/disk/by-id/`.",
+      "difficulty": 1,
+      "content": "Open a detailed listing of a device and you will see clues about what kind of device it is. Run `ls -l` on a couple of them:\n\n```bash\nls -l /dev/sda /dev/null\n# brw-rw---- 1 root disk 8, 0 ... /dev/sda\n# crw-rw-rw- 1 root root 1, 3 ... /dev/null\n```\n\nNotice the very first letter. It is either **`b`** or **`c`**, and it tells you the device's *style*:\n\n- **`b` = block device.** Data is handled in fixed-size chunks (blocks), and you can jump around to any spot. Disks and USB drives work this way, because you need to reach any file anywhere on them.\n- **`c` = character device.** Data flows as a simple stream of bytes, one after another, like water through a hose. Keyboards, serial ports, and `/dev/null` work this way.\n\nA helpful analogy: a **block** device is like a book where you can flip straight to page 200; a **character** device is like a phone call where words just arrive in order.\n\nNow look at where a normal file would show its **size**. A device file shows **two numbers** instead, like `8, 0`. These are the **major** and **minor** numbers:\n\n- The **major number** says *which driver* is in charge (a driver is the kernel code that knows how to run this kind of device; more on that soon).\n- The **minor number** says *which specific device* among the ones that driver handles.\n\nSo `8, 0` means \"driver number 8, device 0.\" You rarely set these by hand. Long ago people created device files manually with a command called **`mknod`**, but today the system makes them for you automatically (the next lessons explain how).\n\n**Recap:** The first letter in `ls -l` shows `b` (block, chunk-based, seekable) or `c` (character, byte stream). The two numbers are the major (which driver) and minor (which device).",
       "items": [
         {
-          "id": "devices-udev-drivers-fc-6",
-          "type": "flashcard",
-          "front": "What is devtmpfs and why does it exist alongside udev?",
-          "back": "devtmpfs is a kernel-maintained tmpfs mounted on /dev that auto-creates a basic node the instant a driver registers a device, so /dev works in early boot. udev runs in user space on top of it to set permissions/ownership, add symlinks, and run rules."
-        },
-        {
-          "id": "devices-udev-drivers-fc-7",
-          "type": "flashcard",
-          "front": "How does udev learn that a device appeared or went away?",
-          "back": "The kernel broadcasts uevents over a netlink socket; systemd-udevd listens on it, then matches the event against rules in /lib/udev/rules.d and /etc/udev/rules.d."
-        },
-        {
-          "id": "devices-udev-drivers-fc-8",
-          "type": "flashcard",
-          "front": "In a udev rule, what is the difference between `ATTR{...}` and `ATTRS{...}`?",
-          "back": "`ATTR{...}` matches a sysfs attribute on the device itself; `ATTRS{...}` matches an attribute on any parent device in the chain (e.g. the USB hub/controller). Use `udevadm info --attribute-walk` to find both.",
-          "hint": "The extra S means search up the parent chain."
-        },
-        {
-          "id": "devices-udev-drivers-fc-9",
-          "type": "flashcard",
-          "front": "Why prefix a custom udev rules file with a number like `99-`?",
-          "back": "Rules files in rules.d are processed in lexical (alphanumeric) order. A high number like 99- makes your rule run after distro defaults so it can override or augment them; SYMLINK+= still accumulates additional links."
-        },
-        {
-          "id": "devices-udev-drivers-fc-10",
-          "type": "flashcard",
-          "front": "After editing a udev rule, which commands apply it without a reboot?",
-          "back": "`sudo udevadm control --reload` to reload the rule set, then `sudo udevadm trigger` (optionally scoped with --subsystem-match) to replay uevents so the rule fires against already-present devices."
-        },
-        {
-          "id": "devices-udev-drivers-mcq-4",
+          "id": "devices-udev-drivers-mcq-10",
           "type": "mcq",
-          "prompt": "You want `/dev/radar0` to always point at one specific USB-serial adapter, surviving reboots and port changes. The most robust match key is:",
+          "prompt": "In `ls -l /dev`, the first letter of a device line is `b`. What does that mean?",
           "choices": [
-            "KERNEL==\"ttyUSB0\" (the kernel name)",
-            "ATTRS{idVendor} plus ATTRS{idProduct} plus ATTRS{serial}",
-            "The minor number of the device",
-            "The mount point of the filesystem on it"
+            "It is a broken device",
+            "It is a block device that handles data in fixed-size chunks and can seek anywhere",
+            "It is a backup file",
+            "It is a character device"
           ],
           "answerIndex": 1,
-          "explanation": "Kernel names like ttyUSB0 depend on enumeration order. Matching vendor+product+serial uniquely identifies that physical adapter, so the SYMLINK is stable across reboots and re-plugs."
+          "explanation": "`b` marks a block device, which deals in fixed-size blocks and lets you jump to any position (like a disk). `c` would mark a character device."
         },
         {
-          "id": "devices-udev-drivers-mcq-5",
+          "id": "devices-udev-drivers-mcq-11",
           "type": "mcq",
-          "prompt": "Which `udevadm` subcommand shows live uevents as you hotplug a device?",
+          "prompt": "Which everyday picture best fits a character device?",
           "choices": [
-            "udevadm info",
-            "udevadm trigger",
-            "udevadm monitor",
-            "udevadm settle"
-          ],
-          "answerIndex": 2,
-          "explanation": "`udevadm monitor` prints kernel and udev events in real time; `info` queries a device's current properties/attributes, `trigger` replays events, and `settle` waits for the event queue to drain."
-        },
-        {
-          "id": "devices-udev-drivers-mcq-6",
-          "type": "mcq",
-          "prompt": "Predictable network interface names like `enp3s0` and persistent paths in /dev/disk/by-id/ are produced by:",
-          "choices": [
-            "The kernel hardcoding them at compile time",
-            "udev rules that build stable names from bus topology / device attributes",
-            "DHCP for NICs and the filesystem for disks",
-            "systemd-networkd exclusively"
+            "A book where you can flip straight to any page",
+            "A phone call where words arrive one after another in order",
+            "A photo album sorted by date",
+            "A locked safe"
           ],
           "answerIndex": 1,
-          "explanation": "udev derives these names/symlinks from stable attributes (PCI bus path, disk WWN/serial), giving deterministic naming instead of probe-order-dependent eth0/sda."
+          "explanation": "A character device is a byte stream, like a phone call where data simply arrives in order. The \"flip to any page\" image fits a block device, which is seekable."
         },
         {
-          "id": "devices-udev-drivers-img-1",
-          "type": "flashcard",
-          "front": "Kernel uevent to udev to /dev node + rule",
-          "back": "Review the diagram above.",
-          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/devices-udev-drivers-1.svg"
+          "id": "devices-udev-drivers-mcq-12",
+          "type": "mcq",
+          "prompt": "A hard disk is a block device rather than a character device. Why does that make sense?",
+          "choices": [
+            "Because you need to reach files anywhere on it, so jumping around in blocks fits",
+            "Because disks cannot store bytes",
+            "Because disks are always read-only",
+            "Because disks have no driver"
+          ],
+          "answerIndex": 0,
+          "explanation": "Disks store files all over their surface, so being able to seek to any block is exactly what you need. A pure one-after-another stream would be a poor fit."
+        },
+        {
+          "id": "devices-udev-drivers-mcq-13",
+          "type": "mcq",
+          "prompt": "Where a normal file shows its size, a device file shows two numbers. What are they called?",
+          "choices": [
+            "Width and height",
+            "Major and minor numbers",
+            "Read and write counts",
+            "Start and end addresses"
+          ],
+          "answerIndex": 1,
+          "explanation": "Device files display a major and a minor number in place of a size. They identify the driver and the specific device, not dimensions or addresses."
+        },
+        {
+          "id": "devices-udev-drivers-mcq-14",
+          "type": "mcq",
+          "prompt": "What does the major number of a device tell you?",
+          "choices": [
+            "How big the device is in gigabytes",
+            "Which driver is responsible for the device",
+            "How fast the device is",
+            "Which user owns the device"
+          ],
+          "answerIndex": 1,
+          "explanation": "The major number points to the driver in charge of that kind of device. Size, speed, and ownership are shown elsewhere (or not at all) in the listing."
+        },
+        {
+          "id": "devices-udev-drivers-mcq-15",
+          "type": "mcq",
+          "prompt": "If two device files share the same major number but have different minor numbers, what is most likely true?",
+          "choices": [
+            "They are handled by the same driver but are different specific devices",
+            "They are the exact same device",
+            "One of them is broken",
+            "They cannot both exist"
+          ],
+          "answerIndex": 0,
+          "explanation": "The same major number means the same driver; different minor numbers mean different specific devices that driver manages (for example two disks of the same type)."
+        },
+        {
+          "id": "devices-udev-drivers-mcq-16",
+          "type": "mcq",
+          "prompt": "The line for /dev/null begins with `c`. What kind of device is it?",
+          "choices": [
+            "A block device",
+            "A character device (a byte stream)",
+            "A network device",
+            "A folder"
+          ],
+          "answerIndex": 1,
+          "explanation": "The leading `c` means character device, which is a simple byte stream. /dev/null fits because data just flows in (and is discarded) without any seeking."
+        },
+        {
+          "id": "devices-udev-drivers-mcq-17",
+          "type": "mcq",
+          "prompt": "What was the old command `mknod` used for?",
+          "choices": [
+            "To create a device file by hand",
+            "To delete a hard disk",
+            "To reboot the system",
+            "To rename a folder"
+          ],
+          "answerIndex": 0,
+          "explanation": "`mknod` created device files manually, including their major and minor numbers. Today the system creates them automatically, so you rarely run it."
+        },
+        {
+          "id": "devices-udev-drivers-mcq-18",
+          "type": "mcq",
+          "prompt": "On a modern Linux system, do you normally have to create device files in /dev yourself?",
+          "choices": [
+            "Yes, you must run mknod for every device at every boot",
+            "No, the system creates them automatically when hardware appears",
+            "Yes, but only for the keyboard",
+            "No, because /dev does not exist anymore"
+          ],
+          "answerIndex": 1,
+          "explanation": "Modern systems populate /dev automatically as devices are detected, so manual creation with mknod is mostly historical. /dev very much still exists."
+        },
+        {
+          "id": "devices-udev-drivers-img-2",
+          "type": "mcq",
+          "prompt": "(See the diagram of `brw-rw---- ... 8, 0 /dev/sda`.) According to the labels, what do the `8` and the `0` represent?",
+          "choices": [
+            "The file size in bytes and its age",
+            "The major number (which driver) and the minor number (which device)",
+            "The read speed and the write speed",
+            "The user ID and group ID"
+          ],
+          "answerIndex": 1,
+          "explanation": "The diagram labels 8 as the major number (the driver) and 0 as the minor number (the specific device). The leading `b` separately marks it as a block device.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/devices-udev-drivers-3.svg"
         }
       ]
     },
     {
       "id": "devices-udev-drivers-lesson-3",
-      "title": "Kernel Modules & a Hello-World Char Driver",
+      "title": "Drivers and Loadable Modules",
       "order": 3,
-      "difficulty": 3,
-      "content": "A **`.ko`** (kernel object) is compiled kernel code loaded into the running kernel's address space at runtime. Tooling:\n\n```bash\nlsmod                      # what's loaded (name, size, use count, dependents)\nmodinfo i2c_dev            # author, license, params, dependencies, vermagic\nsudo insmod ./hello.ko     # raw load, no dep resolution\nsudo modprobe i2c_dev      # resolves deps via modules.dep, searches /lib/modules\nsudo rmmod hello           # unload (refcount must be 0)\nsudo depmod                # rebuild modules.dep after installing modules\n```\n\n`modprobe` reads `/etc/modprobe.d/` for **parameters** (`options snd_hda_intel power_save=1`) and **blacklisting** (`blacklist nouveau`). Loading an out-of-tree or proprietary module sets the **taint** flag (see `dmesg`); maintainers ignore bug reports from a tainted kernel. A minimal module:\n\n```c\n#include <linux/module.h>\n#include <linux/init.h>\nstatic int __init hello_init(void){ printk(KERN_INFO \"hello: loaded\\n\"); return 0; }\nstatic void __exit hello_exit(void){ printk(KERN_INFO \"hello: bye\\n\"); }\nmodule_init(hello_init); module_exit(hello_exit);\nMODULE_LICENSE(\"GPL\");\n```\n\nBuild it against your kernel headers with a one-line Makefile (`obj-m += hello.o`) and `make -C /lib/modules/$(uname -r)/build M=$PWD`, then `insmod` and read `dmesg`. Promote it to a **character driver**: define a `file_operations` struct (`.read`, `.write`, `.open`), then register either the old `register_chrdev()` or the modern **`cdev`** pair `alloc_chrdev_region()` + `cdev_init()` + `cdev_add()`:\n\n```c\nstatic struct file_operations fops = { .owner=THIS_MODULE, .read=my_read, .write=my_write };\n```\n\nFor real hardware you go further: a **platform driver** matched to a node in the **device tree** (`of_match_table`) on its `compatible` string, then `ioremap()` the **MMIO** registers and `request_irq()` for interrupts -- exactly the radar/register-poking model, now inside the kernel. This connects directly to the embedded module later.",
+      "difficulty": 2,
+      "content": "When you write to `/dev/sda`, something has to actually move the disk and store the bytes. That something is a **driver**: a piece of kernel code that knows how to talk to one kind of hardware. Think of a universal TV remote: it only works once you load the right \"profile\" for your TV brand. A driver is that profile for a device.\n\nThe layers fit together like this: your program touches a **file in `/dev`**, the file is connected to a **driver**, and the driver controls the **hardware**.\n\nMany drivers are **modules**: separate pieces of kernel code you can add or remove while the computer is running, without rebooting. This keeps the core kernel small and lets the system load only what your hardware needs.\n\nYou can see and manage modules with a few commands:\n\n```bash\nlsmod                 # list the modules currently loaded\nmodinfo usbcore       # show details about one module (author, description)\nsudo modprobe e1000   # load a module (and anything it depends on)\nsudo modprobe -r e1000 # remove (unload) a module\n```\n\n`modprobe` is the smart, everyday tool: it finds the module by name and also loads anything that module needs. There are two lower-level tools you may meet: **`insmod`** loads one exact file, and **`rmmod`** removes one module, but neither handles dependencies, so `modprobe` is preferred.\n\nUsually you do not load modules by hand at all. The system **autoloads** the right driver when it detects matching hardware. If you ever need to *prevent* a particular driver from loading, you **blacklist** it in a configuration file under `/etc/modprobe.d/`:\n\n```bash\n# /etc/modprobe.d/blacklist-extra.conf\nblacklist nouveau\n```\n\n**Recap:** A driver is kernel code that knows how to run a specific device. Many drivers are loadable modules you can add (`modprobe`) or remove (`modprobe -r`) on the fly; `lsmod` lists them, and blacklisting stops one from autoloading.",
       "items": [
         {
-          "id": "devices-udev-drivers-fc-11",
-          "type": "flashcard",
-          "front": "What is a `.ko` file, and how does `insmod` differ from `modprobe`?",
-          "back": "A .ko is a compiled loadable kernel module. `insmod` loads exactly the file you name with no dependency handling. `modprobe` looks the module up in /lib/modules, resolves and loads dependencies via modules.dep, and honors /etc/modprobe.d/ options and blacklists."
-        },
-        {
-          "id": "devices-udev-drivers-fc-12",
-          "type": "flashcard",
-          "front": "What does `depmod` do and when must you run it?",
-          "back": "depmod scans installed modules and (re)builds modules.dep (and the alias map) that modprobe uses to resolve dependencies. Run it after installing/removing modules in /lib/modules (kernel package installs run it for you)."
-        },
-        {
-          "id": "devices-udev-drivers-fc-13",
-          "type": "flashcard",
-          "front": "What is the kernel taint flag and what commonly sets it?",
-          "back": "Taint marks the kernel as being in a state maintainers won't fully support. Loading an out-of-tree or proprietary/non-GPL module, force-loading, or a prior oops sets it. Check `dmesg` or /proc/sys/kernel/tainted; bug reports from tainted kernels are usually dismissed."
-        },
-        {
-          "id": "devices-udev-drivers-fc-14",
-          "type": "flashcard",
-          "front": "Where do you set persistent module parameters and blacklists?",
-          "back": "In files under /etc/modprobe.d/. e.g. `options snd_hda_intel power_save=1` sets a param; `blacklist nouveau` prevents autoloading. modprobe (and the initramfs) read these."
-        },
-        {
-          "id": "devices-udev-drivers-fc-15",
-          "type": "flashcard",
-          "front": "Why must a module's use count (refcount) be zero before `rmmod` succeeds?",
-          "back": "The count tracks open handles / dependent modules. Unloading while in use would free code still being executed and crash the kernel, so rmmod refuses (you see it in the lsmod 'Used by' column)."
-        },
-        {
-          "id": "devices-udev-drivers-fc-16",
-          "type": "flashcard",
-          "front": "In a char driver, what is the role of `struct file_operations`?",
-          "back": "It's a table of function pointers (.open, .read, .write, .release, .unlocked_ioctl, ...) that the kernel calls when user space performs the corresponding syscall on the device node. It maps VFS operations to your driver code."
-        },
-        {
-          "id": "devices-udev-drivers-fc-17",
-          "type": "flashcard",
-          "front": "How does a platform driver get bound to a hardware block, and how does it then reach the registers?",
-          "back": "It declares an of_match_table; the kernel matches the device tree node's `compatible` string to the driver and calls its probe(). The driver then ioremap()s the MMIO register region and uses request_irq() to claim the interrupt line."
-        },
-        {
-          "id": "devices-udev-drivers-mcq-7",
+          "id": "devices-udev-drivers-mcq-19",
           "type": "mcq",
-          "prompt": "You wrote hello.c. Which build command compiles it against the running kernel's headers?",
+          "prompt": "In simple terms, what is a device driver?",
           "choices": [
-            "gcc hello.c -o hello.ko",
-            "make -C /lib/modules/$(uname -r)/build M=$PWD",
-            "modprobe --build hello.c",
-            "insmod hello.c"
+            "A person who repairs computers",
+            "Kernel code that knows how to talk to a specific kind of hardware",
+            "A file that stores your documents",
+            "A type of network cable"
           ],
           "answerIndex": 1,
-          "explanation": "Kernel modules must be built with the kbuild system against matching kernel headers; `make -C .../build M=$PWD` (with `obj-m += hello.o`) does that. Plain gcc can't produce a valid .ko, and insmod/modprobe load, not build."
+          "explanation": "A driver is software inside the kernel that knows how to operate a particular device. It is the bridge between the /dev file and the real hardware."
         },
         {
-          "id": "devices-udev-drivers-mcq-8",
+          "id": "devices-udev-drivers-mcq-20",
           "type": "mcq",
-          "prompt": "Which is the MODERN, recommended way to register a character device (vs the legacy register_chrdev)?",
+          "prompt": "What is a kernel module?",
           "choices": [
-            "mknod() called from inside the module",
-            "alloc_chrdev_region() + cdev_init() + cdev_add()",
-            "platform_device_register() only",
-            "request_irq() on the device node"
+            "A piece of kernel code that can be loaded or unloaded while the system runs, without rebooting",
+            "A physical chip on the motherboard",
+            "A user account with admin rights",
+            "A backup of the whole operating system"
           ],
-          "answerIndex": 1,
-          "explanation": "The cdev interface -- reserve a dev_t range with alloc_chrdev_region, then cdev_init/cdev_add to bind your file_operations -- is the current model. register_chrdev is the older all-in-one shortcut. request_irq and platform_device_register serve different purposes."
+          "answerIndex": 0,
+          "explanation": "A module is kernel code (often a driver) that can be added or removed at runtime. This keeps the core kernel lean and lets it load only what is needed."
         },
         {
-          "id": "devices-udev-drivers-mcq-9",
+          "id": "devices-udev-drivers-mcq-21",
           "type": "mcq",
-          "prompt": "For an EE bringing up a custom memory-mapped peripheral on an ARM SoC, the path from device tree to register access is:",
+          "prompt": "The universal-remote analogy compares a driver to what?",
           "choices": [
-            "udev rule -> mknod -> read()/write()",
-            "compatible-string match -> probe() -> ioremap() MMIO -> request_irq()",
-            "insmod -> modprobe -> depmod -> lsmod",
-            "printk() -> dmesg -> sysfs"
+            "The remote's batteries",
+            "The correct profile that makes the remote work with your particular TV brand",
+            "The TV's power cord",
+            "The remote's plastic case"
           ],
           "answerIndex": 1,
-          "explanation": "The device tree's compatible string binds the platform driver, whose probe() runs; the driver ioremap()s the MMIO register block to get a virtual address and request_irq()s to handle interrupts -- the kernel-side analogue of poking radar registers."
+          "explanation": "Just as a universal remote needs the right profile for each TV brand, a device needs the right driver. The driver is the matching \"profile\" that knows how to control it."
+        },
+        {
+          "id": "devices-udev-drivers-mcq-22",
+          "type": "mcq",
+          "prompt": "Which command lists the kernel modules that are currently loaded?",
+          "choices": [
+            "lsmod",
+            "ls /home",
+            "modprobe -r",
+            "reboot"
+          ],
+          "answerIndex": 0,
+          "explanation": "`lsmod` shows the modules loaded right now. `modprobe -r` removes a module, and the others are unrelated."
+        },
+        {
+          "id": "devices-udev-drivers-mcq-23",
+          "type": "mcq",
+          "prompt": "Why is `modprobe` usually preferred over `insmod` for loading a module?",
+          "choices": [
+            "modprobe is faster at deleting files",
+            "modprobe also loads any other modules the one you asked for depends on",
+            "insmod only works on Tuesdays",
+            "insmod cannot load drivers at all"
+          ],
+          "answerIndex": 1,
+          "explanation": "`modprobe` resolves dependencies, loading anything the requested module needs. `insmod` loads only the single file you name and ignores dependencies."
+        },
+        {
+          "id": "devices-udev-drivers-mcq-24",
+          "type": "mcq",
+          "prompt": "Which command shows details about a module, such as its description and author?",
+          "choices": [
+            "modinfo",
+            "rmmod",
+            "mkdir",
+            "df"
+          ],
+          "answerIndex": 0,
+          "explanation": "`modinfo <name>` prints information about a module. `rmmod` unloads a module, `mkdir` makes folders, and `df` reports disk space."
+        },
+        {
+          "id": "devices-udev-drivers-mcq-25",
+          "type": "mcq",
+          "prompt": "On most systems, when does the correct driver for a piece of hardware get loaded?",
+          "choices": [
+            "Only after you manually type modprobe every time",
+            "Automatically, when the system detects matching hardware (autoloading)",
+            "Never; you must rebuild the kernel",
+            "Only when you reinstall the operating system"
+          ],
+          "answerIndex": 1,
+          "explanation": "Linux autoloads the matching driver when it detects the hardware, so you rarely load modules by hand. Manual modprobe is the exception, not the rule."
+        },
+        {
+          "id": "devices-udev-drivers-mcq-26",
+          "type": "mcq",
+          "prompt": "You want to stop a particular driver from loading automatically. What is this called, and where is it configured?",
+          "choices": [
+            "Deleting it from /dev",
+            "Blacklisting it, in a file under /etc/modprobe.d/",
+            "Renaming the hardware",
+            "Running lsmod twice"
+          ],
+          "answerIndex": 1,
+          "explanation": "Preventing a driver from autoloading is called blacklisting, set with a `blacklist <name>` line under /etc/modprobe.d/. Deleting /dev files or renaming hardware would not stop the driver."
+        },
+        {
+          "id": "devices-udev-drivers-mcq-27",
+          "type": "mcq",
+          "prompt": "A big advantage of drivers being loadable modules rather than baked into the kernel is that:",
+          "choices": [
+            "The screen gets brighter",
+            "You can add or remove a driver while the system is running, without rebooting",
+            "Files take up less disk space automatically",
+            "The computer never needs drivers at all"
+          ],
+          "answerIndex": 1,
+          "explanation": "Loadable modules can be added or removed on the fly, so the system loads only what it needs and you avoid rebooting to change drivers. Devices still need drivers, just modular ones."
+        },
+        {
+          "id": "devices-udev-drivers-img-3",
+          "type": "mcq",
+          "prompt": "(See the layered diagram.) It shows your program calling read/write, then a /dev file, then a driver, then the hardware. What role does the driver play in this stack?",
+          "choices": [
+            "It stores your files permanently",
+            "It is the translator between the /dev file and the physical device",
+            "It replaces the need for any hardware",
+            "It is the same thing as the program"
+          ],
+          "answerIndex": 1,
+          "explanation": "The diagram places the driver between the /dev file and the hardware, acting as the translator that turns file operations into real device actions.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/devices-udev-drivers-4.svg"
+        }
+      ]
+    },
+    {
+      "id": "devices-udev-drivers-lesson-4",
+      "title": "udev: Plug-and-Play and Stable Names",
+      "order": 4,
+      "difficulty": 2,
+      "content": "Plug in a USB stick and, a second later, you can use it. No reboot, no setup. The helper that makes this happen is **udev**, a background service that watches for hardware changes and creates the matching files in `/dev` automatically.\n\nHere is the chain of events:\n\n1. You plug in (or unplug) a device.\n2. The **kernel** notices and sends out a small notification called a **uevent** (a \"u\" for *user-space* event).\n3. The udev service catches that event, decides what the device is, and **creates the right `/dev` file** for it.\n\nThat is what \"plug and play\" means: the system reacts to the hardware on its own.\n\nYou can watch this happen live, then plug something in:\n\n```bash\nudevadm monitor          # watch device events as they occur\nudevadm info /dev/sda    # show what udev knows about a device\n```\n\nudev follows **rules**: small text instructions that say \"when you see a device like this, do that.\" Distribution defaults live in `/lib/udev/rules.d/`, and your own go in `/etc/udev/rules.d/`. One very common use of a rule is **stable naming**.\n\nThe problem: plug a USB drive into different ports and it might show up as `/dev/sdb` one day and `/dev/sdc` the next, because names are handed out in the order things are detected. A rule can recognize *your specific device* (by its built-in vendor and serial information) and always give it the same extra name, like `/dev/backup-drive`. The same idea gives network cards predictable names instead of a shuffling `eth0`/`eth1`.\n\n```bash\n# /etc/udev/rules.d/99-backup.rules\nSUBSYSTEM==\"block\", ATTRS{serial}==\"AB12CD34\", SYMLINK+=\"backup-drive\"\n```\n\n**Recap:** The kernel announces hardware changes with uevents; udev catches them and creates the right `/dev` files, giving plug-and-play. udev rules can also pin a stable name to a specific device so it is always reachable at the same path.",
+      "items": [
+        {
+          "id": "devices-udev-drivers-mcq-28",
+          "type": "mcq",
+          "prompt": "What is the main job of udev?",
+          "choices": [
+            "To compile the kernel",
+            "To watch for hardware changes and automatically create the matching files in /dev",
+            "To store your personal documents",
+            "To connect to the internet"
+          ],
+          "answerIndex": 1,
+          "explanation": "udev is the service that reacts to devices appearing or disappearing and creates (or removes) their /dev files automatically. That is what makes plug-and-play work."
+        },
+        {
+          "id": "devices-udev-drivers-mcq-29",
+          "type": "mcq",
+          "prompt": "When you plug in a device, what does the kernel send out to announce it?",
+          "choices": [
+            "An email",
+            "A uevent (a small device-change notification)",
+            "A new hard disk",
+            "A password prompt"
+          ],
+          "answerIndex": 1,
+          "explanation": "The kernel emits a uevent to announce that hardware appeared or went away. udev listens for these uevents and acts on them."
+        },
+        {
+          "id": "devices-udev-drivers-mcq-30",
+          "type": "mcq",
+          "prompt": "Put the plug-and-play steps in the right order.",
+          "choices": [
+            "udev creates the file, then the kernel notices, then you plug in",
+            "You plug in, the kernel sends a uevent, then udev creates the /dev file",
+            "You reboot, then the kernel deletes /dev, then udev rebuilds it",
+            "udev sends a uevent, then the kernel ignores it"
+          ],
+          "answerIndex": 1,
+          "explanation": "The order is: plug in, kernel sends a uevent, udev catches it and creates the right /dev file. No reboot is involved."
+        },
+        {
+          "id": "devices-udev-drivers-mcq-31",
+          "type": "mcq",
+          "prompt": "Why might the same USB drive sometimes appear as /dev/sdb and other times as /dev/sdc?",
+          "choices": [
+            "Because the drive changes its own name",
+            "Because these names are handed out in the order devices are detected",
+            "Because the drive is broken",
+            "Because /dev only allows one drive at a time"
+          ],
+          "answerIndex": 1,
+          "explanation": "Names like sdb and sdc are assigned in detection order, which can change between boots or ports. That is exactly why a stable-name udev rule is useful."
+        },
+        {
+          "id": "devices-udev-drivers-mcq-32",
+          "type": "mcq",
+          "prompt": "A udev rule can give a specific device a fixed extra name like /dev/backup-drive. What is the benefit?",
+          "choices": [
+            "The device runs faster",
+            "Scripts can always reach that device at the same path, no matter which port it uses",
+            "The device no longer needs a driver",
+            "It frees up disk space"
+          ],
+          "answerIndex": 1,
+          "explanation": "A stable name means your scripts and configs can rely on one path for that exact device, instead of guessing whether it became sdb or sdc this time."
+        },
+        {
+          "id": "devices-udev-drivers-mcq-33",
+          "type": "mcq",
+          "prompt": "Where do your own custom udev rules normally go?",
+          "choices": [
+            "/etc/udev/rules.d/",
+            "/dev/null",
+            "/home/rules/",
+            "/boot/"
+          ],
+          "answerIndex": 0,
+          "explanation": "Custom rules go in /etc/udev/rules.d/. The distribution's own default rules live separately in /lib/udev/rules.d/."
+        },
+        {
+          "id": "devices-udev-drivers-mcq-34",
+          "type": "mcq",
+          "prompt": "Which command lets you watch device events live as you plug hardware in?",
+          "choices": [
+            "udevadm monitor",
+            "lsmod",
+            "rm -rf /dev",
+            "echo monitor"
+          ],
+          "answerIndex": 0,
+          "explanation": "`udevadm monitor` prints device events as they happen, so you can plug something in and see the uevent. The other options do not monitor events."
+        },
+        {
+          "id": "devices-udev-drivers-mcq-35",
+          "type": "mcq",
+          "prompt": "Predictable network interface names (instead of a shuffling eth0/eth1) come from the same idea as stable device names. What produces them?",
+          "choices": [
+            "Random guessing by the kernel",
+            "udev rules that assign names based on stable hardware details",
+            "The user typing the name at every boot",
+            "The internet provider"
+          ],
+          "answerIndex": 1,
+          "explanation": "udev derives predictable names from stable information about the hardware, so an interface keeps the same name across reboots rather than depending on detection order."
+        },
+        {
+          "id": "devices-udev-drivers-mcq-36",
+          "type": "mcq",
+          "prompt": "What is a udev rule, in plain terms?",
+          "choices": [
+            "A law about who can use the computer",
+            "A small instruction that says \"when a device like this appears, do this\"",
+            "A type of hardware",
+            "A backup schedule"
+          ],
+          "answerIndex": 1,
+          "explanation": "A udev rule is a short instruction matching a kind of device and saying what to do (such as add a symlink or set a name). It is not about user permissions or hardware itself."
+        },
+        {
+          "id": "devices-udev-drivers-img-4",
+          "type": "mcq",
+          "prompt": "(See the four-step diagram.) It shows: plug in USB, kernel sends a uevent, udev reads its rules and creates the node, then /dev/sdb appears. What overall idea is it illustrating?",
+          "choices": [
+            "That devices only work after a reboot",
+            "Automatic plug-and-play: the device file appears on its own when you plug in",
+            "That udev deletes all your files",
+            "That the kernel ignores new hardware"
+          ],
+          "answerIndex": 1,
+          "explanation": "The diagram walks through plug-and-play: the kernel notices the new device, udev reacts, and the /dev file appears without any reboot or manual setup.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/devices-udev-drivers-5.svg"
+        }
+      ]
+    },
+    {
+      "id": "devices-udev-drivers-lesson-5",
+      "title": "A Peek Inside: What Writing a Driver Involves",
+      "order": 5,
+      "difficulty": 3,
+      "content": "You will probably never need to write a driver, but a gentle peek inside makes the whole picture click. This lesson is purely conceptual; no code to memorize.\n\nRecall the layers: a program uses a **`/dev` file**, which connects to a **driver**, which controls the **hardware**. A driver's job is to answer the basic file actions the program performs. When a program does `read` on the device file, the driver runs its own \"read\" routine; when the program does `write`, the driver runs its \"write\" routine. So a simple **character driver** is really just a small set of functions for open, read, and write that the kernel calls at the right moments. That set of functions is the driver's contract with the kernel.\n\nBut how does a driver get connected to the actual hardware in the first place? Two big situations:\n\n- **Devices that announce themselves.** Things on buses like USB or PCI report an ID when plugged in. The kernel reads the ID, finds the driver that claims that ID, and connects them. This is the autoloading you saw earlier.\n- **Devices that cannot announce themselves.** On many small computers (think a Raspberry Pi or other embedded boards), parts like sensors and controllers are wired directly to the chip and cannot say \"here I am.\" So the board ships with a **device tree**: a description file that lists what hardware exists and where. Each entry has a name string (a `compatible` string). The kernel reads the device tree, and for each entry it looks for a driver that says \"I handle that name.\" When the name matches, that driver is started for that device. This matching style is called a **platform driver**.\n\nThe key beginner takeaway is the matching idea: hardware (or its description) carries a name, and the driver that claims that name gets bound to it. Get the name wrong and the driver never connects, which is one of the most common embedded mistakes.\n\n**Recap:** A driver is a small set of functions (open/read/write) the kernel calls. It binds to hardware either by an ID the device reports (USB/PCI) or by a `compatible` name listed in the board's device tree (platform drivers on embedded systems).",
+      "items": [
+        {
+          "id": "devices-udev-drivers-mcq-37",
+          "type": "mcq",
+          "prompt": "At its simplest, what does a character driver provide?",
+          "choices": [
+            "A set of functions (like open, read, write) that the kernel calls when a program uses the device file",
+            "A backup copy of the hard disk",
+            "A new web browser",
+            "A faster internet connection"
+          ],
+          "answerIndex": 0,
+          "explanation": "A character driver supplies routines for actions like open, read, and write. When a program performs those on the /dev file, the kernel calls the driver's matching function."
+        },
+        {
+          "id": "devices-udev-drivers-mcq-38",
+          "type": "mcq",
+          "prompt": "When a program calls `read` on a device file, what happens inside the driver?",
+          "choices": [
+            "Nothing; drivers ignore reads",
+            "The driver's own read routine runs to fetch data from the device",
+            "The driver reboots the computer",
+            "The driver deletes the file"
+          ],
+          "answerIndex": 1,
+          "explanation": "The kernel routes the read to the driver's read routine, which gets the data from the hardware. That is how a file operation becomes a real device action."
+        },
+        {
+          "id": "devices-udev-drivers-mcq-39",
+          "type": "mcq",
+          "prompt": "How does a USB or PCI device usually get matched to its driver?",
+          "choices": [
+            "The user types the driver name every time",
+            "The device reports an ID, and the kernel finds the driver that claims that ID",
+            "The driver is chosen at random",
+            "There is no matching; all devices share one driver"
+          ],
+          "answerIndex": 1,
+          "explanation": "Bus devices like USB and PCI announce an ID. The kernel reads it and loads the driver that claims that ID, which is the autoloading behavior seen earlier."
+        },
+        {
+          "id": "devices-udev-drivers-mcq-40",
+          "type": "mcq",
+          "prompt": "Why do many embedded boards need a device tree?",
+          "choices": [
+            "To make the screen colorful",
+            "Because some hardware is wired directly to the chip and cannot announce itself, so it must be described",
+            "Because device trees replace the kernel",
+            "Because they have no drivers"
+          ],
+          "answerIndex": 1,
+          "explanation": "On small boards, parts like sensors are hardwired and cannot report an ID. The device tree describes what hardware exists and where, so the kernel can find drivers for it."
+        },
+        {
+          "id": "devices-udev-drivers-mcq-41",
+          "type": "mcq",
+          "prompt": "What is a device tree, in plain terms?",
+          "choices": [
+            "A list of users allowed to log in",
+            "A description file that lists what hardware is on a board and where it is",
+            "A type of network cable",
+            "A backup of /dev"
+          ],
+          "answerIndex": 1,
+          "explanation": "A device tree is a description of the board's hardware layout. It lets the kernel learn about parts that cannot announce themselves."
+        },
+        {
+          "id": "devices-udev-drivers-mcq-42",
+          "type": "mcq",
+          "prompt": "In a device tree, each hardware entry carries a name string (a `compatible` string). What is it used for?",
+          "choices": [
+            "To set the screen brightness",
+            "To match the entry to the driver that claims it handles that name",
+            "To store the device's data",
+            "To pick a password"
+          ],
+          "answerIndex": 1,
+          "explanation": "The compatible string is the matching key: the kernel looks for the driver that says it handles that name and binds them. Without a match, no driver connects."
+        },
+        {
+          "id": "devices-udev-drivers-mcq-43",
+          "type": "mcq",
+          "prompt": "A driver that binds to hardware described in the device tree (rather than to a self-announcing USB/PCI device) is called a:",
+          "choices": [
+            "Platform driver",
+            "Web driver",
+            "Block driver only",
+            "Password driver"
+          ],
+          "answerIndex": 0,
+          "explanation": "Drivers that match entries described in the device tree are called platform drivers. They are common on embedded systems where hardware does not announce itself."
+        },
+        {
+          "id": "devices-udev-drivers-mcq-44",
+          "type": "mcq",
+          "prompt": "On an embedded board, a driver exists but never connects to its device. What is a very common cause?",
+          "choices": [
+            "The compatible name in the device tree does not match the name the driver claims",
+            "The screen is turned off",
+            "There are too many files in /home",
+            "The USB stick is unplugged"
+          ],
+          "answerIndex": 0,
+          "explanation": "If the names do not match, the kernel cannot bind the driver to the device, so it never starts. A wrong compatible string is a classic embedded mistake."
+        },
+        {
+          "id": "devices-udev-drivers-mcq-45",
+          "type": "mcq",
+          "prompt": "What is the single biggest idea to take from how drivers bind to hardware?",
+          "choices": [
+            "Drivers must be rewritten for every boot",
+            "Hardware (or its description) carries a name, and the driver that claims that name gets bound to it",
+            "All hardware uses /dev/null",
+            "Drivers and programs are the same thing"
+          ],
+          "answerIndex": 1,
+          "explanation": "Binding is name-based matching: the device reports or is described by a name, and the matching driver claims it. That single idea covers both USB/PCI and device-tree cases."
+        },
+        {
+          "id": "devices-udev-drivers-img-5",
+          "type": "mcq",
+          "prompt": "(See the matching diagram.) A device-tree entry named acme,temp1 is matched to a driver that says \"I handle acme,temp1,\" producing a working device. What does the diagram emphasize?",
+          "choices": [
+            "That the name string is the key: if it does not match, the driver never binds",
+            "That drivers work without any hardware",
+            "That device trees are only for disks",
+            "That matching is random"
+          ],
+          "answerIndex": 0,
+          "explanation": "The diagram highlights name-based binding: the matching compatible string connects the description to the right driver, and a mismatch means no connection.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/devices-udev-drivers-6.svg"
         }
       ]
     }
