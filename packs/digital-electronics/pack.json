@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "id": "digital-electronics",
   "title": "Digital Electronics",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "description": "Digital electronics from scratch (beginner rework in progress): 14 sub-topics from number systems through HDL and FPGAs. Beginner-first readings, diagrams, tiered easy to hard.",
   "requires": [
     "analog-electronics"
@@ -6575,368 +6575,649 @@
       "lessons": [
         {
           "id": "adc-dac-adc-dac-1",
-          "title": "Sampling, Nyquist, Anti-Aliasing & Sample-and-Hold",
+          "title": "What ADCs and DACs Do",
           "order": 1,
           "difficulty": 1,
-          "content": "Every radar receiver and SDR front end has to turn a continuous voltage into numbers, and that act of **sampling** is where the bridge starts. Ideal sampling multiplies $x(t)$ by an impulse train of period $T_s = 1/f_s$, which in the frequency domain **replicates** the spectrum at every multiple of $f_s$. As long as the replicas do not overlap, the baseband copy is intact and the signal is recoverable.\n\nThe **Nyquist-Shannon theorem** gives the no-overlap condition: a signal bandlimited to $B$ Hz needs\n\n$$f_s > 2B.$$\n\nThe minimum $2B$ is the **Nyquist rate** (a signal property); $f_s/2$ is the **Nyquist frequency** or folding frequency (a sampler property). Energy above $f_s/2$ does not vanish - it **folds** back into band as an **alias**, masquerading as a legitimate lower-frequency tone you can never separate after the fact.\n\nThat is why an **anti-alias filter** (an analog low-pass ahead of the converter) is mandatory, not optional: it must attenuate everything above $f_s/2$ before sampling. Your Module 02 filter intuition applies directly - a sharper roll-off lets $f_s$ sit closer to $2B$.\n\nFinally, the **sample-and-hold (S/H)** circuit freezes the input on a capacitor during conversion so the value cannot drift while the converter works. The instant the switch opens defines the **aperture**; uncertainty in that instant (aperture jitter) becomes noise - the topic that ties back to clocking. Note: **bandpass sampling** deliberately exploits the folding to undersample a narrowband IF, sampling at twice the *bandwidth* rather than twice the carrier - a trick radar receivers use constantly.",
+          "content": "**Hook.** The world around you is *analog*: sound, light, and temperature all vary smoothly, taking any value in between. Computers, though, only understand *digital* data: numbers made of bits (0s and 1s). So how does your phone record your voice, or play back a song? It needs a translator.\n\n**Build.** That translator comes in two halves. An **ADC** (analog-to-digital converter) *listens*: it measures a smoothly-varying analog signal many times a second and turns each measurement into a number. A **DAC** (digital-to-analog converter) *speaks*: it takes a stream of numbers and rebuilds a smooth analog signal from them. They are mirror images of each other.\n\nEveryday examples make this concrete. A **microphone** feeding a recording app uses an ADC: the air-pressure wiggles of your voice (analog) become numbers stored in a file. A **speaker** playing that music uses a DAC: the stored numbers become a smooth voltage that pushes the speaker cone. A **digital thermometer** uses an ADC to turn a temperature into a number on its display. A **camera sensor** uses ADCs to turn the brightness hitting each pixel into numbers that form an image.\n\n**Recap.** Analog is smooth and continuous; digital is numbers. An ADC converts analog *into* numbers; a DAC converts numbers *back into* a smooth signal. Almost every device that senses or produces sound, images, or measurements has one or both inside.",
           "items": [
             {
               "id": "adc-dac-1-001",
-              "type": "flashcard",
-              "front": "What does sampling do to a signal's spectrum, and what is the recoverability condition?",
-              "back": "It replicates the spectrum at every multiple of $f_s$. Recovery is perfect if the replicas do not overlap, i.e. $f_s > 2B$ for a signal bandlimited to $B$.",
-              "hint": "Think impulse train -> spectral copies."
+              "type": "mcq",
+              "prompt": "What does an ADC (analog-to-digital converter) do?",
+              "choices": [
+                "Turns a smoothly-varying analog signal into numbers",
+                "Turns numbers back into a smooth analog signal",
+                "Makes a digital signal louder",
+                "Stores numbers in a file"
+              ],
+              "answerIndex": 0,
+              "explanation": "An ADC measures an analog signal and represents each measurement as a number (bits). Turning numbers back into a smooth signal is the job of a DAC, the mirror-image device."
             },
             {
               "id": "adc-dac-1-002",
-              "type": "flashcard",
-              "front": "Distinguish Nyquist rate from Nyquist frequency.",
-              "back": "Nyquist rate $= 2B$ is the minimum sample rate (a property of the signal). Nyquist frequency $= f_s/2$ is the folding frequency (a property of the sampler)."
+              "type": "mcq",
+              "prompt": "Which everyday device relies on a DAC (digital-to-analog converter)?",
+              "choices": [
+                "A microphone recording your voice into a file",
+                "A digital thermometer showing a temperature reading",
+                "A speaker playing back stored music",
+                "A camera sensor capturing a photo"
+              ],
+              "answerIndex": 2,
+              "explanation": "A speaker needs a smooth analog voltage built from the stored numbers, so it uses a DAC. The microphone, thermometer, and camera sensor all turn the analog world into numbers, which is the ADC direction."
             },
             {
               "id": "adc-dac-1-003",
-              "type": "flashcard",
-              "front": "What is aliasing, and why can't you fix it after sampling?",
-              "back": "Energy above $f_s/2$ folds back into band, appearing as a legitimate lower-frequency tone. Once folded it is indistinguishable from a real in-band signal, so no DSP can separate it."
+              "type": "mcq",
+              "prompt": "Why is the real world called 'analog'?",
+              "choices": [
+                "Because it is made of bits",
+                "Because signals vary smoothly and can take any value in between",
+                "Because computers can read it directly",
+                "Because it only has two states, on and off"
+              ],
+              "answerIndex": 1,
+              "explanation": "Analog signals (sound, light, temperature) change smoothly and can be any value. Digital data, by contrast, is made of discrete numbers built from two states (0 and 1)."
             },
             {
               "id": "adc-dac-1-004",
-              "type": "flashcard",
-              "front": "Why is the anti-alias filter mandatory, and where does it sit?",
-              "back": "It is an analog low-pass placed *before* the sampler. It must attenuate energy above $f_s/2$ so it cannot fold in. After sampling it is too late - the aliases are already in band."
+              "type": "mcq",
+              "prompt": "A digital thermometer shows the room is 21 degrees. Which converter turned the warmth into that number?",
+              "choices": [
+                "A DAC, because it produces an output",
+                "An ADC, because it measured an analog quantity and made a number",
+                "Neither; temperature is already digital",
+                "Both an ADC and a DAC working together"
+              ],
+              "answerIndex": 1,
+              "explanation": "Temperature is a smoothly-varying analog quantity. Turning it into a displayed number is the analog-to-digital direction, so it is an ADC."
             },
             {
               "id": "adc-dac-1-005",
-              "type": "flashcard",
-              "front": "What does a sample-and-hold (S/H) circuit do, and what is the aperture?",
-              "back": "It freezes the input on a hold capacitor so the value cannot drift during conversion. The aperture is the instant the switch opens (defining the sampled value); jitter in that instant becomes noise."
+              "type": "mcq",
+              "prompt": "How are an ADC and a DAC related?",
+              "choices": [
+                "They do exactly the same thing",
+                "They are mirror images: one converts analog to numbers, the other numbers to analog",
+                "A DAC is just a faster ADC",
+                "They both only work with digital data"
+              ],
+              "answerIndex": 1,
+              "explanation": "They perform opposite conversions. The ADC goes analog to digital; the DAC goes digital to analog. Together they form the bridge between the two worlds."
             },
             {
               "id": "adc-dac-1-006",
               "type": "mcq",
-              "prompt": "A baseband signal is bandlimited to $B = 20$ MHz. What is the minimum (Nyquist) sample rate for perfect reconstruction?",
+              "prompt": "Your phone records a voice memo and later plays it back. Which converters are used, and in what order?",
               "choices": [
-                "10 MHz",
-                "20 MHz",
-                "40 MHz",
-                "80 MHz"
+                "DAC to record, ADC to play back",
+                "ADC to record, DAC to play back",
+                "ADC for both record and playback",
+                "DAC for both record and playback"
               ],
-              "answerIndex": 2,
-              "explanation": "Nyquist rate $= 2B = 2 \\times 20\\,\\text{MHz} = 40$ MHz. Below this the replicas overlap and aliasing occurs."
+              "answerIndex": 1,
+              "explanation": "Recording turns sound (analog) into stored numbers, which is the ADC. Playback turns those numbers back into sound for the speaker, which is the DAC."
             },
             {
               "id": "adc-dac-1-007",
               "type": "mcq",
-              "prompt": "An ADC samples at $f_s = 100$ MS/s. A 130 MHz tone leaks past a weak anti-alias filter. At what frequency does it alias?",
+              "prompt": "Which of these is a digital signal rather than an analog one?",
               "choices": [
-                "30 MHz",
-                "70 MHz",
-                "130 MHz",
-                "230 MHz"
+                "The changing air pressure of a spoken word",
+                "The brightness of sunlight through a window",
+                "A list of numbers like 12, 47, 30 stored in a file",
+                "The smoothly rising temperature of a heating room"
               ],
-              "answerIndex": 0,
-              "explanation": "Aliases appear at $|f - k f_s|$. With $k=1$: $|130 - 100| = 30$ MHz, which lands below the 50 MHz Nyquist frequency."
+              "answerIndex": 2,
+              "explanation": "A list of discrete numbers is digital data. The other three are smoothly-varying physical quantities, which are analog and would need an ADC to digitize."
             },
             {
               "id": "adc-dac-1-008",
               "type": "mcq",
-              "prompt": "Why does bandpass (under)sampling let a radar digitize a narrowband IF below twice the carrier frequency?",
+              "prompt": "Why do we even need ADCs and DACs?",
               "choices": [
-                "It removes the need for a sample-and-hold",
-                "Nyquist constrains the signal bandwidth, not the absolute carrier frequency",
-                "Aliasing is eliminated entirely above the carrier",
-                "The quantization noise is lower at high frequencies"
+                "Because the analog world is smooth but computers only handle numbers",
+                "Because analog signals are always too weak to use",
+                "Because numbers cannot be stored without converting them",
+                "Because digital signals are slower than analog ones"
               ],
-              "answerIndex": 1,
-              "explanation": "The theorem constrains spectral support (bandwidth $B$). A narrowband IF can be sampled at just over $2B$ if a bandpass anti-alias filter isolates the band, deliberately using folding to bring it to baseband."
+              "answerIndex": 0,
+              "explanation": "The mismatch is the whole reason: real-world signals vary smoothly (analog) while computers work in numbers (digital). ADCs and DACs translate between the two."
             },
             {
               "id": "adc-dac-1-009",
               "type": "mcq",
-              "prompt": "Which statement about the anti-alias filter is correct?",
+              "prompt": "A camera sensor produces an image. What role does an ADC play inside it?",
               "choices": [
-                "A sharper analog roll-off lets $f_s$ sit closer to $2B$",
-                "It is applied digitally after the ADC",
-                "It only matters for sigma-delta converters",
-                "It corrects aliases that have already folded into band"
+                "It turns the stored image back into light",
+                "It measures the brightness at each pixel and turns it into a number",
+                "It makes the image brighter",
+                "It compresses the image file"
               ],
-              "answerIndex": 0,
-              "explanation": "A steeper analog filter attenuates out-of-band energy faster, shrinking the transition guard band so $f_s$ can approach $2B$. It must be analog and precede the sampler; nothing in DSP can undo folding."
+              "answerIndex": 1,
+              "explanation": "Each pixel collects an analog amount of light. The ADC measures that brightness and converts it into a number, and many such numbers together form the digital image."
             }
           ]
         },
         {
           "id": "adc-dac-adc-dac-2",
-          "title": "Quantization: LSB, SNR, Dynamic Range & Coding",
+          "title": "Sampling: Taking Snapshots in Time",
           "order": 2,
           "difficulty": 1,
-          "content": "Sampling discretizes *time*; **quantization** discretizes *amplitude*. An $N$-bit converter divides its full-scale span $V_{FS}$ into $2^N$ levels, so one **least-significant bit** is\n\n$$V_{LSB} = \\frac{V_{FS}}{2^N}.$$\n\nRounding each sample to the nearest level injects an error in $\\pm V_{LSB}/2$. Modeling that error as uniform white noise gives a quantization-noise RMS of $V_{LSB}/\\sqrt{12}$. Working the full-scale sine power against that noise yields the famous **ideal SNR**:\n\n$$\\mathrm{SNR}_{ideal} = 6.02N + 1.76\\,\\text{dB}.$$\n\nEach added bit buys about **6 dB** - the single most useful number in converter work. For a 12-bit converter that is $\\approx 74$ dB ideal SNR. **Dynamic range** (largest-to-smallest representable signal) tracks the same $6.02N$ slope and is what sets radar detection floor and how many simultaneous large and small returns you can resolve.\n\nThat $6.02N + 1.76$ figure is a *ceiling*. Real converters fall short of it (next lesson); and crucially you only get the full value with a near-full-scale input and a clean reference and clock. A noisy or temperature-drifting **reference** scales every code and directly eats SNR - in radar your analog grounding and reference instincts from Module 02 are exactly what protect this number.\n\n**Coding** maps levels to bit patterns: **straight binary** for unipolar inputs; **offset binary** for bipolar (mid-scale = 0); and **two's complement** for bipolar when the DSP wants signed arithmetic directly (just invert the MSB of offset binary). Choosing the right format avoids a needless format-conversion stage in the signal chain.",
+          "content": "**Hook.** An ADC cannot watch a signal every single instant; that would be infinite work. Instead it does what a movie camera does: it takes rapid snapshots. Each snapshot is one measurement of the signal's value at that moment. This is called **sampling**.\n\n**Build.** Imagine a wiggly line drawn on paper representing a sound wave. Sampling means putting a dot on that line at regular time intervals: maybe 44,100 times every second for CD-quality audio. Each dot is one **sample**, a single number giving the signal's height at that instant. The number of snapshots per second is the **sample rate**, measured in samples per second (often written S/s or Hz). Faster sampling captures more detail of fast wiggles.\n\nThere is a catch you have already met in the Mathematics pack: if you sample too slowly, fast wiggles get missed or, worse, *disguised* as slow ones. The rule of thumb (the Nyquist idea) is that the sample rate must be more than twice the highest frequency in the signal. Sample slower than that and you get **aliasing**: a fast tone masquerades as a wrong, lower tone, and once it happens you can never undo it.\n\nTo hold a clean value steady while the converter does its measuring, an ADC uses a tiny circuit called a **sample-and-hold**. It grabs the signal value at the snapshot instant and freezes it (on a small capacitor) so it cannot drift mid-measurement, like pausing a video on one frame.\n\n**Recap.** Sampling = taking snapshots of an analog signal at a steady rate. Sample fast enough (more than twice the highest frequency) or you get aliasing. A sample-and-hold freezes each snapshot so the converter has a stable value to read.",
           "items": [
             {
               "id": "adc-dac-2-001",
-              "type": "flashcard",
-              "front": "Give the LSB voltage of an $N$-bit converter with full scale $V_{FS}$.",
-              "back": "$V_{LSB} = \\dfrac{V_{FS}}{2^N}$. It is the smallest amplitude step the converter resolves; rounding error is within $\\pm V_{LSB}/2$."
+              "type": "mcq",
+              "prompt": "What is 'sampling' in an ADC?",
+              "choices": [
+                "Rounding a number to the nearest level",
+                "Taking measurements of the signal at regular instants in time",
+                "Amplifying the analog signal",
+                "Converting numbers back to a smooth wave"
+              ],
+              "answerIndex": 1,
+              "explanation": "Sampling is taking snapshots in time: measuring the signal's value at steady intervals. Rounding the value to a level is a separate step (quantization), covered in the next lesson.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/adc-dac-3.svg"
             },
             {
               "id": "adc-dac-2-002",
-              "type": "flashcard",
-              "front": "State the ideal SNR of an N-bit ADC and the rule of thumb it implies.",
-              "back": "$\\mathrm{SNR}_{ideal} = 6.02N + 1.76\\,\\text{dB}$ for a full-scale sine. Rule of thumb: every added bit buys about 6 dB of SNR."
+              "type": "mcq",
+              "prompt": "What does 'sample rate' mean?",
+              "choices": [
+                "How many bits each sample uses",
+                "How many snapshots the ADC takes per second",
+                "How loud the signal is",
+                "The highest voltage the ADC can measure"
+              ],
+              "answerIndex": 1,
+              "explanation": "Sample rate is the number of snapshots taken each second (samples per second). A higher rate captures faster changes. The number of bits per sample is resolution, a different idea."
             },
             {
               "id": "adc-dac-2-003",
-              "type": "flashcard",
-              "front": "Where does the 1.76 dB term and the $6.02N$ slope come from?",
-              "back": "Quantization error modeled as uniform noise has RMS $V_{LSB}/\\sqrt{12}$. Ratioing a full-scale sine's RMS to that, in dB, yields $6.02N + 10\\log_{10}(1.5) = 6.02N + 1.76\\,\\text{dB}$."
+              "type": "mcq",
+              "prompt": "A good rule of thumb says the sample rate should be at least how large compared to the highest frequency in the signal?",
+              "choices": [
+                "The same as the highest frequency",
+                "Half the highest frequency",
+                "More than twice the highest frequency",
+                "Ten times the highest frequency"
+              ],
+              "answerIndex": 2,
+              "explanation": "This is the Nyquist idea: sample faster than twice the highest frequency present. Sampling slower lets fast tones alias into wrong lower tones."
             },
             {
               "id": "adc-dac-2-004",
-              "type": "flashcard",
-              "front": "How does a noisy or drifting voltage reference degrade an ADC?",
-              "back": "Every code is measured relative to the reference, so reference noise/drift scales the whole transfer function - adding noise and gain error and directly reducing achievable SNR. Clean grounding and a quiet reference protect the ideal number."
+              "type": "mcq",
+              "prompt": "What is 'aliasing'?",
+              "choices": [
+                "When the signal is too quiet to measure",
+                "When a fast tone, sampled too slowly, masquerades as a wrong lower tone",
+                "When the ADC runs out of numbers",
+                "When two samples have the same value"
+              ],
+              "answerIndex": 1,
+              "explanation": "Aliasing happens when sampling is too slow: high-frequency content folds down and pretends to be a lower frequency. Once it has happened it cannot be undone."
             },
             {
               "id": "adc-dac-2-005",
-              "type": "flashcard",
-              "front": "Contrast straight binary, offset binary, and two's-complement output coding.",
-              "back": "Straight binary: unipolar, all-zeros = bottom of scale. Offset binary: bipolar, mid-scale = 0. Two's complement: bipolar signed for direct DSP - obtained by inverting the MSB of offset binary."
+              "type": "mcq",
+              "prompt": "What does a sample-and-hold circuit do?",
+              "choices": [
+                "It rounds each sample to the nearest level",
+                "It freezes the signal value at the snapshot instant so it stays steady during measurement",
+                "It increases the sample rate",
+                "It removes aliasing after sampling"
+              ],
+              "answerIndex": 1,
+              "explanation": "A sample-and-hold grabs the value at the sampling instant and holds it steady (on a small capacitor) so it cannot drift while the converter measures it, like pausing on one video frame."
             },
             {
               "id": "adc-dac-2-006",
               "type": "mcq",
-              "prompt": "A 12-bit ADC has a 2.048 V full-scale range. What is one LSB?",
+              "prompt": "CD-quality audio samples 44,100 times per second. What does that number describe?",
               "choices": [
-                "0.5 mV",
-                "1 mV",
-                "2 mV",
-                "4 mV"
+                "The number of bits in each sample",
+                "The sample rate",
+                "The loudness of the music",
+                "The number of audio channels"
               ],
-              "answerIndex": 0,
-              "explanation": "$V_{LSB} = V_{FS}/2^N = 2.048\\,\\text{V} / 4096 = 0.5$ mV."
+              "answerIndex": 1,
+              "explanation": "44,100 samples per second is the sample rate. It was chosen to be more than twice the roughly 20 kHz top of human hearing, satisfying the Nyquist rule."
             },
             {
               "id": "adc-dac-2-007",
               "type": "mcq",
-              "prompt": "What is the ideal SNR of a 14-bit ADC for a full-scale sinusoid?",
+              "prompt": "Why is sampling compared to a movie camera?",
               "choices": [
-                "around 74 dB",
-                "around 80 dB",
-                "around 86 dB",
-                "around 92 dB"
+                "Both make colors brighter",
+                "Both take rapid snapshots that together represent smooth motion or change",
+                "Both store data as analog signals",
+                "Both need a sample-and-hold to play sound"
               ],
-              "answerIndex": 2,
-              "explanation": "$6.02 \\times 14 + 1.76 = 84.3 + 1.76 \\approx 86$ dB."
+              "answerIndex": 1,
+              "explanation": "A movie is a series of still frames played fast; sampling is a series of value snapshots taken fast. Each is a discrete record of something that actually changes smoothly."
             },
             {
               "id": "adc-dac-2-008",
               "type": "mcq",
-              "prompt": "A design needs about 96 dB of ideal SNR. What is the minimum resolution?",
+              "prompt": "You record a sound that contains a 5 kHz tone but set the sample rate to only 6,000 samples per second. What is the likely result?",
               "choices": [
-                "12 bits",
-                "14 bits",
-                "16 bits",
-                "18 bits"
+                "Perfect, detailed reproduction of the tone",
+                "Aliasing, because the rate is not more than twice 5 kHz",
+                "The tone becomes louder",
+                "Nothing changes; sample rate does not matter"
               ],
-              "answerIndex": 2,
-              "explanation": "Solve $6.02N + 1.76 \\ge 96 \\Rightarrow N \\ge 15.65$, so 16 bits (giving $\\approx 98$ dB). 14 bits gives only $\\approx 86$ dB."
+              "answerIndex": 1,
+              "explanation": "More than twice 5 kHz means more than 10,000 samples per second. At only 6,000, the rule is broken and the 5 kHz tone will alias to a wrong lower frequency."
             },
             {
               "id": "adc-dac-2-009",
               "type": "mcq",
-              "prompt": "Why is two's-complement output coding often preferred for a converter feeding an FPGA DSP datapath?",
+              "prompt": "Can aliasing be removed by clever processing after the signal has been sampled?",
               "choices": [
-                "It doubles the dynamic range",
-                "Signed arithmetic units consume it directly with no format conversion",
-                "It is immune to reference noise",
-                "It eliminates quantization noise"
+                "Yes, software can always undo it",
+                "No, once a tone has folded to the wrong frequency it is indistinguishable from a real one",
+                "Yes, but only for very loud signals",
+                "No, but only because computers are too slow"
               ],
               "answerIndex": 1,
-              "explanation": "DSP adders/MACs operate on two's-complement signed numbers (Module 1). Outputting that format directly avoids inserting an offset-binary-to-signed conversion stage in the pipeline."
+              "explanation": "Once aliasing occurs, the disguised tone looks exactly like a genuine low-frequency tone, so nothing later can tell them apart. That is why it must be prevented before sampling."
             }
           ]
         },
         {
           "id": "adc-dac-adc-dac-3",
-          "title": "Real-Converter Metrics & ADC Architectures",
+          "title": "Resolution: Bits, Levels, and the Staircase",
           "order": 3,
-          "difficulty": 2,
-          "content": "Real converters never reach $6.02N + 1.76$ dB, so we measure them. **SINAD** (signal-to-noise-and-distortion) is the ratio of signal to *all* unwanted energy - noise plus harmonics. Inverting the ideal SNR formula on the measured SINAD gives the **ENOB**:\n\n$$\\mathrm{ENOB} = \\frac{\\mathrm{SINAD} - 1.76}{6.02}.$$\n\nENOB is the bits you *actually* get; a 12-bit part with 10.5 ENOB is really a 10.5-bit converter at that input frequency. **SFDR** (spurious-free dynamic range) is the gap from the fundamental to the worst spur - critical in radar, where a spur can mimic a target. **THD** sums the harmonic distortion power. These are AC metrics, usually read from an FFT of captured samples.\n\nThe DC/linearity metrics: **DNL** (differential nonlinearity) is each step's deviation from one ideal LSB; DNL $< -1$ LSB means a **missing code**. **INL** (integral nonlinearity) is the accumulated deviation of the transfer curve from a straight line. **Offset** and **gain** errors are the familiar intercept and slope errors.\n\n**Architectures**, fast to slow: **Flash** - $2^N - 1$ comparators in parallel, one clock, GS/s speeds but low resolution and huge area/power (used in the fastest front ends and as sub-stages). **SAR** - a binary search using one comparator and an internal DAC, N clocks per sample; the low-power embedded workhorse (1 kS/s to ~10 MS/s, 8-18 bits). **Pipelined** - a chain of low-res flash stages with inter-stage gain, giving high speed *and* resolution; the dominant choice for radar/SDR IF digitizing. **Integrating / dual-slope** - charges and discharges an integrator; very slow but very linear, used in precision meters. **Sigma-delta** is covered next lesson.",
+          "difficulty": 1,
+          "content": "**Hook.** Sampling decided *when* to measure. Now we ask: how finely can the ADC record the *value* it measured? This is called **resolution**, and it is set by the number of bits used per sample.\n\n**Build.** Think of a ruler. A ruler marked only in whole centimetres rounds everything to the nearest centimetre; one marked in millimetres is far finer. An ADC works the same way, but its marks are spaced by powers of two. An **N-bit** converter can produce $2^N$ different numbers, so it splits its full measuring range into $2^N$ equally-spaced **levels**.\n\nExamples: 1 bit gives $2^1 = 2$ levels; 2 bits give 4; 8 bits give $2^8 = 256$ levels; 12 bits give $2^{12} = 4096$ levels. More bits means more levels, finer steps, and a more faithful number.\n\nThe size of one step is the smallest change the ADC can tell apart. It is called one **LSB** (least-significant bit), and it equals the full-scale range divided by the number of levels:\n\n$$V_{LSB} = \\frac{\\text{full-scale range}}{2^N}.$$\n\nFor example, a 0 to 4 volt range with 12 bits gives $4\\,\\text{V} / 4096 \\approx 0.98$ mV per step.\n\nBecause real values rarely land exactly on a level, the ADC **rounds** to the nearest one. Plotting these rounded values against the smooth original produces a **staircase** instead of a smooth curve. The tiny rounding error at each step is called **quantization noise**: small wrongness that is the unavoidable price of using a finite number of levels.\n\n**Recap.** Resolution is bits per sample. An N-bit converter has $2^N$ levels; one step is 1 LSB = range divided by $2^N$. Rounding to the nearest level makes a staircase and adds a little quantization noise. More bits = finer steps = smaller noise.",
           "items": [
             {
               "id": "adc-dac-3-001",
-              "type": "flashcard",
-              "front": "What is SINAD, and how does it relate to ENOB?",
-              "back": "SINAD is signal-to-(noise+distortion) ratio - all unwanted energy in the denominator. $\\mathrm{ENOB} = \\dfrac{\\mathrm{SINAD} - 1.76}{6.02}$, the effective resolution actually achieved."
+              "type": "mcq",
+              "prompt": "How many distinct levels does an 8-bit ADC have?",
+              "choices": [
+                "8 levels",
+                "16 levels",
+                "256 levels",
+                "1024 levels"
+              ],
+              "answerIndex": 2,
+              "explanation": "An N-bit converter has 2 to the N levels. For N = 8 that is 2^8 = 256. The common mistake is to use the number of bits (8) directly instead of raising 2 to that power.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/adc-dac-4.svg"
             },
             {
               "id": "adc-dac-3-002",
-              "type": "flashcard",
-              "front": "Define SFDR and explain why radar cares about it.",
-              "back": "Spurious-free dynamic range is the dB gap from the fundamental to the largest spur. A large spur can masquerade as a false target return, so high SFDR is essential for clean detection."
+              "type": "mcq",
+              "prompt": "What does 'resolution' refer to for an ADC?",
+              "choices": [
+                "How many snapshots it takes per second",
+                "How many bits (and therefore levels) it uses per sample",
+                "How loud the signal is",
+                "How long the conversion takes"
+              ],
+              "answerIndex": 1,
+              "explanation": "Resolution is the fineness of the value measurement, set by bits per sample. Snapshots per second is the sample rate, a separate property."
             },
             {
               "id": "adc-dac-3-003",
-              "type": "flashcard",
-              "front": "Distinguish DNL from INL, and what causes a missing code.",
-              "back": "DNL is each step's deviation from one ideal LSB; INL is the accumulated (integral) deviation of the transfer curve from a straight line. DNL $< -1$ LSB means a code is never output - a missing code."
+              "type": "mcq",
+              "prompt": "A 12-bit ADC measures a 0 to 4 volt range. Roughly what is the size of one LSB (one step)?",
+              "choices": [
+                "About 1 mV",
+                "About 4 mV",
+                "About 0.33 V",
+                "About 1 V"
+              ],
+              "answerIndex": 0,
+              "explanation": "One LSB = range / 2^N = 4 V / 4096 (since 2^12 = 4096), which is about 0.98 mV, roughly 1 mV. That is the smallest change this ADC can resolve."
             },
             {
               "id": "adc-dac-3-004",
-              "type": "flashcard",
-              "front": "Describe the flash ADC and its trade-offs.",
-              "back": "Uses $2^N - 1$ comparators against a resistor-ladder reference, resolving in a single clock - GS/s fast. Cost: comparator count and power grow as $2^N$, so it is limited to low resolution (and used as sub-stages elsewhere)."
+              "type": "mcq",
+              "prompt": "What is 'quantization noise'?",
+              "choices": [
+                "Noise picked up from nearby radios",
+                "The small error from rounding each sample to the nearest available level",
+                "Aliasing of high frequencies",
+                "Electrical hum from the power supply"
+              ],
+              "answerIndex": 1,
+              "explanation": "Because values rarely fall exactly on a level, the ADC rounds, and that small rounding error is quantization noise. It is the unavoidable cost of having only a finite number of levels."
             },
             {
               "id": "adc-dac-3-005",
-              "type": "flashcard",
-              "front": "How does a SAR ADC work, and where does it fit?",
-              "back": "A successive-approximation register runs a binary search: each clock it sets a bit, compares $V_{in}$ to an internal DAC, and keeps or clears it. N clocks per N-bit sample. Low power, moderate speed - the embedded workhorse.",
-              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/adc-dac-1.svg"
+              "type": "mcq",
+              "prompt": "Why does plotting an ADC's output against the smooth input look like a staircase?",
+              "choices": [
+                "Because the signal is sampled too slowly",
+                "Because each value is rounded to one of a finite set of levels, so it jumps in steps",
+                "Because the ADC adds extra noise on purpose",
+                "Because the input itself is a staircase"
+              ],
+              "answerIndex": 1,
+              "explanation": "Quantization forces every measurement onto a discrete level. Holding each level until the next sample produces flat steps, hence the staircase shape against the smooth original."
             },
             {
               "id": "adc-dac-3-006",
               "type": "mcq",
-              "prompt": "A 12-bit ADC datasheet specifies SINAD = 68 dB at the input frequency of interest. What is its ENOB?",
+              "prompt": "Which converter resolves finer detail in the measured value: a 10-bit or a 14-bit ADC (same range)?",
               "choices": [
-                "10.0 bits",
-                "11.0 bits",
-                "11.3 bits",
-                "12.0 bits"
+                "The 10-bit, because fewer bits means bigger steps",
+                "The 14-bit, because more bits means more levels and smaller steps",
+                "They are identical; bits do not affect detail",
+                "It depends only on the sample rate"
               ],
               "answerIndex": 1,
-              "explanation": "$\\mathrm{ENOB} = (68 - 1.76)/6.02 = 66.24/6.02 \\approx 11.0$ bits. The part delivers ~11 of its nominal 12 bits."
+              "explanation": "More bits means more levels (2^14 = 16384 vs 2^10 = 1024) over the same range, so each step is smaller and the value is recorded more finely."
             },
             {
               "id": "adc-dac-3-007",
               "type": "mcq",
-              "prompt": "Which architecture is the typical choice for digitizing a radar/SDR IF that needs both high speed (>100 MS/s) and 12-16 bit resolution?",
+              "prompt": "A 3-bit ADC covers a 0 to 8 volt range. What is one LSB?",
               "choices": [
-                "Dual-slope integrating",
-                "Pipelined",
-                "Successive-approximation (SAR)",
-                "Single-comparator flash"
+                "0.5 V",
+                "1 V",
+                "2 V",
+                "8 V"
               ],
               "answerIndex": 1,
-              "explanation": "Pipelined ADCs chain low-resolution flash stages with inter-stage gain, achieving high sample rates with good resolution - the standard for radar/SDR front ends. SAR is too slow; dual-slope far too slow; pure flash too low-resolution."
+              "explanation": "3 bits gives 2^3 = 8 levels, so one LSB = 8 V / 8 = 1 V. Each step is one volt."
             },
             {
               "id": "adc-dac-3-008",
               "type": "mcq",
-              "prompt": "A 10-bit ADC reports a DNL of -1.2 LSB at one code transition. What does this imply?",
+              "prompt": "If you double an ADC's full-scale range but keep the number of bits the same, what happens to the LSB step size?",
               "choices": [
-                "The converter has excellent linearity",
-                "A code is missing (never output)",
-                "The gain error is 1.2 LSB",
-                "The offset error is 1.2 LSB"
+                "It stays the same",
+                "It doubles, because the same number of levels now spans a wider range",
+                "It halves",
+                "It becomes zero"
               ],
               "answerIndex": 1,
-              "explanation": "DNL more negative than -1 LSB means the step width is negative-going enough that an output code is skipped entirely - a missing code."
+              "explanation": "LSB = range / 2^N. With the same N (same number of levels) but twice the range, each step is twice as large, so the LSB doubles."
             },
             {
               "id": "adc-dac-3-009",
               "type": "mcq",
-              "prompt": "Which converter is best for a high-accuracy bench multimeter where speed is irrelevant?",
+              "prompt": "Generally, how do you make quantization noise smaller for a given signal range?",
               "choices": [
-                "Flash",
-                "Pipelined",
-                "Dual-slope integrating",
-                "SAR at maximum clock"
+                "Use fewer bits",
+                "Use more bits, giving more levels and smaller rounding steps",
+                "Sample more slowly",
+                "Increase the full-scale range"
               ],
-              "answerIndex": 2,
-              "explanation": "Dual-slope integrating converters are slow but extremely linear and inherently reject mains-frequency noise when the integration window is chosen accordingly - the classic precision-meter architecture."
+              "answerIndex": 1,
+              "explanation": "More bits means finer levels, so the rounding error at each step is smaller. Fewer bits or a wider range both make the steps coarser and the noise larger."
             }
           ]
         },
         {
           "id": "adc-dac-adc-dac-4",
-          "title": "Sigma-Delta, DAC Architectures, Reconstruction & Jitter",
+          "title": "Quality Specs and the Anti-Alias Filter",
           "order": 4,
-          "difficulty": 3,
-          "content": "**Sigma-delta ($\\Delta\\Sigma$)** converters trade speed for resolution using three ideas. **Oversampling** at rate $OSR \\times$ Nyquist spreads the same quantization noise over a wider band, lowering in-band noise by $10\\log_{10}(OSR)$ dB (about 3 dB, half a bit, per octave). **Noise shaping** - a feedback loop with an integrator - pushes quantization noise *up* in frequency, out of the band of interest; an $L$-th-order loop gains an extra $(2L+1)\\cdot 3$ dB per octave. **Decimation** then digitally low-pass filters and downsamples to Nyquist. The result: 1-bit-ish front end, 24-bit output, ideal for audio, weigh scales, and instrumentation - but high latency.\n\n**DAC architectures** mirror the ADCs. **Binary-weighted**: one switched current/resistor per bit weighted $1,2,4,\\dots$; simple but needs an impractically wide range of matched values at high N. **R-2R ladder**: only two resistor values repeated, far easier to match in silicon - the workhorse. **String (Kelvin)**: $2^N$ equal resistors tapped by a switch - inherently monotonic, used in low-resolution and as fine stages. **Sigma-delta DAC**: a 1-bit high-rate stream smoothed to an analog level.\n\nEvery DAC output is a staircase, so it needs a **reconstruction filter** - an analog low-pass that removes the images at multiples of $f_s$ and smooths the steps (the dual of the anti-alias filter). **Interpolation** (digital upsampling before the DAC) eases this filter, just as oversampling eases the anti-alias filter.\n\nFinally, **aperture jitter** $t_j$ caps SNR independent of resolution: $\\mathrm{SNR}_{jitter} = -20\\log_{10}(2\\pi f_{in} t_j)$. At high input frequencies a few hundred femtoseconds of clock jitter can dominate - which is exactly why radar obsesses over clock purity and why analog/digital ground separation matters.",
+          "difficulty": 2,
+          "content": "**Hook.** We now know more bits give finer steps. But how do engineers put a single number on 'how clean' a converter is, and how do they stop aliasing before it ever happens? Two ideas answer this: signal-to-noise ratio and the anti-alias filter.\n\n**Build.** **Signal-to-noise ratio (SNR)** compares how big the wanted signal is to how big the unwanted noise is, expressed in decibels (dB, a logarithmic scale where bigger means cleaner). For an ideal ADC limited only by quantization noise, the best possible SNR works out to a neat formula:\n\n$$\\mathrm{SNR} \\approx 6.02\\,N + 1.76 \\ \\text{dB},$$\n\nwhere $N$ is the number of bits. The useful takeaway: each extra bit buys about **6 dB** of cleanliness. So a 12-bit converter tops out around $6.02 \\times 12 + 1.76 \\approx 74$ dB. A closely related idea is **dynamic range**: the gap between the largest and smallest signals the converter can handle at once, which also grows by about 6 dB per bit.\n\nReal parts never quite reach the ideal, so datasheets quote **ENOB** (effective number of bits): the bits you *actually* get after real-world noise and distortion. A chip sold as 12-bit might deliver only 10.5 ENOB.\n\nFinally, recall that aliasing cannot be undone after sampling. The fix is an **anti-alias filter**: an analog low-pass filter placed *before* the ADC that removes (blocks) any frequency too high to be sampled correctly. A low-pass filter lets low frequencies through and blocks high ones. Because it must act on the smooth analog signal before sampling, it is mandatory, not optional.\n\n**Recap.** SNR (in dB) measures cleanliness; ideally about 6.02N + 1.76 dB, so roughly 6 dB per bit, and dynamic range follows the same slope. ENOB is the honest, real-world bit count. An anti-alias filter sits before the ADC and blocks too-high frequencies so aliasing never happens.",
           "items": [
             {
               "id": "adc-dac-4-001",
-              "type": "flashcard",
-              "front": "Name the three mechanisms a sigma-delta ADC uses to win resolution.",
-              "back": "Oversampling (spreads quantization noise over a wider band), noise shaping (a feedback integrator pushes noise out of band), and decimation (digital LPF + downsample to Nyquist)."
+              "type": "mcq",
+              "prompt": "What does signal-to-noise ratio (SNR) describe?",
+              "choices": [
+                "How fast the ADC samples",
+                "How big the wanted signal is compared to the unwanted noise",
+                "How many bits the ADC uses",
+                "The full-scale voltage range"
+              ],
+              "answerIndex": 1,
+              "explanation": "SNR compares signal size to noise size, usually in decibels. A higher SNR means a cleaner signal. It is related to, but not the same as, the bit count."
             },
             {
               "id": "adc-dac-4-002",
-              "type": "flashcard",
-              "front": "How much in-band SNR does plain oversampling (no shaping) buy per doubling of OSR?",
-              "back": "About $10\\log_{10}(2) \\approx 3$ dB per octave - roughly half a bit. Noise shaping of order $L$ adds much more: an extra $(2L+1)\\cdot 3$ dB per octave."
+              "type": "mcq",
+              "prompt": "Using SNR (in dB) approximately equal to 6.02N + 1.76, what is the ideal SNR of a 12-bit converter?",
+              "choices": [
+                "About 50 dB",
+                "About 62 dB",
+                "About 74 dB",
+                "About 98 dB"
+              ],
+              "answerIndex": 2,
+              "explanation": "6.02 times 12 is 72.24, plus 1.76 gives about 74 dB. Each bit adds roughly 6 dB, so 12 bits lands near 74."
             },
             {
               "id": "adc-dac-4-003",
-              "type": "flashcard",
-              "front": "Why is the R-2R ladder preferred over a binary-weighted DAC?",
-              "back": "It uses only two resistor values (R and 2R) repeated, which silicon can match precisely. Binary-weighting needs values spanning $2^N$ - impossible to match accurately at high resolution.",
-              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/adc-dac-2.svg"
+              "type": "mcq",
+              "prompt": "Roughly how much extra SNR does each additional bit of resolution provide?",
+              "choices": [
+                "About 1 dB",
+                "About 3 dB",
+                "About 6 dB",
+                "About 12 dB"
+              ],
+              "answerIndex": 2,
+              "explanation": "The 6.02N term means each bit adds about 6 dB. This 'about 6 dB per bit' is the single handiest rule for converters."
             },
             {
               "id": "adc-dac-4-004",
-              "type": "flashcard",
-              "front": "What is the reconstruction filter, and how does it relate to the anti-alias filter?",
-              "back": "An analog low-pass after the DAC that removes the spectral images at multiples of $f_s$ and smooths the output staircase. It is the dual (mirror) of the input anti-alias filter."
+              "type": "mcq",
+              "prompt": "What does ENOB (effective number of bits) tell you?",
+              "choices": [
+                "The maximum number of bits the chip's package can hold",
+                "The real-world bit count after actual noise and distortion, often less than the nominal rating",
+                "The number of samples per second",
+                "The size of the full-scale range"
+              ],
+              "answerIndex": 1,
+              "explanation": "ENOB is the honest performance: how many bits the converter effectively delivers in practice. A nominal 12-bit part might show only 10.5 ENOB once real noise is included."
             },
             {
               "id": "adc-dac-4-005",
-              "type": "flashcard",
-              "front": "Give the jitter-limited SNR relation and its key consequence.",
-              "back": "$\\mathrm{SNR}_{jitter} = -20\\log_{10}(2\\pi f_{in} t_j)$. It depends on input frequency, not resolution - so at high $f_{in}$ a tiny clock jitter can cap SNR below the converter's ENOB."
+              "type": "mcq",
+              "prompt": "Where must an anti-alias filter be placed, and what kind of filter is it?",
+              "choices": [
+                "After the ADC, as a digital high-pass filter",
+                "Before the ADC, as an analog low-pass filter",
+                "Inside the file storage, as a compressor",
+                "After the DAC, as an analog band-pass filter"
+              ],
+              "answerIndex": 1,
+              "explanation": "It must act on the smooth analog signal before sampling, and it is a low-pass filter (passes lows, blocks highs) so that too-high frequencies are removed before they can alias."
             },
             {
               "id": "adc-dac-4-006",
               "type": "mcq",
-              "prompt": "A first-order ($L=1$) sigma-delta modulator is oversampled. Roughly how much in-band SNR is gained per octave of OSR increase?",
+              "prompt": "Why is the anti-alias filter mandatory rather than optional?",
               "choices": [
-                "3 dB",
-                "6 dB",
-                "9 dB",
-                "12 dB"
+                "Because it makes the signal louder",
+                "Because aliasing cannot be undone after sampling, so high frequencies must be removed beforehand",
+                "Because it adds more bits to the result",
+                "Because it speeds up the ADC"
               ],
-              "answerIndex": 2,
-              "explanation": "Oversampling alone gives 3 dB/octave; first-order noise shaping adds $(2L+1)\\cdot 3 = 3\\times 3 = 9$ dB/octave total (about 1.5 bits per octave)."
+              "answerIndex": 1,
+              "explanation": "Once a high frequency aliases, it is permanently disguised as a wrong low frequency. The only cure is prevention: block the too-high frequencies before sampling."
             },
             {
               "id": "adc-dac-4-007",
               "type": "mcq",
-              "prompt": "Which DAC architecture is inherently monotonic because it taps a chain of equal resistors with a single switch?",
+              "prompt": "A datasheet says a part is '16-bit' but lists an ENOB of 13.5. What is the practical meaning?",
               "choices": [
-                "Binary-weighted",
-                "R-2R ladder",
-                "String (Kelvin divider)",
-                "Sigma-delta"
+                "The part is broken",
+                "It behaves like a roughly 13.5-bit converter in real use, despite its 16-bit label",
+                "It samples 16,000 times per second",
+                "Its range is 13.5 volts"
               ],
-              "answerIndex": 2,
-              "explanation": "A string DAC connects $2^N$ equal resistors in series and selects a tap; because the tap only moves up the divider, the output can never decrease as the code increases - guaranteed monotonic."
+              "answerIndex": 1,
+              "explanation": "ENOB is the honest figure. Real-world noise and distortion cost it bits, so a 16-bit-labelled part performing at 13.5 ENOB really delivers about 13.5 bits of clean resolution."
             },
             {
               "id": "adc-dac-4-008",
               "type": "mcq",
-              "prompt": "An ADC digitizes a 100 MHz input. To keep jitter-limited SNR above 70 dB, what is the approximate maximum allowable aperture jitter?",
+              "prompt": "What is 'dynamic range'?",
               "choices": [
-                "about 0.5 ps",
-                "about 5 ps",
-                "about 50 ps",
-                "about 500 ps"
+                "The number of samples per second",
+                "The gap between the largest and smallest signals the converter can handle at once",
+                "The time it takes to convert one sample",
+                "The supply voltage of the chip"
               ],
-              "answerIndex": 0,
-              "explanation": "$t_j = \\dfrac{10^{-\\mathrm{SNR}/20}}{2\\pi f_{in}} = \\dfrac{10^{-3.5}}{2\\pi \\times 10^8} \\approx \\dfrac{3.16\\times10^{-4}}{6.28\\times10^8} \\approx 0.5$ ps. High input frequencies demand femtosecond-class clocks."
+              "answerIndex": 1,
+              "explanation": "Dynamic range is how wide a span of signal sizes the converter copes with simultaneously. Like SNR, it improves by about 6 dB per bit."
             },
             {
               "id": "adc-dac-4-009",
               "type": "mcq",
-              "prompt": "What is the purpose of digital interpolation (upsampling) before a DAC?",
+              "prompt": "A design needs about 86 dB of ideal SNR. Using about 6 dB per bit, roughly how many bits are required?",
               "choices": [
-                "To add quantization bits to the data",
-                "To push DAC images to higher frequencies, easing the analog reconstruction filter",
-                "To remove aperture jitter from the clock",
-                "To convert two's complement to offset binary"
+                "About 8 bits",
+                "About 10 bits",
+                "About 14 bits",
+                "About 20 bits"
+              ],
+              "answerIndex": 2,
+              "explanation": "6.02 times 14 plus 1.76 is about 86 dB, so 14 bits meets it. Twelve bits would give only about 74 dB, which falls short."
+            }
+          ]
+        },
+        {
+          "id": "adc-dac-adc-dac-5",
+          "title": "Inside the Converters: Architectures and Choosing One",
+          "order": 5,
+          "difficulty": 3,
+          "content": "**Hook.** All ADCs turn analog into numbers, but they do it in different ways, each good at a different job. Knowing the main three lets you pick the right tool. We will also meet how a DAC rebuilds a smooth signal.\n\n**Build.** **Flash** ADCs are the sprinters. They compare the input against many reference levels all at once, giving an answer in a single step, so they are extremely **fast**. The cost: they need a huge number of comparators, so they are limited to low resolution and use a lot of power. Use them when raw speed matters most.\n\n**SAR** (successive-approximation register) ADCs are the everyday **workhorse**. They find the answer by a clever guessing game, like 'twenty questions': is the value above the halfway mark? Then above the next quarter mark? Each step pins down one more bit. This takes several steps but uses little power and gives good resolution at moderate speed, so SARs are the common choice for general-purpose microcontroller inputs.\n\n**Sigma-delta** ADCs are the **high-resolution specialists**. They sample very fast but crudely, then use heavy digital filtering (oversampling) to trade that speed for many extra bits of accuracy. They are slower overall but superb for audio, digital scales, and precision instruments.\n\nA quick rule for choosing: need speed? Flash. Need a balanced all-rounder? SAR. Need many clean bits and speed is not critical? Sigma-delta.\n\nOn the DAC side, a popular design is the **R-2R ladder**: a repeating network using only two resistor values, R and 2R. Because chips can match two equal-ish values far more easily than many different ones, the R-2R ladder is accurate and simple to build. Finally, just as the ADC needs an anti-alias filter at its input, a DAC needs a **reconstruction filter** at its output: an analog low-pass that smooths the output staircase back into a clean continuous signal.\n\n**Recap.** Flash = fast but low-res; SAR = the balanced workhorse; sigma-delta = high-res via oversampling but slower. Pick by the job. DACs often use an R-2R resistor ladder, and a reconstruction filter smooths the DAC's staircase output back into a smooth wave.",
+          "items": [
+            {
+              "id": "adc-dac-5-001",
+              "type": "mcq",
+              "prompt": "Which ADC architecture is the fastest, comparing the input to many levels at once?",
+              "choices": [
+                "Flash",
+                "SAR",
+                "Sigma-delta",
+                "R-2R"
+              ],
+              "answerIndex": 0,
+              "explanation": "Flash ADCs compare against all reference levels simultaneously, giving an answer in one step, which makes them the fastest. R-2R is a DAC technique, not an ADC architecture.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/adc-dac-5.svg"
+            },
+            {
+              "id": "adc-dac-5-002",
+              "type": "mcq",
+              "prompt": "How does a SAR (successive-approximation) ADC find the answer?",
+              "choices": [
+                "By comparing against every level at once",
+                "By a step-by-step guessing game that pins down one bit at a time",
+                "By sampling crudely and filtering heavily",
+                "By using only two resistor values"
               ],
               "answerIndex": 1,
-              "explanation": "Raising the effective output rate moves the spectral images farther from baseband, so a gentler (cheaper, lower-order) analog reconstruction filter suffices - the output-side dual of input oversampling."
+              "explanation": "A SAR works like 'twenty questions': halve the range, decide above or below, then halve again, fixing one bit per step. It is moderate speed, low power, and good resolution.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/adc-dac-1.svg"
+            },
+            {
+              "id": "adc-dac-5-003",
+              "type": "mcq",
+              "prompt": "A digital bathroom scale needs many clean bits of accuracy, and speed barely matters. Which ADC architecture fits best?",
+              "choices": [
+                "Flash",
+                "SAR",
+                "Sigma-delta",
+                "None; scales do not use ADCs"
+              ],
+              "answerIndex": 2,
+              "explanation": "Sigma-delta ADCs trade speed for high resolution using oversampling, ideal for slow but precise jobs like scales, audio, and instrumentation."
+            },
+            {
+              "id": "adc-dac-5-004",
+              "type": "mcq",
+              "prompt": "Why is the flash ADC limited to low resolution despite being very fast?",
+              "choices": [
+                "Because it samples too slowly",
+                "Because high resolution would need an enormous number of comparators and a lot of power",
+                "Because it only uses two resistor values",
+                "Because it filters the signal too heavily"
+              ],
+              "answerIndex": 1,
+              "explanation": "Flash needs a comparator for each level, and the count grows explosively with bits. That makes high-resolution flash impractical in area and power, so it stays low-resolution and fast."
+            },
+            {
+              "id": "adc-dac-5-005",
+              "type": "mcq",
+              "prompt": "For a general-purpose microcontroller analog input needing a good balance of speed, power, and resolution, which ADC is the usual choice?",
+              "choices": [
+                "Flash",
+                "SAR",
+                "Sigma-delta",
+                "R-2R ladder"
+              ],
+              "answerIndex": 1,
+              "explanation": "SAR is the balanced everyday workhorse: moderate speed, low power, and good resolution, exactly what most MCU inputs need. R-2R is a DAC, not an ADC."
+            },
+            {
+              "id": "adc-dac-5-006",
+              "type": "mcq",
+              "prompt": "Why does the R-2R ladder use only two resistor values?",
+              "choices": [
+                "To make the DAC slower",
+                "Because chips can match two equal-ish values far more accurately than many different ones",
+                "Because it needs only one bit",
+                "To avoid using any filter"
+              ],
+              "answerIndex": 1,
+              "explanation": "Matching component values precisely is hard in a chip. Using just R and 2R, repeated, keeps the matching easy and the DAC accurate and simple.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/digital-electronics/images/adc-dac-2.svg"
+            },
+            {
+              "id": "adc-dac-5-007",
+              "type": "mcq",
+              "prompt": "What does a reconstruction filter do at a DAC's output?",
+              "choices": [
+                "It blocks too-high frequencies before sampling",
+                "It smooths the output staircase back into a clean continuous analog signal",
+                "It adds more bits to the output",
+                "It converts the analog signal into numbers"
+              ],
+              "answerIndex": 1,
+              "explanation": "A DAC's raw output is a staircase. The reconstruction filter is an analog low-pass that smooths those steps into a continuous wave, mirroring the anti-alias filter on the input side."
+            },
+            {
+              "id": "adc-dac-5-008",
+              "type": "mcq",
+              "prompt": "A camera needs to digitize pixel brightness extremely fast, and modest resolution is acceptable. Which ADC type leans best toward that need?",
+              "choices": [
+                "Sigma-delta, because it is slow but precise",
+                "Flash, because it is the fastest",
+                "Dual-slope, because it is for meters",
+                "R-2R, because it uses two resistors"
+              ],
+              "answerIndex": 1,
+              "explanation": "When raw speed is the priority and resolution can be modest, flash is the natural fit. Sigma-delta is the opposite trade (slow, high-res), and R-2R is a DAC technique."
+            },
+            {
+              "id": "adc-dac-5-009",
+              "type": "mcq",
+              "prompt": "How does the reconstruction filter on a DAC compare to the anti-alias filter on an ADC?",
+              "choices": [
+                "They are unrelated and do opposite jobs",
+                "They are mirror images: one cleans the input before sampling, the other smooths the output after conversion",
+                "Both are digital high-pass filters",
+                "Both add quantization noise"
+              ],
+              "answerIndex": 1,
+              "explanation": "Both are analog low-pass filters at the analog edge of the chain. The anti-alias filter guards the ADC input; the reconstruction filter smooths the DAC output. They are mirror images."
+            },
+            {
+              "id": "adc-dac-5-010",
+              "type": "mcq",
+              "prompt": "Which summary of the 'pick one for the job' rule is correct?",
+              "choices": [
+                "Flash for high resolution, SAR for speed, sigma-delta for balance",
+                "Flash for speed, SAR for a balanced all-rounder, sigma-delta for high resolution",
+                "All three are identical in speed and resolution",
+                "Sigma-delta for speed, flash for resolution, SAR for nothing"
+              ],
+              "answerIndex": 1,
+              "explanation": "Flash wins on speed, sigma-delta wins on resolution (via oversampling), and SAR is the balanced middle-ground workhorse. Match the converter to what the job most needs."
             }
           ]
         }
