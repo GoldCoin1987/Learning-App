@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "id": "embedded-systems",
   "title": "Embedded Systems",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Embedded systems from scratch (beginner rework in progress): 15 sub-topics from the bare-metal memory map through RTOS, real-time, and DSP-on-MCU. Beginner-first readings, diagrams, tiered easy to hard.",
   "requires": [
     "digital-electronics"
@@ -945,283 +945,400 @@
     },
     {
       "id": "mcu-architecture",
-      "title": "Microcontroller Architecture: CPU, Registers & Buses",
+      "title": "Microcontroller Architecture: CPU, Registers, Buses",
       "order": 3,
       "lessons": [
         {
-          "id": "mcu-architecture-mcu-architecture-lesson-register-file",
-          "title": "The Cortex-M Register File & Thumb-2",
+          "id": "mcu-architecture-mcu-architecture-lesson-cpu-registers",
+          "title": "The CPU, Registers, and the Instruction Set",
           "order": 1,
           "difficulty": 1,
-          "content": "An ARM **Cortex-M** core is a load/store RISC machine: all arithmetic happens in registers, and memory is touched only by explicit load/store instructions. The visible **register file** is sixteen 32-bit registers. **R0–R12** are general-purpose; by the ARM calling convention (AAPCS) R0–R3 pass arguments and return values and are *caller-saved*, while R4–R11 are *callee-saved*. Three registers have fixed architectural roles: **R13 = SP** (stack pointer), **R14 = LR** (link register, holding the return address after a `BL`), and **R15 = PC** (program counter). Writing PC is a branch.\n\nStatus lives in the **xPSR**, a composite of three views: the **APSR** (condition flags N, Z, C, V, plus Q for saturation), the **IPSR** (the current exception/interrupt number, 0 in thread mode), and the **EPSR** (the **T-bit** and interrupt-continuable state). The T-bit must stay 1: Cortex-M executes only the **Thumb-2** instruction set — a mix of 16- and 32-bit encodings that gives near-ARM performance at roughly Thumb code density. There is no classic 32-bit ARM mode on these cores, which is why a function pointer's least-significant bit is set to mark Thumb state.\n\nFor an ex-radar tech used to bench instruments, the mental model is clean: a small bank of fast 32-bit scratch registers, a flags register the ALU updates, and a PC you can watch march through Thumb-2 opcodes in the debugger. Single-stepping and reading these registers is the foundation of every later debugging skill.",
+          "content": "You already know a microcontroller (a tiny computer on a single chip) runs a program, and that its hardware lives at memory addresses. But what actually *runs* the program? That job belongs to the **CPU** (Central Processing Unit), the part of the chip that does all the thinking. Think of it as a worker at a desk.\n\nThe worker follows the same three-step routine over and over, billions of times a second. This is the **fetch-decode-execute loop**:\n\n1. **Fetch** -- read the next instruction (a single tiny command) from **flash**, the memory that holds your program.\n2. **Decode** -- figure out what that instruction is asking for.\n3. **Execute** -- actually do it (add two numbers, store a value, jump somewhere).\n\nTo do its work fast, the worker keeps a few items right on the desktop instead of walking to the filing cabinet every time. Those desktop slots are called **registers**: a small set (around 16 on our example chips) of super-fast storage spots, each holding one number the CPU is working on right now. Registers are tiny and few, but they are the fastest storage in the whole chip because they sit *inside* the CPU. The filing cabinet -- larger but slower -- is **RAM**, which we will meet more later.\n\nThe full menu of commands a CPU understands (add, load, store, jump, and so on) is its **instruction set**. Different CPU families understand different menus. Throughout these lessons our common example is the **ARM Cortex-M** family, the CPU design inside a huge share of today's microcontrollers.\n\n**Recap:** the CPU is the brain; it endlessly fetches, decodes, and executes instructions from flash; and it keeps its immediate working values in a handful of ultra-fast registers. Everything else in this sub-topic builds on that loop.",
           "items": [
             {
-              "id": "mcu-architecture-fc-reg-count",
-              "type": "flashcard",
-              "front": "How many architecturally-visible core registers does Cortex-M have, and what are R13/R14/R15?",
-              "back": "Sixteen 32-bit registers (R0-R15). R13 = SP (stack pointer), R14 = LR (link register / return address), R15 = PC (program counter).",
-              "hint": "Three of the sixteen have dedicated roles."
-            },
-            {
-              "id": "mcu-architecture-fc-aapcs",
-              "type": "flashcard",
-              "front": "Under AAPCS, which general-purpose registers are caller-saved vs callee-saved?",
-              "back": "R0-R3 are caller-saved (also carry the first four arguments and the return value); R4-R11 are callee-saved (a function must preserve them). R12 is a scratch/intra-procedure register.",
-              "hint": "The argument registers are the volatile ones."
-            },
-            {
-              "id": "mcu-architecture-fc-xpsr",
-              "type": "flashcard",
-              "front": "What three sub-registers make up the xPSR, and what does each hold?",
-              "back": "APSR (condition flags N, Z, C, V, Q), IPSR (current exception number, 0 in thread mode), and EPSR (the Thumb T-bit and interrupt-continuable state).",
-              "hint": "Application, Interrupt, Execution status."
-            },
-            {
-              "id": "mcu-architecture-fc-tbit",
-              "type": "flashcard",
-              "front": "What is the T-bit and why must it always be set on Cortex-M?",
-              "back": "The T-bit (in EPSR) indicates Thumb execution state. Cortex-M only executes Thumb-2; if the T-bit is cleared (e.g. by a bad branch target) the core takes a UsageFault. This is why function-pointer addresses have bit 0 set.",
-              "hint": "Cortex-M has no ARM (A32) mode."
-            },
-            {
-              "id": "mcu-architecture-fc-loadstore",
-              "type": "flashcard",
-              "front": "What does it mean that Cortex-M is a load/store architecture?",
-              "back": "Arithmetic and logic operate only on registers; memory is accessed solely through explicit load (LDR) and store (STR) instructions. You cannot, e.g., add directly to a memory operand as on x86.",
-              "hint": "RISC: compute in registers, move with LDR/STR."
-            },
-            {
-              "id": "mcu-architecture-mcq-pc-write",
+              "id": "mcu-architecture-mcq-what-cpu-does",
               "type": "mcq",
-              "prompt": "What happens when a value is written to R15 (PC)?",
+              "prompt": "What is the main job of the CPU inside a microcontroller?",
               "choices": [
-                "The stack pointer is reset",
-                "Execution branches to that address",
-                "A hard fault is raised unconditionally",
-                "The condition flags are cleared"
+                "To store the program permanently",
+                "To run the program by fetching, decoding, and executing instructions",
+                "To supply electrical power to the chip",
+                "To connect the chip to the internet"
               ],
               "answerIndex": 1,
-              "explanation": "R15 is the program counter; writing it is a branch. This is how returns (e.g. POP {PC}) and computed jumps work."
+              "explanation": "The CPU is the part that actually runs the program, repeating the fetch-decode-execute loop. Storing the program permanently is the job of flash memory, not the CPU; power and connectivity are separate concerns.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/mcu-architecture-2.svg"
             },
             {
-              "id": "mcu-architecture-mcq-thumb2",
+              "id": "mcu-architecture-mcq-loop-order",
               "type": "mcq",
-              "prompt": "What characterizes the Thumb-2 instruction set used by Cortex-M?",
+              "prompt": "In what order does the CPU handle each instruction?",
               "choices": [
-                "Fixed 16-bit instructions only",
-                "Fixed 32-bit instructions only",
-                "A mix of 16- and 32-bit instruction encodings",
-                "Variable-length instructions up to 15 bytes"
+                "Execute, then fetch, then decode",
+                "Decode, then execute, then fetch",
+                "Fetch, then decode, then execute",
+                "Fetch, then execute, then decode"
               ],
               "answerIndex": 2,
-              "explanation": "Thumb-2 blends 16-bit and 32-bit encodings, achieving near-ARM performance with high code density. There is no separate 32-bit ARM state on Cortex-M."
+              "explanation": "The CPU first fetches (reads) the instruction, then decodes (interprets) it, then executes (performs) it, and repeats. You must read a command before you can understand or carry it out."
             },
             {
-              "id": "mcu-architecture-mcq-lr",
+              "id": "mcu-architecture-mcq-what-are-registers",
               "type": "mcq",
-              "prompt": "What does the link register (LR / R14) hold after a 'BL subroutine' instruction executes?",
+              "prompt": "What are CPU registers, and why are they so fast?",
               "choices": [
-                "The address of the subroutine",
-                "The return address (instruction after the BL)",
-                "The current stack pointer",
-                "The exception number"
+                "Large blocks of external memory that store the whole program",
+                "A few tiny storage slots inside the CPU itself, holding values it is using right now",
+                "Special files saved on a flash drive",
+                "Buttons on the outside of the chip"
               ],
               "answerIndex": 1,
-              "explanation": "BL (branch-with-link) saves the return address into LR; the subroutine returns by branching to LR (e.g. BX LR)."
+              "explanation": "Registers are a small number of tiny storage slots built right inside the CPU, so the CPU can reach them almost instantly with no trip across the chip. That on-chip closeness is exactly why they are the fastest storage available."
             },
             {
-              "id": "mcu-architecture-mcq-apsr-flags",
+              "id": "mcu-architecture-mcq-register-desk-analogy",
               "type": "mcq",
-              "prompt": "Which set of flags lives in the APSR view of the xPSR?",
+              "prompt": "Using the desk analogy, registers are to RAM as what is to what?",
               "choices": [
-                "N, Z, C, V (and Q)",
-                "The current IRQ number",
-                "MSP and PSP selection",
-                "Privilege and Thumb state"
+                "The filing cabinet is to the desktop",
+                "The few items on the worker's desktop are to the filing cabinet",
+                "The office building is to the desk",
+                "The worker is to the chair"
               ],
-              "answerIndex": 0,
-              "explanation": "The APSR holds the condition flags Negative, Zero, Carry, oVerflow, plus the Q saturation flag. The IRQ number is in the IPSR; privilege/stack selection is in CONTROL."
+              "answerIndex": 1,
+              "explanation": "Registers are like the few items kept right on the desktop for instant use, while RAM is the larger but slower filing cabinet you walk to. The point is that registers are few and fast; RAM is plentiful but slower."
+            },
+            {
+              "id": "mcu-architecture-mcq-where-program-lives",
+              "type": "mcq",
+              "prompt": "Where does the CPU fetch its instructions from on a typical microcontroller?",
+              "choices": [
+                "From the registers",
+                "From flash memory, which holds the program",
+                "From the power supply",
+                "From the instruction set"
+              ],
+              "answerIndex": 1,
+              "explanation": "The program is stored in flash memory, so the CPU fetches each instruction from flash. Registers hold working values, not the program; the instruction set is just the list of commands the CPU understands, not a place."
+            },
+            {
+              "id": "mcu-architecture-mcq-instruction-set",
+              "type": "mcq",
+              "prompt": "What is a CPU's 'instruction set'?",
+              "choices": [
+                "The order in which a program runs",
+                "The complete menu of basic commands that CPU understands",
+                "The number of registers it has",
+                "A list of connected peripherals"
+              ],
+              "answerIndex": 1,
+              "explanation": "The instruction set is the full menu of low-level commands (add, load, store, jump, and so on) a CPU can carry out. Different CPU families understand different menus, which is why code for one family will not directly run on another."
+            },
+            {
+              "id": "mcu-architecture-mcq-single-instruction",
+              "type": "mcq",
+              "prompt": "What is a single 'instruction'?",
+              "choices": [
+                "An entire program",
+                "One tiny command the CPU can carry out, like add two numbers or store a value",
+                "A block of RAM",
+                "A type of register"
+              ],
+              "answerIndex": 1,
+              "explanation": "An instruction is one small, specific command, such as 'add these two numbers' or 'store this value.' A program is just a long sequence of these tiny instructions executed one after another."
+            },
+            {
+              "id": "mcu-architecture-mcq-cortex-m-example",
+              "type": "mcq",
+              "prompt": "Which CPU family is used as the common example throughout these lessons?",
+              "choices": [
+                "Intel x86",
+                "ARM Cortex-M",
+                "Apple M-series",
+                "A made-up family with no real chips"
+              ],
+              "answerIndex": 1,
+              "explanation": "ARM Cortex-M is the example family because its design sits inside a very large share of today's microcontrollers, making it the natural reference. The other options are real but are not the microcontroller family these lessons focus on."
+            },
+            {
+              "id": "mcu-architecture-mcq-fastest-storage",
+              "type": "mcq",
+              "prompt": "Why does the CPU keep working values in registers instead of always reaching out to RAM?",
+              "choices": [
+                "RAM cannot store numbers",
+                "Registers are inside the CPU and far faster to reach than RAM",
+                "Registers can hold more data than RAM",
+                "RAM only works when the chip is off"
+              ],
+              "answerIndex": 1,
+              "explanation": "Registers live inside the CPU, so accessing them is far faster than reaching out across the chip to RAM. Registers are fewer and smaller than RAM, not larger, but their speed is why the CPU does its immediate work there."
             }
           ]
         },
         {
-          "id": "mcu-architecture-mcu-architecture-lesson-stacks-privilege-exceptions",
-          "title": "Stack Pointers, Privilege Modes & the Exception Model",
+          "id": "mcu-architecture-mcu-architecture-lesson-reset-vectortable-peripherals",
+          "title": "Reset, the Vector Table, and Core Peripherals",
           "order": 2,
           "difficulty": 2,
-          "content": "Cortex-M **banks the stack pointer** into two physical registers: the **Main Stack Pointer (MSP)** and the **Process Stack Pointer (PSP)**. R13 is whichever one is currently active. Out of reset, MSP is used everywhere. An RTOS typically runs handlers and the kernel on MSP while each thread/task uses PSP, so a task's stack overflow can't corrupt the kernel stack and context switching only has to save/restore PSP.\n\nThe core has two **modes** and two **privilege** levels. **Handler mode** (always privileged) runs exception handlers; **thread mode** runs ordinary code and can be privileged or unprivileged, selected by the **CONTROL** register (which also chooses MSP vs PSP in thread mode). Unprivileged thread code plus an **MPU** is how an RTOS sandboxes tasks away from peripheral registers and each other.\n\nThe **reset and exception model** is what makes interrupts deterministic. At address 0 sits the **vector table**: word 0 is the **initial MSP value**, word 1 is the **reset handler address**, and the rest are exception/IRQ handler addresses indexed by exception number. On exception entry the hardware automatically **stacks eight words** — R0–R3, R12, LR, PC (return address), and xPSR — onto the active stack, loads a special **EXC_RETURN** pattern into LR, fetches the handler address from the vector table, and begins executing in handler mode. Because R0–R3/R12 (the caller-saved set) are pushed by hardware, an ISR is a plain C function. On return, the EXC_RETURN value in PC triggers hardware unstacking. This auto-stacking — and tricks like **tail-chaining** between back-to-back interrupts — is the entire answer to \"what the CPU does between an interrupt firing and your handler's first instruction.\"",
+          "content": "When you press the reset button or first apply power, the CPU has a problem: how does it know *where* in memory your program starts? It cannot just guess. The answer is a small, fixed list of addresses placed at the very start of memory called the **vector table**.\n\nThink of the vector table as a directory of 'where to jump' addresses. The first slot holds the starting value for the **stack pointer** (a register that tracks the CPU's temporary scratch space, covered more later). The second slot holds the address of the **reset handler** -- the very first piece of your program to run. So at reset the CPU automatically: (1) loads slot 0 into the stack pointer, and (2) loads slot 1 into the **PC** (program counter, the register that points at the next instruction). With the PC now pointing at your start address, the fetch-decode-execute loop begins running your code. No magic -- just a tiny lookup.\n\nThe rest of the vector table works the same way for **interrupts**: events (a timer ticking, a byte arriving, a button press) that make the CPU pause what it is doing and jump to a special handler. Each event has its own slot listing the address to jump to.\n\nWhich brings us to two helpers built into every Cortex-M chip, called **core peripherals**:\n\n- **NVIC** (Nested Vectored Interrupt Controller): the traffic cop for interrupts. It decides which events are allowed, which is more urgent, and routes the CPU to the right vector-table slot.\n- **SysTick**: a simple built-in countdown timer that 'ticks' at a steady rate. Operating systems use it as a heartbeat to keep time and switch between tasks.\n\n**Recap:** at reset the CPU reads the vector table to find the stack pointer and the start of your code, then runs. The NVIC manages interrupts and SysTick provides a steady tick -- two standard helpers you will rely on constantly.",
           "items": [
             {
-              "id": "mcu-architecture-fc-msp-psp",
-              "type": "flashcard",
-              "front": "What are MSP and PSP, and how does an RTOS typically use them?",
-              "back": "Two banked stack pointers (R13 selects one). MSP is the Main Stack Pointer (used out of reset and in handler mode); PSP is the Process Stack Pointer. An RTOS runs the kernel/handlers on MSP and each task on its own PSP, isolating task stacks and simplifying context switches.",
-              "hint": "Main vs Process; kernel vs task."
-            },
-            {
-              "id": "mcu-architecture-fc-handler-thread",
-              "type": "flashcard",
-              "front": "Distinguish handler mode from thread mode on Cortex-M.",
-              "back": "Handler mode runs exception handlers and is always privileged (and always uses MSP). Thread mode runs normal application code and can be privileged or unprivileged, using MSP or PSP as selected by the CONTROL register.",
-              "hint": "Exceptions vs ordinary code."
-            },
-            {
-              "id": "mcu-architecture-fc-control-reg",
-              "type": "flashcard",
-              "front": "What does the CONTROL register select?",
-              "back": "In thread mode it selects the privilege level (privileged vs unprivileged) and which stack pointer is used (MSP vs PSP). It also has an FPU-active bit (FPCA) on cores with an FPU.",
-              "hint": "Privilege and stack-pointer choice for thread mode."
-            },
-            {
-              "id": "mcu-architecture-fc-vector-table",
-              "type": "flashcard",
-              "front": "What are the first two entries of the Cortex-M vector table?",
-              "back": "Word 0 is the initial Main Stack Pointer value (loaded into MSP at reset); word 1 is the reset handler's address (loaded into PC). Subsequent words are exception/IRQ handler addresses indexed by exception number.",
-              "hint": "Initial SP, then reset vector."
-            },
-            {
-              "id": "mcu-architecture-fc-stacked-frame",
-              "type": "flashcard",
-              "front": "Which eight registers does hardware automatically stack on exception entry?",
-              "back": "R0, R1, R2, R3, R12, LR, the return PC, and xPSR (the caller-saved set plus return state). This is why an ISR can be a normal C function with no special prologue.",
-              "hint": "The caller-saved registers plus PC and xPSR."
-            },
-            {
-              "id": "mcu-architecture-fc-exc-return",
-              "type": "flashcard",
-              "front": "What is EXC_RETURN and how does it cause an exception return?",
-              "back": "A special value (e.g. 0xFFFFFFFx) loaded into LR on exception entry. When that value is written to PC (e.g. BX LR at the end of the handler), the hardware recognizes it and performs the unstacking and mode/stack restoration.",
-              "hint": "A magic LR value that triggers HW unstacking."
-            },
-            {
-              "id": "mcu-architecture-mcq-reset-vector",
+              "id": "mcu-architecture-mcq-vector-table-what",
               "type": "mcq",
-              "prompt": "At reset, where does the Cortex-M core get the initial stack pointer value?",
+              "prompt": "What is the vector table?",
               "choices": [
-                "From a fixed RAM address",
-                "From word 0 of the vector table",
-                "From the CONTROL register",
-                "It defaults to the top of RAM automatically"
+                "A list of all the numbers a program uses",
+                "A fixed list of 'where to jump' addresses placed at the start of memory",
+                "The CPU's set of registers",
+                "A type of high-speed RAM"
               ],
               "answerIndex": 1,
-              "explanation": "Word 0 of the vector table holds the initial MSP value; word 1 holds the reset handler address. The hardware loads both before the first instruction runs.",
-              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/mcu-architecture-1.svg"
+              "explanation": "The vector table is a small fixed list of addresses, near the start of memory, telling the CPU where to jump for reset and for each interrupt. It is a directory of destinations, not a place for ordinary data.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/mcu-architecture-4.svg"
             },
             {
-              "id": "mcu-architecture-mcq-isr-c-fn",
+              "id": "mcu-architecture-mcq-what-at-reset",
               "type": "mcq",
-              "prompt": "Why can a Cortex-M interrupt service routine be written as an ordinary C function with no special attribute?",
+              "prompt": "What happens at reset, using the vector table?",
               "choices": [
-                "The compiler inserts a custom prologue for ISRs",
-                "Hardware auto-stacks the caller-saved registers (R0-R3, R12, LR, PC, xPSR) on entry",
-                "Interrupts run with all registers disabled",
-                "ISRs never use registers"
+                "The CPU erases all of flash",
+                "The CPU loads the initial stack pointer from slot 0 and the start address from slot 1, then begins running",
+                "The CPU waits for the user to type the start address",
+                "The CPU runs every interrupt handler once"
               ],
               "answerIndex": 1,
-              "explanation": "Because the AAPCS caller-saved registers are pushed automatically by hardware on entry and restored on exit, the C compiler's normal calling convention is already satisfied."
+              "explanation": "At reset the CPU automatically reads slot 0 for the initial stack pointer and slot 1 for the reset handler address, loads that address into the PC, and starts the fetch-decode-execute loop. This is how it knows where your program begins without guessing."
             },
             {
-              "id": "mcu-architecture-mcq-handler-priv",
+              "id": "mcu-architecture-mcq-reset-handler",
               "type": "mcq",
-              "prompt": "Which statement about handler mode is correct?",
+              "prompt": "What is the 'reset handler'?",
               "choices": [
-                "It is always unprivileged",
-                "It is always privileged and uses MSP",
-                "It can use either MSP or PSP",
-                "It is selected by the T-bit"
+                "A button on the board",
+                "The very first piece of your program code that runs after reset",
+                "A backup copy of the program",
+                "The interrupt that fires most often"
               ],
               "answerIndex": 1,
-              "explanation": "Handler mode (entered on any exception) is always privileged and always uses the Main Stack Pointer, regardless of what thread mode was using."
+              "explanation": "The reset handler is the first code that runs after a reset; its address sits in slot 1 of the vector table. It typically sets things up and then calls into the rest of your program."
+            },
+            {
+              "id": "mcu-architecture-mcq-pc-meaning",
+              "type": "mcq",
+              "prompt": "What does the PC (program counter) register hold?",
+              "choices": [
+                "The total number of instructions in the program",
+                "The address of the next instruction to run",
+                "The result of the last calculation",
+                "The chip's temperature"
+              ],
+              "answerIndex": 1,
+              "explanation": "The program counter points at the address of the next instruction to fetch. At reset it is loaded with the start address from the vector table; changing it (a jump) makes the CPU run code somewhere else."
+            },
+            {
+              "id": "mcu-architecture-mcq-interrupt-what",
+              "type": "mcq",
+              "prompt": "What is an interrupt?",
+              "choices": [
+                "A permanent stop of the program",
+                "An event that makes the CPU pause its current work and jump to a special handler",
+                "A way to slow down the clock",
+                "An error that erases RAM"
+              ],
+              "answerIndex": 1,
+              "explanation": "An interrupt is an event (like a timer tick or an arriving byte) that pauses the CPU's current work so it can jump to a handler for that event, then resume. It is a temporary detour, not a permanent stop or an error."
+            },
+            {
+              "id": "mcu-architecture-mcq-nvic-role",
+              "type": "mcq",
+              "prompt": "What does the NVIC do?",
+              "choices": [
+                "Generates the chip's electrical power",
+                "Manages interrupts: which are enabled, which is most urgent, and where to jump",
+                "Stores the program permanently",
+                "Converts analog signals to digital"
+              ],
+              "answerIndex": 1,
+              "explanation": "The NVIC (Nested Vectored Interrupt Controller) is the interrupt traffic cop: it enables or disables interrupts, ranks their urgency, and routes the CPU to the correct vector-table slot. It does not handle power, storage, or analog conversion."
+            },
+            {
+              "id": "mcu-architecture-mcq-systick-role",
+              "type": "mcq",
+              "prompt": "What is SysTick?",
+              "choices": [
+                "A serial communication port",
+                "A simple built-in countdown timer that ticks at a steady rate",
+                "The main program memory",
+                "A type of CPU register"
+              ],
+              "answerIndex": 1,
+              "explanation": "SysTick is a small countdown timer built into every Cortex-M chip; it ticks steadily and is commonly used by operating systems as a timekeeping and task-switching heartbeat. It is a timer, not a memory or a communication port."
+            },
+            {
+              "id": "mcu-architecture-mcq-core-peripherals",
+              "type": "mcq",
+              "prompt": "Why are the NVIC and SysTick called 'core peripherals'?",
+              "choices": [
+                "They are optional add-on chips you solder on",
+                "They are standard helpers built into the CPU core on every Cortex-M chip",
+                "They are only found on the largest microcontrollers",
+                "They are parts of the user's program"
+              ],
+              "answerIndex": 1,
+              "explanation": "They are called core peripherals because they come built into the Cortex-M core itself on every such chip, so you can always count on them being present. They are not optional external parts or user code."
+            },
+            {
+              "id": "mcu-architecture-mcq-interrupt-uses-table",
+              "type": "mcq",
+              "prompt": "How does the CPU know where to jump when an interrupt fires?",
+              "choices": [
+                "It scans all of flash looking for the handler",
+                "It looks up that event's slot in the vector table for the handler address",
+                "It always jumps back to the reset handler",
+                "It asks the user to enter an address"
+              ],
+              "answerIndex": 1,
+              "explanation": "Each interrupt has its own slot in the vector table holding the address of its handler, so the CPU jumps there the same way it used slot 1 at reset. This is exactly why the vector table covers both reset and interrupts."
             }
           ]
         },
         {
-          "id": "mcu-architecture-mcu-architecture-lesson-core-peripherals-buses",
-          "title": "Core Peripherals, the Bus Matrix & Architecture Contrasts",
+          "id": "mcu-architecture-mcu-architecture-lesson-buses-privilege-clocks",
+          "title": "Buses, Stacks, Privilege, and Clocks",
           "order": 3,
           "difficulty": 3,
-          "content": "Beyond the CPU pipeline, every Cortex-M includes a standard set of **core peripherals** in the System region (the Private Peripheral Bus at 0xE000_0000). The **NVIC** (Nested Vectored Interrupt Controller) manages IRQ enable/pending/active state and priorities; **SysTick** is a simple 24-bit down-counter that gives an OS its periodic tick. Optional blocks include the **MPU** (region-based memory protection — no virtual addressing, just access permissions and attributes) and an **FPU** (single- or double-precision; its registers must be context-saved, hence the extended exception stack frame).\n\nA load or store doesn't reach a peripheral by magic — it traverses a **bus matrix**. Cortex-M uses AMBA buses: the fast **AHB** (multi-master, pipelined) connects the core, memories, DMA, and high-speed peripherals, while slower peripherals hang off one or more **APB** segments behind an AHB-to-APB bridge. The matrix arbitrates concurrent masters (e.g. CPU vs DMA). Because flash is slower than the core clock, fast MCUs insert **flash wait states** and add a **flash accelerator / prefetch / cache** (ST's ART, for example) so the CPU isn't stalled on every fetch. Crucially, the **CPU clock and peripheral (bus) clocks are separate domains** with their own prescalers — the root of \"enable the peripheral clock first\" and of correct DMA/timer configuration later.\n\nFor perspective, contrast the field. The **ESP32** uses Tensilica **Xtensa LX6/LX7** cores (and newer parts use **RISC-V**) rather than ARM. The **RP2040** is a **dual Cortex-M0+** with a bus fabric letting both cores and DMA share peripherals. At the low end, **8-bit AVR and PIC** are typically Harvard, ~8/16-bit, register-file or accumulator machines with far simpler interrupt models — a useful reminder that the Cortex-M conveniences above are not universal.",
+          "content": "We have a CPU running a loop, registers, and a vector table. Now: how do the pieces actually talk to each other, and how does the chip stay organized? The answers are buses, stacks, privilege levels, and clocks. We keep these light and conceptual.\n\n**Buses -- the internal roads.** A **bus** is a set of wires that carries data between parts of the chip: the CPU, memory, and peripherals. When the CPU reads a value, that value travels along a bus. Cortex-M chips often have a fast road and a slow road. The **AHB** (Advanced High-performance Bus) is the fast highway for the CPU, RAM, and high-speed parts. The **APB** (Advanced Peripheral Bus) is a slower side street for simpler peripherals. The **bus matrix** is the interchange that connects them and directs traffic so two parts do not collide.\n\nA snag: flash memory can be *slower* than the CPU. If the CPU outruns flash, it must idle for a beat -- those waits are called **wait states**. To hide them, chips add a small **flash accelerator** (a fast buffer or cache) so the CPU rarely has to wait for code.\n\n**The stack and its pointers.** The **stack** is a scratch area in RAM for temporary values. The **stack pointer (SP)** register marks the top. Cortex-M actually has two: the **MSP** (Main Stack Pointer) and the **PSP** (Process Stack Pointer). An operating system runs its own code on the MSP and gives each task the PSP, keeping them from corrupting each other.\n\n**Privilege levels.** The CPU runs in either **handler mode** (while servicing an interrupt) or **thread mode** (normal code). Code can also be privileged (full access) or unprivileged (limited). An OS uses the limited level, sometimes backed by an optional **MPU** (Memory Protection Unit), to keep a buggy task from touching memory it should not. Some chips also add an **FPU** (Floating-Point Unit) for fast decimal math.\n\n**Clocks.** Everything marches to a clock -- a steady electrical beat. Importantly, the **CPU clock and the peripheral clocks are separate** and can run at different speeds. That is why you often must switch on a peripheral's clock before it will work at all.\n\nFinally, for perspective: not every chip is Cortex-M. The ESP32 family uses **Xtensa** or **RISC-V** cores instead. The ideas -- a CPU, registers, buses, clocks -- carry over even when the details differ.\n\n**Recap:** buses move data (fast AHB, slow APB, joined by the bus matrix, with wait states and a flash accelerator smoothing flash); two stack pointers and privilege levels keep an OS and its tasks safely separated; and separate clocks mean you must enable a peripheral's clock to use it.",
           "items": [
             {
-              "id": "mcu-architecture-fc-nvic-systick",
-              "type": "flashcard",
-              "front": "What do the NVIC and SysTick core peripherals do?",
-              "back": "The NVIC (Nested Vectored Interrupt Controller) handles interrupt enable/pending/active state, priorities, and vectoring. SysTick is a 24-bit down-counter that provides a simple periodic tick, commonly used as an RTOS scheduler tick.",
-              "hint": "One manages interrupts; one is the OS heartbeat."
-            },
-            {
-              "id": "mcu-architecture-fc-mpu",
-              "type": "flashcard",
-              "front": "What is the Cortex-M MPU and how does it differ from an MMU?",
-              "back": "The Memory Protection Unit enforces access permissions and memory attributes (cacheable, bufferable, executable) over a small number of address regions. Unlike an MMU it does NOT do virtual-to-physical address translation; it only polices accesses to physical addresses.",
-              "hint": "Protection and attributes, but no address translation."
-            },
-            {
-              "id": "mcu-architecture-fc-ahb-apb",
-              "type": "flashcard",
-              "front": "Contrast the AHB and APB buses in a Cortex-M system.",
-              "back": "AHB is the fast, pipelined, multi-master bus connecting the core, memories, DMA, and high-speed peripherals. APB is a simpler, slower bus for low-speed peripherals, reached through an AHB-to-APB bridge.",
-              "hint": "High-performance bus vs peripheral bus."
-            },
-            {
-              "id": "mcu-architecture-fc-wait-states",
-              "type": "flashcard",
-              "front": "Why do fast MCUs need flash wait states and a flash accelerator/cache?",
-              "back": "Flash is slower than a high CPU clock, so the core would stall waiting for each fetch. Wait states tell the bus how many extra cycles flash needs; a prefetch buffer/cache (e.g. ST's ART accelerator) hides that latency so the CPU runs near zero-wait-state throughput.",
-              "hint": "Flash can't keep up with the core clock."
-            },
-            {
-              "id": "mcu-architecture-fc-clock-domains",
-              "type": "flashcard",
-              "front": "Why does it matter that the CPU clock and peripheral bus clocks are separate domains?",
-              "back": "Each bus (AHB, APB1, APB2) has its own prescaler off the system clock, and peripheral clocks must be explicitly enabled. This is the root of the classic 'enable the peripheral clock first' gotcha and underlies correct timer/baud/DMA timing calculations.",
-              "hint": "Separate prescalers; clocks must be enabled."
-            },
-            {
-              "id": "mcu-architecture-fc-fpu-context",
-              "type": "flashcard",
-              "front": "What is the consequence of an active FPU for exception handling?",
-              "back": "The FPU registers (S0-S15, FPSCR) are additional caller-saved state, so when FPU context is active the hardware pushes an extended stack frame on exception entry. Lazy stacking can defer this until the handler actually uses the FPU.",
-              "hint": "Extra registers mean an extended stacked frame."
-            },
-            {
-              "id": "mcu-architecture-mcq-rp2040",
+              "id": "mcu-architecture-mcq-bus-what",
               "type": "mcq",
-              "prompt": "What CPU configuration does the RP2040 (Raspberry Pi Pico) use?",
+              "prompt": "What is a bus inside a microcontroller?",
               "choices": [
-                "A single Cortex-M7",
-                "Dual Cortex-M0+ cores",
-                "A single Xtensa LX7",
-                "Quad RISC-V cores"
+                "A backup battery",
+                "A set of wires that carries data between the CPU, memory, and peripherals",
+                "A type of register",
+                "The program counter"
               ],
               "answerIndex": 1,
-              "explanation": "The RP2040 contains two Cortex-M0+ cores sharing a bus fabric with DMA and peripherals, a contrast to single-core STM32 parts."
+              "explanation": "A bus is the internal 'road' (a set of wires) that moves data between parts of the chip such as the CPU, memory, and peripherals. It is not a power source or a register."
             },
             {
-              "id": "mcu-architecture-mcq-esp32-core",
+              "id": "mcu-architecture-mcq-ahb-apb",
               "type": "mcq",
-              "prompt": "Which core architecture do classic ESP32 parts use, distinguishing them from STM32/RP2040?",
+              "prompt": "How do the AHB and APB buses differ?",
               "choices": [
-                "ARM Cortex-A",
-                "Tensilica Xtensa (with newer parts using RISC-V)",
-                "MIPS",
-                "ARM Cortex-M4 only"
+                "AHB is the slow bus and APB is the fast bus",
+                "AHB is the fast highway for the CPU and high-speed parts; APB is a slower bus for simpler peripherals",
+                "They are two names for the same single bus",
+                "AHB carries power while APB carries data"
               ],
               "answerIndex": 1,
-              "explanation": "Classic ESP32 uses Tensilica Xtensa LX6/LX7 cores; newer ESP32-C/H parts use RISC-V. Neither is ARM Cortex-M, so the register/exception model differs."
+              "explanation": "AHB (Advanced High-performance Bus) is the fast road for the CPU, RAM, and high-speed parts, while APB (Advanced Peripheral Bus) is the slower side street for simpler peripherals. Splitting fast and slow traffic keeps the fast parts from being held back.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/mcu-architecture-3.svg"
             },
             {
-              "id": "mcu-architecture-mcq-avr-contrast",
+              "id": "mcu-architecture-mcq-bus-matrix",
               "type": "mcq",
-              "prompt": "Compared with a Cortex-M, how do typical 8-bit AVR/PIC MCUs differ architecturally?",
+              "prompt": "What does the bus matrix do?",
               "choices": [
-                "They have a richer 32-register banked interrupt model",
-                "They are usually Harvard, narrower (8/16-bit), with simpler interrupt models",
-                "They use the same AHB/APB bus matrix",
-                "They run Thumb-2 code"
+                "It stores the program",
+                "It connects the different buses and directs traffic so parts do not collide",
+                "It generates the clock signal",
+                "It holds the vector table"
               ],
               "answerIndex": 1,
-              "explanation": "8-bit AVR/PIC are typically Harvard-architecture, 8/16-bit register-file or accumulator machines with much simpler interrupt handling and no AHB/APB matrix or Thumb-2."
+              "explanation": "The bus matrix is the interchange that links the buses and arbitrates traffic so two parts (say the CPU and a data mover) do not try to use the same road at once. It routes data; it does not store programs or make clocks."
+            },
+            {
+              "id": "mcu-architecture-mcq-wait-states",
+              "type": "mcq",
+              "prompt": "Why do fast microcontrollers need 'wait states' and a flash accelerator?",
+              "choices": [
+                "Because RAM is faster than the CPU",
+                "Because flash can be slower than the CPU, so the CPU must wait; a flash accelerator hides those waits",
+                "Because the clock is too slow",
+                "Because peripherals run faster than the CPU"
+              ],
+              "answerIndex": 1,
+              "explanation": "When the CPU runs faster than flash can supply instructions, it must idle for a beat (a wait state). A flash accelerator (a fast buffer or cache) hides this so the CPU rarely waits for code."
+            },
+            {
+              "id": "mcu-architecture-mcq-stack-what",
+              "type": "mcq",
+              "prompt": "What is the stack?",
+              "choices": [
+                "The list of interrupt addresses",
+                "A scratch area in RAM for temporary values, with the SP register marking its top",
+                "The fastest CPU register",
+                "Another name for flash memory"
+              ],
+              "answerIndex": 1,
+              "explanation": "The stack is a temporary scratch area in RAM, and the stack pointer (SP) register tracks its top. It is not the vector table (that is the interrupt address list) nor flash."
+            },
+            {
+              "id": "mcu-architecture-mcq-msp-psp",
+              "type": "mcq",
+              "prompt": "Why does Cortex-M provide two stack pointers, MSP and PSP?",
+              "choices": [
+                "To make the chip run faster",
+                "So an operating system can keep its own stack separate from each task's stack, preventing corruption",
+                "Because one of them is just a spare",
+                "To store twice as much program code"
+              ],
+              "answerIndex": 1,
+              "explanation": "An OS runs its own code on the MSP (Main Stack Pointer) and gives tasks the PSP (Process Stack Pointer), so a misbehaving task cannot corrupt the OS's stack. The second pointer is for separation, not a spare or extra storage."
+            },
+            {
+              "id": "mcu-architecture-mcq-handler-thread",
+              "type": "mcq",
+              "prompt": "What is the difference between handler mode and thread mode?",
+              "choices": [
+                "Handler mode runs while servicing an interrupt; thread mode runs normal everyday code",
+                "Handler mode is for fast code and thread mode is for slow code",
+                "They refer to two different buses",
+                "Thread mode only exists on chips with an FPU"
+              ],
+              "answerIndex": 0,
+              "explanation": "The CPU is in handler mode while it is servicing an interrupt, and in thread mode while running ordinary code. The distinction is about what the CPU is doing, not about speed, buses, or the FPU."
+            },
+            {
+              "id": "mcu-architecture-mcq-mpu",
+              "type": "mcq",
+              "prompt": "What is the role of the optional MPU (Memory Protection Unit)?",
+              "choices": [
+                "It speeds up floating-point math",
+                "It can stop a buggy or unprivileged task from accessing memory it should not",
+                "It generates the system clock",
+                "It stores the stack"
+              ],
+              "answerIndex": 1,
+              "explanation": "The MPU lets an OS restrict which memory a task may touch, so a buggy unprivileged task cannot corrupt memory it should not. Fast decimal math is the FPU's job, not the MPU's."
+            },
+            {
+              "id": "mcu-architecture-mcq-clocks-separate",
+              "type": "mcq",
+              "prompt": "What is a practical consequence of the CPU clock and peripheral clocks being separate?",
+              "choices": [
+                "Peripherals never need power",
+                "You often must enable a peripheral's clock before it will work",
+                "The CPU cannot run at all",
+                "Flash never needs wait states"
+              ],
+              "answerIndex": 1,
+              "explanation": "Because peripherals run on their own clocks, a peripheral usually stays inactive until you switch its clock on, so forgetting to enable it is a classic beginner trap. Separate clocks let parts run at different speeds, but require you to turn them on."
+            },
+            {
+              "id": "mcu-architecture-mcq-other-cores",
+              "type": "mcq",
+              "prompt": "Is every microcontroller built on an ARM Cortex-M core?",
+              "choices": [
+                "Yes, all microcontrollers are Cortex-M",
+                "No; for example the ESP32 family uses Xtensa or RISC-V cores, though the same basic ideas apply",
+                "No, but all the others are exactly identical to Cortex-M",
+                "Yes, except for the ESP32 which has no CPU"
+              ],
+              "answerIndex": 1,
+              "explanation": "Cortex-M is very common but not universal; the ESP32 family, for instance, uses Xtensa or RISC-V cores. The core ideas (a CPU, registers, buses, clocks) carry over even when the specifics differ."
             }
           ]
         }
