@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "id": "embedded-systems",
   "title": "Embedded Systems",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "Embedded systems from scratch (beginner rework in progress): 15 sub-topics from the bare-metal memory map through RTOS, real-time, and DSP-on-MCU. Beginner-first readings, diagrams, tiered easy to hard.",
   "requires": [
     "digital-electronics"
@@ -3817,265 +3817,532 @@
     },
     {
       "id": "adc-dac",
-      "title": "ADC & DAC (register level)",
+      "title": "ADC & DAC",
       "order": 8,
       "lessons": [
         {
           "id": "adc-dac-adc-dac-l1",
-          "title": "ADC Fundamentals at the Register Level",
+          "title": "Reading a Sensor: What an ADC (and DAC) Do",
           "order": 1,
           "difficulty": 1,
-          "content": "An ADC maps an analog input onto an $N$-bit integer code. The smallest distinguishable step, one LSB, is\n\n$$V_{LSB}=\\frac{V_{ref}}{2^N}$$\n\nso a 12-bit ADC with $V_{ref}=3.3\\,\\text{V}$ resolves $\\approx 0.806\\,\\text{mV}$. The output code is\n\n$$\\text{code}=\\left\\lfloor \\frac{V_{in}}{V_{ref}}\\cdot 2^N \\right\\rfloor$$\n\nclamped to $[0, 2^N-1]$. At the register level you typically configure a **resolution** field (e.g. 12/10/8/6 bits), select the **reference** (an external pin, VDDA, or an on-chip bandgap), and pick the **input channel** in a sequence register.\n\nThe front end is a **sample-and-hold (S/H)**: a switch charges a hold capacitor $C_H$ through the source resistance $R_S$ plus the internal switch resistance. The sampling capacitor must settle to within $\\tfrac{1}{2}$ LSB, which takes several RC time constants. As a rule of thumb you need\n\n$$t_{samp} \\ge (N+1)\\ln 2 \\cdot R_S C_H$$\n\nso a **high source impedance forces a longer sampling time** (set via the sample-time register) or an op-amp buffer. Skimp on it and you read a value pulled toward the previous channel. This is exactly the radar/instrumentation lesson: characterize your source impedance before trusting a code.",
+          "content": "## Hook\n\nTurn a volume knob, and somewhere a chip turns your twist into a number. A thermostat reads a temperature sensor the same way. The trick is that most sensors speak in **voltage** (electrical \"pressure\", measured in volts, V), but a computer program can only work with **numbers**. Something has to translate.\n\n## Build\n\nThat translator is the **ADC**, short for **analog-to-digital converter**. \"Analog\" means a smoothly varying signal, like a voltage that can be 1.0 V, 1.65 V, or anything in between. \"Digital\" means a plain whole number. The ADC measures the voltage on a pin and hands your program a number that stands for it.\n\nA microcontroller (MCU) is the small computer chip running your program. Most MCUs have an ADC built in, so you can wire a sensor straight to a pin and read it.\n\nWhat kind of sensors? A temperature sensor whose voltage rises as it gets warmer. A light sensor that gives more voltage in bright light. A **potentiometer** (a knob, often shortened to \"pot\") whose voltage changes as you turn it. In every case, the ADC reads the voltage and gives you a count.\n\nThe **DAC** (**digital-to-analog converter**) does the exact reverse: your program writes a number, and the DAC sets a real voltage on an output pin. That is how a chip can make a tone or a smooth control signal.\n\n## Recap\n\nSensors give voltages; programs want numbers. The ADC converts voltage to a number, and the DAC converts a number back to a voltage.",
           "items": [
-            {
-              "id": "adc-dac-l1-fc1",
-              "type": "flashcard",
-              "front": "Write the formula for one LSB of an N-bit ADC and compute it for 12 bits, Vref = 3.3 V.",
-              "back": "$V_{LSB}=\\frac{V_{ref}}{2^N}$. For 12 bits: $3.3/4096 \\approx 0.806\\,\\text{mV}$.",
-              "hint": "2^12 = 4096."
-            },
-            {
-              "id": "adc-dac-l1-fc2",
-              "type": "flashcard",
-              "front": "What does the sample-and-hold (S/H) circuit do, and what limits how fast it can capture?",
-              "back": "A switch charges a hold capacitor C_H so the input is frozen during conversion. Charging time is set by R_S (source) + R_switch through C_H; the cap must settle to <= 1/2 LSB.",
-              "hint": "Think RC time constant."
-            },
-            {
-              "id": "adc-dac-l1-fc3",
-              "type": "flashcard",
-              "front": "Why does a high source impedance require a longer ADC sampling time?",
-              "back": "Larger R_S increases the RC time constant charging C_H, so more time is needed to settle to within 1/2 LSB. Otherwise charge sharing leaves residual error (often from the previous channel).",
-              "hint": "t_samp scales with R_S * C_H."
-            },
-            {
-              "id": "adc-dac-l1-fc4",
-              "type": "flashcard",
-              "front": "Name three common reference (Vref) sources an MCU ADC can use.",
-              "back": "An external Vref pin, the analog supply VDDA, or an internal bandgap reference. Accuracy of Vref directly scales every conversion.",
-              "hint": "External, supply, internal."
-            },
             {
               "id": "adc-dac-l1-mcq1",
               "type": "mcq",
-              "prompt": "A 10-bit ADC uses Vref = 2.5 V. What is V_LSB?",
+              "prompt": "What does an ADC do?",
               "choices": [
-                "2.44 mV",
-                "0.610 mV",
-                "9.77 mV",
-                "0.244 mV"
+                "Converts a voltage on a pin into a number your program can read",
+                "Converts a number from your program into a voltage on a pin",
+                "Amplifies a weak signal so it is louder",
+                "Stores numbers in flash memory"
               ],
               "answerIndex": 0,
-              "explanation": "V_LSB = 2.5 / 2^10 = 2.5 / 1024 ~= 2.44 mV."
+              "explanation": "ADC stands for analog-to-digital converter: voltage in, number out. The reverse (number to voltage) is the DAC. Amplifying and storing are different jobs entirely.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-2.svg"
             },
             {
               "id": "adc-dac-l1-mcq2",
               "type": "mcq",
-              "prompt": "You read a sensor with 100 kohm output impedance and codes look wrong, biased toward the previously sampled channel. Best first fix?",
+              "prompt": "A DAC (digital-to-analog converter) is used to:",
               "choices": [
-                "Lower Vref",
-                "Increase the ADC sample-time setting or add a buffer op-amp",
-                "Switch to 8-bit resolution",
-                "Enable continuous mode"
+                "Read the voltage from a temperature sensor",
+                "Set a real voltage on an output pin from a number your program chooses",
+                "Count how many times a button is pressed",
+                "Convert a number into text for a display"
               ],
               "answerIndex": 1,
-              "explanation": "Symptom is incomplete S/H settling from high source impedance. Lengthen sample time or buffer the source so C_H fully charges."
+              "explanation": "A DAC takes a number and outputs a matching voltage, which is how an MCU can generate a tone or a smooth control signal. Reading a sensor is the ADC's job.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-2.svg"
             },
             {
               "id": "adc-dac-l1-mcq3",
               "type": "mcq",
-              "prompt": "Doubling the ADC resolution from 6 to 12 bits, with Vref fixed, changes V_LSB by what factor?",
+              "prompt": "Why can't your program use a sensor's output directly without an ADC?",
               "choices": [
-                "1/2",
-                "1/64",
-                "1/12",
-                "1/4096"
+                "Sensors are too slow for software",
+                "The sensor gives a voltage, but the program works with numbers, so a translation is needed",
+                "Sensors only work with a DAC",
+                "The voltage is always exactly zero"
               ],
               "answerIndex": 1,
-              "explanation": "V_LSB ~ 1/2^N. Going from 2^6 to 2^12 multiplies the denominator by 2^6 = 64, so V_LSB shrinks to 1/64."
+              "explanation": "Most sensors produce an analog voltage. Software handles whole numbers, so the ADC bridges the two. Speed is not the core issue here.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-2.svg"
             },
             {
               "id": "adc-dac-l1-mcq4",
               "type": "mcq",
-              "prompt": "What does the raw ADC code represent?",
+              "prompt": "Which of these is a good everyday example of using an ADC?",
               "choices": [
-                "An absolute voltage independent of Vref",
-                "A ratio of V_in to V_ref scaled by 2^N",
-                "A current proportional to V_in",
-                "The time taken to convert"
+                "Toggling an LED on and off",
+                "Reading the position of a volume knob (potentiometer)",
+                "Sending a text string over a serial port",
+                "Blinking at a fixed rate using a timer"
               ],
               "answerIndex": 1,
-              "explanation": "code = floor((V_in/V_ref) * 2^N). The conversion is ratiometric to the reference, which is why Vref accuracy matters."
+              "explanation": "A potentiometer gives a voltage that depends on how far it is turned, and the ADC turns that into a number. Toggling an LED, sending text, and blinking do not involve measuring an analog voltage.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-4.svg"
+            },
+            {
+              "id": "adc-dac-l1-mcq5",
+              "type": "mcq",
+              "prompt": "In this context, what does \"analog\" mean?",
+              "choices": [
+                "A signal that is either fully on or fully off",
+                "A smoothly varying signal, like a voltage that can take any value in a range",
+                "A number stored in memory",
+                "A type of computer chip"
+              ],
+              "answerIndex": 1,
+              "explanation": "Analog signals vary smoothly and can take any value in their range (such as 1.65 V). On/off is a digital idea, not analog.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-2.svg"
+            },
+            {
+              "id": "adc-dac-l1-mcq6",
+              "type": "mcq",
+              "prompt": "Where does the ADC usually live in a typical microcontroller project?",
+              "choices": [
+                "On a separate chip you must always buy",
+                "Built into the MCU, so a sensor can wire straight to a pin",
+                "Only inside the sensor itself",
+                "In the power supply"
+              ],
+              "answerIndex": 1,
+              "explanation": "Most MCUs include an ADC on-chip, letting you connect a sensor directly to an ADC-capable pin. External ADCs exist but are not the common starting point.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-2.svg"
+            },
+            {
+              "id": "adc-dac-l1-mcq7",
+              "type": "mcq",
+              "prompt": "A thermostat reads a temperature sensor whose voltage rises as the room warms. What converts that voltage into something the thermostat's program can compare to a setpoint?",
+              "choices": [
+                "The DAC",
+                "The ADC",
+                "A timer",
+                "The output pin driver"
+              ],
+              "answerIndex": 1,
+              "explanation": "The rising voltage is analog; the ADC turns it into a number the program can compare against the target. The DAC goes the other direction.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-2.svg"
+            },
+            {
+              "id": "adc-dac-l1-mcq8",
+              "type": "mcq",
+              "prompt": "You want your MCU to play a simple tone out of a speaker by producing a changing voltage. Which peripheral fits best?",
+              "choices": [
+                "The ADC, reading the speaker",
+                "The DAC, outputting a changing voltage",
+                "A button input",
+                "The flash memory"
+              ],
+              "answerIndex": 1,
+              "explanation": "Generating an output voltage from numbers is the DAC's job. The ADC only reads voltages; it cannot drive a speaker.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-6.svg"
             }
           ]
         },
         {
           "id": "adc-dac-adc-dac-l2",
-          "title": "Conversion Modes, Triggering & Throughput",
+          "title": "Reference Voltage, Resolution, and Counts to Volts",
           "order": 2,
-          "difficulty": 2,
-          "content": "Once the analog path is sound, you choose **how** conversions are launched. **Single (one-shot)** mode converts once per trigger. **Continuous** mode re-arms itself the instant a conversion finishes, free-running as fast as it can. **Scan/sequence** mode walks an ordered list of channels (regular sequence registers), optionally storing each result via DMA so you can sample, say, four sensors per sweep.\n\n**Triggering** is the crux. **Software trigger** (set the start bit) is convenient but the launch time jitters with whatever the CPU was doing. **Timer (hardware) triggering** ties each conversion to a timer event (e.g. TIM update -> TRGO -> ADC start), giving a hardware-precise, low-jitter sample clock at frequency $f_s$. This is the standard pattern for clean acquisition.\n\nTotal conversion time is the sampling window plus the SAR steps:\n\n$$t_{conv}=t_{samp}+t_{SAR}=t_{samp}+\\frac{N+\\delta}{f_{ADC}}$$\n\nand throughput is $f_{s,max}=1/t_{conv}$.\n\nDon't forget **Nyquist**: to represent a signal of bandwidth $B$ you must sample at $f_s>2B$. Because the ADC samples everything, any energy above $f_s/2$ folds (aliases) back into your band — so the **anti-alias filter is analog, ahead of the ADC**, and cannot be undone in software. A radar tech knows this viscerally: an unfiltered spur at $f_s+f$ lands right on top of your target return.",
+          "difficulty": 1,
+          "content": "## Hook\n\nThe ADC gives you a number, but a number alone is meaningless. Is a reading of 2048 a lot or a little? To make sense of it you need two settings: the **reference voltage** and the **resolution**.\n\n## Build\n\nThe **reference voltage** (often written $V_{ref}$) is the highest voltage the ADC can measure. Think of it as the top of a ruler. If $V_{ref}$ is 3.3 V, then 0 V reads as the smallest count and 3.3 V reads as the largest count. Anything above $V_{ref}$ just pins at the top.\n\n**Resolution** is how many steps the ruler is divided into, set by a number of **bits**. An $N$-bit ADC has $2^N$ steps. A common choice is **12-bit**, giving $2^{12} = 4096$ steps numbered **0 to 4095**. More bits means finer steps.\n\nEach step is called one **LSB** (least significant bit), the smallest voltage change the ADC can tell apart:\n\n$$\\text{step size} = \\frac{V_{ref}}{2^N}$$\n\nFor 12-bit with $V_{ref} = 3.3\\,\\text{V}$: $3.3 / 4096 \\approx 0.81\\,\\text{mV}$ per count.\n\nTo turn a **count back into volts**, multiply by the step size:\n\n$$V_{in} = \\text{count} \\times \\frac{V_{ref}}{2^N} = \\frac{\\text{count}}{2^N} \\times V_{ref}$$\n\nSo a reading of 2048 (exactly halfway up the 0..4095 range) means about $2048/4096 \\times 3.3 = 1.65\\,\\text{V}$, half of $V_{ref}$.\n\n## Recap\n\n$V_{ref}$ sets the top of the scale, resolution sets how many steps fit under it, and `count/2^N x Vref` turns any reading back into volts.",
           "items": [
-            {
-              "id": "adc-dac-l2-fc1",
-              "type": "flashcard",
-              "front": "Contrast single, continuous, and scan ADC modes.",
-              "back": "Single: one conversion per trigger. Continuous: re-arms automatically and free-runs. Scan/sequence: steps through an ordered channel list each trigger (often into DMA).",
-              "hint": "One-shot vs free-run vs multi-channel."
-            },
-            {
-              "id": "adc-dac-l2-fc2",
-              "type": "flashcard",
-              "front": "Why is timer triggering preferred over software triggering for signal acquisition?",
-              "back": "A timer launches each conversion on a hardware event (TRGO), giving a precise, low-jitter sample interval independent of CPU activity. Software triggers jitter with code timing, corrupting the time base.",
-              "hint": "Jitter and a clean sample clock."
-            },
-            {
-              "id": "adc-dac-l2-fc3",
-              "type": "flashcard",
-              "front": "State the Nyquist criterion and where the anti-alias filter must live.",
-              "back": "Sample at f_s > 2B for a signal of bandwidth B. The anti-alias filter must be analog, before the ADC; aliasing folds in-band energy and cannot be removed afterward.",
-              "hint": "Filter ahead of the sampler."
-            },
-            {
-              "id": "adc-dac-l2-fc4",
-              "type": "flashcard",
-              "front": "Write conversion time and max throughput in terms of sampling and SAR time.",
-              "back": "$t_{conv}=t_{samp}+t_{SAR}$, with $t_{SAR}\\approx (N+\\delta)/f_{ADC}$. Max throughput $f_{s,max}=1/t_{conv}$.",
-              "hint": "Add the sampling window to the bit-trial time."
-            },
             {
               "id": "adc-dac-l2-mcq1",
               "type": "mcq",
-              "prompt": "An input at 5.2 kHz is sampled at 8 kHz with no anti-alias filter. Where does it appear?",
+              "prompt": "A 12-bit ADC has a 3.3 V reference. A reading of 2048 corresponds to about what voltage?",
               "choices": [
-                "At 5.2 kHz, correctly",
-                "Aliased to 2.8 kHz",
-                "Aliased to 13.2 kHz",
-                "It is rejected automatically"
+                "0.81 mV",
+                "1.65 V",
+                "3.30 V",
+                "2.05 V"
               ],
               "answerIndex": 1,
-              "explanation": "f_s/2 = 4 kHz. 5.2 kHz exceeds Nyquist and folds to |8 - 5.2| = 2.8 kHz, masquerading as a lower-frequency tone."
+              "explanation": "12-bit means 0..4095, and 2048 is the halfway count. V = (2048/4096) x 3.3 = 1.65 V, exactly half of Vref. 0.81 mV is the step size, not this reading.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-3.svg"
             },
             {
               "id": "adc-dac-l2-mcq2",
               "type": "mcq",
-              "prompt": "You need exactly evenly-spaced samples at 50 kHz to feed an FFT. Which trigger source?",
+              "prompt": "For a 12-bit ADC with a 3.3 V reference, what is the step size (one LSB)?",
               "choices": [
-                "Software start in a polling loop",
-                "Timer TRGO at 50 kHz",
-                "Continuous mode with no timer",
-                "EXTI from a push button"
+                "About 0.81 mV per count",
+                "About 3.3 mV per count",
+                "About 1.65 V per count",
+                "About 4096 mV per count"
               ],
-              "answerIndex": 1,
-              "explanation": "A timer at 50 kHz driving the ADC gives a hardware-locked, uniform sample interval. Software/continuous free-run produce non-uniform spacing that smears the FFT."
+              "answerIndex": 0,
+              "explanation": "Step size = Vref / 2^N = 3.3 V / 4096, which is about 0.81 mV per count. 1.65 V is the midscale reading, not the step.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-3.svg"
             },
             {
               "id": "adc-dac-l2-mcq3",
               "type": "mcq",
-              "prompt": "If t_samp = 1.5 us and t_SAR = 0.9 us, the maximum single-channel throughput is about:",
+              "prompt": "How many distinct steps does a 12-bit ADC have?",
               "choices": [
-                "417 kSPS",
-                "1.1 MSPS",
-                "667 kSPS",
-                "2.4 MSPS"
+                "12 steps",
+                "1024 steps",
+                "4096 steps",
+                "65536 steps"
               ],
-              "answerIndex": 0,
-              "explanation": "t_conv = 1.5 + 0.9 = 2.4 us, so f_s,max = 1/2.4 us ~= 417 kSPS."
+              "answerIndex": 2,
+              "explanation": "An N-bit ADC has 2^N steps. 2^12 = 4096, numbered 0 to 4095. 1024 is 2^10 and 65536 is 2^16.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-3.svg"
             },
             {
               "id": "adc-dac-l2-mcq4",
               "type": "mcq",
-              "prompt": "Continuous conversion mode means the ADC:",
+              "prompt": "What does the reference voltage (Vref) of an ADC represent?",
               "choices": [
-                "Converts once then stops until re-triggered",
-                "Re-arms itself and converts back-to-back without a new trigger",
-                "Requires a timer event per conversion",
-                "Samples all channels exactly once"
+                "The lowest voltage the ADC can measure",
+                "The highest voltage the ADC can measure, mapped to the largest count",
+                "The voltage the ADC outputs to a sensor",
+                "The speed of the conversion"
               ],
               "answerIndex": 1,
-              "explanation": "Continuous mode automatically restarts after each conversion, free-running at the maximum rate without an external trigger per sample."
+              "explanation": "Vref is the top of the measuring scale: it maps to the maximum count, while 0 V maps to count 0. The ADC does not output voltage to the sensor, and Vref has nothing to do with speed.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-3.svg"
+            },
+            {
+              "id": "adc-dac-l2-mcq5",
+              "type": "mcq",
+              "prompt": "A 10-bit ADC uses a 5.0 V reference. About how many volts is each step (one LSB)?",
+              "choices": [
+                "About 4.9 mV",
+                "About 0.5 mV",
+                "About 50 mV",
+                "About 5 V"
+              ],
+              "answerIndex": 0,
+              "explanation": "10-bit gives 2^10 = 1024 steps. 5.0 V / 1024 is about 4.9 mV per count.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-3.svg"
+            },
+            {
+              "id": "adc-dac-l2-mcq6",
+              "type": "mcq",
+              "prompt": "Keeping Vref the same, you switch an ADC from 8-bit to 12-bit resolution. What happens?",
+              "choices": [
+                "The steps get coarser (bigger volts per count)",
+                "The steps get finer (smaller volts per count), so you can tell apart smaller voltage changes",
+                "The reference voltage doubles",
+                "Nothing changes"
+              ],
+              "answerIndex": 1,
+              "explanation": "More bits means more steps under the same Vref, so each step covers fewer volts and fine changes become visible. Vref is unaffected by the resolution setting.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-3.svg"
+            },
+            {
+              "id": "adc-dac-l2-mcq7",
+              "type": "mcq",
+              "prompt": "Your 12-bit, 3.3 V ADC reads a count of 1024. What voltage is on the pin?",
+              "choices": [
+                "About 0.41 V",
+                "About 0.825 V",
+                "About 1.65 V",
+                "About 3.3 V"
+              ],
+              "answerIndex": 1,
+              "explanation": "V = (count/4096) x Vref = (1024/4096) x 3.3 = 0.25 x 3.3 = 0.825 V. 1024 is one quarter of the full 0..4095 range.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-3.svg"
+            },
+            {
+              "id": "adc-dac-l2-mcq8",
+              "type": "mcq",
+              "prompt": "Why does the accuracy of the reference voltage matter so much?",
+              "choices": [
+                "It does not matter; only the count matters",
+                "Every count is interpreted as a fraction of Vref, so an error in Vref shifts every voltage you calculate",
+                "It only matters for the DAC, not the ADC",
+                "It sets how fast the ADC can sample"
+              ],
+              "answerIndex": 1,
+              "explanation": "Because V = (count/2^N) x Vref, the converted voltage scales directly with Vref. If Vref is off, all your computed voltages are off by the same factor.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-3.svg"
             }
           ]
         },
         {
           "id": "adc-dac-adc-dac-l3",
-          "title": "Timer+DMA Acquisition, Oversampling, Calibration & DAC/DDS",
+          "title": "Sampling Time, Conversion Modes, and Triggering",
           "order": 3,
-          "difficulty": 3,
-          "content": "The headline pattern: **timer -> ADC -> DMA -> circular buffer**. A timer's TRGO triggers each conversion; the ADC raises a request on end-of-conversion; the DMA copies the data register into RAM and auto-increments. With a **circular (ping-pong/double) buffer** plus **half-transfer (HT)** and **transfer-complete (TC)** interrupts, the CPU processes the half that just filled while the other half fills — an evenly-sampled block, captured with near-zero CPU babysitting, ready for an FFT.\n\n**Oversampling** trades speed for resolution. Averaging (or decimating) $M$ samples of a signal with sufficient noise dither raises the effective number of bits by\n\n$$\\Delta N=\\frac{1}{2}\\log_2 M$$\n\nso $M=256$ buys 4 extra bits. A hardware oversampler does this in the ADC and right-shifts automatically.\n\n**Calibration** corrects **offset** (zero error) and **gain** (full-scale slope) error; many MCUs run a startup self-calibration into a register. **Internal channels** (a die temperature sensor, the bandgap $V_{ref}$) let you measure VDDA and compensate.\n\nThe **DAC** is the inverse: code in, voltage out, $V_{out}=\\frac{\\text{code}}{2^N}V_{ref}$, with an optional output buffer. Drive it from a **timer + DMA** streaming a sine lookup table and you have **DDS**: output frequency $f_{out}=f_{update}/L$ for a table of length $L$. Finally, **SAR vs sigma-delta**: SAR is fast, low-latency, moderate resolution (great for radar/scan); sigma-delta oversamples a 1-bit modulator for very high resolution at low bandwidth (great for audio/precision DC).",
+          "difficulty": 2,
+          "content": "## Hook\n\nGetting a good reading is not only about resolution. The ADC needs a moment to \"look\" at the voltage, and you also choose *when* and *how often* it reads. Get these wrong and your numbers drift or arrive at uneven times.\n\n## Build\n\nInside the ADC is a tiny **sample-and-hold**: a little capacitor (a charge bucket) that must charge up to match the input voltage before the reading is taken. The **sampling time** is how long you give that bucket to fill.\n\nHow long is enough depends on the sensor's **source impedance**, roughly how \"stiff\" or \"weak\" its output is. A weak source (high impedance, like a simple resistor divider) fills the bucket slowly, so you must set a **longer sampling time** or add a buffer. Too short, and the reading is pulled toward whatever was measured just before.\n\nNext, the **conversion mode**:\n- **Single (one-shot):** convert once when asked.\n- **Continuous:** the moment one conversion ends, start the next, over and over.\n- **Scan / sequence:** step through a list of channels, so you can read several sensors (multi-channel) in one sweep.\n\nFinally, **triggering**, which means what starts a conversion:\n- **Software trigger:** your code sets a \"start\" bit. Easy, but the timing wobbles depending on what the CPU was busy doing.\n- **Timer trigger:** a hardware timer fires each conversion at an exact, even rate, with no CPU involvement in the timing.\n\nFor evenly spaced samples (for example, to analyze a waveform later), the timer trigger is the right tool: it removes the wobble that a software loop introduces.\n\n## Recap\n\nGive the sample-and-hold enough time (more for weak sources), pick single / continuous / scan to match the job, and let a timer trigger conversions when you need even spacing.",
           "items": [
-            {
-              "id": "adc-dac-l3-fc1",
-              "type": "flashcard",
-              "front": "Describe the timer -> ADC -> DMA circular-buffer acquisition chain and the CPU's role.",
-              "back": "Timer TRGO triggers each ADC conversion; on EOC the DMA copies the data register to RAM and increments. A circular double buffer with HT/TC interrupts lets the CPU process the just-filled half while the other fills. CPU does no per-sample work.",
-              "hint": "Trigger, copy, ping-pong."
-            },
-            {
-              "id": "adc-dac-l3-fc2",
-              "type": "flashcard",
-              "front": "How many extra effective bits does oversampling by M = 256 give, and why?",
-              "back": "$\\Delta N = \\tfrac{1}{2}\\log_2 M = \\tfrac{1}{2}\\log_2 256 = 4$ bits. Averaging uncorrelated noise reduces it as sqrt(M), gaining 0.5 bit per 4x oversample.",
-              "hint": "Half a bit per factor-of-4."
-            },
-            {
-              "id": "adc-dac-l3-fc3",
-              "type": "flashcard",
-              "front": "What are offset and gain calibration, and what are internal channels good for?",
-              "back": "Offset corrects the zero-point error; gain corrects the full-scale slope. Internal channels (temperature sensor, bandgap Vref) let firmware measure die temp and the true VDDA to compensate readings.",
-              "hint": "Intercept vs slope; on-chip references."
-            },
-            {
-              "id": "adc-dac-l3-fc4",
-              "type": "flashcard",
-              "front": "Give the DDS output-frequency relation for a timer+DMA driving a DAC from a length-L sine table.",
-              "back": "$f_{out}=f_{update}/L$, where f_update is the DAC sample rate set by the timer and L is the lookup-table length. Change f_update (or L, or use a phase accumulator) to tune.",
-              "hint": "One full table = one period."
-            },
             {
               "id": "adc-dac-l3-mcq1",
               "type": "mcq",
-              "prompt": "Why use half-transfer AND transfer-complete interrupts on a circular ADC-DMA buffer?",
+              "prompt": "Why is timer-triggering an ADC usually better than reading it in a software loop when you want evenly spaced samples?",
               "choices": [
-                "To double the sample rate",
-                "To process one half while the other half is still being filled (no overwrite)",
-                "To calibrate offset error",
-                "To trigger the timer"
+                "The timer increases the ADC resolution",
+                "A timer fires each conversion at an exact, fixed rate, while a software loop's timing wobbles with whatever the CPU is doing",
+                "A software loop cannot read the ADC at all",
+                "The timer lowers the reference voltage"
               ],
               "answerIndex": 1,
-              "explanation": "HT fires at the midpoint and TC at the end, giving a ping-pong: the CPU consumes the completed half while DMA keeps writing the other, avoiding data races and overwrites."
+              "explanation": "A hardware timer launches conversions at a precise, uniform interval independent of CPU activity. A polling loop's spacing jitters because other code steals time. Triggering does not change resolution or Vref.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-5.svg"
             },
             {
               "id": "adc-dac-l3-mcq2",
               "type": "mcq",
-              "prompt": "You oversample by 64x with adequate dither. Effective added resolution is:",
+              "prompt": "What is the job of the sample-and-hold inside the ADC?",
               "choices": [
-                "1 bit",
-                "2 bits",
-                "3 bits",
-                "6 bits"
+                "To amplify the input voltage",
+                "To charge a small capacitor to match the input, then hold it steady during the conversion",
+                "To store the final number",
+                "To pick which channel to read"
               ],
-              "answerIndex": 2,
-              "explanation": "Delta N = 0.5 * log2(64) = 0.5 * 6 = 3 bits."
+              "answerIndex": 1,
+              "explanation": "The sample-and-hold captures the input on a small capacitor and freezes it so the converter has a stable value to work on. It does not amplify or store the result number.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-5.svg"
             },
             {
               "id": "adc-dac-l3-mcq3",
               "type": "mcq",
-              "prompt": "For a fast, low-latency, per-sample-converting ADC in a radar/scan front end, which architecture fits best?",
+              "prompt": "A sensor with high source impedance gives readings that drift toward the previously measured channel. What is the best first fix?",
               "choices": [
-                "Sigma-delta",
-                "SAR",
-                "Dual-slope integrating",
-                "Flash only above 1 GHz"
+                "Lower the reference voltage",
+                "Increase the ADC sampling time, or add a buffer between the sensor and the pin",
+                "Switch from 12-bit to 8-bit",
+                "Turn on continuous mode"
               ],
               "answerIndex": 1,
-              "explanation": "SAR gives one accurate conversion per trigger with low latency and good speed - ideal for timer-triggered scanning. Sigma-delta trades latency/bandwidth for very high resolution, better suited to audio/precision DC."
+              "explanation": "A weak (high-impedance) source charges the sample capacitor slowly, so a longer sampling time or a buffer lets it settle fully. Changing Vref, resolution, or mode does not address the charging problem.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-5.svg"
             },
             {
               "id": "adc-dac-l3-mcq4",
               "type": "mcq",
-              "prompt": "A DAC sine table has L = 100 entries, updated by a timer at 1 MHz via DMA. Output frequency is:",
+              "prompt": "What does \"continuous\" conversion mode mean?",
+              "choices": [
+                "It converts once and then stops until triggered again",
+                "It starts a new conversion the moment the previous one finishes, repeating on its own",
+                "It requires a timer event for every single conversion",
+                "It reads every channel exactly once and stops"
+              ],
+              "answerIndex": 1,
+              "explanation": "Continuous mode re-arms itself automatically and free-runs back-to-back. Single mode stops after one conversion; scan mode walks a channel list.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-5.svg"
+            },
+            {
+              "id": "adc-dac-l3-mcq5",
+              "type": "mcq",
+              "prompt": "You need to read four different sensors, one after another, in a single sweep. Which mode is designed for that?",
+              "choices": [
+                "Single mode",
+                "Scan / sequence mode",
+                "Software-trigger mode only",
+                "DAC mode"
+              ],
+              "answerIndex": 1,
+              "explanation": "Scan (sequence) mode steps through an ordered list of channels, reading several sensors per sweep. Single mode does one conversion per trigger.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-5.svg"
+            },
+            {
+              "id": "adc-dac-l3-mcq6",
+              "type": "mcq",
+              "prompt": "What does a sensor's source impedance describe, in plain terms?",
+              "choices": [
+                "How bright the sensor's LED is",
+                "How easily the sensor can deliver charge to the ADC, roughly how 'stiff' or 'weak' its output is",
+                "The sensor's color",
+                "The number of bits in the ADC"
+              ],
+              "answerIndex": 1,
+              "explanation": "Source impedance reflects how readily the source supplies charge. A high (weak) impedance fills the sample capacitor slowly, needing more sampling time.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-5.svg"
+            },
+            {
+              "id": "adc-dac-l3-mcq7",
+              "type": "mcq",
+              "prompt": "Setting the sampling time too short results in what kind of error?",
+              "choices": [
+                "The reference voltage drops",
+                "The sample capacitor has not fully charged, so the reading is pulled toward the previous value",
+                "The ADC switches to 8-bit automatically",
+                "The conversion never finishes"
+              ],
+              "answerIndex": 1,
+              "explanation": "If the hold capacitor has not settled, leftover charge from the prior reading biases the result. Sampling time does not change Vref or resolution.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-5.svg"
+            },
+            {
+              "id": "adc-dac-l3-mcq8",
+              "type": "mcq",
+              "prompt": "Which trigger source gives the most precise, even spacing between samples?",
+              "choices": [
+                "A software 'start' bit set inside a polling loop",
+                "A hardware timer firing each conversion",
+                "Pressing a button",
+                "Whenever an interrupt happens to occur"
+              ],
+              "answerIndex": 1,
+              "explanation": "A hardware timer produces a uniform, low-jitter sample interval. Software bits, button presses, and incidental interrupts all introduce uneven timing.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-5.svg"
+            }
+          ]
+        },
+        {
+          "id": "adc-dac-adc-dac-l4",
+          "title": "Timer to ADC to DMA, Oversampling, and Calibration",
+          "order": 4,
+          "difficulty": 3,
+          "content": "## Hook\n\nSuppose you want thousands of evenly spaced samples per second. Reading each one in code would swamp the CPU. There is a hands-off way: let hardware do the whole loop.\n\n## Build\n\nThe pattern is **timer to ADC to DMA**. You met timers in an earlier sub-topic; **DMA** (direct memory access) is a helper that copies data without the CPU, covered more in the coming DMA sub-topic. Here is the chain:\n1. A **timer** fires at your chosen rate and triggers each conversion.\n2. The **ADC** converts and produces a result.\n3. The **DMA** copies that result straight into a buffer (an array in RAM), all by itself.\n\nThe result is an evenly sampled block of data in memory with the CPU barely involved, ready for later processing. Often the buffer is a **circular buffer** with a half-done and a fully-done signal, so the CPU can work on one half while the other fills.\n\n**Oversampling** is a trick to gain extra bits. If you take many readings of a slowly changing signal (which carries a little natural noise) and average them, the average is steadier than any single reading. Averaging $M$ samples roughly adds $\\tfrac{1}{2}\\log_2 M$ bits: averaging 256 readings buys about 4 extra bits of effective resolution. Some MCUs do this automatically in hardware.\n\n**Calibration** corrects small built-in errors. **Offset** error is a constant shift (zero does not read as zero); **gain** error is a wrong slope (full-scale is slightly off). Many MCUs run a quick self-calibration at startup to reduce both.\n\n## Recap\n\nA timer-ADC-DMA chain captures an evenly sampled buffer with almost no CPU work; oversampling averages readings for extra effective bits; calibration trims offset and gain errors.",
+          "items": [
+            {
+              "id": "adc-dac-l4-mcq1",
+              "type": "mcq",
+              "prompt": "In the timer to ADC to DMA chain, what is each part's job?",
+              "choices": [
+                "The timer stores data, the ADC triggers, the DMA converts",
+                "The timer triggers conversions at a fixed rate, the ADC converts, and the DMA copies results into a buffer without the CPU",
+                "The DMA triggers, the timer converts, the ADC stores",
+                "All three jobs are done by the CPU one at a time"
+              ],
+              "answerIndex": 1,
+              "explanation": "Timer = the even clock that triggers; ADC = the converter; DMA = the mover that copies results to RAM. The whole point is to keep the CPU out of the per-sample loop.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-1.svg"
+            },
+            {
+              "id": "adc-dac-l4-mcq2",
+              "type": "mcq",
+              "prompt": "What is the main benefit of using DMA to collect ADC samples?",
+              "choices": [
+                "It increases the reference voltage",
+                "The CPU does not have to read each sample by hand, so it can do other work or stay idle",
+                "It makes the ADC use fewer bits",
+                "It removes the need for a timer"
+              ],
+              "answerIndex": 1,
+              "explanation": "DMA copies each result automatically, freeing the CPU from per-sample reads. It does not change Vref or resolution, and a timer is still what sets the sample rate.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-1.svg"
+            },
+            {
+              "id": "adc-dac-l4-mcq3",
+              "type": "mcq",
+              "prompt": "Why is a circular buffer with half-done and full-done signals useful for streaming ADC data?",
+              "choices": [
+                "It doubles the sample rate",
+                "The CPU can process the half that just filled while the DMA keeps writing the other half, avoiding overwrites",
+                "It calibrates the offset error",
+                "It triggers the timer"
+              ],
+              "answerIndex": 1,
+              "explanation": "The half/full signals create a ping-pong: process one half while the other fills, so data is never overwritten before it is used. It does not change the sample rate.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-1.svg"
+            },
+            {
+              "id": "adc-dac-l4-mcq4",
+              "type": "mcq",
+              "prompt": "Oversampling by averaging 256 readings gives roughly how many extra effective bits?",
+              "choices": [
+                "About 1 extra bit",
+                "About 2 extra bits",
+                "About 4 extra bits",
+                "About 8 extra bits"
+              ],
+              "answerIndex": 2,
+              "explanation": "Extra bits is about (1/2) x log2(M). For M = 256, log2(256) = 8, so (1/2) x 8 = 4 extra bits.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-1.svg"
+            },
+            {
+              "id": "adc-dac-l4-mcq5",
+              "type": "mcq",
+              "prompt": "Why does averaging many readings give a steadier result than a single reading?",
+              "choices": [
+                "Averaging increases the reference voltage",
+                "Each reading carries a little random noise, and averaging makes that noise partly cancel out",
+                "Averaging changes the sensor's voltage",
+                "It only works if the ADC is 8-bit"
+              ],
+              "answerIndex": 1,
+              "explanation": "Random noise tends to cancel when many samples are averaged, so the average sits closer to the true value. It is a software/hardware trick, not a change to Vref or the sensor.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-1.svg"
+            },
+            {
+              "id": "adc-dac-l4-mcq6",
+              "type": "mcq",
+              "prompt": "What does offset error mean in an ADC?",
+              "choices": [
+                "The full-scale reading has the wrong slope",
+                "A constant shift, so an input of zero does not read as exactly zero",
+                "The ADC is too slow",
+                "The reference voltage is missing"
+              ],
+              "answerIndex": 1,
+              "explanation": "Offset is a constant shift of the whole scale (zero does not read zero). A wrong slope at full scale is gain error, a different thing.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-1.svg"
+            },
+            {
+              "id": "adc-dac-l4-mcq7",
+              "type": "mcq",
+              "prompt": "What does calibration do for an ADC?",
+              "choices": [
+                "It increases the number of bits permanently",
+                "It corrects built-in errors such as offset (zero shift) and gain (slope error)",
+                "It replaces the timer",
+                "It converts the result to text"
+              ],
+              "answerIndex": 1,
+              "explanation": "Calibration trims offset and gain errors so readings are more accurate; many MCUs self-calibrate at startup. It does not add bits or replace other peripherals.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-1.svg"
+            },
+            {
+              "id": "adc-dac-l4-mcq8",
+              "type": "mcq",
+              "prompt": "Oversampling trades what for the extra resolution it gives?",
+              "choices": [
+                "It costs nothing at all",
+                "It takes more time / more samples, so it is slower per final reading",
+                "It needs a higher reference voltage",
+                "It needs a bigger DAC"
+              ],
+              "answerIndex": 1,
+              "explanation": "You must take and combine many samples, so each final high-resolution value takes longer to produce. That speed-for-bits trade is the catch.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-1.svg"
+            }
+          ]
+        },
+        {
+          "id": "adc-dac-adc-dac-l5",
+          "title": "DAC Output, Waveforms with Timer + DMA, and ADC Types",
+          "order": 5,
+          "difficulty": 3,
+          "content": "## Hook\n\nNow flip the direction. Instead of reading the world, your program *creates* a voltage, and even a smooth, repeating waveform like a sine wave, with the same timer and DMA tools.\n\n## Build\n\nThe **DAC** turns a number into a voltage on a pin. With the same convention as the ADC:\n\n$$V_{out} = \\frac{\\text{count}}{2^N} \\times V_{ref}$$\n\nSo on a 3.3 V, 12-bit DAC, writing 4095 outputs about 3.3 V; writing 2048 outputs about 1.65 V. Many DACs include an **output buffer** so they can drive a small load without sagging.\n\nTo make a **waveform**, you do not write each value by hand. You store one cycle of the shape (say, a sine) as a list of numbers in a table, then use a **timer + DMA** to feed those numbers to the DAC one after another at a steady rate. This is the same hands-off idea as the ADC chain, just reversed: timer sets the pace, DMA streams the table, DAC outputs the voltage.\n\nThis simple technique is called **DDS** (direct digital synthesis). The output frequency is:\n\n$$f_{out} = \\frac{f_{update}}{L}$$\n\nwhere $f_{update}$ is how often you push a new value and $L$ is the table length. One full trip through the table is one cycle of the wave. A table of 100 entries updated at 1 MHz gives $1{,}000{,}000 / 100 = 10\\,\\text{kHz}$.\n\nFinally, two common ADC styles, just conceptually. **SAR** (successive-approximation) ADCs are fast and give one result per conversion, great for general sensing and timer-triggered sampling. **Sigma-delta** ADCs oversample heavily to reach very high resolution, but are slower, great for audio or precise slow measurements.\n\n## Recap\n\nThe DAC sets a voltage from a number; a timer + DMA streaming a table makes waveforms (DDS) with $f_{out} = f_{update}/L$; SAR is fast and general, sigma-delta is high-resolution but slower.",
+          "items": [
+            {
+              "id": "adc-dac-l5-mcq1",
+              "type": "mcq",
+              "prompt": "On a 12-bit, 3.3 V DAC, what voltage does writing a count of 2048 produce?",
+              "choices": [
+                "About 0.81 mV",
+                "About 1.65 V",
+                "About 3.3 V",
+                "About 0 V"
+              ],
+              "answerIndex": 1,
+              "explanation": "Vout = (count/4096) x Vref = (2048/4096) x 3.3 = 1.65 V, half of Vref. The DAC uses the same scale idea as the ADC.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-6.svg"
+            },
+            {
+              "id": "adc-dac-l5-mcq2",
+              "type": "mcq",
+              "prompt": "To play a sine wave out of a DAC without the CPU writing each value by hand, you use:",
+              "choices": [
+                "A single software write repeated forever",
+                "A timer + DMA streaming a table of values to the DAC at a steady rate",
+                "The ADC in scan mode",
+                "A bigger reference voltage"
+              ],
+              "answerIndex": 1,
+              "explanation": "A timer paces the updates and DMA streams the lookup table into the DAC, the reverse of the ADC capture chain. This frees the CPU and keeps the timing even.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-6.svg"
+            },
+            {
+              "id": "adc-dac-l5-mcq3",
+              "type": "mcq",
+              "prompt": "A DAC sine table has 100 entries and is updated by a timer at 1 MHz via DMA. What is the output frequency?",
               "choices": [
                 "100 Hz",
                 "1 kHz",
@@ -4083,14 +4350,78 @@
                 "1 MHz"
               ],
               "answerIndex": 2,
-              "explanation": "f_out = f_update / L = 1,000,000 / 100 = 10 kHz. One full table traversal is one output period."
+              "explanation": "f_out = f_update / L = 1,000,000 / 100 = 10 kHz. One full pass through the 100-entry table is one cycle of the wave.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-6.svg"
             },
             {
-              "id": "adc-dac-l3-img1",
-              "type": "flashcard",
-              "front": "Timer -> ADC -> DMA evenly-sampled buffer",
-              "back": "Block diagram: a timer TRGO triggers the ADC sample-and-hold and SAR, which raises an end-of-conversion request to a circular DMA that writes into an N-sample RAM buffer, with half-transfer and transfer-complete interrupts feeding an FFT/radar stage while the CPU stays idle between buffers.",
-              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-1.svg"
+              "id": "adc-dac-l5-mcq4",
+              "type": "mcq",
+              "prompt": "In the DDS formula f_out = f_update / L, what does L stand for?",
+              "choices": [
+                "The reference voltage",
+                "The number of entries in the waveform table (one full pass = one cycle)",
+                "The number of ADC channels",
+                "The latency of the DAC"
+              ],
+              "answerIndex": 1,
+              "explanation": "L is the table length. Stepping through all L entries once produces one cycle, so a longer table at the same update rate gives a lower output frequency.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-6.svg"
+            },
+            {
+              "id": "adc-dac-l5-mcq5",
+              "type": "mcq",
+              "prompt": "What is the purpose of a DAC's output buffer?",
+              "choices": [
+                "To increase the resolution",
+                "To let the output drive a small load without the voltage sagging",
+                "To convert voltage back into a number",
+                "To store the waveform table"
+              ],
+              "answerIndex": 1,
+              "explanation": "A buffer provides drive strength so a modest load does not pull the output voltage down. It does not change resolution or store data.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-6.svg"
+            },
+            {
+              "id": "adc-dac-l5-mcq6",
+              "type": "mcq",
+              "prompt": "Which ADC type is fast and gives one result per conversion, making it a good general choice for timer-triggered sensing?",
+              "choices": [
+                "Sigma-delta",
+                "SAR (successive-approximation)",
+                "DAC",
+                "Open-drain"
+              ],
+              "answerIndex": 1,
+              "explanation": "SAR ADCs convert quickly with low latency, one clean result per trigger, ideal for timer-driven sampling. Sigma-delta trades speed for very high resolution.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-6.svg"
+            },
+            {
+              "id": "adc-dac-l5-mcq7",
+              "type": "mcq",
+              "prompt": "Which ADC type oversamples heavily to reach very high resolution but is slower, suiting audio or precise slow measurements?",
+              "choices": [
+                "SAR",
+                "Sigma-delta",
+                "Flash only",
+                "DAC"
+              ],
+              "answerIndex": 1,
+              "explanation": "Sigma-delta ADCs trade speed for resolution by oversampling, which fits audio and precise DC measurements. SAR is the faster, general-purpose choice.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-6.svg"
+            },
+            {
+              "id": "adc-dac-l5-mcq8",
+              "type": "mcq",
+              "prompt": "You want a lower-frequency tone from the same DAC table without changing how fast you push values. What can you do?",
+              "choices": [
+                "Use a shorter table",
+                "Use a longer table, since f_out = f_update / L drops as L grows",
+                "Raise the reference voltage",
+                "Switch to the ADC"
+              ],
+              "answerIndex": 1,
+              "explanation": "With f_update fixed, increasing the table length L lowers f_out because one cycle now takes more updates. A shorter table would raise the frequency.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/adc-dac-6.svg"
             }
           ]
         }
