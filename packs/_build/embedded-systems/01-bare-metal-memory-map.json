@@ -5,269 +5,419 @@
   "lessons": [
     {
       "id": "bare-metal-memory-map-lesson-1",
-      "title": "Memory Is Silicon, Not an Array",
+      "title": "What Is an Embedded System?",
       "order": 1,
       "difficulty": 1,
-      "content": "On a hosted machine, memory feels like one flat, uniform array of bytes that a runtime hands you. On a microcontroller (MCU), that abstraction is gone. The CPU drives a single linear **address space** (4 GB on a 32-bit Cortex-M), but different *ranges* of that space are wired to physically different things.\n\nThree regions dominate:\n\n- **Flash** — non-volatile, read/execute. Your code (`.text`), constants (`.rodata`), and the reset vectors live here. It survives power-off. You cannot casually store to it; writing flash means erase-then-program a whole page.\n- **SRAM** — volatile read/write. Your variables (`.data`, `.bss`), the stack, and any heap live here. Fast, but small (often kilobytes) and gone at reset.\n- **Peripheral region** — addresses that are not memory at all. They are *control and status registers* hard-wired into devices (GPIO, timers, UART).\n\nThe load-bearing reframe for a software dev: an address is not a slot that just holds a value. The *same* `STR` (store) instruction that writes a struct field can, at a different address, physically toggle a pin or launch a DMA transfer. Where the address points decides what the bus does.\n\n```c\n/* All three are just stores -- the address decides the effect. */\nuint32_t x;\nx = 1;                       /* writes SRAM, no side effect */\n*(volatile uint32_t *)0x40020018 = 1; /* writes a GPIO register: a pin goes high */\n```\n\nYou studied this exact bus in your digital course; here it is the silicon under your C.",
+      "content": "**Hook.** Think about a microwave oven. When you press a button, it beeps, counts down, and spins the plate. Something inside is making those decisions. That something is a tiny computer. Most devices around you have one: a thermostat, a washing machine, a TV remote, a child's toy, even a car (which has dozens).\n\n**Build.** An **embedded system** is a small computer built *into* a device to control it. You don't think of the microwave as \"a computer\" the way you think of a laptop, because the computer is hidden and does just one job. That hidden computer is usually a single chip called a **microcontroller** (often shortened to **MCU**, for *micro-controller unit*). A microcontroller is a complete little computer on one chip: it has a **CPU** (the part that runs instructions, the \"brain\"), some **memory** (to hold the program and its data), and **pins** (metal legs that connect to the outside world — to buttons, lights, motors, and sensors).\n\nThe program that runs on a microcontroller has a special name: **firmware**. It's called *firmware* (rather than just *software*) because it is usually stored permanently inside the chip and rarely changes — it sits between \"hard\" hardware and \"soft\" everyday apps.\n\nOn a laptop or phone, your programs run on top of an **operating system** (like Windows, macOS, Android, or Linux). The operating system is a big program that manages everything and shares the computer among many apps. Most microcontrollers have *no operating system at all*. Your firmware runs directly on the chip. We call this **bare-metal** programming: there's nothing between your program and the \"bare metal\" of the hardware.\n\n**Recap.** An embedded system is a small computer inside a device. The chip is usually a microcontroller (CPU + memory + pins). Its program is called firmware, and \"bare-metal\" means that firmware runs straight on the chip with no operating system underneath.",
       "items": [
-        {
-          "id": "bare-metal-memory-map-1-fc-1",
-          "type": "flashcard",
-          "front": "Name the three dominant regions of a Cortex-M address space and what each is for.",
-          "back": "Flash: non-volatile read/execute -- code, constants, vectors. SRAM: volatile read/write -- variables, stack, heap. Peripheral region: addresses that ARE device registers (GPIO, timers, UART), not storage.",
-          "hint": "One survives power-off, one is fast scratch, one isn't memory at all.",
-          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bare-metal-memory-map-1.svg"
-        },
-        {
-          "id": "bare-metal-memory-map-1-fc-2",
-          "type": "flashcard",
-          "front": "Why is 'memory is a flat array of objects' a misleading model on an MCU?",
-          "back": "Because the address space is heterogeneous: ranges map to physically different hardware -- flash, SRAM, or peripheral registers. The effect of a store depends on WHERE it targets, not just the value written.",
-          "hint": "Think about what a store does at a peripheral address."
-        },
-        {
-          "id": "bare-metal-memory-map-1-fc-3",
-          "type": "flashcard",
-          "front": "On an MCU, where do global/static variables (.data and .bss) physically live at run time?",
-          "back": "In SRAM. (.data is initialized from a copy stored in flash; .bss is zeroed. Both reside in SRAM once running.)",
-          "hint": "Volatile, fast, read/write, lost at reset."
-        },
-        {
-          "id": "bare-metal-memory-map-1-fc-4",
-          "type": "flashcard",
-          "front": "Why can't you treat flash like ordinary RAM and just store individual bytes to it?",
-          "back": "Flash is non-volatile and must be erased a whole page/sector at a time before re-programming; it has limited write endurance. It is read/execute in normal operation, not arbitrarily byte-writable.",
-          "hint": "Erase-before-write granularity."
-        },
         {
           "id": "bare-metal-memory-map-1-mcq-1",
           "type": "mcq",
-          "prompt": "A 32-bit Cortex-M executes `*(volatile uint32_t *)0x40020018 = 1;`. The pin wired to that bit goes high. What does this demonstrate?",
+          "prompt": "What is an \"embedded system\"?",
           "choices": [
-            "The compiler special-cased the address into a GPIO intrinsic",
-            "A plain store instruction to a peripheral address has a physical side effect because the address is a hardware register",
-            "Writing to flash toggled the pin",
-            "The value 1 is interpreted as a voltage by the CPU core"
+            "A small computer built into a device to control it",
+            "A website that runs inside another website",
+            "A type of operating system for laptops",
+            "A spreadsheet with formulas embedded in the cells"
           ],
-          "answerIndex": 1,
-          "explanation": "The store is an ordinary STR; the address falls in the peripheral region where that location is a GPIO output register, so the bus write physically drives the pin."
+          "answerIndex": 0,
+          "explanation": "An embedded system is a small, often hidden computer placed inside a device (microwave, thermostat, car) to control how that device behaves. It is not a website or a desktop operating system.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bare-metal-memory-map-2.svg"
         },
         {
           "id": "bare-metal-memory-map-1-mcq-2",
           "type": "mcq",
-          "prompt": "After a power cycle, which contents are guaranteed to be lost?",
+          "prompt": "A microcontroller (MCU) is best described as:",
           "choices": [
-            "The contents of flash (.text and .rodata)",
-            "The reset vector",
-            "The contents of SRAM (variables, stack, heap)",
-            "Nothing; an MCU retains all memory across power cycles"
+            "A screen for displaying text",
+            "A complete tiny computer on a single chip, with a CPU, memory, and pins",
+            "A cable that connects a computer to the internet",
+            "The plastic case around a device"
           ],
-          "answerIndex": 2,
-          "explanation": "SRAM is volatile and loses its contents at power-off; flash is non-volatile and persists, which is why code and constants live there."
+          "answerIndex": 1,
+          "explanation": "A microcontroller packs a CPU (the brain), memory, and connection pins onto one small chip, making it a whole little computer. It is not a screen, a cable, or a case.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bare-metal-memory-map-2.svg"
         },
         {
           "id": "bare-metal-memory-map-1-mcq-3",
           "type": "mcq",
-          "prompt": "Which statement best captures the 'bare-metal mindset' shift from application programming?",
+          "prompt": "Inside a microcontroller, what is the job of the CPU?",
           "choices": [
-            "Pointers no longer hold addresses",
-            "Memory is a managed abstraction provided by a runtime",
-            "Memory is a physical address space where the target address determines whether you touch RAM, flash, or a live device register",
-            "All memory accesses are equally fast and side-effect free"
+            "To store the program permanently",
+            "To supply electrical power to the chip",
+            "To run the program's instructions (it is the \"brain\")",
+            "To connect wirelessly to the internet"
           ],
           "answerIndex": 2,
-          "explanation": "The core reframe is that the address space is physical and heterogeneous; the address decides what the access actually does."
+          "explanation": "The CPU is the part that actually executes instructions one after another, so it acts as the brain. Storing the program is the job of memory, not the CPU.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bare-metal-memory-map-2.svg"
         },
         {
           "id": "bare-metal-memory-map-1-mcq-4",
           "type": "mcq",
-          "prompt": "Why does code typically execute directly from flash on a small MCU rather than being copied to RAM first?",
+          "prompt": "The program that runs on a microcontroller is commonly called:",
           "choices": [
-            "Flash is faster than SRAM for execution",
-            "SRAM is usually tiny and non-persistent, while flash is non-volatile, larger, and execute-in-place capable",
-            "The CPU cannot fetch instructions from SRAM",
-            "Flash cannot store data, only instructions"
+            "Firmware",
+            "A browser",
+            "A driver's license",
+            "An operating system"
+          ],
+          "answerIndex": 0,
+          "explanation": "A microcontroller's program is called firmware because it is stored more or less permanently in the chip and sits between fixed hardware and changeable everyday software.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bare-metal-memory-map-2.svg"
+        },
+        {
+          "id": "bare-metal-memory-map-1-mcq-5",
+          "type": "mcq",
+          "prompt": "What does \"bare-metal\" programming mean?",
+          "choices": [
+            "Writing code on a metal desk instead of a wooden one",
+            "Your program runs directly on the chip, with no operating system underneath it",
+            "Programming a robot made of metal",
+            "Code that can only be written in the metal industry"
           ],
           "answerIndex": 1,
-          "explanation": "MCUs have far more flash than SRAM and flash retains code across resets, so execute-in-place from flash is the norm; SRAM is reserved for the small, mutable working set."
+          "explanation": "Bare-metal means there is no operating system layer between your firmware and the hardware; your program talks to the \"bare metal\" of the chip directly. It has nothing to do with desks or industries.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bare-metal-memory-map-2.svg"
+        },
+        {
+          "id": "bare-metal-memory-map-1-mcq-6",
+          "type": "mcq",
+          "prompt": "On a laptop or phone, an operating system (like Windows or Android) mainly:",
+          "choices": [
+            "Replaces the CPU with a faster one",
+            "Is the metal body of the device",
+            "Manages the computer and shares it among many apps",
+            "Is required on every microcontroller"
+          ],
+          "answerIndex": 2,
+          "explanation": "An operating system is a large program that manages the machine and lets many apps share it. Most microcontrollers run bare-metal and have no operating system at all.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bare-metal-memory-map-2.svg"
+        },
+        {
+          "id": "bare-metal-memory-map-1-mcq-7",
+          "type": "mcq",
+          "prompt": "Which of these is most likely to contain an embedded system?",
+          "choices": [
+            "A printed paper book",
+            "A glass of water",
+            "A digital thermostat on the wall",
+            "A wooden spoon"
+          ],
+          "answerIndex": 2,
+          "explanation": "A digital thermostat has a small computer inside that reads the temperature and controls the heating, so it is an embedded system. A book, water, and a spoon have no computer in them.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bare-metal-memory-map-2.svg"
+        },
+        {
+          "id": "bare-metal-memory-map-1-mcq-8",
+          "type": "mcq",
+          "prompt": "Why do microcontrollers have pins (metal legs)?",
+          "choices": [
+            "To connect the chip to the outside world: buttons, lights, motors, and sensors",
+            "To make the chip heavier so it stays in place",
+            "Purely for decoration",
+            "To store the firmware permanently"
+          ],
+          "answerIndex": 0,
+          "explanation": "Pins are how the chip senses and controls the physical world, wiring it to buttons, LEDs, motors, and sensors. They are not decorative, and the program is stored in memory, not in the pins.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bare-metal-memory-map-2.svg"
+        },
+        {
+          "id": "bare-metal-memory-map-1-mcq-9",
+          "type": "mcq",
+          "prompt": "Why is a microwave's controller considered \"embedded\" rather than a regular computer?",
+          "choices": [
+            "Because it is bigger than a laptop",
+            "Because it can run any app you download",
+            "Because the computer is built into the device and does one dedicated job, hidden from the user",
+            "Because it has no CPU"
+          ],
+          "answerIndex": 2,
+          "explanation": "Embedded systems are dedicated, built-in computers doing one job, which is why you don't think of the microwave as \"a computer.\" It still has a CPU; it just isn't a general-purpose machine."
         }
       ]
     },
     {
       "id": "bare-metal-memory-map-lesson-2",
-      "title": "Memory-Mapped I/O, Word Size, Alignment & Endianness",
+      "title": "The Memory Map: One Big Numbered Address Space",
       "order": 2,
       "difficulty": 2,
-      "content": "In the peripheral region, **memory-mapped I/O (MMIO)** means a load or store *is* the device transaction. This breaks two assumptions a desktop C programmer leans on.\n\n**Writes have side effects.** Storing to a GPIO set/reset register drives pins; storing to a UART data register launches a byte on the wire. The value you wrote may not even be readable back.\n\n**Reads have side effects too.** Reading a status register can clear a flag. A classic UART pattern: reading the data register clears the RXNE 'data ready' bit. So a stray, optimizer-inserted, or duplicated read can *eat* an event. This is exactly why register accesses must be `volatile` -- the compiler must perform every access you wrote, no more and no fewer, and must not cache or reorder them.\n\n**Word size & alignment.** Cortex-M is a 32-bit machine: the natural word is 4 bytes. Registers are accessed at their natural width and natural alignment. A 32-bit access to an address not divisible by 4 can raise a **UsageFault** (unaligned access), and many peripherals *only* accept word-width access. Packed protocol structs that misalign fields are a frequent fault source.\n\n```c\n/* uint32_t access must be 4-byte aligned */\nvolatile uint32_t *reg = (volatile uint32_t *)0x40020014;\nuint32_t status = *reg;   /* one real bus read -- may clear a flag */\n```\n\n**Endianness.** Most Cortex-M parts are **little-endian**: the least-significant byte sits at the lowest address. It is invisible within the chip but bites the moment you serialize multi-byte values for a protocol or parse a big-endian network/sensor frame. Always byte-pack explicitly rather than casting a struct over a buffer.",
+      "content": "**Hook.** Imagine a long street where every house has a number: house 1, house 2, house 3, and so on. To deliver a letter you just need the house number. A microcontroller's memory works the same way: it is one long line of numbered slots, and each number is called an **address**.\n\n**Build.** The whole range of addresses is called the **address space**, and the picture of which addresses are used for what is called the **memory map**. Here's the key idea: not every address holds the same kind of thing. Different stretches of the street are wired to different hardware. There are three main neighborhoods:\n\n- **Flash** — this is **non-volatile** memory, meaning it *keeps its contents even when the power is off* (like a USB stick). Your firmware (the program itself) lives here, along with fixed constant values. Flash is read often but changed rarely.\n- **RAM** (often a type called **SRAM**, *static RAM*) — this is **volatile** memory, meaning it is *erased when the power goes off*. RAM is fast scratch space for data the program is working with right now: the values of your variables. There is usually only a little of it.\n- **Peripheral region** — this is the surprising one. These addresses are *not storage at all*. Each is a special control box called a **register** that is wired directly to a piece of hardware (a pin, a timer, a communication port). A register is a small set of bits whose value controls or reports on that hardware.\n\nSo: flash holds your program, RAM holds your scratch data, and the peripheral region is how you reach the hardware. Same numbered street, three very different kinds of house.\n\n**Memory-mapped I/O.** Because peripherals live at addresses, you control hardware just by reading and writing addresses. Writing a number to a particular address can literally make a pin turn on and light an LED. This trick is called **memory-mapped I/O** (\"I/O\" means *input/output*). A write you might expect to simply \"store a number\" instead has a real, physical **side effect**.\n\n```c\n/* Both lines just write a number to an address. */\nx = 1;                                  /* address in RAM: just stores data */\n*(volatile uint32_t *)0x40020018 = 1;   /* address is a pin register: a pin goes HIGH -> LED on */\n```\n\n**Recap.** Memory is one numbered address space. Flash keeps your program (survives power-off), RAM holds scratch data (lost at power-off), and peripheral addresses *are* hardware registers — so writing to the right address has a physical effect.",
       "items": [
-        {
-          "id": "bare-metal-memory-map-2-fc-1",
-          "type": "flashcard",
-          "front": "In memory-mapped I/O, what surprising thing can a simple READ of a register do?",
-          "back": "It can have a side effect -- e.g. reading a data register clears the 'data ready' / RXNE flag. A spurious or duplicated read can therefore lose an event, which is why such accesses must be volatile.",
-          "hint": "Status flags and read-to-clear."
-        },
-        {
-          "id": "bare-metal-memory-map-2-fc-2",
-          "type": "flashcard",
-          "front": "What does `volatile` on a register pointer force the compiler to do?",
-          "back": "Perform exactly the accesses written in source -- no caching the value in a CPU register, no eliding 'redundant' reads/writes, and no reordering volatile accesses relative to each other.",
-          "hint": "Every access in source becomes one real bus access."
-        },
-        {
-          "id": "bare-metal-memory-map-2-fc-3",
-          "type": "flashcard",
-          "front": "What is the natural word size of a Cortex-M, and what happens on a misaligned 32-bit access?",
-          "back": "32 bits (4 bytes). A 32-bit access to an address not divisible by 4 can raise a UsageFault (unaligned access); many peripherals also require word-width access only.",
-          "hint": "Divisible by 4."
-        },
-        {
-          "id": "bare-metal-memory-map-2-fc-4",
-          "type": "flashcard",
-          "front": "Most Cortex-M cores are little-endian. Where does endianness actually bite you?",
-          "back": "In serialization/protocol code: when packing multi-byte values onto a wire or parsing a big-endian frame. Inside the chip it's invisible; across a link it corrupts data if you cast a struct over a byte buffer instead of packing explicitly.",
-          "hint": "Crossing the chip boundary."
-        },
         {
           "id": "bare-metal-memory-map-2-mcq-1",
           "type": "mcq",
-          "prompt": "A UART driver reads the data register twice 'to be safe.' Bytes go missing. Why?",
+          "prompt": "In a microcontroller, what is an \"address\"?",
           "choices": [
-            "The second read corrupts the alignment of the buffer",
-            "Reading the data register clears RXNE, so the second read consumes/discards a fresh byte's state",
-            "Two reads cause an unaligned access fault",
-            "The compiler merged both reads into one"
+            "The name of the company that made the chip",
+            "A number that identifies one slot in memory, like a house number on a street",
+            "The speed at which the CPU runs",
+            "A password that unlocks the chip"
           ],
           "answerIndex": 1,
-          "explanation": "Reads of MMIO registers can have side effects; reading the data register clears the data-ready flag, so an extra read mis-handles the receive state and effectively eats data."
+          "explanation": "Memory is a long line of numbered slots; an address is the number of one slot, just like a house number tells you which house on a street. It is not a speed or a password.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bare-metal-memory-map-1.svg"
         },
         {
           "id": "bare-metal-memory-map-2-mcq-2",
           "type": "mcq",
-          "prompt": "Which is a guarantee `volatile` does NOT provide?",
+          "prompt": "Which memory region holds the program (the firmware) so that it survives a power-off?",
           "choices": [
-            "Each source-level access becomes a real memory access",
-            "Volatile accesses are not cached in CPU registers",
-            "Atomicity and a full CPU memory barrier across all accesses",
-            "Volatile accesses are not reordered relative to each other"
+            "RAM",
+            "The peripheral region",
+            "Flash",
+            "The stack"
           ],
           "answerIndex": 2,
-          "explanation": "volatile controls that accesses happen and are not elided or reordered among themselves, but it does not provide atomicity or ordering against non-volatile accesses; for that you need atomics or barriers (DMB/DSB/ISB)."
+          "explanation": "Flash is non-volatile, so it keeps the firmware even with the power off, which is why the program lives there. RAM is volatile scratch space and the peripheral region is hardware registers, not program storage.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bare-metal-memory-map-1.svg"
         },
         {
           "id": "bare-metal-memory-map-2-mcq-3",
           "type": "mcq",
-          "prompt": "On a little-endian Cortex-M, the 32-bit value 0x11223344 is stored at address A. Which byte is at address A (the lowest)?",
+          "prompt": "Where does a microcontroller keep the scratch data its variables use while running?",
           "choices": [
-            "0x11",
-            "0x22",
-            "0x33",
-            "0x44"
+            "In RAM",
+            "In flash",
+            "In the pins",
+            "Nowhere; variables are not stored"
           ],
-          "answerIndex": 3,
-          "explanation": "Little-endian places the least-significant byte at the lowest address, so 0x44 is at A and 0x11 at A+3."
+          "answerIndex": 0,
+          "explanation": "RAM is fast read/write scratch space for data the program is working with right now, so variables live there at run time. Flash is for the (rarely changed) program, and pins are connections, not storage.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bare-metal-memory-map-1.svg"
         },
         {
           "id": "bare-metal-memory-map-2-mcq-4",
           "type": "mcq",
-          "prompt": "A peripheral register block is overlaid with a packed struct, and one 32-bit field lands at an offset of 2 bytes. A word read of it faults. The root cause is:",
+          "prompt": "What does \"non-volatile\" mean when describing flash memory?",
           "choices": [
-            "The register is read-only",
-            "Endianness mismatch between host and target",
-            "A 32-bit access to a non-4-byte-aligned address violated natural alignment",
-            "volatile was missing from the struct"
+            "It is the fastest memory on the chip",
+            "It keeps its contents even when the power is turned off",
+            "It can never be changed at all",
+            "It explodes if overheated"
+          ],
+          "answerIndex": 1,
+          "explanation": "Non-volatile means the data stays put with the power off, like a USB stick, which is why flash is used for the program. It can still be changed, just rarely, and it is usually slower than RAM.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bare-metal-memory-map-1.svg"
+        },
+        {
+          "id": "bare-metal-memory-map-2-mcq-5",
+          "type": "mcq",
+          "prompt": "After you unplug the device, which data is lost?",
+          "choices": [
+            "The firmware stored in flash",
+            "The constants stored in flash",
+            "The variable data held in RAM",
+            "All of the data is kept forever"
           ],
           "answerIndex": 2,
-          "explanation": "A 32-bit access must be 4-byte aligned on Cortex-M; an offset of 2 is misaligned and can raise a UsageFault. Packed structs that misalign word fields are a common cause."
+          "explanation": "RAM is volatile, so its contents (the variables) disappear when power is removed. Flash is non-volatile, so the program and constants survive a power-off.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bare-metal-memory-map-1.svg"
+        },
+        {
+          "id": "bare-metal-memory-map-2-mcq-6",
+          "type": "mcq",
+          "prompt": "What is a \"register\" in the peripheral region?",
+          "choices": [
+            "A cash register that counts money",
+            "A backup copy of the flash memory",
+            "A special set of bits at an address that is wired directly to a piece of hardware",
+            "A list of all the people who bought the chip"
+          ],
+          "answerIndex": 2,
+          "explanation": "A peripheral register is a small group of bits living at an address that controls or reports on hardware (a pin, a timer, a port). It is not storage, a backup, or anything to do with money or buyers.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bare-metal-memory-map-3.svg"
+        },
+        {
+          "id": "bare-metal-memory-map-2-mcq-7",
+          "type": "mcq",
+          "prompt": "A program writes the number 1 to a specific address, and an LED lights up. Why does writing a number turn on a light?",
+          "choices": [
+            "The number 1 is secretly a unit of electricity that flows out of the CPU",
+            "That address is a hardware register wired to a pin, so the write makes the pin go high and power the LED",
+            "Writing to flash always lights an LED",
+            "The compiler recognized the word \"LED\" in the code"
+          ],
+          "answerIndex": 1,
+          "explanation": "With memory-mapped I/O, certain addresses are registers connected to pins; writing the value there drives the pin high, which powers the LED. The number itself is not electricity, and the effect comes from where the address points, not from flash or the compiler.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bare-metal-memory-map-3.svg"
+        },
+        {
+          "id": "bare-metal-memory-map-2-mcq-8",
+          "type": "mcq",
+          "prompt": "What does \"memory-mapped I/O\" mean?",
+          "choices": [
+            "Hardware is controlled by reading and writing ordinary memory addresses",
+            "Memory can only be read, never written",
+            "The memory is drawn on a paper map for engineers",
+            "Input and output are impossible without an operating system"
+          ],
+          "answerIndex": 0,
+          "explanation": "Memory-mapped I/O means peripherals appear at addresses, so you control them with the same read/write operations you use for memory. It is not about paper maps or needing an OS.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bare-metal-memory-map-3.svg"
+        },
+        {
+          "id": "bare-metal-memory-map-2-mcq-9",
+          "type": "mcq",
+          "prompt": "Two lines of code both write the value 1, but to different addresses: one to a RAM slot, one to a peripheral register. What is the difference in effect?",
+          "choices": [
+            "The RAM write changes hardware; the register write does nothing",
+            "Both simply store the number with no effect on the outside world",
+            "The RAM write just stores data; the register write has a physical side effect like turning a pin on",
+            "Neither write is allowed on a microcontroller"
+          ],
+          "answerIndex": 2,
+          "explanation": "Where the address points decides what happens: a RAM address just stores the value, while a peripheral register address can physically act on hardware. That is the heart of memory-mapped I/O.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bare-metal-memory-map-3.svg"
         }
       ]
     },
     {
       "id": "bare-metal-memory-map-lesson-3",
-      "title": "Stack vs Heap With No OS, and the Path to main()",
+      "title": "Bytes, Order, and Sharing Memory With No OS",
       "order": 3,
       "difficulty": 3,
-      "content": "With no operating system, there is no process, no virtual memory, and no allocator handed to you. SRAM is a single physical region you partition yourself via the **linker script**. Typically `.data`/`.bss` sit at the bottom, the **heap** (if any) grows upward, and the **stack** grows downward from the top of SRAM. Nothing checks the gap between them.\n\nThis is why a stack overflow on bare metal is *silent corruption*, not a clean crash: with no MMU, the stack simply overwrites whatever sits below it (your variables, or the heap), and the bug surfaces far away. You size the stack by analysis (worst-case call depth, ISR nesting) and ideally guard it with an MPU region or a watermark pattern.\n\n**Why dynamic allocation is discouraged:** `malloc`/`free` on an MCU is non-deterministic (variable time), fragments a tiny heap until an allocation fails unpredictably, is usually not safe to call from an ISR, and has no recovery path when it returns NULL in the field. The embedded discipline is static allocation: fixed pools, ring buffers, and statically sized buffers whose footprint you can read off the map file.\n\n**There is no `main()` until you write the path to it.** At reset the CPU loads the initial stack pointer from the first vector-table word and the reset handler address from the second, then begins executing the **reset handler / startup code**. That code copies `.data` from its flash load image into SRAM, zeroes `.bss`, optionally sets up the heap and runs C-library/constructor init, and only *then* calls `main`.\n\n```c\nvoid Reset_Handler(void) {\n    /* copy .data flash->SRAM, zero .bss, ... */\n    extern int main(void);\n    main();           /* main() is just another function we chose to call */\n    for (;;) { }      /* main must never return on bare metal */\n}\n```\n\nNo runtime did this for you; the startup code and linker script *are* the runtime, and they are yours to understand.",
+      "content": "**Hook.** Now that we know memory is a numbered street of slots, a few practical questions come up. How big a chunk does the CPU grab at once? When a number is too big for one slot, in what order are its pieces stored? And with no operating system refereeing, how do two parts of your program safely share memory? These details matter because getting them wrong causes bugs that are hard to find.\n\n**Build — word size and alignment.** A CPU likes to move data in fixed-size chunks. On many microcontrollers the natural chunk is **4 bytes** (32 bits), called a **word**. (A *byte* is 8 bits; a *bit* is a single 0 or 1.) The CPU is happiest when a 4-byte value sits at an address that is a multiple of 4 — this is called being **aligned**. A misaligned access (a 4-byte read starting at, say, address 2) can be slow or can even crash the program on some chips. So the rule of thumb is: keep word-sized values on word-sized boundaries.\n\n**Build — endianness.** A 4-byte number has four pieces. **Endianness** is simply the order those pieces are stored in memory. **Little-endian** (the most common on these chips) puts the *least significant* byte (the \"ones\" end) at the lowest address. This is invisible while everything stays on one chip, but it matters the moment you send multi-byte numbers to another device or read them from a sensor — both sides must agree on the order, or the value comes out scrambled.\n\n**Build — stack vs heap with no OS.** Your scratch data in RAM is used two ways. The **stack** is automatic short-term storage for function calls and their local variables; it grows and shrinks on its own as functions are called and return. The **heap** is memory you ask for on demand while running (\"give me 100 bytes\") and give back later. With no operating system, *nobody is guarding the boundary* between them. If the stack grows too far it can quietly overwrite the heap or your variables — no warning, just mysterious corruption. For this reason, embedded programmers usually avoid asking for memory on the fly (called **dynamic allocation**); they prefer fixed, known-size storage decided up front, so memory use is predictable.\n\n**Build — sharing with an interrupt.** Sometimes the chip pauses your main program to handle an urgent event; that quick handler is called an **interrupt** (covered fully in a later sub-topic). If your main program and an interrupt both touch the same variable, the value can change \"behind your back\" at an unexpected moment. Shared data like that needs special care so one side doesn't read a half-updated value — just be aware of it for now.\n\n**Recap.** CPUs move data in words and prefer aligned addresses; endianness is the byte order that matters when data leaves the chip; the stack and heap share RAM with no referee, so dynamic allocation is risky and often avoided; and data shared with an interrupt needs careful handling.",
       "items": [
-        {
-          "id": "bare-metal-memory-map-3-fc-1",
-          "type": "flashcard",
-          "front": "On a typical MCU, which direction do the stack and heap grow within SRAM, and what guards the gap between them?",
-          "back": "The stack grows downward from the top of SRAM; the heap grows upward from above .bss. Nothing inherently guards the gap -- with no MMU, a stack overflow silently corrupts whatever is below it.",
-          "hint": "They grow toward each other; collision = silent corruption."
-        },
-        {
-          "id": "bare-metal-memory-map-3-fc-2",
-          "type": "flashcard",
-          "front": "Why is a stack overflow on bare metal especially dangerous compared to a hosted OS?",
-          "back": "There is no MMU/guard page to trap it, so it doesn't fault cleanly -- it silently overwrites adjacent SRAM (variables or heap), and the symptom appears far from the cause.",
-          "hint": "No MMU, no guard page."
-        },
-        {
-          "id": "bare-metal-memory-map-3-fc-3",
-          "type": "flashcard",
-          "front": "List the main reasons dynamic allocation (malloc/free) is discouraged in bare-metal firmware.",
-          "back": "Non-deterministic timing, heap fragmentation in tiny RAM leading to unpredictable allocation failure, usually not ISR-safe, and no sane recovery when it returns NULL in the field. Prefer static allocation: fixed pools, ring buffers, sized buffers.",
-          "hint": "Determinism, fragmentation, ISR-safety, recovery."
-        },
-        {
-          "id": "bare-metal-memory-map-3-fc-4",
-          "type": "flashcard",
-          "front": "What does the reset/startup code do before it ever calls main()?",
-          "back": "It sets the initial stack pointer (from the first vector-table word), copies .data from its flash load image into SRAM, zeroes .bss, optionally inits the heap and runs C-lib/constructor init, then calls main. main must never return.",
-          "hint": "Copy .data, zero .bss, set SP, then main."
-        },
         {
           "id": "bare-metal-memory-map-3-mcq-1",
           "type": "mcq",
-          "prompt": "What does 'there is no main() until you write the path to it' mean on a Cortex-M?",
+          "prompt": "What is a \"word\" on a typical 32-bit microcontroller?",
           "choices": [
-            "main() is forbidden in embedded C",
-            "The reset handler and linker script -- not a hidden runtime -- are what initialize memory and reach main(); main is just a function the startup code calls",
-            "main() must be written in assembly",
-            "The CPU jumps directly to main() at reset with no setup"
+            "A single letter of text",
+            "The natural chunk of data the CPU handles, here 4 bytes (32 bits)",
+            "A spoken command to the chip",
+            "The name of one variable"
           ],
           "answerIndex": 1,
-          "explanation": "At reset the CPU runs the reset handler from the vector table; that startup code initializes .data/.bss and then calls main. There is no implicit runtime -- the startup code and linker script are the runtime you own."
+          "explanation": "A word is the CPU's natural data chunk; on a 32-bit chip that is 4 bytes. It is not a letter, a spoken command, or a variable name.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bare-metal-memory-map-4.svg"
         },
         {
           "id": "bare-metal-memory-map-3-mcq-2",
           "type": "mcq",
-          "prompt": "At reset on a Cortex-M, the very first two words of the vector table provide:",
+          "prompt": "What does it mean for a 4-byte value to be \"aligned\"?",
           "choices": [
-            "The heap base and heap limit",
-            "The initial stack pointer and the reset handler address",
-            "The clock frequency and flash wait states",
-            "The addresses of main() and exit()"
+            "It is stored at an address that is a multiple of 4",
+            "It is sorted in increasing order",
+            "It is centered on the screen",
+            "It is encrypted before storage"
           ],
-          "answerIndex": 1,
-          "explanation": "Word 0 is the initial MSP value loaded into the stack pointer; word 1 is the reset handler address the CPU jumps to. Other vectors follow."
+          "answerIndex": 0,
+          "explanation": "Alignment means a word-sized value sits at an address that is a multiple of its size (a multiple of 4 for a 4-byte value), which the CPU handles most efficiently. It has nothing to do with sorting, screens, or encryption.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bare-metal-memory-map-4.svg"
         },
         {
           "id": "bare-metal-memory-map-3-mcq-3",
           "type": "mcq",
-          "prompt": "Why must .data be copied from flash to SRAM at startup, while .bss is merely zeroed?",
+          "prompt": "Why can a misaligned access (e.g. a 4-byte read starting at address 2) be a problem?",
           "choices": [
-            ".data holds initialized variables whose initial values are stored in flash but must live in writable SRAM; .bss is zero-initialized so only needs clearing",
-            ".bss is read-only and stays in flash",
-            ".data executes and .bss does not",
-            "There is no difference; both are copied identically"
+            "It always deletes the firmware",
+            "It can be slow or even crash the program on some chips",
+            "It changes the chip's color",
+            "It is never a problem on any chip"
           ],
-          "answerIndex": 0,
-          "explanation": ".data variables have nonzero initial values kept as a load image in flash and must be copied into their writable SRAM home; .bss variables start at zero, so the startup code just zeroes that SRAM range."
+          "answerIndex": 1,
+          "explanation": "Misaligned accesses can be slower and on some microcontrollers cause a fault that crashes the program, so values are kept aligned. It does not erase firmware, and it is not harmless on every chip.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bare-metal-memory-map-4.svg"
         },
         {
           "id": "bare-metal-memory-map-3-mcq-4",
           "type": "mcq",
-          "prompt": "A firmware engineer wants deterministic, fragmentation-free buffers. Which approach best fits the bare-metal discipline?",
+          "prompt": "What does \"endianness\" describe?",
           "choices": [
-            "Call malloc() in each ISR and free() in main",
-            "Use a global recursive allocator with garbage collection",
-            "Statically allocate fixed-size pools and ring buffers whose footprint is visible in the map file",
-            "Grow the stack dynamically as needed"
+            "How fast the chip runs",
+            "The order in which the bytes of a multi-byte number are stored in memory",
+            "Whether memory is full",
+            "The brand of the microcontroller"
+          ],
+          "answerIndex": 1,
+          "explanation": "Endianness is the byte ordering of a multi-byte value in memory. It is not about speed, fullness, or brand.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bare-metal-memory-map-4.svg"
+        },
+        {
+          "id": "bare-metal-memory-map-3-mcq-5",
+          "type": "mcq",
+          "prompt": "On a little-endian chip, which byte of a multi-byte number goes at the lowest address?",
+          "choices": [
+            "The least significant byte (the \"ones\" end)",
+            "The most significant byte",
+            "A random byte each time",
+            "Always the byte 0x00"
+          ],
+          "answerIndex": 0,
+          "explanation": "Little-endian places the least significant byte at the lowest address. The order is fixed, not random, and it is not always a zero byte.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bare-metal-memory-map-4.svg"
+        },
+        {
+          "id": "bare-metal-memory-map-3-mcq-6",
+          "type": "mcq",
+          "prompt": "When does endianness actually cause trouble?",
+          "choices": [
+            "Only when the device is unplugged",
+            "When multi-byte numbers are sent to another device or read from a sensor and the two sides assume different byte orders",
+            "Never; endianness is just a name",
+            "Only when the chip overheats"
+          ],
+          "answerIndex": 1,
+          "explanation": "Within one chip the byte order is invisible, but crossing to another device requires both sides to agree on the order, or the value comes out scrambled. It is unrelated to power or temperature.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bare-metal-memory-map-4.svg"
+        },
+        {
+          "id": "bare-metal-memory-map-3-mcq-7",
+          "type": "mcq",
+          "prompt": "What is the \"stack\" used for?",
+          "choices": [
+            "Permanent storage of the firmware",
+            "Automatic short-term storage for function calls and their local variables",
+            "Controlling the pins directly",
+            "Holding constants that never change"
+          ],
+          "answerIndex": 1,
+          "explanation": "The stack automatically holds the local variables and bookkeeping for function calls, growing and shrinking as functions run and return. The program itself lives in flash, and pin control uses peripheral registers.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bare-metal-memory-map-4.svg"
+        },
+        {
+          "id": "bare-metal-memory-map-3-mcq-8",
+          "type": "mcq",
+          "prompt": "With no operating system, what happens if the stack grows too far into the heap or your variables?",
+          "choices": [
+            "The chip shows a friendly error dialog",
+            "Nothing; the OS moves things out of the way",
+            "It can silently overwrite that data, causing mysterious corruption with no warning",
+            "The stack automatically shrinks itself"
           ],
           "answerIndex": 2,
-          "explanation": "Static allocation -- fixed pools, ring buffers, sized buffers -- gives deterministic timing and a known, map-file-visible memory footprint, avoiding heap fragmentation and ISR-unsafe allocation."
+          "explanation": "Bare-metal has no referee guarding the boundary, so an over-grown stack quietly clobbers whatever is next to it, and the bug shows up far from its cause. There is no OS to step in and no dialog box.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bare-metal-memory-map-4.svg"
+        },
+        {
+          "id": "bare-metal-memory-map-3-mcq-9",
+          "type": "mcq",
+          "prompt": "Why do embedded programmers usually avoid dynamic allocation (asking for memory on the fly with the heap)?",
+          "choices": [
+            "It is illegal in the C language",
+            "Memory use becomes unpredictable and can fail or fragment in tiny RAM, so fixed known-size storage is preferred",
+            "The heap is faster than every other option",
+            "Dynamic allocation deletes the firmware"
+          ],
+          "answerIndex": 1,
+          "explanation": "On tiny systems, asking for memory at run time makes usage hard to predict and can fail unexpectedly, so programmers favor fixed-size storage decided up front. It is legal in C; it is just risky here.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bare-metal-memory-map-4.svg"
+        },
+        {
+          "id": "bare-metal-memory-map-3-mcq-10",
+          "type": "mcq",
+          "prompt": "An \"interrupt\" can pause your main program to handle an urgent event. Why does data shared between the main program and an interrupt need extra care?",
+          "choices": [
+            "Because interrupts erase all variables",
+            "Because the shared value can change \"behind your back\" at an unexpected moment, so one side might read a half-updated value",
+            "Because interrupts only run when the power is off",
+            "Because shared data is always stored in flash"
+          ],
+          "answerIndex": 1,
+          "explanation": "An interrupt can modify a shared variable at any moment, so the main program might catch it mid-update and read a wrong, half-changed value unless the sharing is handled carefully. Interrupts do not erase memory or require power-off.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bare-metal-memory-map-4.svg"
         }
       ]
     }
