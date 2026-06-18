@@ -4,283 +4,778 @@
   "order": 13,
   "lessons": [
     {
-      "id": "debugging-instrumentation-l1-instruments",
-      "title": "Seeing the Bus: Logic Analyzer vs Oscilloscope",
+      "id": "debugging-instrumentation-l1-why-different",
+      "title": "Why Embedded Debugging Is Different",
       "order": 1,
       "difficulty": 1,
-      "content": "As a radar tech you already know the rule: pick the instrument that matches the question. The same split governs embedded debugging, and it is the first reflex to rebuild.\n\nA **logic analyzer** samples many channels as 1/0 against a threshold and, crucially, **decodes protocols** in software (UART, SPI, I2C, CAN). It is the right tool when the question is *digital and relational*: \"Did the master actually send address 0x76? Did the slave ACK or NACK? Is CPOL/CPHA correct? Which byte is wrong?\" With 8+ channels you watch SCL, SDA, CS, and an MCU GPIO marker together and read out the transaction as bytes. You give up vertical detail — it only sees \"above or below threshold.\"\n\nAn **oscilloscope** measures a few channels as *continuous voltage over time*. Reach for it when the question is *analog or about signal integrity*: ringing, slow rise times from missing I2C pull-ups, ground bounce, an undershooting reset line, a runt/glitch pulse too narrow to clock in cleanly, or a metastable edge. The scope shows you *why* a level was misread; the logic analyzer shows you *that* it was.\n\nIn practice they are complementary. A flaky I2C read: the logic analyzer tells you the NACK is real and on which byte; the scope tells you SDA never reaches a clean logic high because the rise time is too slow for the bus capacitance. Many modern bench tools (and the Saleae) do both: analog capture plus protocol decode.\n\nMental model: **logic analyzer for \"what bytes,\" scope for \"what shape.\"** When a bus misbehaves, start with the analyzer to localize the failing transaction, then bring the scope to the suspect line only if the bytes look impossible.",
+      "content": "**Hook.** On your laptop, when a program misbehaves you add a `print` and read the message on the screen. A tiny microcontroller (MCU — the little computer chip inside a gadget) usually has *no screen at all*. So how do you see what your program and the hardware are doing? You need special tools.\n\n**Build.** Think of a doctor. A patient says \"I feel bad\" — that is like \"my gadget doesn't work.\" The doctor doesn't guess; they reach for a tool that reveals one specific thing: a stethoscope to hear the heart, a thermometer for temperature, an X-ray to see bones. Each tool answers a different question, and the doctor picks the right one for the symptom.\n\nEmbedded debugging works the same way. There are four everyday tools, each answering a different question:\n\n- A **debugger** lets you pause your program and look inside it (what is my *code* doing?).\n- A **logic analyzer** shows the 1s and 0s on several wires over time (what *bytes* are on the bus?).\n- An **oscilloscope** shows the real voltage shape of a signal (what does the electrical signal actually *look* like?).\n- A **GPIO toggle** flips an output pin so you can measure timing on a scope (how *long* did something take?).\n\nThe single most useful habit is a **hypothesis-test mindset**: instead of changing things at random, say out loud \"I think the problem is X,\" then pick the one tool that would prove or disprove X, and look. If you were wrong, you've still learned something and you form a new hypothesis.\n\n**Recap.** Embedded debugging is different because there is no screen, so you use external tools to *see* the program and the signals. Pick the tool that answers your current question, and always test a clear guess rather than poking blindly.",
       "items": [
         {
-          "id": "debugging-instrumentation-l1-fc-protocoldecode",
-          "type": "flashcard",
-          "front": "What single capability makes a logic analyzer the default tool for debugging UART/SPI/I2C/CAN?",
-          "back": "Protocol decode: it samples many digital channels and reconstructs the bus traffic as decoded frames/bytes (addresses, ACK/NACK, data), so you read the actual transaction instead of guessing from edges.",
-          "hint": "It is not about voltage accuracy."
-        },
-        {
-          "id": "debugging-instrumentation-l1-fc-scopewhen",
-          "type": "flashcard",
-          "front": "When do you reach for an oscilloscope instead of a logic analyzer?",
-          "back": "When the question is analog or about signal integrity: rise/fall times, ringing, ground bounce, glitches/runt pulses, slow edges from missing pull-ups, metastability — anything where 'above/below threshold' hides the real cause.",
-          "hint": "Shape, not bytes."
-        },
-        {
-          "id": "debugging-instrumentation-l1-fc-complementary",
-          "type": "flashcard",
-          "front": "How do the logic analyzer and scope divide a flaky I2C read between them?",
-          "back": "Logic analyzer: confirms which byte NACKs / whether the address is right (the 'what bytes' layer). Scope: shows whether SDA actually reaches a clean high or has slow/ringing edges from bus capacitance or weak pull-ups (the 'what shape' layer).",
-          "hint": "What vs why."
-        },
-        {
-          "id": "debugging-instrumentation-l1-fc-channels",
-          "type": "flashcard",
-          "front": "Why does a logic analyzer typically offer 8+ channels while a scope offers 2-4?",
-          "back": "A logic analyzer only stores 1 bit per sample per channel (a threshold comparison), so wide channel counts are cheap; a scope digitizes full-resolution voltage at high rate, which is expensive per channel.",
-          "hint": "Bits per sample."
-        },
-        {
-          "id": "debugging-instrumentation-l1-mcq-glitch",
+          "id": "debugging-instrumentation-l1-img-tools",
           "type": "mcq",
-          "prompt": "Your SPI sensor occasionally returns garbage. The logic analyzer decode looks byte-perfect at every capture, yet the fault recurs. What is the smart next move?",
+          "prompt": "Study the diagram of the four tools. Which question is the *debugger* best suited to answer?",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/debugging-instrumentation-2.svg",
           "choices": [
-            "Add more printf calls in the driver",
-            "Put a scope on SCK and MISO to look for ringing/overshoot or marginal edges the analyzer's threshold hides",
-            "Increase the analyzer sample rate and recapture indefinitely",
+            "What does the analog voltage shape look like?",
+            "What is my code doing right now (pause and inspect variables)?",
+            "How many milliamps is the board drawing?",
+            "What is the resistance of a pull-up resistor?"
+          ],
+          "answerIndex": 1,
+          "explanation": "The debugger looks inside your running program — it pauses execution and lets you read variables. Signal shape is the oscilloscope's job; the debugger does not measure current or resistance."
+        },
+        {
+          "id": "debugging-instrumentation-l1-mcq-noscreen",
+          "type": "mcq",
+          "prompt": "Why can't you debug a typical bare-metal MCU the same easy way you debug a laptop program?",
+          "choices": [
+            "MCUs run too fast for any tool to keep up",
+            "A typical MCU has no screen or console to print to, so you need external tools to see what is happening",
+            "MCUs don't run real code, only fixed firmware",
+            "Printing is illegal on microcontrollers"
+          ],
+          "answerIndex": 1,
+          "explanation": "The core difference is the missing screen: there is usually nowhere to display a message, so you reach for a debugger, logic analyzer, scope, or pin toggle. MCUs do run real code, and speed is not the fundamental issue here."
+        },
+        {
+          "id": "debugging-instrumentation-l1-mcq-doctor",
+          "type": "mcq",
+          "prompt": "The lesson compares embedded tools to a doctor's tools. What is the point of that comparison?",
+          "choices": [
+            "All the tools do the same thing, so any one will do",
+            "Each tool reveals a different specific thing, so you choose the right one for the symptom",
+            "The most expensive tool is always the best choice",
+            "You should use every tool at once on every bug"
+          ],
+          "answerIndex": 1,
+          "explanation": "A stethoscope, thermometer, and X-ray each answer a different question. Likewise each debug tool answers a different question — the skill is matching the tool to the symptom, not owning the priciest one."
+        },
+        {
+          "id": "debugging-instrumentation-l1-mcq-hypothesis",
+          "type": "mcq",
+          "prompt": "What does a 'hypothesis-test' debugging mindset mean in practice?",
+          "choices": [
+            "Change several things at once and see if anything improves",
+            "State a clear guess about the cause, then use one tool to prove or disprove it",
+            "Always assume the hardware is broken",
+            "Rewrite the whole program from scratch when stuck"
+          ],
+          "answerIndex": 1,
+          "explanation": "You form a specific guess (\"I think X is the cause\") and run the one test that would confirm or rule it out. Changing many things at once teaches you nothing about which change mattered."
+        },
+        {
+          "id": "debugging-instrumentation-l1-mcq-bytes",
+          "type": "mcq",
+          "prompt": "Your question is \"did the chip actually send the right data bytes out on a communication wire?\" Which tool fits best?",
+          "choices": [
+            "Oscilloscope, to see the voltage shape",
+            "Logic analyzer, to read the 1s and 0s and decode them into bytes",
+            "Debugger, to single-step the code",
+            "A multimeter, to measure average voltage"
+          ],
+          "answerIndex": 1,
+          "explanation": "Reading the actual bits/bytes on several wires over time is exactly what a logic analyzer does. The scope shows shape, not decoded bytes; the debugger shows code state, not the wire."
+        },
+        {
+          "id": "debugging-instrumentation-l1-mcq-shape",
+          "type": "mcq",
+          "prompt": "A wire's signal is 'sometimes misread' and you suspect the electrical shape is bad (not the data values). Which tool answers that?",
+          "choices": [
+            "Logic analyzer, because it shows clean 1s and 0s",
+            "Oscilloscope, because it shows the real continuous voltage shape",
+            "Debugger, because it can pause the code",
+            "GPIO toggle, because it marks events"
+          ],
+          "answerIndex": 1,
+          "explanation": "The oscilloscope shows the actual analog voltage over time, revealing slow edges, ringing, or glitches. A logic analyzer only reports 0/1 and would hide a bad shape."
+        },
+        {
+          "id": "debugging-instrumentation-l1-mcq-timing",
+          "type": "mcq",
+          "prompt": "You want to know how many microseconds a piece of code takes to run. What is a simple, low-cost way to measure it?",
+          "choices": [
+            "Add a print statement and time it by eye",
+            "Flip a GPIO pin high at the start and low at the end, and measure the pulse on a scope",
+            "Guess based on the number of lines of code",
+            "Read the datasheet's typical figure and trust it"
+          ],
+          "answerIndex": 1,
+          "explanation": "Toggling a pin costs almost nothing and the pulse width on a scope directly shows the duration. Printing is far too slow and imprecise for microsecond timing."
+        },
+        {
+          "id": "debugging-instrumentation-l1-mcq-firststep",
+          "type": "mcq",
+          "prompt": "A gadget 'just doesn't work.' What is the best first move using this mindset?",
+          "choices": [
+            "Swap random parts until it works",
+            "Narrow the problem to one clear guess, then pick the single tool that tests it",
+            "Add as many print statements as possible everywhere",
+            "Assume it is unfixable and start over"
+          ],
+          "answerIndex": 1,
+          "explanation": "Start by forming a specific, testable hypothesis and choosing the matching tool. Random swaps and scattershot prints waste time and can introduce new problems."
+        },
+        {
+          "id": "debugging-instrumentation-l1-mcq-debuggerwhat",
+          "type": "mcq",
+          "prompt": "Among the four tools, which one looks *inside your program* rather than at the wires?",
+          "choices": [
+            "Oscilloscope",
+            "Logic analyzer",
+            "Debugger",
+            "GPIO toggle"
+          ],
+          "answerIndex": 2,
+          "explanation": "The debugger inspects the program itself — its variables and where execution is. The other three observe electrical signals on the pins/wires."
+        }
+      ]
+    },
+    {
+      "id": "debugging-instrumentation-l2-debugger-swd",
+      "title": "The Debugger over SWD: Pause, Step, Watch",
+      "order": 2,
+      "difficulty": 1,
+      "content": "**Hook.** Imagine you could freeze your program at any moment and look inside — see exactly which line it's on and what every variable holds. That is what a **debugger** does, and on a microcontroller it is often the very first tool you reach for.\n\n**Build.** To talk to the chip, a small box called a **debug probe** connects your PC to the board using just two signal wires. This two-wire link is called **SWD** (Serial Wire Debug — a standard way to control an ARM chip). The probe can pause the chip, read its memory and variables, and let it run again, all without changing your code.\n\nThree everyday debugger moves:\n\n- **Breakpoint** = \"stop here.\" You mark a line; when the program reaches it, the chip freezes so you can look around.\n- **Step** = \"run one line, then stop.\" You walk through the code one line at a time and watch what happens.\n- **Watch a variable** = \"show me this value.\" While paused, you read (or even change) any variable, like a temperature reading or a loop counter.\n\nWhy is this powerful for a beginner? Because instead of guessing, you can *see*. Hypothesis: \"I think `count` never reaches 10.\" Set a breakpoint inside the loop, watch `count`, step a few times — now you know.\n\nOne caution: pausing the chip stops time for the *program*, but the outside world keeps going. If a motor was spinning or data was arriving, it won't wait for you. So the debugger is perfect for logic bugs (\"my math is wrong\") but can be misleading for timing bugs (covered later).\n\n**Recap.** A debug probe over SWD lets you pause, step line-by-line, and watch variables on a chip with no screen. Use it to *see* your code's logic instead of guessing.",
+      "items": [
+        {
+          "id": "debugging-instrumentation-l2-img-swd",
+          "type": "mcq",
+          "prompt": "Study the SWD setup diagram. What sits between the PC and the target MCU?",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/debugging-instrumentation-3.svg",
+          "choices": [
+            "Nothing — the PC connects straight to the chip's pins",
+            "A debug probe, linked to the PC by USB and to the chip by the two SWD wires",
+            "An oscilloscope",
+            "A second microcontroller running the same program"
+          ],
+          "answerIndex": 1,
+          "explanation": "The debug probe is the translator in the middle: USB to the PC on one side, the two SWD wires (SWDIO and SWCLK) to the target on the other. The PC does not drive the chip's debug pins directly."
+        },
+        {
+          "id": "debugging-instrumentation-l2-mcq-swd",
+          "type": "mcq",
+          "prompt": "What is SWD?",
+          "choices": [
+            "A type of memory inside the MCU",
+            "A two-wire link (Serial Wire Debug) a probe uses to pause and inspect an ARM chip",
+            "A programming language for microcontrollers",
+            "A kind of oscilloscope probe"
+          ],
+          "answerIndex": 1,
+          "explanation": "SWD (Serial Wire Debug) is the standard two-wire debug interface on ARM Cortex-M chips. It carries debug commands, not your program's normal data."
+        },
+        {
+          "id": "debugging-instrumentation-l2-mcq-breakpoint",
+          "type": "mcq",
+          "prompt": "What does setting a breakpoint do?",
+          "choices": [
+            "Permanently deletes that line of code",
+            "Tells the chip to freeze when execution reaches that line, so you can look around",
+            "Speeds the program up past that point",
+            "Sends the variable to the screen automatically"
+          ],
+          "answerIndex": 1,
+          "explanation": "A breakpoint is a \"stop here\" marker. When the program hits it, the chip pauses and you can inspect everything. It does not change or delete code."
+        },
+        {
+          "id": "debugging-instrumentation-l2-mcq-step",
+          "type": "mcq",
+          "prompt": "What does 'stepping' mean in a debugger?",
+          "choices": [
+            "Running the program at half speed continuously",
+            "Executing one line (or one instruction) and then stopping again",
+            "Skipping over broken code",
+            "Restarting the program from the top"
+          ],
+          "answerIndex": 1,
+          "explanation": "Stepping runs a single line then pauses, letting you walk through the code and watch each step's effect. It is not the same as just slowing the program down."
+        },
+        {
+          "id": "debugging-instrumentation-l2-mcq-watch",
+          "type": "mcq",
+          "prompt": "You suspect a counter never reaches 10. What is the most direct debugger move?",
+          "choices": [
+            "Add a slow print after every line",
+            "Set a breakpoint in the loop and watch the counter variable as you step",
+            "Reflash the whole chip",
+            "Measure the supply voltage"
+          ],
+          "answerIndex": 1,
+          "explanation": "Breakpoint plus watching the variable lets you see its actual value directly — the fastest way to confirm or disprove your guess. Printing is slower and the other options don't reveal the value."
+        },
+        {
+          "id": "debugging-instrumentation-l2-mcq-noscreen-need",
+          "type": "mcq",
+          "prompt": "Why is a debug probe especially valuable on an MCU with no screen?",
+          "choices": [
+            "It adds a screen to the board",
+            "It lets you read variables and pause execution without any on-board display or print path",
+            "It makes the program run faster",
+            "It replaces the need to write correct code"
+          ],
+          "answerIndex": 1,
+          "explanation": "With no screen, the probe is your window into the running program — reading variables and pausing without needing the chip to print anything. It doesn't speed up code or excuse bugs."
+        },
+        {
+          "id": "debugging-instrumentation-l2-mcq-timinglimit",
+          "type": "mcq",
+          "prompt": "You pause the chip at a breakpoint while a motor is spinning and sensor data is arriving. What is the catch?",
+          "choices": [
+            "The motor and incoming data also pause and wait for you",
+            "The program freezes, but the outside world keeps going — so paused debugging can mislead you about timing-sensitive behavior",
+            "Pausing damages the chip",
+            "Variables become unreadable while paused"
+          ],
+          "answerIndex": 1,
+          "explanation": "Pausing stops the program's clock, not the real world. The motor keeps spinning and data keeps coming, so a breakpoint can distort or hide timing bugs even though it is great for logic bugs."
+        },
+        {
+          "id": "debugging-instrumentation-l2-mcq-bestfor",
+          "type": "mcq",
+          "prompt": "Which kind of bug is the pause-and-step debugger best suited for?",
+          "choices": [
+            "A timing race that only happens at full speed",
+            "A logic error, like wrong math or a loop that never runs",
+            "A signal that has electrical ringing",
+            "A bus sending the wrong bytes"
+          ],
+          "answerIndex": 1,
+          "explanation": "Logic errors are ideal: pause and inspect to see exactly what the code computed. Timing races, electrical shape, and bus bytes are better seen with tools that don't stop the program."
+        },
+        {
+          "id": "debugging-instrumentation-l2-mcq-nochange",
+          "type": "mcq",
+          "prompt": "A nice property of debugging over SWD is that, to inspect a variable, you generally do NOT need to:",
+          "choices": [
+            "Connect a debug probe",
+            "Add extra print code to your program just to see that value",
+            "Set a breakpoint",
+            "Have power to the board"
+          ],
+          "answerIndex": 1,
+          "explanation": "The probe reads memory directly, so you can watch a variable without sprinkling print statements into your source. You still need the probe, power, and (usually) a breakpoint to pause."
+        }
+      ]
+    },
+    {
+      "id": "debugging-instrumentation-l3-analyzer-vs-scope",
+      "title": "Logic Analyzer vs Oscilloscope",
+      "order": 3,
+      "difficulty": 2,
+      "content": "**Hook.** Two of your most useful bench tools look at the *wires* instead of your code. They seem similar, but they answer opposite questions. Knowing which to grab saves hours.\n\n**Build.** A **logic analyzer** watches several wires at once and records each as just a **1 or a 0** — above or below a threshold voltage. Because it stores only one bit per wire per moment, it can watch many wires (often 8 or more) cheaply. Its superpower is **protocol decode**: it can take the raw 1s and 0s of a bus like **SPI**, **I2C**, or **UART** (common ways chips talk to each other) and label them as actual bytes, addresses, and acknowledgements. So it answers: *\"what bytes went across, and in what order?\"*\n\nAn **oscilloscope** (\"scope\") watches a few wires (usually 2–4) but records the **real, continuous voltage shape** over time. It answers: *\"what does the electrical signal actually look like?\"* — revealing a slow rounded edge, ringing, or a tiny **glitch** (an unwanted short pulse) that a logic analyzer would quietly round off to a clean 1 or 0.\n\nSo: **logic analyzer = \"what bytes,\" oscilloscope = \"what shape.\"** They are partners. A flaky I2C read? Start with the logic analyzer to find *which* byte fails or whether the device acknowledges. If the bytes look impossible — the device should have replied but didn't — put the scope on that wire to see if the voltage even reaches a clean high.\n\n**Recap.** Reach for the logic analyzer to read and decode the bytes on a bus; reach for the oscilloscope to inspect the actual voltage shape and catch glitches the digital view hides.",
+      "items": [
+        {
+          "id": "debugging-instrumentation-l3-img-twoviews",
+          "type": "mcq",
+          "prompt": "Study the 'same wire, two views' diagram. What does the logic analyzer view leave out that the oscilloscope view shows?",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/debugging-instrumentation-4.svg",
+          "choices": [
+            "The order of the pulses",
+            "The actual voltage shape — ringing and a narrow glitch get flattened into clean 1s and 0s",
+            "The number of wires",
+            "The names of the signals"
+          ],
+          "answerIndex": 1,
+          "explanation": "The logic analyzer reports only above/below threshold, so the ringing and glitch the scope reveals are flattened into tidy square edges. That is exactly why a scope is needed for signal-quality problems."
+        },
+        {
+          "id": "debugging-instrumentation-l3-img-spi",
+          "type": "mcq",
+          "prompt": "Study the SPI decode diagram. Beyond showing the raw wires, what extra thing is the logic analyzer doing?",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/debugging-instrumentation-5.svg",
+          "choices": [
+            "Measuring the exact voltage of each high level",
+            "Decoding the 1s and 0s into labeled bytes like 0x9F and 0xEF",
+            "Pausing the CPU at each byte",
+            "Charting current draw over time"
+          ],
+          "answerIndex": 1,
+          "explanation": "Protocol decode turns the raw edges into meaningful bytes you can read directly. It does not measure precise voltage (that's the scope) or pause the CPU (that's the debugger)."
+        },
+        {
+          "id": "debugging-instrumentation-l3-mcq-whichtool",
+          "type": "mcq",
+          "prompt": "Your SPI sensor 'occasionally returns garbage.' The logic analyzer decode looks byte-perfect on every capture, yet the fault keeps happening. Which tool should you reach for next, and why?",
+          "choices": [
+            "Stay on the logic analyzer and capture more often — it will eventually show the bad byte",
+            "Put an oscilloscope on the clock and data lines, because a marginal edge or ringing can be misread even when the analyzer shows clean 1s and 0s",
+            "Use the debugger to single-step the SPI driver until it fails",
             "Replace the sensor immediately"
           ],
           "answerIndex": 1,
-          "explanation": "The analyzer only reports above/below threshold, so clean-looking decodes can still ride on a marginal analog edge (ringing, overshoot, slow rise). The scope reveals the signal-integrity problem the digital view masks."
+          "explanation": "This is the classic 'which tool' call. The analyzer only reports above/below threshold, so a perfectly decoded capture can still ride on a marginal or ringing analog edge. The scope shows the signal-shape problem the digital view hides; capturing more on the analyzer won't reveal it."
         },
         {
-          "id": "debugging-instrumentation-l1-mcq-firsttool",
+          "id": "debugging-instrumentation-l3-mcq-decode",
           "type": "mcq",
-          "prompt": "An I2C device intermittently fails to ACK. Which instrument do you grab FIRST and why?",
+          "prompt": "What single capability makes a logic analyzer the default choice for debugging SPI/I2C/UART?",
           "choices": [
-            "Scope, because I2C is analog at heart",
-            "Logic analyzer, to localize which byte/address the NACK lands on before investigating signal shape",
-            "A voltmeter on VDD",
-            "Neither; just retry in software with delays"
+            "It measures voltage more precisely than a scope",
+            "Protocol decode: it turns the raw 1s and 0s into labeled bytes, addresses, and acknowledgements",
+            "It can pause the CPU",
+            "It draws less power from the board"
           ],
           "answerIndex": 1,
-          "explanation": "Start with the analyzer to localize the failing transaction (is it the address? a data byte? a missing ACK?). Only then, if the bytes look impossible, bring the scope to the suspect line."
+          "explanation": "Decoding the bus into readable bytes lets you see the actual transaction instead of guessing from edges. Voltage precision is the scope's strength, not the analyzer's."
         },
         {
-          "id": "debugging-instrumentation-l1-mcq-pullup",
+          "id": "debugging-instrumentation-l3-mcq-scopewhen",
           "type": "mcq",
-          "prompt": "On a scope, SDA rises slowly and rounded toward VDD and the device sometimes misreads. What is the most likely cause?",
+          "prompt": "When is the oscilloscope the right tool instead of the logic analyzer?",
           "choices": [
-            "The MCU clock is too fast",
-            "RC time constant too large: pull-up resistance too high for the bus capacitance (or missing pull-ups), so the open-drain line can't rise fast enough",
-            "The logic analyzer is loading the bus",
-            "Wrong SPI mode"
+            "When you want to read which bytes crossed the bus",
+            "When the question is about signal shape: slow edges, ringing, or a narrow glitch",
+            "When you want to decode an I2C address",
+            "When you need to watch eight wires at once"
           ],
           "answerIndex": 1,
-          "explanation": "I2C is open-drain: lines are pulled high by resistors. Rounded slow rises mean the RC constant is too large (pull-ups too weak or absent for the trace/bus capacitance), so SDA misses the logic-high window."
+          "explanation": "Signal-shape questions need the scope's continuous voltage view. Reading bytes, decoding addresses, and watching many wires are logic-analyzer jobs."
         },
         {
-          "id": "debugging-instrumentation-l1-mcq-tradeoff",
+          "id": "debugging-instrumentation-l3-mcq-tradeoff",
           "type": "mcq",
-          "prompt": "What does a logic analyzer fundamentally give up compared to an oscilloscope?",
+          "prompt": "What does a logic analyzer give up compared to an oscilloscope?",
           "choices": [
             "The ability to decode protocols",
-            "Channel count",
-            "Vertical (voltage) detail: it sees only above/below a threshold, not the continuous waveform shape",
-            "Triggering on edges"
+            "Voltage detail — it sees only above or below a threshold, not the real waveform shape",
+            "The ability to trigger on an edge",
+            "The ability to watch more than one wire"
           ],
-          "answerIndex": 2,
-          "explanation": "By storing one threshold-compared bit per sample, the analyzer trades away vertical resolution. That is exactly why it can't diagnose ringing, overshoot, or marginal edges the way a scope can."
+          "answerIndex": 1,
+          "explanation": "By storing one bit per sample, the analyzer trades away voltage detail. That is precisely why it can't diagnose ringing or marginal edges, while it keeps its decode and many-channel strengths."
+        },
+        {
+          "id": "debugging-instrumentation-l3-mcq-channels",
+          "type": "mcq",
+          "prompt": "Why can a logic analyzer typically watch 8+ wires while a scope often watches only 2–4?",
+          "choices": [
+            "Logic analyzers are always more expensive",
+            "The analyzer stores just one bit (high/low) per wire per sample, which is cheap; a scope stores full voltage detail, which costs much more per channel",
+            "Scopes are not allowed to have more channels",
+            "Wires for a scope must be longer"
+          ],
+          "answerIndex": 1,
+          "explanation": "One bit per wire is cheap to store, so wide channel counts are easy. Full-resolution voltage capture is expensive per channel, which limits scope channel counts."
+        },
+        {
+          "id": "debugging-instrumentation-l3-mcq-i2cflow",
+          "type": "mcq",
+          "prompt": "An I2C device intermittently fails to acknowledge. What is the sensible order of tools?",
+          "choices": [
+            "Scope first to read the bytes, then analyzer for the shape",
+            "Logic analyzer first to find which byte/address the missing ACK lands on; then a scope on that wire only if the bytes look impossible",
+            "Debugger only — single-step until it fails",
+            "Replace the device, then test"
+          ],
+          "answerIndex": 1,
+          "explanation": "Start with the analyzer to localize the failing transaction (bytes/ACK). Only escalate to the scope's signal-shape view if the decoded bytes don't make sense. The scope can't read bytes for you."
+        },
+        {
+          "id": "debugging-instrumentation-l3-mcq-glitch",
+          "type": "mcq",
+          "prompt": "What is a 'glitch' that a scope can reveal but a logic analyzer may hide?",
+          "choices": [
+            "A correctly decoded byte",
+            "A tiny unwanted pulse or distorted edge in the signal that gets rounded off to a clean 1 or 0 by the analyzer",
+            "A software exception in the CPU",
+            "A missing pull-up resistor value"
+          ],
+          "answerIndex": 1,
+          "explanation": "A glitch is a brief, unwanted feature of the actual waveform. The scope's continuous view shows it; the analyzer's threshold view can flatten it into a clean level and miss it entirely."
         }
       ]
     },
     {
-      "id": "debugging-instrumentation-l2-tracing",
-      "title": "Stop Lying with printf: SWO/ITM, SEGGER RTT, and defmt",
-      "order": 2,
+      "id": "debugging-instrumentation-l4-gpio-profiling",
+      "title": "Measuring Time with a GPIO Toggle",
+      "order": 4,
       "difficulty": 2,
-      "content": "The biggest debugging-mindset upgrade is to stop trusting `printf`. On bare metal `printf` is a trap: it formats on the target, then **blocks** pushing bytes out a slow UART (a 115200-baud line moves ~11.5 KB/s; a single line can cost milliseconds). That latency sits inside whatever code you instrumented, so it *changes the timing of the very bug you're chasing* and stalls ISRs. It also drags in heavyweight libc formatting.\n\nThree lower-overhead paths, in increasing modernity:\n\n**SWO/ITM trace.** The Cortex-M ITM has 32 stimulus ports; writing a word to a port emits it over the single-wire SWO pin to the debug probe. The CPU does a register store and moves on — no UART, no blocking. Good for `printf`-style strings and event markers, but SWO bandwidth and probe support vary.\n\n**SEGGER RTT (Real-Time Transfer).** RTT puts ring buffers in target RAM; firmware writes a few words into RAM (near-zero overhead, no peripheral), and the debug probe reads that RAM out-of-band over SWD/JTAG while the core runs. Throughput is high and it works even where SWO doesn't. This is the workhorse for fast, non-intrusive logging.\n\n**(MODERN) defmt + RTT (Rust).** `defmt` does **deferred formatting**: the target transmits only a format-string *id* plus raw argument bytes; the *host* does the actual string formatting against the ELF's symbol table. So `defmt::info!(\"x={}\", x)` sends a couple of bytes, not a rendered string — even smaller and faster than RTT alone, and it costs almost no flash for format strings.\n\nReflex: instrument with RTT/defmt, not blind `printf`. If you must keep `printf`, route it over RTT rather than UART.",
+      "content": "**Hook.** \"How long does this code take?\" is one of the most important questions in embedded work, and there is a beautifully cheap way to answer it: flip a pin.\n\n**Build.** A **GPIO** pin (General-Purpose Input/Output — a pin you can drive high or low from software) can act as a tiny event marker. The trick: set the pin **high** at the start of the code you care about, and set it **low** at the end. Now connect a scope or logic analyzer to that pin. The **width of the high pulse is exactly how long that code took.**\n\nWhy is this so good? Setting a pin high or low is a single, fast operation — it costs only nanoseconds. Compare that to printing a message, which can take *milliseconds* (thousands of times longer). Because the toggle is so cheap, it barely disturbs the thing you are measuring. This matters most for an **ISR** (Interrupt Service Routine — the short function that runs when an interrupt fires): you can wrap the whole ISR in a high/low toggle and read its duration directly.\n\nYou can also measure **jitter** — how much the timing wobbles from one run to the next — by capturing many pulses and watching whether they all line up or vary. Steady pulses mean predictable timing; varying ones mean something is occasionally delaying you.\n\nHypothesis-test in action: \"I think my ISR sometimes runs too long.\" Toggle a pin around it, capture a few hundred events, and *look* — the worst-case pulse width is your answer, measured, not guessed.\n\n**Recap.** Toggle a GPIO pin high at the start and low at the end of a section, then measure the pulse on a scope. It is the cheapest, most honest way to measure how long code (especially an ISR) takes.",
       "items": [
         {
-          "id": "debugging-instrumentation-l2-fc-printfcost",
-          "type": "flashcard",
-          "front": "Name the three concrete costs of a blocking UART printf on bare metal.",
-          "back": "1) Latency: it blocks while shoving bytes out a slow UART (ms per line at 115200). 2) Timing distortion: that delay sits inside instrumented code/ISRs and alters the bug's timing. 3) Code size: heavyweight libc formatting pulled into flash.",
-          "hint": "Time, timing, and size."
-        },
-        {
-          "id": "debugging-instrumentation-l2-fc-itm",
-          "type": "flashcard",
-          "front": "How does ITM/SWO trace logging avoid the printf bottleneck?",
-          "back": "The Cortex-M ITM has 32 stimulus ports; firmware writes a word to a port register and the data is emitted over the single SWO pin to the probe. The CPU just does a store — no UART transmit loop, no blocking.",
-          "hint": "Single-wire output, register store."
-        },
-        {
-          "id": "debugging-instrumentation-l2-fc-rtt",
-          "type": "flashcard",
-          "front": "What makes SEGGER RTT near-zero-overhead?",
-          "back": "RTT places ring buffers in target RAM. Firmware just writes a few words into RAM (no peripheral, no blocking); the debug probe reads those buffers out-of-band over SWD/JTAG while the core keeps running.",
-          "hint": "Ring buffers in RAM, probe reads them."
-        },
-        {
-          "id": "debugging-instrumentation-l2-fc-defmt",
-          "type": "flashcard",
-          "front": "What is 'deferred formatting' in defmt and why is it so cheap?",
-          "back": "The target sends only a format-string id plus the raw argument bytes; the host reconstructs the full string using symbols from the ELF. The MCU never builds the string, so transmit size and flash usage (no stored format strings) both shrink dramatically.",
-          "hint": "Format on the host, not the target."
-        },
-        {
-          "id": "debugging-instrumentation-l2-mcq-heisen",
+          "id": "debugging-instrumentation-l4-img-toggle",
           "type": "mcq",
-          "prompt": "A race only appears in the release build. You add a printf in the suspect ISR and the bug disappears. What happened?",
+          "prompt": "Study the GPIO-toggle timing diagram. What does the width of the high pulse on the pin represent?",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/debugging-instrumentation-6.svg",
           "choices": [
-            "The printf fixed the race",
-            "The printf's blocking delay changed the timing, masking the race (a Heisenbug); use RTT/GPIO toggle instead",
-            "The compiler optimized the race away",
-            "The UART hardware corrected it"
+            "The supply voltage of the board",
+            "How long the ISR took to run (set high at entry, low at exit)",
+            "The number of bytes sent on the bus",
+            "The clock frequency of the CPU"
           ],
           "answerIndex": 1,
-          "explanation": "Blocking printf adds milliseconds of delay that perturb the timing you're measuring. The race is still there; you've just hidden it. Low-overhead RTT or a GPIO toggle observes without disturbing."
+          "explanation": "The pin is set high at ISR entry and low at exit, so the high-pulse width is exactly the ISR's run time. It is not a voltage, byte count, or clock reading."
         },
         {
-          "id": "debugging-instrumentation-l2-mcq-pickrtt",
+          "id": "debugging-instrumentation-l4-mcq-howtomeasure",
           "type": "mcq",
-          "prompt": "You need high-throughput logging on a board whose probe doesn't support SWO well, while the firmware keeps meeting hard deadlines. Best choice?",
+          "prompt": "What is the basic recipe for GPIO-toggle timing?",
           "choices": [
-            "Crank UART to 921600 and keep using printf",
-            "SEGGER RTT: write to RAM ring buffers, probe reads them over SWD with near-zero target overhead",
-            "Add more breakpoints",
-            "Disable interrupts while printing"
+            "Print the time before and after the code",
+            "Set a pin high at the start and low at the end of the code, then measure the pulse on a scope",
+            "Count the lines of code and multiply by the clock period",
+            "Pause the chip with a breakpoint and read a stopwatch"
           ],
           "answerIndex": 1,
-          "explanation": "RTT needs no SWO pin and no peripheral; the target only writes RAM. It delivers high throughput while leaving timing essentially undisturbed, unlike blocking UART printf."
+          "explanation": "High at the start, low at the end, then read the pulse width — that's the whole technique. Printing is too slow, line-counting is inaccurate, and a breakpoint stops the very thing you're timing."
         },
         {
-          "id": "debugging-instrumentation-l2-mcq-defmtwire",
+          "id": "debugging-instrumentation-l4-mcq-cheap",
           "type": "mcq",
-          "prompt": "With defmt over RTT, what actually travels across the wire for defmt::info!(\"temp={}\", t)?",
+          "prompt": "Why does a GPIO toggle barely disturb the code it measures, while a print statement does?",
           "choices": [
-            "The fully rendered ASCII string 'temp=23'",
-            "A format-string id plus the raw bytes of t, formatted into text later on the host",
-            "Nothing until the buffer is full",
-            "The entire format string every call"
+            "A toggle uses a special debug-only pin",
+            "Setting a pin is a single fast operation (nanoseconds), while printing can take milliseconds — thousands of times longer",
+            "Printing is done by the debug probe, not the CPU",
+            "A toggle runs on a separate processor"
           ],
           "answerIndex": 1,
-          "explanation": "defmt defers formatting: only an interned id and raw argument bytes are sent; the host turns them into text using the ELF symbol table. That is why it beats even plain RTT on size and speed."
+          "explanation": "The cost gap is the point: a pin write is nanoseconds, a print is milliseconds. Because the toggle is so cheap, it doesn't meaningfully change the timing you're trying to observe."
         },
         {
-          "id": "debugging-instrumentation-l2-mcq-keepprintf",
+          "id": "debugging-instrumentation-l4-mcq-isr",
           "type": "mcq",
-          "prompt": "Your codebase is full of printf calls you can't rewrite right now, but UART blocking is wrecking timing. Pragmatic fix?",
+          "prompt": "What is an ISR, and why is GPIO-toggle timing a great fit for it?",
           "choices": [
-            "Remove all logging",
-            "Retarget the printf/_write backend to push bytes into an RTT buffer instead of the UART",
-            "Lower the baud rate",
-            "Call printf only from the idle loop"
+            "A type of memory; toggling lets you erase it",
+            "An Interrupt Service Routine — a short function that runs on an interrupt; toggling lets you measure its run time without slowing it down",
+            "A debug protocol like SWD; toggling replaces it",
+            "A kind of resistor; toggling tests it"
           ],
           "answerIndex": 1,
-          "explanation": "You can keep the printf call sites but redirect the low-level output (_write/putchar) to RTT. Same source, but the bytes now go to a RAM ring buffer the probe drains, eliminating the blocking UART cost."
+          "explanation": "An ISR runs in response to an interrupt and must usually be short. Wrapping it in a cheap pin toggle measures its exact duration without the heavy disturbance a print would cause."
+        },
+        {
+          "id": "debugging-instrumentation-l4-mcq-jitter",
+          "type": "mcq",
+          "prompt": "You capture many toggle pulses and notice their widths vary from run to run. What does that variation tell you?",
+          "choices": [
+            "The scope is broken",
+            "There is jitter — the timing wobbles, meaning something occasionally delays the code",
+            "The pin voltage is too low",
+            "The code never runs"
+          ],
+          "answerIndex": 1,
+          "explanation": "Varying pulse widths are jitter: the run time is not perfectly consistent, hinting at occasional delays (e.g., other interrupts). Steady widths would indicate predictable timing."
+        },
+        {
+          "id": "debugging-instrumentation-l4-mcq-vsprint",
+          "type": "mcq",
+          "prompt": "Why not just add a print at the start and end of the ISR to time it?",
+          "choices": [
+            "Printing is illegal inside an ISR",
+            "Printing is so slow it would dominate and distort the measurement, and may itself stall the ISR",
+            "Prints can't include numbers",
+            "The scope can't see prints"
+          ],
+          "answerIndex": 1,
+          "explanation": "A slow print would add far more time than the ISR itself, wrecking the measurement and possibly delaying real work. The cheap toggle avoids this by costing almost nothing."
+        },
+        {
+          "id": "debugging-instrumentation-l4-mcq-worstcase",
+          "type": "mcq",
+          "prompt": "To check whether an ISR ever runs too long, what should you look at across many captured pulses?",
+          "choices": [
+            "The average pulse width only",
+            "The worst-case (longest) pulse width, since the occasional long run is what breaks deadlines",
+            "The shortest pulse width",
+            "The voltage of the high level"
+          ],
+          "answerIndex": 1,
+          "explanation": "In real-time work the worst case matters most — a rare long run can miss a deadline even if the average looks fine. Capturing many events lets you find that worst-case width."
+        },
+        {
+          "id": "debugging-instrumentation-l4-mcq-mindset",
+          "type": "mcq",
+          "prompt": "Applying the hypothesis-test mindset to timing, what is the right sequence?",
+          "choices": [
+            "Assume the ISR is fine because the code is short",
+            "Guess the ISR may run long, toggle a pin around it, capture many events, and read the measured worst case",
+            "Rewrite the ISR first, then never measure",
+            "Add prints until the bug disappears"
+          ],
+          "answerIndex": 1,
+          "explanation": "You form a clear guess, pick the cheap matching tool (the toggle), and measure. Short code can still be slow (e.g., a hidden delay), so you confirm by measuring rather than assuming."
+        },
+        {
+          "id": "debugging-instrumentation-l4-mcq-whichpin",
+          "type": "mcq",
+          "prompt": "Which tool do you connect to the toggled pin to actually read the pulse width?",
+          "choices": [
+            "A debugger over SWD",
+            "An oscilloscope or logic analyzer",
+            "A multimeter set to average voltage",
+            "Another MCU's UART"
+          ],
+          "answerIndex": 1,
+          "explanation": "A scope or logic analyzer shows the pin's high/low timing directly, so you can read the pulse width. A multimeter only shows an average, and a debugger would stop the timing."
         }
       ]
     },
     {
-      "id": "debugging-instrumentation-l3-faults",
-      "title": "Turning a HardFault into a Source Line",
-      "order": 3,
+      "id": "debugging-instrumentation-l5-logging",
+      "title": "Low-Overhead Logging: printf vs SWO/ITM and RTT",
+      "order": 5,
       "difficulty": 3,
-      "content": "The payoff skill: convert a mysterious crash into an exact instruction, and time code without disturbing it.\n\n**GPIO-toggle profiling.** The cheapest, most honest timing probe is a free pin. Set it high at the start of an ISR or critical section and clear it at the end; watch the pulse on a scope/logic analyzer. A single store costs nanoseconds, so unlike printf it doesn't move the thing you measure — ideal for measuring ISR latency and jitter (Modules 6/12).\n\n**Decoding faults.** Cortex-M exceptions you'll meet: **HardFault** (the catch-all / escalation), **MemManage** (MPU violation), **BusFault** (bad bus transaction, e.g. bad pointer/peripheral), **UsageFault** (undefined instruction, unaligned access, div-by-zero if enabled). On exception entry the core auto-stacks 8 words: R0-R3, R12, **LR, PC, xPSR** (see diagram). The stacked **PC is the faulting instruction's address** — `addr2line` or your map turns it into a source line. To find which stack holds the frame, check EXC_RETURN bit 2 (MSP vs PSP). Then read the **CFSR** (Configurable Fault Status Register at 0xE000ED28): its MMFSR/BFSR/UFSR sub-fields tell you *why* — e.g. BFSR.PRECISERR with a valid **BFAR** address pinpoints a precise bus fault and the offending address. Many HardFaults are escalated config faults; enabling the individual fault handlers (SHCSR) gives sharper diagnosis.\n\n**Assertions under budget.** `static_assert` (compile-time) is free — use it liberally for sizes/alignment. Runtime `assert` costs flash and cycles, so in tight builds make it lightweight: capture file/line (or just the PC) and trap, rather than pulling in printf.\n\nReflex to keep: a crash is not a mystery. Read stacked PC -> source line, read CFSR -> cause, read BFAR/MMFAR -> address. Three registers, and the fault becomes a bug report.",
+      "content": "**Hook.** Printing messages feels like the safe, familiar way to debug. On a microcontroller it is often a trap — and understanding why teaches a deep lesson about *not disturbing what you measure*.\n\n**Build.** The classic `printf` on bare metal does two slow things. First it builds the text. Then it pushes the bytes out a slow serial wire (a **UART**) one at a time, and the CPU usually **waits** for each byte to leave. A single line can cost milliseconds — an eternity for a chip. That delay sits right inside the code you instrumented, so it *changes the timing of the very bug you are chasing*. This is the heart of a famous problem: **a slow print can hide a timing bug** by perturbing the timing enough that the bug stops appearing.\n\nLower-overhead alternatives let you log without that heavy cost:\n\n- **SWO/ITM trace.** ARM Cortex-M chips have a built-in trace unit (ITM). Your code writes a value to a register and it goes out a single dedicated pin (SWO) to the debug probe. The CPU does one quick write and moves on — no slow wait.\n- **RTT (Real-Time Transfer).** Your code drops a few words into a small buffer in the chip's RAM (very fast). The debug probe reads that buffer *out of the side*, over the debug link, while the program keeps running. No special pin and very little disturbance — it is the everyday workhorse for fast logging.\n\nThe big idea: low-overhead logging gets information *out* without stopping the chip or stealing its time, so the bug you're hunting still behaves the same. (Conceptually, that's the goal; the exact setup varies by chip and probe.)\n\n**Recap.** Blocking `printf` over a UART is slow enough to distort timing and hide bugs. Prefer low-overhead trace (SWO/ITM) or RTT, which log with so little cost that they barely disturb the running program.",
       "items": [
         {
-          "id": "debugging-instrumentation-l3-img-stackframe",
-          "type": "flashcard",
-          "front": "Study this diagram.",
-          "back": "Cortex-M exception stack frame: the eight words (R0-R3, R12, LR, PC, xPSR) auto-pushed on exception entry, with the stacked PC highlighted as the faulting instruction and a note to select MSP/PSP via EXC_RETURN and cross-check the CFSR.",
-          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/debugging-instrumentation-1.svg"
-        },
-        {
-          "id": "debugging-instrumentation-l3-fc-stackedpc",
-          "type": "flashcard",
-          "front": "After a HardFault, which stacked register points at the source line, and how do you find which stack it's on?",
-          "back": "The stacked PC (offset +0x18 in the 8-word frame). Use addr2line / the map to map it to a source line. Determine MSP vs PSP from EXC_RETURN bit 2 (in LR on entry) to know which stack pointer holds the frame.",
-          "hint": "+0x18, and EXC_RETURN bit 2."
-        },
-        {
-          "id": "debugging-instrumentation-l3-fc-cfsr",
-          "type": "flashcard",
-          "front": "What does the CFSR (0xE000ED28) tell you, and what are its three sub-registers?",
-          "back": "It tells you WHY the fault happened. Sub-fields: MMFSR (MemManage), BFSR (BusFault), UFSR (UsageFault). Bits flag causes like unaligned access, div-by-zero, precise/imprecise bus error, MPU violation.",
-          "hint": "Three byte/halfword sub-fields, one per fault class."
-        },
-        {
-          "id": "debugging-instrumentation-l3-fc-bfar",
-          "type": "flashcard",
-          "front": "When does BFAR (or MMFAR) give you a usable address, and what does it contain?",
-          "back": "When the corresponding 'address valid' bit is set (e.g. BFSR.BFARVALID for a precise bus fault). It then holds the faulting memory address — the bad pointer/peripheral address that caused the access fault.",
-          "hint": "Only valid for precise faults; check the valid bit."
-        },
-        {
-          "id": "debugging-instrumentation-l3-fc-gpioprofile",
-          "type": "flashcard",
-          "front": "Why is a GPIO toggle a better timing probe than printf for ISR latency?",
-          "back": "Setting/clearing a pin is a single ~ns store with no blocking, so it doesn't perturb the timing you're measuring. You read the high-pulse width directly on a scope/logic analyzer — accurate latency and jitter without a Heisenbug.",
-          "hint": "Cost is one store; printf costs milliseconds."
-        },
-        {
-          "id": "debugging-instrumentation-l3-fc-staticassert",
-          "type": "flashcard",
-          "front": "Why prefer static_assert over runtime assert in a flash-constrained build?",
-          "back": "static_assert is evaluated at compile time: zero flash, zero cycles, and the build fails instead of the device. Runtime assert costs code/cycles and (naively) drags in printf, so reserve it for things only knowable at runtime and keep it lightweight (trap + capture PC/line).",
-          "hint": "Compile-time checks are free."
-        },
-        {
-          "id": "debugging-instrumentation-l3-mcq-workflow",
+          "id": "debugging-instrumentation-l5-img-paths",
           "type": "mcq",
-          "prompt": "You hit a HardFault. What is the correct first sequence to localize it?",
+          "prompt": "Study the 'why printf can hide a bug' diagram. What is the key difference between the printf path and the trace/RTT path?",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/debugging-instrumentation-7.svg",
           "choices": [
-            "Add printf everywhere and rerun",
-            "Read the stacked PC to get the faulting instruction/source line, then read CFSR for the cause and BFAR/MMFAR for the address",
-            "Mass-comment code until it stops crashing",
+            "The printf path is faster",
+            "The printf path makes the CPU wait (milliseconds) while bytes leave a slow wire; the trace/RTT path writes quickly and lets the CPU keep running",
+            "The trace path needs no debug probe at all",
+            "Both paths cost exactly the same time"
+          ],
+          "answerIndex": 1,
+          "explanation": "The diagram contrasts blocking-and-waiting (printf over UART) with write-and-continue (trace/RTT). The whole point is that the low-overhead path doesn't make the CPU sit and wait."
+        },
+        {
+          "id": "debugging-instrumentation-l5-mcq-whyhide",
+          "type": "mcq",
+          "prompt": "A race bug only shows up at full speed. You add a printf in the suspect code and the bug disappears. What most likely happened?",
+          "choices": [
+            "The printf fixed the bug",
+            "The printf's slow delay changed the timing enough to mask the race — the bug is still there, just hidden; use a low-overhead trace or a pin toggle instead",
+            "The compiler removed the race",
+            "The serial hardware corrected the data"
+          ],
+          "answerIndex": 1,
+          "explanation": "This is the central 'why printf can hide a timing bug' lesson. Blocking printf adds milliseconds that perturb the timing you're measuring, so the race stops appearing without being fixed. Low-overhead trace or a GPIO toggle observes without disturbing."
+        },
+        {
+          "id": "debugging-instrumentation-l5-mcq-cost",
+          "type": "mcq",
+          "prompt": "What are the two slow steps of a classic blocking printf on bare metal?",
+          "choices": [
+            "Compiling the code and flashing it",
+            "Building the text, then waiting while the bytes go out a slow serial wire one at a time",
+            "Reading a sensor and converting it",
+            "Pausing the CPU and reading memory"
+          ],
+          "answerIndex": 1,
+          "explanation": "First it formats the string, then it blocks pushing bytes out a slow UART. That blocking wait is what costs milliseconds and disturbs timing."
+        },
+        {
+          "id": "debugging-instrumentation-l5-mcq-itm",
+          "type": "mcq",
+          "prompt": "How does SWO/ITM trace logging avoid the printf bottleneck?",
+          "choices": [
+            "It prints faster by raising the baud rate",
+            "Code writes a value to the chip's trace unit and it exits on a dedicated pin to the probe — one quick write, no long wait",
+            "It disables interrupts while printing",
+            "It stores logs on an SD card"
+          ],
+          "answerIndex": 1,
+          "explanation": "ITM lets the CPU do a single quick register write that the trace pin (SWO) carries to the probe, instead of looping over a slow UART transmit. Raising baud still leaves a blocking, disturbing path."
+        },
+        {
+          "id": "debugging-instrumentation-l5-mcq-rtt",
+          "type": "mcq",
+          "prompt": "What makes RTT (Real-Time Transfer) so low-overhead?",
+          "choices": [
+            "It compresses the text before sending",
+            "Code just drops a few words into a RAM buffer; the debug probe reads that buffer out over the debug link while the program keeps running",
+            "It sends logs over Wi-Fi",
+            "It only logs once at startup"
+          ],
+          "answerIndex": 1,
+          "explanation": "RTT's trick is writing to a RAM buffer (cheap) and letting the probe drain it out-of-band. The CPU never waits on a slow wire, so timing stays nearly undisturbed."
+        },
+        {
+          "id": "debugging-instrumentation-l5-mcq-pickrtt",
+          "type": "mcq",
+          "prompt": "You need to log a lot of data while the firmware keeps meeting tight deadlines. Best approach?",
+          "choices": [
+            "Crank the UART baud rate way up and keep using blocking printf",
+            "Use a low-overhead method like RTT, where the CPU only writes to RAM and the probe reads it out",
+            "Add more breakpoints",
+            "Disable interrupts during every print"
+          ],
+          "answerIndex": 1,
+          "explanation": "RTT delivers high throughput while barely disturbing timing. A faster UART is still a blocking path that steals time, and breakpoints/disabling interrupts make timing worse."
+        },
+        {
+          "id": "debugging-instrumentation-l5-mcq-principle",
+          "type": "mcq",
+          "prompt": "What general principle explains why low-overhead logging is preferred for timing-sensitive code?",
+          "choices": [
+            "More text is always better data",
+            "Get information out with as little cost as possible, so the act of observing doesn't change the behavior you're observing",
+            "Only the debug probe should ever run code",
+            "Logging should always stop the CPU first"
+          ],
+          "answerIndex": 1,
+          "explanation": "The aim is to observe without disturbing — the same idea behind the GPIO toggle. Heavy logging changes timing; light logging preserves the behavior you're trying to study."
+        },
+        {
+          "id": "debugging-instrumentation-l5-mcq-keepprintf",
+          "type": "mcq",
+          "prompt": "Your code is full of printf calls you can't rewrite right now, but the blocking UART is wrecking timing. Pragmatic fix?",
+          "choices": [
+            "Delete all logging",
+            "Redirect the low-level output of printf so the bytes go into a fast buffer (like RTT) instead of the slow UART",
+            "Lower the baud rate so each byte is even slower",
+            "Only call printf once per minute"
+          ],
+          "answerIndex": 1,
+          "explanation": "You can keep the printf call sites but point their output at a low-overhead path like an RTT buffer. Same source, but the bytes no longer block on a slow UART."
+        },
+        {
+          "id": "debugging-instrumentation-l5-mcq-blocking",
+          "type": "mcq",
+          "prompt": "What does it mean that a UART printf is 'blocking'?",
+          "choices": [
+            "It blocks other programs from running on your PC",
+            "The CPU stops and waits for the bytes to finish leaving the slow wire before continuing",
+            "It blocks interrupts permanently",
+            "It prevents the chip from booting"
+          ],
+          "answerIndex": 1,
+          "explanation": "Blocking means the CPU sits idle waiting for each byte to be sent, instead of doing useful work. That wait is the source of the timing disturbance."
+        }
+      ]
+    },
+    {
+      "id": "debugging-instrumentation-l6-faults",
+      "title": "Decoding a Crash and Debugging Cleanly",
+      "order": 6,
+      "difficulty": 3,
+      "content": "**Hook.** Sometimes a program doesn't just misbehave — it *crashes*. On an ARM Cortex-M chip the crash has a name, a **HardFault**, and the good news is a crash is not a mystery: the chip leaves behind clues that point at the exact line that broke.\n\n**Build.** A **fault** is the chip's reaction to something illegal — like using a bad pointer (an address that points nowhere valid) or doing math it can't, such as dividing by zero. When this happens, the chip jumps to a special handler. The most common one is the **HardFault**, a catch-all for serious errors. (There are more specific ones too, like a bus fault for a bad memory access.)\n\nHere's the clue trail. When the fault happens, the chip automatically saves a small set of registers onto the stack. One of them is the **PC** (Program Counter — the address of the instruction that was running). That saved PC is essentially the address of the *faulting instruction*. A tool can translate that address back into a **source line**, so \"crash\" becomes \"line 47 in sensor.c.\" Other status registers tell you *why* it faulted (bad pointer? divide by zero?). Conceptually: read the saved PC for *where*, read the status registers for *why*.\n\nTwo habits keep crashes rare and debugging honest:\n\n- **Assertions.** An `assert` is a built-in check: \"this must be true; if not, stop now.\" It catches a bad assumption at the moment it happens, instead of letting it corrupt things and crash mysteriously later.\n- **Non-intrusive vs intrusive.** A tool that observes without changing timing (a pin toggle, RTT) is *non-intrusive*. A tool that stops or slows the chip (a breakpoint, a blocking print) is *intrusive* and can create or hide a bug. A timing bug that appears or vanishes only because you're observing it is nicknamed a **Heisenbug** — a reminder to prefer non-intrusive tools when timing matters.\n\n**Recap.** A HardFault isn't random: the saved PC tells you *where* it crashed and the status registers tell you *why*. Use assertions to catch bad assumptions early, and prefer non-intrusive observation so you don't create Heisenbugs.",
+      "items": [
+        {
+          "id": "debugging-instrumentation-l6-img-stackframe",
+          "type": "mcq",
+          "prompt": "Study the exception stack-frame diagram. Which saved register points at the instruction that was running when the fault hit?",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/debugging-instrumentation-1.svg",
+          "choices": [
+            "R0",
+            "The stacked PC (Program Counter)",
+            "xPSR",
+            "R12"
+          ],
+          "answerIndex": 1,
+          "explanation": "The diagram highlights the stacked PC as the faulting instruction's address. Translating that address to a source line is how a crash becomes a specific line of code."
+        },
+        {
+          "id": "debugging-instrumentation-l6-mcq-whatfault",
+          "type": "mcq",
+          "prompt": "What is a HardFault on a Cortex-M chip?",
+          "choices": [
+            "A physical crack in the silicon",
+            "The chip's catch-all reaction to a serious error, like a bad pointer or illegal operation",
+            "A slow but normal part of booting",
+            "A warning that the battery is low"
+          ],
+          "answerIndex": 1,
+          "explanation": "A HardFault is the software-level catch-all exception for serious errors such as a bad pointer access or an illegal instruction. It is not hardware damage or a battery warning."
+        },
+        {
+          "id": "debugging-instrumentation-l6-mcq-where",
+          "type": "mcq",
+          "prompt": "After a HardFault, which clue tells you WHERE the crash happened (which instruction)?",
+          "choices": [
+            "The saved PC (Program Counter), which you translate into a source line",
+            "The supply voltage",
+            "The number of interrupts pending",
+            "The size of the heap"
+          ],
+          "answerIndex": 0,
+          "explanation": "The automatically stacked PC is the address of the faulting instruction; mapping it to source pinpoints the line. Voltage, pending interrupts, and heap size don't locate the fault."
+        },
+        {
+          "id": "debugging-instrumentation-l6-mcq-why",
+          "type": "mcq",
+          "prompt": "The saved PC tells you where the crash was. What tells you WHY it faulted (e.g., bad pointer vs divide-by-zero)?",
+          "choices": [
+            "The PC again",
+            "The fault status registers, which record the cause",
+            "The stack pointer alone",
+            "The clock frequency"
+          ],
+          "answerIndex": 1,
+          "explanation": "Status registers record the reason for the fault (bad memory access, illegal operation, etc.). The PC gives the location; the status registers give the cause."
+        },
+        {
+          "id": "debugging-instrumentation-l6-mcq-workflow",
+          "type": "mcq",
+          "prompt": "Applying the hypothesis-test mindset to a HardFault, what is the clean first sequence?",
+          "choices": [
+            "Add prints everywhere and rerun until it stops",
+            "Read the saved PC to find the faulting line, then read the status registers to learn the cause",
+            "Comment out code at random until the crash goes away",
             "Increase the stack size and hope"
           ],
           "answerIndex": 1,
-          "explanation": "The deterministic recipe: stacked PC -> source line, CFSR -> why, BFAR/MMFAR -> which address. Three registers turn the crash into a precise bug report; printf-bisection is slow and can perturb timing."
+          "explanation": "The deterministic recipe is PC → where, status registers → why. That turns a crash into a precise bug report, far faster than random prints or commenting code out."
         },
         {
-          "id": "debugging-instrumentation-l3-mcq-escalated",
+          "id": "debugging-instrumentation-l6-mcq-badpointer",
           "type": "mcq",
-          "prompt": "Your fault handler is the HardFault handler, but CFSR's UsageFault/BusFault bits are set. What does this indicate, and how do you get sharper diagnosis?",
+          "prompt": "What is a common cause of a fault that involves a 'bad pointer'?",
           "choices": [
-            "CFSR is irrelevant inside HardFault",
-            "A configurable fault escalated to HardFault because its specific handler was disabled; enable the individual fault handlers via SHCSR to catch them directly",
-            "The CPU is broken",
-            "You must clear CFSR before reading PC"
+            "A variable set to the correct address",
+            "Using an address that points to no valid memory (e.g., a null or garbage pointer)",
+            "A loop that counts up correctly",
+            "A function that returns the right value"
           ],
           "answerIndex": 1,
-          "explanation": "If MemManage/Bus/Usage handlers aren't enabled (SHCSR), those faults escalate to HardFault — but CFSR still records the real cause. Enabling the dedicated handlers lets you trap each class directly for finer diagnosis."
+          "explanation": "A bad pointer holds an invalid address (null or garbage), so accessing through it is illegal and faults. Correct addresses, loops, and returns don't cause this."
         },
         {
-          "id": "debugging-instrumentation-l3-mcq-cause",
+          "id": "debugging-instrumentation-l6-mcq-assert",
           "type": "mcq",
-          "prompt": "CFSR shows UFSR.UNALIGNED set. What kind of code most likely caused it?",
+          "prompt": "What does an assertion (assert) do, and why is it useful?",
           "choices": [
-            "A division by zero",
-            "A multi-byte access (e.g. a 32-bit load) to a non-word-aligned address, often via a misaligned packed-struct/pointer cast",
-            "Writing to flash without unlocking it",
-            "An infinite recursion"
+            "It speeds up the program",
+            "It checks that a condition you expect is true and stops immediately if not, catching a bad assumption right when it happens",
+            "It prints the whole program state continuously",
+            "It deletes invalid data automatically"
           ],
           "answerIndex": 1,
-          "explanation": "UFSR.UNALIGNED flags an unaligned word/halfword access that the core (with alignment trap enabled) refuses. Typical sources are packed structs, casting an odd address to a uint32_t*, or deserializing a protocol buffer in place."
+          "explanation": "An assert verifies an expected condition and traps at once if it's violated, so you catch the problem at its source rather than after it has corrupted state and caused a confusing later crash."
         },
         {
-          "id": "debugging-instrumentation-l3-mcq-imprecise",
+          "id": "debugging-instrumentation-l6-mcq-heisenbug",
           "type": "mcq",
-          "prompt": "BFSR indicates an IMPRECISE bus fault and BFARVALID is 0. Why might the address be unavailable, and what's a practical mitigation?",
+          "prompt": "A timing bug appears at full speed but vanishes the moment you set a breakpoint to investigate. What is this called, and what's the lesson?",
           "choices": [
-            "The fault never happened",
-            "Write buffering let the CPU advance before the bus error surfaced, so the exact PC/address is lost; add a DSB/memory barrier after suspect writes to force precise faults while debugging",
-            "BFAR is only for MemManage faults",
-            "You must reset to read BFAR"
+            "A compiler bug; switch compilers",
+            "A Heisenbug; the act of observing (the intrusive breakpoint) changed the timing, so prefer non-intrusive tools when timing matters",
+            "A hardware failure; replace the board",
+            "A normal feature; ignore it"
           ],
           "answerIndex": 1,
-          "explanation": "Imprecise faults arise from buffered writes completing after the core moved on, so PC/BFAR don't pin the cause. Inserting a DSB (or disabling write buffering) after suspect stores forces the fault to be precise, restoring a usable address."
+          "explanation": "A Heisenbug changes or disappears because the intrusive observation altered timing. The takeaway is to use non-intrusive tools (pin toggle, RTT) for timing-sensitive bugs, just like avoiding blocking printf."
+        },
+        {
+          "id": "debugging-instrumentation-l6-mcq-intrusive",
+          "type": "mcq",
+          "prompt": "Which pair correctly labels the tools as non-intrusive vs intrusive?",
+          "choices": [
+            "GPIO toggle = intrusive; breakpoint = non-intrusive",
+            "GPIO toggle and RTT = non-intrusive; a breakpoint and a blocking print = intrusive",
+            "Everything is non-intrusive",
+            "Only the oscilloscope is intrusive"
+          ],
+          "answerIndex": 1,
+          "explanation": "Cheap, observe-without-stopping methods (pin toggle, RTT) are non-intrusive; anything that halts or significantly slows the chip (breakpoint, blocking print) is intrusive and can distort timing."
+        },
+        {
+          "id": "debugging-instrumentation-l6-mcq-notmystery",
+          "type": "mcq",
+          "prompt": "Why is the saying 'a crash is not a mystery' justified on Cortex-M?",
+          "choices": [
+            "Because crashes never actually happen",
+            "Because the chip automatically leaves clues — the saved PC for where, and status registers for why",
+            "Because the debugger rewrites the buggy code",
+            "Because all crashes are caused by low voltage"
+          ],
+          "answerIndex": 1,
+          "explanation": "On a fault the chip stacks registers (including the PC) and sets status bits, giving you a location and a cause. Those clues turn a scary crash into a readable bug report."
         }
       ]
     }
