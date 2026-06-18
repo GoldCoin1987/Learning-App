@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "id": "embedded-systems",
   "title": "Embedded Systems",
-  "version": "1.13.0",
+  "version": "1.14.0",
   "description": "Embedded systems from scratch (beginner rework in progress): 15 sub-topics from the bare-metal memory map through RTOS, real-time, and DSP-on-MCU. Beginner-first readings, diagrams, tiered easy to hard.",
   "requires": [
     "digital-electronics"
@@ -7380,317 +7380,690 @@
       "lessons": [
         {
           "id": "bootloaders-firmware-update-bootloaders-firmware-update-lesson-1",
-          "title": "Living in Kilobytes: Budgeting Flash, RAM & the Heap",
+          "title": "Living in Kilobytes: Measuring Memory & Avoiding the Heap",
           "order": 1,
           "difficulty": 1,
-          "content": "On a desktop you ignore memory until you run out of gigabytes. On an MCU you have *kilobytes*, and you account for every one. The ground truth is the **map file** the linker emits: it lists each section's size and address, so you can read off exactly how much flash (`.text`+`.rodata`) and RAM (`.data`+`.bss`+stack+heap) you consume. `arm-none-eabi-size your.elf` gives the summary; the `.map` gives the per-symbol detail when you need to find the hog.\n\nThe usual hogs are predictable. A full `printf` with float support can pull in **8-20 KB** of flash and a big chunk of stack; `malloc`/`free` drag in heap management; software floating point or `double` math on a no-FPU part is huge and slow. The standard mitigations:\n\n- Link **newlib-nano** (`--specs=nano.specs`) for a much smaller libc, and add `-u _printf_float` only if you truly need float formatting.\n- Prefer a tiny custom formatter or integer-only `printf` for logging.\n- Use `float` over `double`, and avoid `double`-promoting constants (`1.0f` not `1.0`).\n\n**Avoid the heap.** Dynamic allocation is non-deterministic, fragments a tiny pool until it fails unpredictably in the field, and is usually ISR-unsafe. The embedded discipline is *static* allocation: fixed-size buffers, object **pools**, and **ring buffers** for streaming I/O, all sized at compile time and visible in the map. Finally, budget the **stack** explicitly: estimate worst-case call depth plus deepest ISR nesting, and guard it with an MPU region or a watermark pattern, because with no MMU an overflow is silent corruption, not a clean fault.\n\n```bash\n# Read the budget straight from the binary\narm-none-eabi-size --format=berkeley app.elf\n#   text    data     bss     dec     hex filename\n#  18324     112    4096   22532    5804 app.elf\n```",
+          "content": "**Hook.** On a laptop you almost never worry about memory — you have gigabytes. A *microcontroller* (the tiny computer-on-a-chip inside a thermostat, a toy, or a smart bulb) has only **kilobytes**. A kilobyte is about a thousand bytes; a gigabyte is about a billion. So a microcontroller has roughly a *million times less* room. When space is that tight, you must be frugal and count every byte.\n\n**Build.** A microcontroller has two separate kinds of memory, and they are two separate budgets:\n\n- **Flash** — where your *program* is stored. It keeps its contents even when the power is off, like a tiny built-in hard drive. Your code and any fixed constants live here.\n- **RAM** — *working memory* the program scribbles in while it runs. It is wiped when power goes off. Variables, the *stack* (the scratchpad for function calls), and any *heap* live here.\n\nYou do not have to guess how much you use. The build tools print a **size report**: a few numbers telling you how many bytes of flash and how many bytes of RAM your program needs. The rule is simple: **measure first, then cut the biggest thing.**\n\nThe single most useful habit for a beginner is: **avoid the heap.** The *heap* is memory you ask for while the program is running and give back later (\"grow-on-demand\" memory). On a big computer that is fine. On a chip with kilobytes it is risky: requests can fail unpredictably after the device has been running a while, and that is hard to recover from in the field. Instead, use **static buffers** — fixed-size storage you decide on ahead of time, before the program runs. You always know exactly how much it costs.\n\n**Recap.** Microcontrollers live in kilobytes, with flash for code and RAM for working data. Measure usage with the size report, cut the biggest hog, and prefer fixed-size static buffers over grow-on-demand heap memory.",
           "items": [
             {
-              "id": "bootloaders-firmware-update-1-fc-1",
-              "type": "flashcard",
-              "front": "Where do you read the authoritative flash/RAM usage of a firmware build, and what does each region include?",
-              "back": "The linker map file (and the size summary from arm-none-eabi-size). Flash = .text + .rodata; RAM = .data + .bss + stack + (any) heap. The .map gives per-symbol detail to find the largest contributors.",
-              "hint": "The linker emits it; one tool summarizes, the other itemizes."
-            },
-            {
-              "id": "bootloaders-firmware-update-1-fc-2",
-              "type": "flashcard",
-              "front": "Why is a full printf so expensive on a small MCU, and what reduces its cost?",
-              "back": "It pulls in large formatting/parsing code plus float support (often 8-20 KB flash and significant stack). Reduce it by linking newlib-nano (--specs=nano.specs), gating float with -u _printf_float, or using a tiny integer-only/custom formatter.",
-              "hint": "Think libc variant and the float specifier."
-            },
-            {
-              "id": "bootloaders-firmware-update-1-fc-3",
-              "type": "flashcard",
-              "front": "Give three reasons dynamic allocation (malloc/free) is discouraged on bare metal.",
-              "back": "1) Non-deterministic timing; 2) fragmentation of a tiny heap leading to unpredictable late failures; 3) usually not ISR-safe and no sane recovery when it returns NULL in the field.",
-              "hint": "Timing, fragmentation, safety/recovery."
-            },
-            {
-              "id": "bootloaders-firmware-update-1-fc-4",
-              "type": "flashcard",
-              "front": "What static patterns replace the heap for buffers and streaming I/O?",
-              "back": "Statically sized buffers, fixed-size object pools (pre-allocated slots handed out/returned), and ring (circular) buffers for streaming producer/consumer I/O. All sized at compile time and visible in the map file.",
-              "hint": "Pools and a circular buffer."
-            },
-            {
-              "id": "bootloaders-firmware-update-1-fc-5",
-              "type": "flashcard",
-              "front": "How do you size the stack on bare metal, and why is getting it wrong dangerous?",
-              "back": "Estimate worst-case call depth plus deepest ISR nesting (and FPU/large frames). Wrong sizing overflows silently because there is no MMU to fault it; the stack overwrites adjacent RAM, surfacing as corruption far from the cause. Guard with an MPU region or watermark.",
-              "hint": "No MMU means no clean crash."
+              "id": "bootloaders-firmware-update-1-img-1",
+              "type": "mcq",
+              "prompt": "Use the diagram. It shows two separate memory budgets on a microcontroller. Which pairing is correct?",
+              "choices": [
+                "Flash stores the program and keeps it when power is off; RAM is working memory wiped at power-off",
+                "Flash is wiped at power-off; RAM keeps the program forever",
+                "Flash and RAM are the same memory with two names",
+                "Flash holds variables while running; RAM holds the program"
+              ],
+              "answerIndex": 0,
+              "explanation": "Flash is non-volatile storage for code and constants — it survives power-off, like a tiny built-in drive. RAM is volatile working memory for variables and the stack, and is wiped when power is removed. They are two distinct budgets, not the same memory.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-3.svg"
             },
             {
               "id": "bootloaders-firmware-update-1-mcq-1",
               "type": "mcq",
-              "prompt": "Your image is 2 KB over the flash limit and you log with full printf including %f. What is the highest-leverage first cut?",
+              "prompt": "Roughly how much memory does a typical microcontroller have, compared to a laptop?",
               "choices": [
-                "Switch all variables from int to char to save RAM",
-                "Link newlib-nano and drop float printf support (or use a tiny integer formatter)",
-                "Increase the compiler optimization to -O0",
-                "Move the stack into flash"
+                "About the same as a laptop",
+                "Kilobytes — dramatically less than a laptop's gigabytes",
+                "More than a laptop, because it is dedicated to one job",
+                "Memory does not exist on a microcontroller"
               ],
               "answerIndex": 1,
-              "explanation": "Full printf with float pulls in the largest, most expendable code. newlib-nano plus integer-only formatting typically recovers many kilobytes of flash immediately, far more than micro-optimizing variable types. -O0 grows code, and the stack cannot live in flash."
+              "explanation": "A microcontroller typically has kilobytes (thousands of bytes), while a laptop has gigabytes (billions). That is roughly a million times less, which is exactly why you must budget memory carefully on a microcontroller.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-3.svg"
             },
             {
               "id": "bootloaders-firmware-update-1-mcq-2",
               "type": "mcq",
-              "prompt": "A device runs fine for hours then occasionally fails a sensor read after heavy logging traffic. Heap is used for log buffers. Most likely root cause?",
+              "prompt": "Where is your program kept so that it is still there after you unplug the device and plug it back in?",
               "choices": [
-                "Flash wear-out after a few hours",
-                "Heap fragmentation: a malloc eventually fails or returns a too-small block unpredictably",
-                "The CPU clock drifts over time",
-                "newlib-nano is too small to hold the data"
+                "In RAM",
+                "In flash",
+                "On the stack",
+                "It is re-downloaded every time you plug in"
               ],
               "answerIndex": 1,
-              "explanation": "Intermittent, load-dependent, time-to-failure behavior with heap-backed buffers is the classic fragmentation signature: free space exists but not contiguously, so an allocation fails or is undersized unpredictably. Static pools/ring buffers remove the failure mode."
+              "explanation": "Flash is non-volatile: it retains its contents with the power off, so the program stored there is ready the moment you power on. RAM loses its contents at power-off, and the stack is just a region of RAM.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-3.svg"
             },
             {
               "id": "bootloaders-firmware-update-1-mcq-3",
               "type": "mcq",
-              "prompt": "You add `-u _printf_float` to your link flags. What did you just do?",
+              "prompt": "What is the first thing you should do when you suspect your program is too big to fit?",
               "choices": [
-                "Disabled all floating-point math in the program",
-                "Forced the smaller integer-only printf to be used",
-                "Pulled in the float-formatting code for printf, increasing flash usage",
-                "Enabled the hardware FPU"
+                "Guess which feature is biggest and delete it",
+                "Check the size report to measure how much flash and RAM you actually use",
+                "Buy a bigger laptop",
+                "Add more comments to the code"
               ],
-              "answerIndex": 2,
-              "explanation": "With newlib-nano, printf defaults to integer-only to save space; -u _printf_float undefines that symbol so the float-capable formatter is linked in. It does not touch the FPU or your math, only printf's formatting code size."
+              "answerIndex": 1,
+              "explanation": "Measure before you cut. The build tools print a size report showing your real flash and RAM usage, so you can target the biggest consumer instead of guessing. Guessing wastes effort and can remove the wrong thing.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-3.svg"
             },
             {
               "id": "bootloaders-firmware-update-1-mcq-4",
               "type": "mcq",
-              "prompt": "On a Cortex-M0 (no FPU), which constant choice avoids accidental double-precision software math?",
+              "prompt": "What is the 'heap'?",
               "choices": [
-                "Writing `area = 3.14159 * r * r;`",
-                "Writing `area = 3.14159f * r * r;` with r as float",
-                "Declaring r as double",
-                "Using `long double` for all literals"
+                "A pile of unused chips",
+                "Memory you request while the program runs and give back later (grow-on-demand)",
+                "The fastest part of flash",
+                "Another name for the program's code"
               ],
               "answerIndex": 1,
-              "explanation": "Unsuffixed floating literals are double; mixing them in promotes the whole expression to double, which on a no-FPU part is large, slow software emulation. The f suffix and float operands keep it single precision."
+              "explanation": "The heap is grow-on-demand memory: the program asks for a chunk while running and returns it later. This flexibility is handy on big computers but risky on a tiny chip. It is not flash, and it is not the code itself.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-3.svg"
             },
             {
-              "id": "bootloaders-firmware-update-1-fc-6",
-              "type": "flashcard",
-              "front": "What is the practical workflow to cut a firmware image that is over budget?",
-              "back": "Read the map/size output to find the biggest sections and symbols, then attack the largest: swap full printf for newlib-nano or a tiny formatter, remove the heap, drop double for float, and trim unused features (gc-sections). Re-measure from the map after each change.",
-              "hint": "Measure, cut the biggest hog, re-measure."
+              "id": "bootloaders-firmware-update-1-mcq-5",
+              "type": "mcq",
+              "prompt": "Why is using dynamic (grow-on-demand) memory discouraged on a tiny microcontroller?",
+              "choices": [
+                "It is illegal in the C language",
+                "On a chip with so little RAM, requests can fail unpredictably after the device has run for a while, and that is hard to recover from in the field",
+                "It makes the program run faster, which wastes battery",
+                "It only works when a laptop is connected"
+              ],
+              "answerIndex": 1,
+              "explanation": "With only kilobytes of RAM, repeatedly asking for and returning memory can leave the free space broken into unusable scraps, so a later request fails at an unpredictable moment in a deployed device — with no easy recovery. It is legal, but unwise on tiny systems; fixed buffers avoid the surprise.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-3.svg"
+            },
+            {
+              "id": "bootloaders-firmware-update-1-mcq-6",
+              "type": "mcq",
+              "prompt": "What is a 'static buffer', and why is it preferred on a microcontroller?",
+              "choices": [
+                "A buffer that never moves on the screen; it looks nicer",
+                "A fixed-size piece of storage decided ahead of time, so you always know exactly how much memory it costs",
+                "A buffer made of static electricity",
+                "Memory that grows automatically when you need more"
+              ],
+              "answerIndex": 1,
+              "explanation": "A static buffer has a fixed size chosen before the program runs, so its memory cost is known and guaranteed available. That predictability is exactly what you want on a tiny chip, unlike grow-on-demand heap memory that can run out unexpectedly.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-3.svg"
+            },
+            {
+              "id": "bootloaders-firmware-update-1-mcq-7",
+              "type": "mcq",
+              "prompt": "Your program is a little too big for flash. The size report shows one feature's code is by far the largest. What is the most sensible move?",
+              "choices": [
+                "Trim or simplify that largest feature and then re-measure",
+                "Rename your variables to shorter names",
+                "Delete random small functions until it fits",
+                "Move the program into RAM instead"
+              ],
+              "answerIndex": 0,
+              "explanation": "Attack the biggest consumer first — that yields the most savings — then re-measure to confirm. Shorter variable names do not change compiled size, deleting at random is unreliable, and the program must live in flash.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-3.svg"
+            },
+            {
+              "id": "bootloaders-firmware-update-1-mcq-8",
+              "type": "mcq",
+              "prompt": "Which statement about flash versus RAM is correct?",
+              "choices": [
+                "Both are wiped at power-off",
+                "Flash keeps its contents at power-off; RAM is wiped at power-off",
+                "RAM keeps its contents at power-off; flash is wiped",
+                "Neither can store anything"
+              ],
+              "answerIndex": 1,
+              "explanation": "Flash is non-volatile (keeps data with power off) and holds your program; RAM is volatile (wiped at power-off) and holds working data while running. That difference is why code lives in flash and scratch data lives in RAM.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-3.svg"
             }
           ]
         },
         {
           "id": "bootloaders-firmware-update-bootloaders-firmware-update-lesson-2",
-          "title": "Flash Characteristics & the Bootloader Jump",
+          "title": "What Is a Bootloader? The Program That Runs First",
           "order": 2,
-          "difficulty": 2,
-          "content": "Before you can update firmware you must respect how flash physically behaves. Flash is **erase-before-write**: a programmed bit can only go 1->0 by writing; to set bits back to 1 you must **erase**, and erase works at a coarse **page/sector** granularity (often 2-128 KB), not per byte. You cannot rewrite a word in place; you erase its whole page first. Flash also has finite **endurance** (often ~10k-100k erase cycles per sector), so frequently-changing data needs **wear leveling** or EEPROM emulation rather than hammering one page. Many parts also forbid **read-while-write**: code cannot execute from the same flash bank you are erasing/programming, which is exactly why update code often runs from RAM or a second bank.\n\nA **bootloader** is a small program that runs first and decides what to launch. The boot flow is layered: the on-chip **ROM bootloader** (mask ROM) runs at reset, optionally enters a vendor download mode, then hands control to *your* bootloader in flash, which validates and launches the **application**.\n\nThe jump to the app is the part people get wrong and brick boards. The app is built to a higher flash offset with its own vector table, so the bootloader must, in order: (1) **set the Vector Table Offset Register (VTOR)** to the app's vector table so interrupts dispatch into the app; (2) load the app's **initial stack pointer** from word 0 of its vector table into MSP; (3) load the **reset handler address** from word 1; (4) jump (branch) to it. Skipping VTOR or the SP load is the classic anti-pattern in the pitfalls list.\n\n```c\n#define APP_BASE 0x08008000u\nvoid jump_to_app(void) {\n    uint32_t sp   = *(volatile uint32_t *)(APP_BASE + 0);\n    uint32_t rst  = *(volatile uint32_t *)(APP_BASE + 4);\n    __disable_irq();\n    SCB->VTOR = APP_BASE;            /* relocate vector table */\n    __set_MSP(sp);                  /* set stack pointer     */\n    __DSB(); __ISB();\n    ((void (*)(void))rst)();        /* set PC: jump to app   */\n}\n```",
+          "difficulty": 1,
+          "content": "**Hook.** When you switch on a device, *something* has to run before your main program can. On a microcontroller, that something is often a **bootloader** — a small program that runs first, does a little setup, and then hands control to your real program. Think of a hotel front desk: it greets you first, checks a few things, and then sends you to your room.\n\n**Build.** Your real program is called the **firmware** — simply the software inside the device. (\"Firm\" because it usually lives in flash and changes rarely, unlike apps on a phone.) The bootloader is a separate, smaller program that lives in its own part of flash, near the start.\n\nWhy have a bootloader at all? Because it can do one very valuable job: **load a new version of the firmware.** It can receive a fresh copy of the main program, write it into flash, and then start it. That is how a device can be *updated in the field* — out in the real world, in someone's home — without any special equipment. Your Wi-Fi router, your phone, even a smart bulb gets software updates this way.\n\nSo the order of events at power-on is a simple chain:\n\n1. **Power on / reset.** The chip wakes up.\n2. **Bootloader runs first.** It may check for a new firmware to install, or just decide everything is fine.\n3. **It hands control to the application** — your real firmware — which then runs normally.\n\nThe bootloader itself usually stays put and is not changed during an update; only the application part gets replaced. That separation is deliberate: the part that does the updating should not be able to break itself.\n\n**Recap.** A bootloader is a small program that runs first when the chip powers on. Its key power is the ability to receive and install a new version of the firmware (the device's software), letting devices update themselves in the field, then it hands off to the application.",
           "items": [
             {
               "id": "bootloaders-firmware-update-2-img-1",
-              "type": "flashcard",
-              "front": "Study this diagram.",
-              "back": "Flash layout showing an immutable bootloader at the low address, an active Slot A application with a header containing magic, size, CRC and signature, an inactive Slot B staging region for new images, and a swap status trailer.",
-              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-1.svg"
-            },
-            {
-              "id": "bootloaders-firmware-update-2-fc-1",
-              "type": "flashcard",
-              "front": "What does 'erase-before-write' mean for flash, and at what granularity does erase happen?",
-              "back": "Programming can only clear bits (1->0); to set bits back to 1 you must erase, which operates on a whole page/sector (often 2-128 KB), not a single byte. So you cannot rewrite a word in place--you erase its entire page first.",
-              "hint": "Bits only go one way until you erase a whole sector."
-            },
-            {
-              "id": "bootloaders-firmware-update-2-fc-2",
-              "type": "flashcard",
-              "front": "What is flash endurance, and how do you protect frequently-updated data like config/calibration?",
-              "back": "Endurance is the limited number of erase cycles per sector (often ~10k-100k). Protect hot data with wear leveling or EEPROM emulation--spreading writes across many slots/pages rather than repeatedly erasing one page.",
-              "hint": "Spread the writes; don't hammer one page."
-            },
-            {
-              "id": "bootloaders-firmware-update-2-fc-3",
-              "type": "flashcard",
-              "front": "Why does read-while-write limitation matter for a flash-resident updater?",
-              "back": "On many parts the CPU cannot fetch instructions from the same flash bank being erased/programmed. So the update routine must run from RAM (or from a different bank), or the core stalls/faults trying to execute from flash mid-program.",
-              "hint": "You can't execute from the bank you're erasing."
-            },
-            {
-              "id": "bootloaders-firmware-update-2-fc-4",
-              "type": "flashcard",
-              "front": "List the boot flow layers from reset to the application.",
-              "back": "On-chip ROM bootloader (mask ROM) runs at reset and may offer a vendor download mode -> your bootloader in flash, which validates the image -> the application. Each stage hands control to the next.",
-              "hint": "ROM -> your bootloader -> app."
-            },
-            {
-              "id": "bootloaders-firmware-update-2-fc-5",
-              "type": "flashcard",
-              "front": "State the safe four-step sequence a bootloader uses to jump to an application at a higher flash offset.",
-              "back": "1) Set VTOR to the app's vector table (relocate vectors); 2) load the app's initial SP from vector-table word 0 into MSP; 3) read the reset-handler address from word 1; 4) branch to it (set PC). Disable IRQs and add DSB/ISB barriers around the switch.",
-              "hint": "VTOR, MSP, reset addr, jump."
+              "type": "mcq",
+              "prompt": "Use the boot-flow diagram. What is the correct order of events after power-on?",
+              "choices": [
+                "Application runs first, then calls the bootloader",
+                "Power on → bootloader runs first → it hands control to the application",
+                "Power on → application → RAM → flash",
+                "The bootloader and application run at the same time, competing"
+              ],
+              "answerIndex": 1,
+              "explanation": "At reset the bootloader runs first (like a front desk greeting you), does a little setup or update check, then hands control to the application. The application does not run before the bootloader, and they do not run simultaneously.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-4.svg"
             },
             {
               "id": "bootloaders-firmware-update-2-mcq-1",
               "type": "mcq",
-              "prompt": "A bootloader jumps to an app by calling the app's reset handler but never sets VTOR. The app runs until its first interrupt, then crashes. Why?",
+              "prompt": "In one sentence, what is a bootloader?",
               "choices": [
-                "The app's code was not erased correctly",
-                "Interrupts still dispatch through the bootloader's vector table, so the wrong (or stale) handler addresses are used",
-                "The stack pointer is automatically wrong without VTOR",
-                "VTOR controls the CPU clock needed for interrupts"
+                "A program that runs first when the chip powers on and can hand control to the main program",
+                "The physical boot-shaped connector on the board",
+                "A tool that runs only on your laptop to compile code",
+                "The largest program on the device"
               ],
-              "answerIndex": 1,
-              "explanation": "VTOR tells the core where the active vector table lives. Without relocating it, an interrupt fetches its handler from the bootloader's table--pointing at bootloader code or garbage relative to the running app--so the first IRQ faults. The SP load is a separate step."
+              "answerIndex": 0,
+              "explanation": "A bootloader is a small program that runs first at power-on, does setup (and optionally installs a new firmware), then hands control to the application. It is not a connector, not a laptop-only tool, and it is usually smaller than the application.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-4.svg"
             },
             {
               "id": "bootloaders-firmware-update-2-mcq-2",
               "type": "mcq",
-              "prompt": "You must reprogram a 4 KB region but only one 64 KB sector covers it. What is the correct procedure?",
+              "prompt": "What does the word 'firmware' mean?",
               "choices": [
-                "Write the new 4 KB directly over the old bytes",
-                "Read-modify the bytes in place one word at a time",
-                "Read out the whole sector, erase the sector, then program back the merged 64 KB with the 4 KB changed",
-                "Erase only the 4 KB sub-region, then write it"
+                "The metal case of the device",
+                "The software inside the device (its program)",
+                "A firm handshake protocol",
+                "The hardest part of the silicon chip"
               ],
-              "answerIndex": 2,
-              "explanation": "Erase granularity is the whole 64 KB sector, and you cannot set bits without erasing. The safe pattern is read sector to RAM, modify, erase sector, reprogram. You cannot erase a 4 KB sub-region or write over programmed bytes directly."
+              "answerIndex": 1,
+              "explanation": "Firmware is the software running inside an embedded device — its program. It is called 'firm' because it lives in flash and changes rarely compared to phone apps. It is not the case or the silicon itself.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-4.svg"
             },
             {
               "id": "bootloaders-firmware-update-2-mcq-3",
               "type": "mcq",
-              "prompt": "An app is linked to base 0x08008000. The bootloader reads which words to find the app's initial SP and entry point?",
+              "prompt": "What valuable job lets a bootloader update a device out in the field?",
               "choices": [
-                "0x08008000 holds the SP; 0x08008004 holds the reset handler address",
-                "0x08008000 holds main()'s address; 0x08008004 holds the SP",
-                "Both are stored in RAM at 0x20000000",
-                "The SP and PC are read from the bootloader's own vector table"
+                "It can speed up the CPU clock",
+                "It can receive a new firmware, write it into flash, and then start it",
+                "It can add more RAM to the chip",
+                "It can charge the battery faster"
               ],
-              "answerIndex": 0,
-              "explanation": "On Cortex-M the vector table begins with the initial stack pointer at offset 0 and the reset-handler (entry) address at offset 4. So at the app base, word 0 is the SP to load into MSP and word 4 is the entry to branch to."
+              "answerIndex": 1,
+              "explanation": "The bootloader's update superpower is receiving a fresh copy of the program, writing it into flash, and launching it — no special hardware or trip to a repair shop needed. It cannot add RAM, change battery hardware, or magically overclock the chip.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-4.svg"
             },
             {
               "id": "bootloaders-firmware-update-2-mcq-4",
               "type": "mcq",
-              "prompt": "Why do many bootloaders copy the flash erase/program routine into RAM before running an update?",
+              "prompt": "Which everyday example is firmware updating in the field, the way a bootloader enables?",
               "choices": [
-                "RAM is faster so the update finishes sooner",
-                "Some parts cannot execute code from a flash bank while that bank is being erased/programmed (no read-while-write)",
-                "Flash routines are encrypted and must be decrypted into RAM",
-                "It saves flash endurance on the routine itself"
+                "Your Wi-Fi router or smart bulb receiving a software update",
+                "Plugging in a new keyboard",
+                "Charging your phone overnight",
+                "Turning the volume up on a speaker"
+              ],
+              "answerIndex": 0,
+              "explanation": "A router, phone, or smart bulb installing new software while sitting in your home is exactly field firmware update, made possible by a bootloader. Charging, plugging in peripherals, and adjusting volume do not change the device's software.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-4.svg"
+            },
+            {
+              "id": "bootloaders-firmware-update-2-mcq-5",
+              "type": "mcq",
+              "prompt": "During a firmware update, which part of flash usually stays unchanged?",
+              "choices": [
+                "The application",
+                "The bootloader",
+                "Both are erased every time",
+                "Neither part exists after an update"
               ],
               "answerIndex": 1,
-              "explanation": "The read-while-write restriction means the CPU may stall or fault fetching instructions from a bank under erase/program. Running the routine from RAM (or a separate bank) avoids executing out of the bank being modified."
+              "explanation": "The bootloader normally stays put; only the application is replaced. Keeping the updater itself unchanged is deliberate — the part responsible for installing updates should not be able to overwrite and break itself.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-4.svg"
+            },
+            {
+              "id": "bootloaders-firmware-update-2-mcq-6",
+              "type": "mcq",
+              "prompt": "Why is it useful that the bootloader and the application are separate programs in separate parts of flash?",
+              "choices": [
+                "It makes the device heavier",
+                "So the part that installs updates is not replaced by the update and cannot break itself",
+                "Because two programs always run faster than one",
+                "It is required to charge the battery"
+              ],
+              "answerIndex": 1,
+              "explanation": "Separation protects the updater: by leaving the bootloader untouched while only the application changes, you keep a reliable program that can always perform (or retry) updates. It has nothing to do with weight, speed, or charging.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-4.svg"
+            },
+            {
+              "id": "bootloaders-firmware-update-2-mcq-7",
+              "type": "mcq",
+              "prompt": "The hotel front-desk analogy maps onto the boot flow how?",
+              "choices": [
+                "The front desk is the application; your room is the bootloader",
+                "The front desk greets you first and then sends you to your room — like the bootloader running first and then handing off to the application",
+                "There is no order; you go straight to your room",
+                "The front desk and the room are the same place"
+              ],
+              "answerIndex": 1,
+              "explanation": "The front desk (bootloader) handles you first, checks things, then directs you to your room (the application). That mirrors the bootloader running first at power-on and then handing control to the real program.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-4.svg"
+            },
+            {
+              "id": "bootloaders-firmware-update-2-mcq-8",
+              "type": "mcq",
+              "prompt": "Compared to the application, the bootloader is usually:",
+              "choices": [
+                "Much larger and more complex",
+                "Smaller, and stored near the start of flash",
+                "Stored only in RAM",
+                "Identical in size and purpose"
+              ],
+              "answerIndex": 1,
+              "explanation": "The bootloader is typically a small program placed near the start of flash so it runs first. The application is the larger, full-featured program. The bootloader lives in flash (so it survives power-off), not only in RAM.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-4.svg"
             }
           ]
         },
         {
           "id": "bootloaders-firmware-update-bootloaders-firmware-update-lesson-3",
-          "title": "Firmware Update (FOTA/DFU): Validate, Swap, Roll Back",
+          "title": "How Flash Works & How the Bootloader Jumps to the App",
           "order": 3,
-          "difficulty": 3,
-          "content": "A field firmware update is a transaction that must be **atomic** and **recoverable**: power can fail at any instant and the device must still boot. The robust pattern is built on the A/B (dual-bank) layout: an immutable bootloader plus a currently-running **active** slot and an **inactive** slot for staging.\n\nThe flow has four phases. **(1) Receive** the new image over a transport--UART, USB (often USB-DFU), or an OTA radio link--writing it into the *inactive* bank while the active app keeps running. **(2) Validate** before trusting it: check a **CRC** for integrity against corruption, and a cryptographic **signature** against a baked-in public key for authenticity (the heart of **secure boot** and the chain of trust). Reject and erase on any mismatch--never jump to an unverified image. **(3) Swap atomically**: set a small persistent flag/trailer to 'pending', reset, and let the bootloader make the inactive bank active. Because the *active* image is never overwritten in place, a power loss mid-update leaves the old working image intact--this is the anti-brick guarantee. **(4) Confirm or roll back**: the new image must run a self-test and explicitly **confirm** (set 'confirmed'); if it crashes or a boot-counter/watchdog expires before confirming, the bootloader **reverts** to the previous slot on the next reset.\n\nYou rarely write all this from scratch. **MCUboot** is the standard open bootloader (used by Zephyr) implementing signed images, swap/overwrite, and confirm/revert; **ESP-IDF OTA** provides `esp_ota_*` APIs over its `ota_0`/`ota_1` partitions with a rollback option; ST and others ship built-in DFU/secure-boot stacks. **Versioning** (monotonic version + anti-rollback counter) prevents downgrade attacks and accidental loops.\n\n```c\nif (!crc_ok(slotB) || !sig_verify(slotB, pubkey)) {\n    flash_erase(slotB);          /* reject: keep running A */\n} else {\n    set_update_flag(PENDING);    /* bootloader swaps on reset */\n    NVIC_SystemReset();\n}\n/* New image, once healthy: confirm; else watchdog -> revert to A */\n```",
+          "difficulty": 2,
+          "content": "**Hook.** To update firmware safely you first need to know one quirk of flash memory: you cannot just overwrite it like a notepad. And once a new program is in place, the bootloader has to *jump* to it correctly — do this wrong and the device won't start.\n\n**Build.** *Flash is erase-before-write.* Writing to flash can only change bits in one direction. To truly rewrite a spot, you must first **erase** it back to blank. And erase does not work byte-by-byte — it works on a whole **sector** (a block, often several kilobytes) at a time. So to change a few bytes, you erase the entire block they live in, then write. There is also a wear limit: each sector can only be erased a finite number of times (often tens of thousands), so you avoid hammering one spot over and over — spreading writes out is called **wear leveling**.\n\nNow the **flash layout**. Flash is divided into regions: the **bootloader** sits at the start, and the **application** sits in its own region at a higher address. The diagram shows this split (plus a spare slot we'll use later).\n\n*The jump.* The application is built to live at its own address and starts with two key values at its very beginning: where its **stack** should start, and the address of its **first instruction** (its entry point). To launch the app, the bootloader, in order: (1) points the chip's *vector table* setting at the app's region, so interrupts go to the app's handlers; (2) sets the **stack pointer (SP)** to the app's stack start; (3) sets the **program counter (PC)** — the \"what to run next\" pointer — to the app's entry point. Setting the PC is the actual jump. Skipping the vector-table step is a classic bug: the app runs until the first interrupt, then crashes.\n\n**Recap.** Flash must be erased (a whole sector at a time) before rewriting, and it wears out, so spread writes. The bootloader and app live in separate flash regions, and the bootloader launches the app by pointing the vector table, setting the stack pointer, and finally setting the program counter to the app's entry.",
           "items": [
             {
               "id": "bootloaders-firmware-update-3-img-1",
-              "type": "flashcard",
-              "front": "Study this diagram.",
-              "back": "Flowchart of an OTA update: receive image into Slot B, validate CRC and signature, on failure reject and keep running A, on success mark pending and reset, the bootloader swaps and boots the new image which must self-test and confirm, and if no confirm a watchdog or boot counter triggers a revert to A.",
-              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-2.svg"
-            },
-            {
-              "id": "bootloaders-firmware-update-3-fc-1",
-              "type": "flashcard",
-              "front": "What two properties make a firmware update safe against power loss, and how does the A/B scheme provide them?",
-              "back": "Atomicity and recoverability. The new image is written to the INACTIVE bank while the active one keeps running and is never overwritten in place; a persistent flag plus bootloader swap makes the changeover all-or-nothing, so a mid-update power loss leaves the old working image bootable.",
-              "hint": "Never overwrite the running image in place."
-            },
-            {
-              "id": "bootloaders-firmware-update-3-fc-2",
-              "type": "flashcard",
-              "front": "What is the difference between a CRC check and a signature check on a received image?",
-              "back": "A CRC verifies INTEGRITY (the bits arrived uncorrupted) but anyone can compute it. A signature verifies AUTHENTICITY/integrity against a baked-in public key, proving the image came from a trusted signer--the basis of secure boot. You want both.",
-              "hint": "One catches corruption, the other catches forgery."
-            },
-            {
-              "id": "bootloaders-firmware-update-3-fc-3",
-              "type": "flashcard",
-              "front": "Name the four phases of a robust A/B firmware update.",
-              "back": "1) Receive the image into the inactive bank over UART/USB-DFU/OTA; 2) Validate with CRC + signature (reject+erase on mismatch); 3) Swap atomically via a persistent pending flag + reset; 4) Confirm after self-test, or roll back (revert) if it fails to confirm.",
-              "hint": "Receive, validate, swap, confirm/rollback."
-            },
-            {
-              "id": "bootloaders-firmware-update-3-fc-4",
-              "type": "flashcard",
-              "front": "How does the confirm/rollback mechanism prevent a bad update from permanently bricking the device?",
-              "back": "After swap, the new image is only 'pending'; it must run a self-test and explicitly confirm. If it crashes or a boot-counter/watchdog expires before confirming, the bootloader reverts to the previous (known-good) slot on the next reset.",
-              "hint": "Pending until proven healthy; watchdog reverts."
-            },
-            {
-              "id": "bootloaders-firmware-update-3-fc-5",
-              "type": "flashcard",
-              "front": "What do MCUboot and ESP-IDF OTA provide so you don't write update logic from scratch?",
-              "back": "MCUboot (used by Zephyr) is an open bootloader with signed images, swap/overwrite strategies, and confirm/revert. ESP-IDF OTA gives esp_ota_* APIs over ota_0/ota_1 partitions with rollback. Both implement validate-swap-confirm with secure boot support.",
-              "hint": "One is the Zephyr standard; one is Espressif's."
-            },
-            {
-              "id": "bootloaders-firmware-update-3-fc-6",
-              "type": "flashcard",
-              "front": "Why include a monotonic version and anti-rollback counter in firmware images?",
-              "back": "To prevent downgrade attacks (re-flashing an older, vulnerable but validly-signed image) and to avoid accidental update loops. The bootloader refuses images whose version is below the stored anti-rollback counter.",
-              "hint": "Stops attackers from re-installing old signed firmware."
+              "type": "mcq",
+              "prompt": "Use the flash-layout diagram. Which describes it correctly?",
+              "choices": [
+                "The bootloader sits at the start; the application has its own region at a higher address, with a spare staging slot",
+                "There is only one region, shared by everything",
+                "The application sits before the bootloader",
+                "Flash holds only working variables, no code"
+              ],
+              "answerIndex": 0,
+              "explanation": "The layout shows the immutable bootloader at the low address, the active application in its own region above it, and a spare slot for staging a new image. Flash is divided into regions and holds code, not just variables; the bootloader comes first.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-1.svg"
             },
             {
               "id": "bootloaders-firmware-update-3-mcq-1",
               "type": "mcq",
-              "prompt": "Power is lost exactly while the device is writing the new image into the inactive bank. After reboot, what should happen in a correct A/B design?",
+              "prompt": "What does 'erase-before-write' mean for flash?",
               "choices": [
-                "The device is bricked because the image is half-written",
-                "The bootloader runs the half-written inactive image and crashes",
-                "The pending flag is not set/confirmed, so the bootloader boots the untouched active image as before",
-                "The bootloader erases both banks and waits for a new image"
+                "You can freely overwrite any byte at any time",
+                "To truly rewrite a location you must first erase it back to blank, and erase works on a whole block",
+                "Flash must be erased every single time you read it",
+                "Erasing and writing are the same operation"
               ],
-              "answerIndex": 2,
-              "explanation": "The active image was never touched, and the swap only happens after a fully-written image is validated and the pending flag is committed. An interrupted download leaves the active slot bootable; the device simply restarts the old firmware, which can retry the update."
+              "answerIndex": 1,
+              "explanation": "Flash writes can only change bits one way, so to genuinely change data you must erase first — and erase happens on a whole sector/block, not per byte. Reading never requires an erase, and erase and write are distinct steps.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-1.svg"
             },
             {
               "id": "bootloaders-firmware-update-3-mcq-2",
               "type": "mcq",
-              "prompt": "A new image passes its CRC but its signature does not verify against the device's public key. The correct action is to:",
+              "prompt": "You need to change just a few bytes that sit inside one flash sector. What must you do?",
               "choices": [
-                "Boot it anyway since the CRC proves it is intact",
-                "Reject and erase it; keep running the current image",
-                "Store it and ask the user to confirm",
-                "Boot it but disable interrupts as a precaution"
+                "Overwrite those few bytes directly",
+                "Erase only those few bytes",
+                "Erase the whole sector that contains them, then write the data back",
+                "Move the bytes into RAM permanently"
               ],
-              "answerIndex": 1,
-              "explanation": "A valid CRC only proves the bits are uncorrupted, not that they came from a trusted source. A failed signature means the image is unauthenticated (possibly malicious or wrong-key); secure boot must reject it, erase the staging slot, and continue running the trusted image."
+              "answerIndex": 2,
+              "explanation": "Erase granularity is a whole sector, and you cannot rewrite bytes in place, so you erase the entire containing sector (saving any other data it held) and then program. You cannot erase just a few bytes, and the data must end up back in flash.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-1.svg"
             },
             {
               "id": "bootloaders-firmware-update-3-mcq-3",
               "type": "mcq",
-              "prompt": "After an atomic swap, the new firmware boots but hangs in early init and never calls confirm. With a boot counter + watchdog, what is the safe outcome?",
+              "prompt": "Why do designers avoid erasing the same flash sector over and over, and what is the fix called?",
               "choices": [
-                "The device stays hung forever in the new image",
-                "The bootloader, seeing no confirmation, reverts to the previous slot on the next reset",
-                "The bootloader re-downloads the image automatically",
-                "Both slots are erased to recover space"
+                "It uses too much electricity; the fix is 'sleep mode'",
+                "Each sector can only be erased a limited number of times before wearing out; spreading writes around is called 'wear leveling'",
+                "It is too slow; the fix is 'overclocking'",
+                "Flash never wears out, so there is no concern"
               ],
               "answerIndex": 1,
-              "explanation": "The new image is only pending until it confirms. A watchdog reset (or exceeding the boot-attempt counter) without a confirmation tells the bootloader the update is unhealthy, so it reverts to the known-good previous slot--the anti-brick rollback."
+              "explanation": "Flash sectors have a finite erase-cycle limit (often tens of thousands), so hammering one sector wears it out. Spreading writes across many locations — wear leveling — extends the flash's life. It is about endurance, not speed or power.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-1.svg"
             },
             {
               "id": "bootloaders-firmware-update-3-mcq-4",
               "type": "mcq",
-              "prompt": "Why is writing the incoming image into the INACTIVE bank (rather than over the running app) essential?",
+              "prompt": "Where do the bootloader and the application live in flash?",
               "choices": [
-                "The inactive bank is faster to program",
-                "It lets the device keep running the current app during download and guarantees a known-good image remains if anything fails",
-                "Signatures only validate against the inactive bank",
-                "The active bank cannot be erased at all"
+                "In the same bytes, taking turns",
+                "The bootloader near the start; the application in its own separate region at a higher address",
+                "Both only in RAM",
+                "The application near the start; the bootloader is not stored anywhere"
               ],
               "answerIndex": 1,
-              "explanation": "Staging in the inactive bank means the running app is untouched throughout receive and validation, so a failure or power loss at any point leaves a complete, bootable image. Overwriting the active app in place would leave the device with a partial, unbootable image on interruption."
+              "explanation": "Flash is split into regions: the bootloader sits near the start so it runs first, and the application occupies its own region higher up. They do not share the same bytes, and both are stored in flash, not RAM.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-1.svg"
+            },
+            {
+              "id": "bootloaders-firmware-update-3-mcq-5",
+              "type": "mcq",
+              "prompt": "What two key values sit at the very beginning of the application, which the bootloader needs to launch it?",
+              "choices": [
+                "The app's name and its version number",
+                "Where the stack should start, and the address of the app's first instruction (entry point)",
+                "The Wi-Fi password and the device serial number",
+                "The amount of free RAM and free flash"
+              ],
+              "answerIndex": 1,
+              "explanation": "The application begins with its initial stack-pointer value and the address of its entry point (first instruction). The bootloader reads these to set the stack pointer and to jump. Names, versions, passwords, and free-space figures are not what the launch sequence needs.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-1.svg"
+            },
+            {
+              "id": "bootloaders-firmware-update-3-mcq-6",
+              "type": "mcq",
+              "prompt": "What is the 'program counter' (PC), and how is it used in the jump to the app?",
+              "choices": [
+                "A counter of how many programs are installed; it is reset to zero",
+                "The pointer to 'what instruction to run next'; setting it to the app's entry point is the actual jump",
+                "A timer that counts seconds since boot",
+                "The number of bytes the program uses"
+              ],
+              "answerIndex": 1,
+              "explanation": "The program counter holds the address of the next instruction to execute. When the bootloader sets the PC to the application's entry point, the CPU starts running the app — that is the jump. It is not a count of programs, a clock, or a size.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-1.svg"
+            },
+            {
+              "id": "bootloaders-firmware-update-3-mcq-7",
+              "type": "mcq",
+              "prompt": "A bootloader jumps to the app but forgets to point the vector table at the app's region. The app runs fine until its first interrupt, then crashes. Why?",
+              "choices": [
+                "The stack pointer was never set, which only matters during interrupts",
+                "Interrupts are still routed to the bootloader's handler list instead of the app's, so the wrong code runs",
+                "Forgetting the vector table erases the application",
+                "Interrupts cannot happen unless the vector table is wrong"
+              ],
+              "answerIndex": 1,
+              "explanation": "The vector table tells the chip where to find each interrupt's handler. If it still points at the bootloader's table, the first interrupt jumps into bootloader/garbage code relative to the running app, and it crashes. The crash appears only when an interrupt finally fires.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-1.svg"
+            },
+            {
+              "id": "bootloaders-firmware-update-3-mcq-8",
+              "type": "mcq",
+              "prompt": "Put the bootloader's launch steps in the right order.",
+              "choices": [
+                "Set the program counter first, then the stack pointer, then point the vector table",
+                "Point the vector table to the app, set the stack pointer, then set the program counter to the entry point",
+                "Erase the app, then set the stack pointer, then read its name",
+                "Only set the program counter; nothing else is needed"
+              ],
+              "answerIndex": 1,
+              "explanation": "The safe order is: point the vector table at the app (so interrupts dispatch correctly), set the stack pointer to the app's stack start, then set the program counter to the entry point — that last step is the jump. Skipping the vector-table or stack-pointer step causes crashes.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-1.svg"
+            }
+          ]
+        },
+        {
+          "id": "bootloaders-firmware-update-bootloaders-firmware-update-lesson-4",
+          "title": "Receiving & Writing a New Firmware Image",
+          "order": 4,
+          "difficulty": 2,
+          "content": "**Hook.** So far the bootloader can run first and launch the app. Now for the interesting part: actually *getting* a new program onto the device and writing it into flash. This is the heart of a field update.\n\n**Build.** The new program is packaged as an **image** — just a file containing the bytes of the new firmware (often a `.bin` file). The device receives this image over some **transport**, a link that carries the data:\n\n- **UART** — a simple two-wire serial cable, common for wired updates on a workbench.\n- **USB** — the same connector you use for many gadgets; a common style is called *DFU* (Device Firmware Upgrade) mode.\n- **OTA** (\"over the air\") — *wireless*, such as Wi-Fi or Bluetooth. This is how your phone or smart bulb updates with no cable at all.\n\nNo matter the transport, the smart place to put the incoming image is **not** on top of the program that is currently running. Recall the flash layout had a **spare slot**. The device keeps running the current app in its slot while it writes the brand-new image into the *spare* slot. This is the safe choice: if the download is interrupted, the working app is still completely intact.\n\nWriting the image obeys the flash rules from the previous lesson: **erase the spare slot first** (a sector at a time), then **program** the new bytes in. Because the image usually arrives in pieces, the device writes it chunk by chunk as the data streams in. Often the device also runs the flash-writing code from RAM, because on many chips the CPU cannot fetch instructions from a flash region while that same region is being erased or written.\n\n**Recap.** A firmware image (the new program's bytes) arrives over a transport — UART, USB, or wireless OTA — and the device writes it into a *spare* slot (erase then program, chunk by chunk) while the current app keeps running, so an interrupted download never harms the working firmware.",
+          "items": [
+            {
+              "id": "bootloaders-firmware-update-4-img-1",
+              "type": "mcq",
+              "prompt": "Use the diagram of receiving an image. Where does the new image get written, and what is the running app doing meanwhile?",
+              "choices": [
+                "Written over the running app, which must stop",
+                "Written into the spare slot (Slot B) while the current app in Slot A keeps running",
+                "Written into RAM permanently, never flash",
+                "Written into the bootloader region"
+              ],
+              "answerIndex": 1,
+              "explanation": "The incoming image goes into the spare slot while the current app keeps running from its own slot. That way an interrupted download leaves the working app untouched. It does not overwrite the running app or the bootloader, and firmware lives in flash, not permanently in RAM.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-5.svg"
+            },
+            {
+              "id": "bootloaders-firmware-update-4-mcq-1",
+              "type": "mcq",
+              "prompt": "What is a firmware 'image'?",
+              "choices": [
+                "A photo of the circuit board",
+                "A file containing the bytes of the new firmware program",
+                "The icon shown on the device's screen",
+                "A picture used to test the camera"
+              ],
+              "answerIndex": 1,
+              "explanation": "In firmware updates, an 'image' is the packaged bytes of the new program (often a .bin file) that will be written into flash. It has nothing to do with pictures or icons.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-5.svg"
+            },
+            {
+              "id": "bootloaders-firmware-update-4-mcq-2",
+              "type": "mcq",
+              "prompt": "What does 'transport' mean in the context of firmware update?",
+              "choices": [
+                "A truck that ships the device",
+                "The link that carries the image data to the device, such as UART, USB, or wireless",
+                "The part of flash that holds the image",
+                "Moving the device to a repair shop"
+              ],
+              "answerIndex": 1,
+              "explanation": "The transport is the communication link that delivers the new image — a UART cable, a USB connection, or a wireless OTA link. It is not a vehicle and not a flash region.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-5.svg"
+            },
+            {
+              "id": "bootloaders-firmware-update-4-mcq-3",
+              "type": "mcq",
+              "prompt": "What does OTA ('over the air') update mean?",
+              "choices": [
+                "Updating using a wireless link such as Wi-Fi or Bluetooth, with no cable",
+                "Updating only while the device is airborne",
+                "A type of antenna",
+                "Updating by physically swapping the flash chip"
+              ],
+              "answerIndex": 0,
+              "explanation": "OTA means the image arrives wirelessly (Wi-Fi, Bluetooth, etc.) with no cable — how phones and smart bulbs update at home. It is not about flying or swapping chips, and it is a delivery method, not an antenna.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-5.svg"
+            },
+            {
+              "id": "bootloaders-firmware-update-4-mcq-4",
+              "type": "mcq",
+              "prompt": "Why write the incoming image into a spare slot instead of over the currently running app?",
+              "choices": [
+                "The spare slot is faster to write",
+                "So the working app stays intact — if the download is interrupted, the device still has a complete, runnable program",
+                "Because the running app's slot cannot be erased",
+                "It saves battery"
+              ],
+              "answerIndex": 1,
+              "explanation": "Staging in the spare slot keeps the current app whole and bootable throughout the download. If the transfer fails partway, you have lost nothing — the old app still works. It is about safety, not speed or battery.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-5.svg"
+            },
+            {
+              "id": "bootloaders-firmware-update-4-mcq-5",
+              "type": "mcq",
+              "prompt": "Writing the image into the spare slot follows which flash rule?",
+              "choices": [
+                "Write directly; flash needs no preparation",
+                "Erase the slot first (a sector at a time), then program the new bytes",
+                "Program first, then erase",
+                "Only RAM rules apply, never flash rules"
+              ],
+              "answerIndex": 1,
+              "explanation": "Flash is erase-before-write, so the spare slot is erased (sector by sector) and then the new bytes are programmed in. You cannot write without erasing first, and programming before erasing makes no sense.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-5.svg"
+            },
+            {
+              "id": "bootloaders-firmware-update-4-mcq-6",
+              "type": "mcq",
+              "prompt": "The image often arrives in pieces. How does the device handle that?",
+              "choices": [
+                "It refuses anything that is not delivered all at once",
+                "It writes the image chunk by chunk into the spare slot as the data streams in",
+                "It stores every chunk in the bootloader region",
+                "It can only accept images smaller than one byte"
+              ],
+              "answerIndex": 1,
+              "explanation": "Because data streams in over the transport, the device programs it into the spare slot piece by piece as chunks arrive. It does not require the whole file at once, and chunks go into the staging slot, not the bootloader.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-5.svg"
+            },
+            {
+              "id": "bootloaders-firmware-update-4-mcq-7",
+              "type": "mcq",
+              "prompt": "Why do devices often run the flash-writing code from RAM during an update?",
+              "choices": [
+                "RAM code looks nicer",
+                "On many chips the CPU cannot fetch instructions from a flash region while that same region is being erased or written",
+                "RAM is the only place code can ever run",
+                "It permanently moves the program out of flash"
+              ],
+              "answerIndex": 1,
+              "explanation": "Many chips cannot execute code out of a flash region while that region is mid-erase or mid-write. Running the writer from RAM avoids that conflict so the update can proceed. Code normally runs from flash; this is a special case during writing.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-5.svg"
+            },
+            {
+              "id": "bootloaders-firmware-update-4-mcq-8",
+              "type": "mcq",
+              "prompt": "Which is a wired transport, and which is wireless, for delivering an image?",
+              "choices": [
+                "UART and USB are wireless; OTA is wired",
+                "UART and USB are wired; OTA is wireless",
+                "All three are wireless",
+                "All three are wired"
+              ],
+              "answerIndex": 1,
+              "explanation": "UART (a serial cable) and USB are wired transports; OTA is the wireless one (Wi-Fi/Bluetooth). Matching the transport to the situation — cable on a bench, OTA in the field — is part of designing an update path.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-5.svg"
+            }
+          ]
+        },
+        {
+          "id": "bootloaders-firmware-update-bootloaders-firmware-update-lesson-5",
+          "title": "Safe Updates: Validate, A/B Swap & Rollback (Don't Brick It)",
+          "order": 5,
+          "difficulty": 3,
+          "content": "**Hook.** The scary part of any update is failure. If the power is cut halfway through, or the new program is broken, the device could end up dead — unable to start at all. That dead state has a name: **bricked** (as useful as a brick). A well-designed update makes bricking nearly impossible. Here's how.\n\n**Build.** Three ideas work together.\n\n*1. Validate before trusting.* Once the new image is in the spare slot, the device checks it before ever running it. A **checksum** (a CRC) is a quick math fingerprint over the bytes: if even one byte got corrupted in transit, the fingerprint won't match, and the image is rejected. A stronger check is a **signature** — a cryptographic stamp proving the image really came from the legitimate maker, not an attacker. Rejecting on any mismatch means you never launch a bad image.\n\n*2. A/B (two-slot) update with rollback.* Keep **two slots**: the running app stays in slot A while the new image goes into slot B (as in the last lesson). After validation, the bootloader switches over to slot B on the next restart. Crucially, the new image starts as \"on trial\": it must run a quick self-test and **confirm** it works. If it doesn't confirm — say it crashes, or a *watchdog* timer (a safety timer that resets the chip if the program stops responding) fires — the bootloader **rolls back**, returning to the known-good slot A. The diagram shows this whole flow.\n\nWhy does this beat bricking on power loss? Because the old app is *never erased while the new one is unproven.* Lose power mid-download, or get a bad image, and slot A is still there to boot. The switch only sticks once the new image proves itself.\n\n*3. Secure boot, in one line:* the bootloader refuses to run any image whose signature isn't valid — so only trusted firmware ever runs.\n\nYou rarely build all this by hand. Ready-made systems exist — for example **MCUboot** (a popular open-source bootloader) and chip vendors' built-in update tools — that already implement validate, A/B swap, and rollback.\n\n**Recap.** Avoid bricking by validating the image (checksum for corruption, signature for authenticity), using two slots so the working app is never erased until the new one is proven, and rolling back to the old slot if the new image fails to confirm. Secure boot means only validly signed images run; mature tools like MCUboot provide this off the shelf.",
+          "items": [
+            {
+              "id": "bootloaders-firmware-update-5-img-1",
+              "type": "mcq",
+              "prompt": "Use the update-and-rollback flow diagram. What happens after the new image is received into Slot B?",
+              "choices": [
+                "It runs immediately with no checks",
+                "It is validated; if invalid it is rejected and the device keeps running A; if valid it is booted on trial and rolled back if it fails to confirm",
+                "Both slots are erased",
+                "The bootloader is replaced"
+              ],
+              "answerIndex": 1,
+              "explanation": "The flow validates the image first; an invalid image is rejected (keep running A, no brick), and a valid one is booted on trial — confirmed if healthy, or rolled back to A by a watchdog/boot counter if it fails. It never runs unchecked, and the bootloader stays put.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-2.svg"
+            },
+            {
+              "id": "bootloaders-firmware-update-5-mcq-1",
+              "type": "mcq",
+              "prompt": "What does it mean to 'brick' a device?",
+              "choices": [
+                "To make it run faster",
+                "To leave it dead and unable to start at all, as useful as a brick",
+                "To add a brick-red case",
+                "To double its memory"
+              ],
+              "answerIndex": 1,
+              "explanation": "Bricking means a failed update (or other mishap) leaves the device unable to boot — useless, like a brick. A safe update process is designed specifically to prevent this.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-2.svg"
+            },
+            {
+              "id": "bootloaders-firmware-update-5-mcq-2",
+              "type": "mcq",
+              "prompt": "What does a checksum (CRC) tell you about a received image?",
+              "choices": [
+                "Whether the bytes arrived uncorrupted (a fingerprint of the data)",
+                "Who the legal owner of the device is",
+                "How fast the image will run",
+                "The image's color scheme"
+              ],
+              "answerIndex": 0,
+              "explanation": "A CRC is a quick math fingerprint over the bytes. If the image got corrupted in transit, the recomputed fingerprint won't match and the image is rejected. It checks for corruption, not ownership, speed, or appearance.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-2.svg"
+            },
+            {
+              "id": "bootloaders-firmware-update-5-mcq-3",
+              "type": "mcq",
+              "prompt": "What does a cryptographic signature add beyond a checksum?",
+              "choices": [
+                "It makes the file smaller",
+                "It proves the image genuinely came from the legitimate maker, not an attacker",
+                "It speeds up the download",
+                "Nothing; it is the same as a checksum"
+              ],
+              "answerIndex": 1,
+              "explanation": "A checksum only catches accidental corruption — anyone could recompute it for a tampered image. A signature is a cryptographic stamp proving authenticity (it came from the trusted signer), which a checksum cannot do.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-2.svg"
+            },
+            {
+              "id": "bootloaders-firmware-update-5-mcq-4",
+              "type": "mcq",
+              "prompt": "How does keeping two slots (A/B) plus validation prevent bricking when power is lost mid-update?",
+              "choices": [
+                "It makes the download faster so power loss is less likely",
+                "The running app in slot A is never erased while the new image is unproven, so if power is lost mid-download slot A still boots",
+                "It stores the image twice in the same slot",
+                "It charges the battery during the update"
+              ],
+              "answerIndex": 1,
+              "explanation": "The new image is staged and validated in slot B while slot A keeps running and is never erased until the new image proves itself. So a power cut mid-download leaves slot A intact and bootable — the device simply restarts the old firmware. The switch only sticks after validation and confirmation.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-2.svg"
+            },
+            {
+              "id": "bootloaders-firmware-update-5-mcq-5",
+              "type": "mcq",
+              "prompt": "A new image is validated and booted, but it starts as 'on trial'. What must it do, and what happens if it doesn't?",
+              "choices": [
+                "It must confirm it works; if it fails to confirm, the bootloader rolls back to the old slot",
+                "It must delete the old slot immediately",
+                "Nothing; trial mode lasts forever",
+                "It must increase its own version number"
+              ],
+              "answerIndex": 0,
+              "explanation": "The new image runs a self-test and must explicitly confirm it is healthy. If it crashes or never confirms (e.g. a watchdog fires), the bootloader rolls back to the known-good previous slot on the next restart — the anti-brick safety net.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-2.svg"
+            },
+            {
+              "id": "bootloaders-firmware-update-5-mcq-6",
+              "type": "mcq",
+              "prompt": "What is a watchdog timer's role in a safe update?",
+              "choices": [
+                "It guards the building where the server lives",
+                "It is a safety timer that resets the chip if the program stops responding, which can trigger a rollback if the new image hangs",
+                "It counts how many images have been installed",
+                "It speeds up the CPU during updates"
+              ],
+              "answerIndex": 1,
+              "explanation": "A watchdog resets the chip if the running program stops 'petting' it, meaning the program has hung. If a freshly installed image hangs before confirming, the watchdog reset lets the bootloader roll back to the known-good slot. It is a safety mechanism, not a counter or speed booster.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-2.svg"
+            },
+            {
+              "id": "bootloaders-firmware-update-5-mcq-7",
+              "type": "mcq",
+              "prompt": "An image passes its checksum but its signature does not verify. What is the correct action?",
+              "choices": [
+                "Run it anyway, since the checksum proves it is fine",
+                "Reject it and keep running the current app; a valid checksum does not prove the image is from a trusted source",
+                "Run it but turn off the watchdog",
+                "Ask the user to retype the signature"
+              ],
+              "answerIndex": 1,
+              "explanation": "A good checksum only means the bytes are uncorrupted, not that they are authentic. A failed signature means the image is unauthenticated (possibly tampered with), so secure boot must reject it and keep the trusted app running.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-2.svg"
+            },
+            {
+              "id": "bootloaders-firmware-update-5-mcq-8",
+              "type": "mcq",
+              "prompt": "What is 'secure boot', in one line?",
+              "choices": [
+                "Booting only after the user logs in",
+                "The bootloader refuses to run any image whose signature is not valid, so only trusted firmware runs",
+                "Booting as fast as possible",
+                "Booting only when plugged into a charger"
+              ],
+              "answerIndex": 1,
+              "explanation": "Secure boot means the bootloader checks each image's signature and runs it only if it is validly signed by the trusted maker — so only trusted firmware ever executes. It is about authenticity, not login, speed, or charging.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-2.svg"
+            },
+            {
+              "id": "bootloaders-firmware-update-5-mcq-9",
+              "type": "mcq",
+              "prompt": "Why might you use a ready-made system like MCUboot instead of writing all the update logic yourself?",
+              "choices": [
+                "It is required by law",
+                "It already implements validation, A/B swap, and rollback correctly, so you avoid reinventing tricky, safety-critical logic",
+                "It makes the device physically larger",
+                "It is the only way to turn on an LED"
+              ],
+              "answerIndex": 1,
+              "explanation": "MCUboot is a popular open-source bootloader that already provides signed-image validation, A/B swap, and rollback — logic that is subtle and easy to get dangerously wrong. Using it (or a vendor's built-in tool) saves effort and reduces bricking risk. It is a choice, not a legal requirement.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/bootloaders-firmware-update-2.svg"
             }
           ]
         }
