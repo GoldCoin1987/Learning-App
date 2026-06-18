@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "id": "embedded-systems",
   "title": "Embedded Systems",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Embedded systems from scratch (beginner rework in progress): 15 sub-topics from the bare-metal memory map through RTOS, real-time, and DSP-on-MCU. Beginner-first readings, diagrams, tiered easy to hard.",
   "requires": [
     "digital-electronics"
@@ -444,388 +444,500 @@
       "order": 2,
       "lessons": [
         {
-          "id": "embedded-c-volatile-embedded-c-volatile-l1-pointers-as-addresses",
-          "title": "Pointers as Addresses: Reaching a Register",
+          "id": "embedded-c-volatile-embedded-c-volatile-l1-variables-pointers-registers",
+          "title": "Variables, Pointers, and Reaching a Register",
           "order": 1,
           "difficulty": 1,
-          "content": "On a desktop, a pointer is a handle to an object the runtime placed somewhere. On bare metal, a pointer *is* a physical bus address, and some of those addresses are not RAM at all -- they are peripheral control registers. To talk to one you take the integer address from the reference manual and cast it to a pointer of the right width and qualification.\n\nThe canonical move: a 32-bit register at `0x40020014` becomes a `volatile uint32_t *`.\n\n```c\n#include <stdint.h>\n\n#define GPIOA_ODR (*(volatile uint32_t *)0x40020014UL)\n\nvoid set_pin5(void) {\n    GPIOA_ODR |= (1u << 5);   /* read-modify-write of one register */\n}\n```\n\nThree things matter here. First, the width: a 32-bit register must be accessed as `uint32_t`, not `int` or `char` -- the bus transaction size has to match what the peripheral expects, and a byte write to a word-only register can fault or be ignored. Second, the `UL` suffix keeps the literal an unsigned long so it does not overflow `int` and is not sign-extended. Third, `volatile` (covered next lesson) tells the compiler this access has side effects and must actually happen.\n\nWhy a macro that dereferences, rather than a bare pointer? Because the register lives at a fixed, known address forever -- there is no allocation, no lifetime, no `NULL`. The address comes straight from the datasheet's memory map. This is the whole reframe: memory here is the silicon address space from Module 1, and a pointer is just how C names a spot in it.",
+          "content": "**Hook.** To control a piece of hardware, your program has to find it in memory and poke it. This lesson builds the three ideas you need: a variable, an address, and a pointer.\n\n**Build.** A program is a list of instructions. We write microcontroller programs in a language called **C**. A **variable** is just a *named box that holds a value* — for example `uint32_t count = 0;` makes a box called `count` holding the number 0.\n\nEvery box lives somewhere in memory, and that location has a number called its **address**. Think of an address like a house address written on a slip of paper. The slip is not the house; it just tells you where the house is.\n\nA **pointer** is a variable whose value *is an address*. It holds the slip of paper, not the thing itself. To go to the house the slip names — to read or write the actual value there — you put a `*` in front of the pointer. That is called *dereferencing*.\n\n```c\nuint32_t count = 0;       // a box holding a value\nuint32_t *p = &count;     // p holds the ADDRESS of count (&count)\n*p = 7;                   // go to that address and write 7\n// now count == 7\n```\n\nIn sub-topic 1 you saw that **hardware registers live at fixed addresses** — special memory locations that control real hardware. So to control hardware in C, you make a pointer to that fixed address and read or write through it. The address comes straight from the chip's manual; you just write it down and turn it into a pointer:\n\n```c\n// register at address 0x40020014 controls some output pins\nuint32_t *reg = (uint32_t *)0x40020014;  // a pointer to that address\n*reg = 32;                                // write 32 into the register\n```\n\n**Recap.** A variable is a named box; an address is where the box lives; a pointer holds an address, and `*pointer` reaches the value there. A hardware register is just a box at a fixed address you point to.",
           "items": [
             {
-              "id": "embedded-c-volatile-l1-fc-pointer-is-address",
-              "type": "flashcard",
-              "front": "On a bare-metal MCU, what does a pointer value physically represent?",
-              "back": "A physical bus address. Dereferencing it issues a real load/store transaction on the bus to that address -- which may be RAM, flash, or a peripheral register, not a runtime-managed object.",
-              "hint": "There is no allocator or virtual memory underneath you."
-            },
-            {
-              "id": "embedded-c-volatile-l1-fc-cast-syntax",
-              "type": "flashcard",
-              "front": "Write the expression that accesses the 32-bit register at address 0x40020014.",
-              "back": "*(volatile uint32_t *)0x40020014UL -- cast the literal address to a pointer of the correct width and volatility, then dereference.",
-              "hint": "Width + volatile qualifier + cast + dereference."
-            },
-            {
-              "id": "embedded-c-volatile-l1-fc-width-match",
-              "type": "flashcard",
-              "front": "Why must the pointer type width match the register's defined access width?",
-              "back": "The pointer type determines the bus transaction size (byte/half-word/word). Many peripheral registers only support word access; a mismatched-width access can fault, be ignored, or corrupt adjacent bits.",
-              "hint": "The C type controls LDR/LDRB/LDRH selection."
-            },
-            {
-              "id": "embedded-c-volatile-l1-fc-ul-suffix",
-              "type": "flashcard",
-              "front": "Why append UL to an address literal like 0x40020014UL?",
-              "back": "To force the literal to unsigned long so it is not treated as a (possibly signed) int that overflows or gets sign-extended when cast to a pointer.",
-              "hint": "Signedness and size of the integer constant."
-            },
-            {
-              "id": "embedded-c-volatile-l1-mcq-where-address-comes-from",
+              "id": "embedded-c-volatile-l1-mcq-what-pointer-holds",
               "type": "mcq",
-              "prompt": "Where does the numeric address you cast to a register pointer come from?",
+              "prompt": "What does a pointer hold?",
               "choices": [
-                "The linker assigns it at link time from the .data section",
-                "The MCU's reference manual / datasheet memory map fixes it in silicon",
-                "malloc returns it at runtime",
-                "The OS maps it during process startup"
+                "The value stored at some location",
+                "An address — the location where a value lives in memory",
+                "A copy of the C program",
+                "The name of a variable as text"
               ],
               "answerIndex": 1,
-              "explanation": "Peripheral register addresses are fixed by the chip's memory map in the reference manual. There is no allocator and (on a typical MCU) no MMU remapping; the address is a constant baked into the silicon."
+              "explanation": "A pointer is a variable whose value is an address (a 'where'), like a slip of paper with a house address. The value itself lives at that address; you reach it with the `*` (dereference) operator. It is not the value and not a name.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/embedded-c-volatile-2.svg"
             },
             {
-              "id": "embedded-c-volatile-l1-mcq-byte-vs-word",
+              "id": "embedded-c-volatile-l1-mcq-variable-is",
               "type": "mcq",
-              "prompt": "You access a word-only peripheral register through a volatile uint8_t *. What is the most likely consequence?",
+              "prompt": "In plain terms, what is a variable in C?",
               "choices": [
-                "Identical behavior to a uint32_t access",
-                "A byte-sized bus transaction that may fault or fail to update the register correctly",
-                "The compiler silently promotes it to a 32-bit access",
-                "A compile-time error in every conformant compiler"
+                "A named box that holds a value",
+                "A function that runs instructions",
+                "A fixed number that can never change",
+                "The wire connecting two chips"
+              ],
+              "answerIndex": 0,
+              "explanation": "A variable is a named box that stores a value, like `uint32_t count = 0;`. The name lets you read or change what is in the box. It is not a function and (unlike a `const`) its value can change.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/embedded-c-volatile-2.svg"
+            },
+            {
+              "id": "embedded-c-volatile-l1-mcq-dereference",
+              "type": "mcq",
+              "prompt": "If `p` is a pointer, what does `*p` mean?",
+              "choices": [
+                "The address stored in p",
+                "The value found at the address p holds",
+                "Multiply p by something",
+                "A brand-new pointer"
               ],
               "answerIndex": 1,
-              "explanation": "The pointer type selects the transaction size. A byte access to a register that only supports word access can bus-fault or update only part of the register. C will not error and will not silently widen it."
+              "explanation": "The `*` in front of a pointer 'dereferences' it: go to the address the pointer holds and use the value living there. `p` is the slip of paper (the address); `*p` is going to the house and looking inside.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/embedded-c-volatile-2.svg"
             },
             {
-              "id": "embedded-c-volatile-l1-mcq-null-check",
+              "id": "embedded-c-volatile-l1-mcq-ampersand",
               "type": "mcq",
-              "prompt": "Why is a NULL check meaningless for a hardcoded register pointer like GPIOA?",
+              "prompt": "What does `&count` give you in `uint32_t *p = &count;`?",
               "choices": [
-                "Because volatile pointers can never be NULL",
-                "Because the address is a fixed nonzero constant from the memory map, not a runtime allocation that can fail",
-                "Because the compiler removes all NULL checks at -O2",
-                "Because peripheral registers are always at address 0"
+                "The value stored in count",
+                "The address of count (where the box lives)",
+                "A copy of count in a new box",
+                "Two variables added together"
               ],
               "answerIndex": 1,
-              "explanation": "The pointer is a compile-time constant address from the datasheet. There is no allocation step that could yield NULL, so the check has no purpose (and 0x00000000 is itself a valid address region on many MCUs)."
+              "explanation": "The `&` operator means 'address of'. `&count` is the location of the `count` box, which is exactly what a pointer stores. So `p` ends up holding the address of `count`.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/embedded-c-volatile-2.svg"
             },
             {
-              "id": "embedded-c-volatile-l1-fc-mmio-read-side-effect",
-              "type": "flashcard",
-              "front": "Give an example of a register read that has a side effect.",
-              "back": "Reading a peripheral's data/status register can clear a flag (e.g. reading the UART data register clears the RXNE 'data ready' bit). So even a read is not free of consequences -- which is part of why volatile is required.",
-              "hint": "Think UART RX or a status-then-data sequence."
+              "id": "embedded-c-volatile-l1-mcq-register-is-box",
+              "type": "mcq",
+              "prompt": "Why can a hardware register be controlled with a pointer in C?",
+              "choices": [
+                "Because every register is also a function",
+                "Because a register is a memory location at a fixed address, and a pointer can hold that address",
+                "Because pointers physically generate electricity",
+                "Because C copies the register into RAM first"
+              ],
+              "answerIndex": 1,
+              "explanation": "From sub-topic 1: a register is just a special memory location living at a fixed address. Since a pointer holds an address, you make a pointer to the register's address and read/write through it with `*`. That is the whole trick.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/embedded-c-volatile-2.svg"
             },
             {
-              "id": "embedded-c-volatile-l1-fc-rmw-preview",
-              "type": "flashcard",
-              "front": "What three bus operations does `GPIOA_ODR |= (1u << 5);` actually perform?",
-              "back": "A read of ODR, an OR in a CPU register, and a write back of ODR -- a read-modify-write. This is non-atomic and can race with an ISR or DMA that also touches ODR (covered later).",
-              "hint": "Expand the compound assignment."
+              "id": "embedded-c-volatile-l1-mcq-where-address-from",
+              "type": "mcq",
+              "prompt": "Where do you get the actual number for a register's address, like 0x40020014?",
+              "choices": [
+                "You make it up; any number works",
+                "From the chip's reference manual / datasheet, which lists each register's fixed address",
+                "The program randomly picks one when it starts",
+                "It is always address 0"
+              ],
+              "answerIndex": 1,
+              "explanation": "Register addresses are fixed by the chip's design and listed in its reference manual (the 'memory map'). You copy the number from the manual. It is not random and not chosen at run time — it is baked into the silicon.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/embedded-c-volatile-2.svg"
+            },
+            {
+              "id": "embedded-c-volatile-l1-mcq-write-through-pointer",
+              "type": "mcq",
+              "prompt": "You have `uint32_t *reg = (uint32_t *)0x40020014;`. How do you write the value 32 into that register?",
+              "choices": [
+                "reg = 32;",
+                "*reg = 32;",
+                "&reg = 32;",
+                "32 = reg;"
+              ],
+              "answerIndex": 1,
+              "explanation": "`*reg = 32;` dereferences the pointer and stores 32 at the address it holds — the register. Writing `reg = 32;` would instead change the slip of paper to point at address 32, which is wrong.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/embedded-c-volatile-2.svg"
+            },
+            {
+              "id": "embedded-c-volatile-l1-mcq-slip-vs-house",
+              "type": "mcq",
+              "prompt": "In the 'slip of paper' analogy, which statement is correct?",
+              "choices": [
+                "The pointer is the house; the address is inside it",
+                "The pointer is the slip of paper (the address); `*pointer` is going to the house to see what is inside",
+                "The pointer and the value are the same thing",
+                "Dereferencing destroys the pointer"
+              ],
+              "answerIndex": 1,
+              "explanation": "The pointer holds the address — the slip of paper. The actual value lives at that address (the house). Dereferencing with `*` is the act of going to the house; it does not destroy the pointer, and the pointer is never the value itself.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/embedded-c-volatile-2.svg"
             }
           ]
         },
         {
           "id": "embedded-c-volatile-embedded-c-volatile-l2-what-volatile-does",
-          "title": "What volatile Does -- and Does Not -- Guarantee",
+          "title": "What volatile Does and Why Hardware Needs It",
           "order": 2,
           "difficulty": 2,
-          "content": "`volatile` has exactly one job: it tells the compiler that every read and write of that object in the source must become a real memory access, in program order *relative to other volatile accesses*. The compiler may not cache the value in a register, may not elide a 'redundant' load, and may not invent or merge accesses. That is the entire guarantee.\n\nThe classic failure is a flag set in an ISR and polled in `main`:\n\n```c\nvolatile uint8_t flag = 0;          /* set in ISR */\n\nvoid wait(void) {\n    while (!flag) { }               /* must reload flag each pass */\n}\n```\n\nWithout `volatile`, the optimizer sees no store to `flag` inside the loop, reads it once into a register, and spins forever -- this is the textbook 'works at -O0, hangs at -O2' bug. The same applies to a hardware register: drop `volatile` on a register pointer and a poll loop reading a status bit can be hoisted out entirely.\n\nNow the limits, because they bite hard. `volatile` does NOT give you atomicity: `reg |= bit;` is still a read-modify-write that an interrupt can split. It does NOT order a volatile access relative to a *non-volatile* one -- the compiler may freely move ordinary code across a volatile access. It does NOT emit any CPU memory barrier, so the *processor* (or write buffer / store buffer) can still reorder or delay the actual bus transaction even though the compiler kept them in order. And it does NOT make a multi-word object update atomic.\n\nSo `volatile` is necessary for register and ISR-shared access, but it is not sufficient for concurrency. The next lesson is about closing those three gaps: atomicity, ordering, and barriers.",
+          "content": "**Hook.** You write perfect code to blink an LED by polling a hardware register. It works while debugging, then you turn on the compiler's speed optimizations and the LED freezes. The missing word is `volatile`.\n\n**Build.** The C compiler tries to make your program fast. One trick it uses: if it reads a value once and *thinks* nothing changed it, it keeps a cached copy instead of reading memory again. For ordinary variables that is safe. For **hardware**, it is a disaster — a status register can change on its own at any moment, because real electronics flipped a bit.\n\nThe keyword **`volatile`** tells the compiler: *this value can change on its own, so always actually read it (or write it) from memory — never reuse a cached copy and never optimize the access away.*\n\nEveryday hook: `volatile` means \"always physically walk to the mailbox and check; don't assume it holds the same letters as last time.\"\n\n```c\n// WITHOUT volatile: compiler may read STATUS once and cache it forever\nuint32_t *STATUS = (uint32_t *)0x40020010;\nwhile (*STATUS == 0) { }   // may spin forever on a stale copy\n\n// WITH volatile: compiler re-reads the real hardware every time\nvolatile uint32_t *STATUS = (volatile uint32_t *)0x40020010;\nwhile (*STATUS == 0) { }   // actually checks the register each loop\n```\n\nThe same applies to a variable shared between your main program and an **interrupt** (a small routine the hardware runs when an event happens). If the interrupt sets a flag and `main` polls it, the flag must be `volatile`, or `main` may cache it and never notice the change.\n\n```c\nvolatile uint8_t data_ready = 0;   // set by an interrupt\nwhile (!data_ready) { }            // waits for the real value to change\n```\n\n**Recap.** `volatile` forces the compiler to genuinely read and write the value every time. Use it for hardware registers and for data shared with interrupts — anything that can change behind the compiler's back.",
           "items": [
             {
-              "id": "embedded-c-volatile-l2-fc-one-guarantee",
-              "type": "flashcard",
-              "front": "State the single guarantee volatile provides.",
-              "back": "Every source-level read/write of the object becomes a real memory access that the compiler will not cache, elide, reorder relative to other volatile accesses, invent, or merge.",
-              "hint": "It is about the compiler making accesses real and keeping volatile-vs-volatile order."
-            },
-            {
-              "id": "embedded-c-volatile-l2-fc-not-atomic",
-              "type": "flashcard",
-              "front": "Does volatile make `reg |= mask;` atomic?",
-              "back": "No. It is still a read-modify-write; an interrupt or DMA can occur between the read and the write. volatile guarantees the accesses happen, not that they are indivisible.",
-              "hint": "Atomicity and visibility are different properties."
-            },
-            {
-              "id": "embedded-c-volatile-l2-fc-not-order-nonvolatile",
-              "type": "flashcard",
-              "front": "Does volatile order a volatile access relative to surrounding non-volatile accesses?",
-              "back": "No. The compiler only preserves ordering among volatile accesses. Ordinary (non-volatile) reads/writes may be moved across a volatile access.",
-              "hint": "The ordering promise is volatile-to-volatile only."
-            },
-            {
-              "id": "embedded-c-volatile-l2-fc-not-barrier",
-              "type": "flashcard",
-              "front": "Does volatile emit a CPU memory barrier?",
-              "back": "No. It constrains the compiler, not the hardware. The processor's write/store buffer and memory system can still reorder or delay the actual bus transactions; you need DMB/DSB/ISB for that.",
-              "hint": "Compiler ordering is not the same as hardware ordering."
-            },
-            {
-              "id": "embedded-c-volatile-l2-mcq-o2-hang",
+              "id": "embedded-c-volatile-l2-mcq-led-stopped",
               "type": "mcq",
-              "prompt": "A `while (!flag) {}` loop on a non-volatile flag set by an ISR runs fine at -O0 but hangs at -O2. Why?",
+              "prompt": "An LED blinks correctly with optimizations off, but stops blinking once you compile with optimizations on. The poll loop reads a hardware register that is not marked volatile. What happened?",
               "choices": [
-                "The ISR is disabled at -O2",
-                "At -O2 the optimizer caches flag in a register since nothing in the loop writes it, never reloading from memory",
-                "-O2 reorders the ISR after the loop",
-                "The flag variable is placed in flash at -O2"
+                "Optimization turned off the LED hardware",
+                "The optimizer read the register once and reused that stale cached value, so it never sees the bit change — the access was optimized away",
+                "The register address changed when optimizations were enabled",
+                "The compiler deleted the LED entirely"
               ],
               "answerIndex": 1,
-              "explanation": "Without volatile the compiler proves the loop body never modifies flag, so it loads it once into a register and spins on the stale copy. volatile forces a reload of the actual memory each iteration."
+              "explanation": "This is the classic missing-`volatile` bug. With optimizations on, the compiler decided the register couldn't change and cached one read, so the loop spins on a stale value. Marking the register `volatile` forces a real read each time and the LED blinks again.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/embedded-c-volatile-3.svg"
             },
             {
-              "id": "embedded-c-volatile-l2-mcq-what-volatile-fixes",
+              "id": "embedded-c-volatile-l2-mcq-one-job",
               "type": "mcq",
-              "prompt": "Adding volatile to the ISR-shared flag fixes the -O2 hang. What problem does it specifically solve?",
+              "prompt": "What does the `volatile` keyword tell the compiler to do?",
               "choices": [
-                "It makes the read atomic",
-                "It forces an actual memory load on each access instead of reusing a cached register copy",
-                "It inserts a DMB before the load",
-                "It disables interrupts during the read"
+                "Make the variable faster by caching it in a register",
+                "Always perform a real read/write to memory for this value — never cache it or optimize the access away",
+                "Lock the variable so interrupts cannot change it",
+                "Convert the variable to floating point"
               ],
               "answerIndex": 1,
-              "explanation": "volatile's only effect is making each access a real memory access the compiler cannot cache away. It does not add atomicity, barriers, or interrupt masking."
+              "explanation": "`volatile` means every access in the source becomes a real memory access. The compiler must not keep a cached copy or skip the access. It does NOT lock anything or change the type — it only forces the access to actually happen.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/embedded-c-volatile-3.svg"
             },
             {
-              "id": "embedded-c-volatile-l2-mcq-reg-without-volatile",
+              "id": "embedded-c-volatile-l2-mcq-mailbox",
               "type": "mcq",
-              "prompt": "You poll a hardware status bit through a non-volatile register pointer at -O2. The likely result is:",
+              "prompt": "Which everyday phrase best captures what volatile does?",
               "choices": [
-                "The poll works but is slower",
-                "The compiler may read the register once and hoist the check out of the loop, so it never sees the bit change",
-                "A BusFault on the first read",
-                "The compiler inserts a barrier automatically"
+                "\"Remember the last answer; it never changes.\"",
+                "\"Always physically go check the mailbox; don't assume it's the same as last time.\"",
+                "\"Do this only once and skip it after.\"",
+                "\"Make a backup copy and use the copy.\""
               ],
               "answerIndex": 1,
-              "explanation": "Without volatile the compiler treats the register like ordinary memory it can prove is unchanged, hoisting the load out of the loop. The hardware updates the bit but the code never re-reads it. This is the same class of bug as the ISR flag."
+              "explanation": "volatile forces the program to actually check the real value every time, like physically walking to the mailbox each time instead of assuming its contents. The other phrases describe caching or skipping — exactly what volatile prevents.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/embedded-c-volatile-3.svg"
             },
             {
-              "id": "embedded-c-volatile-l2-fc-multiword",
-              "type": "flashcard",
-              "front": "Is a write to a volatile 64-bit variable guaranteed atomic on a 32-bit Cortex-M?",
-              "back": "No. A 64-bit store compiles to two 32-bit stores; an interrupt can observe a half-updated value. volatile does not bundle multi-word accesses into one atomic transaction.",
-              "hint": "Bus width vs object width."
+              "id": "embedded-c-volatile-l2-mcq-why-hardware-changes",
+              "type": "mcq",
+              "prompt": "Why is caching a hardware status register's value dangerous, but caching an ordinary local counter is usually fine?",
+              "choices": [
+                "Hardware registers are always larger than counters",
+                "A hardware register can change on its own (real electronics flip its bits), while an ordinary variable only changes when your code changes it",
+                "Counters live in flash and registers live on the stack",
+                "There is no difference; both are equally dangerous"
+              ],
+              "answerIndex": 1,
+              "explanation": "A status register reflects real hardware and can change at any moment without your code touching it, so a cached copy goes stale. An ordinary local only changes when your code writes it, so the compiler can safely reason about it. That difference is exactly why registers need volatile.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/embedded-c-volatile-3.svg"
             },
             {
-              "id": "embedded-c-volatile-l2-fc-elide-merge",
-              "type": "flashcard",
-              "front": "Name two specific optimizations volatile forbids on the qualified object.",
-              "back": "Eliding a 'redundant' load/store, and merging/coalescing multiple accesses into one. It also forbids caching the value in a register and reordering relative to other volatile accesses.",
-              "hint": "Dead-store elimination and load coalescing."
+              "id": "embedded-c-volatile-l2-mcq-isr-flag",
+              "type": "mcq",
+              "prompt": "An interrupt sets `data_ready = 1`, and `main` runs `while (!data_ready) { }`. If `data_ready` is NOT volatile, what is the likely bug?",
+              "choices": [
+                "The interrupt never runs",
+                "main may cache data_ready as 0 and loop forever, never seeing the interrupt's update",
+                "data_ready is automatically made volatile by the interrupt",
+                "The program crashes immediately at startup"
+              ],
+              "answerIndex": 1,
+              "explanation": "Because main's loop body never writes `data_ready`, the optimizer may read it once and spin on the cached 0, never noticing the interrupt set it to 1. Marking it `volatile` forces main to re-read the real value each loop.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/embedded-c-volatile-3.svg"
+            },
+            {
+              "id": "embedded-c-volatile-l2-mcq-where-volatile-goes",
+              "type": "mcq",
+              "prompt": "Which declaration correctly makes a pointer to a volatile 32-bit register at 0x40020010?",
+              "choices": [
+                "uint32_t *STATUS = (uint32_t *)0x40020010;",
+                "volatile uint32_t *STATUS = (volatile uint32_t *)0x40020010;",
+                "uint32_t STATUS = 0x40020010;",
+                "volatile STATUS = read(0x40020010);"
+              ],
+              "answerIndex": 1,
+              "explanation": "The `volatile` qualifier must apply to what the pointer points at, so accesses through it (`*STATUS`) are never cached. The first option lacks volatile (cache bug); the third stores the address as a plain number, not a usable pointer.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/embedded-c-volatile-3.svg"
+            },
+            {
+              "id": "embedded-c-volatile-l2-mcq-still-runs-debug",
+              "type": "mcq",
+              "prompt": "Why do missing-volatile bugs often hide during debugging and only appear in the optimized 'release' build?",
+              "choices": [
+                "Debug builds use different hardware",
+                "With optimizations off, the compiler tends to re-read memory anyway, so the missing volatile doesn't bite until optimizations let it cache the value",
+                "Release builds disable interrupts",
+                "volatile only exists in debug mode"
+              ],
+              "answerIndex": 1,
+              "explanation": "Unoptimized builds often re-read variables from memory on every use, accidentally doing what volatile would force. Turn on optimizations and the compiler starts caching values in CPU registers, exposing the missing volatile. The behavior should not depend on luck — mark it volatile.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/embedded-c-volatile-3.svg"
+            },
+            {
+              "id": "embedded-c-volatile-l2-mcq-read-also-matters",
+              "type": "mcq",
+              "prompt": "volatile affects which operations on the value?",
+              "choices": [
+                "Only writes to the value",
+                "Only reads of the value",
+                "Both reads and writes — each becomes a real, non-optimizable memory access",
+                "Neither; it only changes the variable's name"
+              ],
+              "answerIndex": 2,
+              "explanation": "volatile forces both reads and writes to actually touch memory. This matters because some hardware reacts to being read (e.g. reading a data register can clear a flag) and to being written. The compiler may not drop or merge either kind of access.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/embedded-c-volatile-3.svg"
             }
           ]
         },
         {
-          "id": "embedded-c-volatile-embedded-c-volatile-l3-barriers-atomics-rmw",
-          "title": "Barriers, Atomics, and RMW Hazards",
+          "id": "embedded-c-volatile-embedded-c-volatile-l3-limits-bits-rmw",
+          "title": "What volatile Does NOT Give, and Working with Bits",
           "order": 3,
           "difficulty": 3,
-          "content": "Since `volatile` gives neither atomicity nor hardware ordering, you close those gaps explicitly.\n\nThe read-modify-write hazard: `GPIO->ODR |= (1u << 5);` reads ODR, ORs, writes back. If an ISR sets bit 6 between the read and the write, your write-back clobbers it. Two fixes. Use a dedicated atomic set/reset register where the hardware provides one -- on Cortex-M the GPIO **BSRR** sets/clears bits in a single write with no read:\n\n```c\nGPIO->BSRR = (1u << 5);          /* atomic set bit 5  */\nGPIO->BSRR = (1u << (5 + 16));   /* atomic clear bit 5 */\n```\n\nOr, for plain RAM shared with an ISR, use a critical section (`__disable_irq()`/`__enable_irq()` or BASEPRI masking), or a C11 `_Atomic` object where the toolchain supports it on your core.\n\nBarriers address *ordering*, and there are two independent kinds. A **compiler barrier** (`asm volatile(\"\" ::: \"memory\");`) stops the compiler reordering memory accesses across it but emits no instruction. A **CPU barrier** is a real instruction: `__DMB()` (Data Memory Barrier) orders memory accesses as seen by the system; `__DSB()` (Data Synchronization Barrier) additionally waits until all prior accesses complete; `__ISB()` (Instruction Synchronization Barrier) flushes the pipeline so newly-written config takes effect.\n\nWhen do you need them on Cortex-M? Typical cases: after writing a register that must fully land before the next step (e.g. enabling a peripheral clock -- `__DSB()` then use it); after reprogramming something that affects instruction fetch or priority masking (`__ISB()`); and around DMA buffer handoff, where you must order CPU writes before kicking the DMA. Single-core Cortex-M is largely in-order for normal memory, so barriers are rarer than on big multicore SoCs -- but write buffers and the specific 'must complete before X' cases above still require them.\n\n```c\nRCC->AHB1ENR |= RCC_GPIOAEN;     /* enable clock  */\n__DSB();                          /* ensure it landed before use */\n(void)RCC->AHB1ENR;               /* read-back also forces completion */\n```",
+          "content": "**Hook.** `volatile` is necessary, but it is not magic. It makes accesses *real*; it does not make them *safe* when two things touch the same value. And most register work is about flipping individual **bits**, which hides a sneaky hazard.\n\n**Build — the limits of volatile.** `volatile` does NOT give you two things people often expect:\n\n- **No atomicity.** An operation like `reg |= mask;` is not a single step. 'Atomic' means all-or-nothing, indivisible. volatile does not make multi-step operations indivisible.\n- **No ordering vs ordinary code or hardware.** volatile keeps volatile accesses in order *relative to each other* in the compiled code, but it does not stop the processor's hardware from reordering or delaying the actual memory traffic, and it does not order a volatile access against nearby non-volatile code.\n\n**Build — bit idioms.** A register is a row of bits. A **mask** like `(1u << 5)` is a value with a single 1 in position 5, used to pick out one bit. The four moves:\n\n```c\nreg |=  (1u << 5);   // SET   bit 5 -> 1\nreg &= ~(1u << 5);   // CLEAR bit 5 -> 0\nreg ^=  (1u << 5);   // TOGGLE bit 5 (flip it)\nif (reg & (1u << 5)) { }   // TEST bit 5\n```\n\n**Build — the read-modify-write hazard.** Look at `reg |= (1u << 5);`. It is really three steps: **read** reg, **OR** in the bit, **write** it back. If an interrupt changes a *different* bit of the same register between your read and your write, your write-back uses the old value and erases the interrupt's change. This is the *read-modify-write (RMW)* hazard, and `volatile` does not fix it.\n\nFixes: use a hardware register designed to set/clear bits in one single write (no read step), or briefly disable interrupts around the operation. **One line on barriers:** when you truly need the hardware itself to finish or order memory accesses, you add a *memory barrier* instruction (e.g. on ARM, `__DMB()`/`__DSB()`) — a separate tool from volatile.\n\n**Recap.** volatile guarantees the access happens, not that it is atomic or ordered against everything. Bits are set/cleared/toggled/tested with masks, and the read-modify-write hazard is fixed with single-write registers, brief interrupt masking, or (for ordering) a memory barrier.",
           "items": [
             {
-              "id": "embedded-c-volatile-l3-fc-rmw-clobber",
-              "type": "flashcard",
-              "front": "How can `port |= bit5;` in main lose a bit that an ISR set?",
-              "back": "It is a read-modify-write. If the ISR sets bit6 after main reads the register but before main writes it back, the write-back uses the stale value and clears bit6 -- a lost update.",
-              "hint": "Interleave the read and the write with the ISR."
-            },
-            {
-              "id": "embedded-c-volatile-l3-fc-bsrr",
-              "type": "flashcard",
-              "front": "How does the Cortex-M GPIO BSRR register avoid the RMW hazard?",
-              "back": "BSRR is write-only with set bits in the low half-word and reset bits in the high half-word. Writing it sets/clears the chosen pins in one bus write with no read step, so it cannot clobber bits the program did not touch.",
-              "hint": "A single write, no read-back, separate set and reset fields."
-            },
-            {
-              "id": "embedded-c-volatile-l3-fc-compiler-vs-cpu-barrier",
-              "type": "flashcard",
-              "front": "Distinguish a compiler barrier from a CPU memory barrier.",
-              "back": "A compiler barrier (asm volatile(\"\" ::: \"memory\")) only stops the compiler reordering memory ops across it and emits no instruction. A CPU barrier (DMB/DSB/ISB) is a real instruction that orders/completes accesses in the hardware itself.",
-              "hint": "One constrains code generation, the other the processor."
-            },
-            {
-              "id": "embedded-c-volatile-l3-fc-dmb-dsb-isb",
-              "type": "flashcard",
-              "front": "What do DMB, DSB, and ISB each do on Cortex-M?",
-              "back": "DMB orders memory accesses (no access after it is observed before accesses before it). DSB also waits until all prior accesses complete. ISB flushes the pipeline so newly written configuration affects subsequent instruction execution.",
-              "hint": "Order vs complete vs flush-the-pipeline."
-            },
-            {
-              "id": "embedded-c-volatile-l3-mcq-which-barrier-clock",
+              "id": "embedded-c-volatile-l3-mcq-not-atomic",
               "type": "mcq",
-              "prompt": "You enable a peripheral clock and immediately write its config register, but the first writes are lost. The standard fix is:",
+              "prompt": "Does marking a register `volatile` make `reg |= mask;` atomic (an all-or-nothing single step)?",
               "choices": [
-                "Mark the config register volatile",
-                "Insert a delay/DSB (or read back the enable register) so the clock-enable completes before the config access",
-                "Wrap the writes in __disable_irq()/__enable_irq()",
-                "Use _Atomic on the enable register"
+                "Yes, volatile makes every operation atomic",
+                "No — volatile only forces the accesses to be real; the read-then-write is still separate steps that something can interrupt",
+                "Yes, but only on 8-bit registers",
+                "Only if mask is a single bit"
               ],
               "answerIndex": 1,
-              "explanation": "The clock-enable write must fully take effect before the peripheral can accept config writes. A DSB or a read-back of the enable register forces completion. volatile, irq masking, and _Atomic address different problems (caching, atomicity)."
+              "explanation": "volatile guarantees the read and the write actually happen, not that they happen as one indivisible step. `reg |= mask;` is still read, modify, write — an interrupt can land in the middle. Atomicity is a separate concern from volatile.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/embedded-c-volatile-5.svg"
             },
             {
-              "id": "embedded-c-volatile-l3-mcq-volatile-not-enough-concurrency",
+              "id": "embedded-c-volatile-l3-mcq-rmw-lost-bit",
               "type": "mcq",
-              "prompt": "Two flags written by main are read by an ISR that depends on the order of the writes. volatile keeps them in order in the generated code, yet the ISR still occasionally sees them reordered. Why, and what fixes it?",
+              "prompt": "main runs `reg |= (1u << 5);`. Between main's read and its write-back, an interrupt sets bit 6 of the same register. What happens to bit 6?",
               "choices": [
-                "The compiler ignores volatile in ISRs; recompile",
-                "The hardware/write buffer can reorder the actual transactions; a DMB between the writes enforces order",
-                "volatile only works on uint32_t; change the type",
-                "Nothing can fix this on Cortex-M"
+                "Bit 6 stays set; both changes survive",
+                "Bit 6 is lost — main's write-back uses the old value it read before bit 6 was set, erasing the interrupt's change",
+                "The program faults",
+                "Bit 5 is lost instead"
               ],
               "answerIndex": 1,
-              "explanation": "volatile preserves order in the instruction stream but emits no barrier, so the memory system/write buffer may still reorder the observable accesses. A DMB between the writes enforces the ordering at the hardware level."
+              "explanation": "This is the read-modify-write hazard. main read the register before bit 6 was set, ORs in bit 5, then writes back the stale value, clearing bit 6. volatile does not help — the three steps still interleave with the interrupt.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/embedded-c-volatile-5.svg"
             },
             {
-              "id": "embedded-c-volatile-l3-mcq-atomic-bit-clear-method",
+              "id": "embedded-c-volatile-l3-mcq-set-bit",
               "type": "mcq",
-              "prompt": "Which is the safest way for main to set one GPIO output bit without disturbing others, on a Cortex-M with a BSRR register?",
+              "prompt": "Which expression SETS bit 5 of `reg` to 1 without disturbing the other bits?",
               "choices": [
-                "ODR |= (1u<<5); with ODR volatile",
-                "Write (1u<<5) to BSRR",
-                "Disable interrupts, then ODR |= (1u<<5);, then enable",
-                "Both B and C are race-free; B needs no critical section"
-              ],
-              "answerIndex": 3,
-              "explanation": "BSRR performs the set in a single non-read-modify-write store, so it is inherently race-free without a critical section. Masking interrupts around the ODR RMW also works but is heavier. The bare volatile RMW (A) is still a race."
-            },
-            {
-              "id": "embedded-c-volatile-l3-fc-atomic-c11",
-              "type": "flashcard",
-              "front": "When is C11 _Atomic an appropriate tool on an MCU, and what is the caveat?",
-              "back": "For lock-free shared variables (e.g. between ISR and main) where the toolchain/core supports the needed atomic ops. Caveat: on small cores some _Atomic operations may lower to libcalls or critical sections, and support varies -- verify the generated code.",
-              "hint": "It is real but check what it compiles to on your target."
-            },
-            {
-              "id": "embedded-c-volatile-l3-fc-critical-section",
-              "type": "flashcard",
-              "front": "What does a __disable_irq()/__enable_irq() critical section protect, and what does it cost?",
-              "back": "It makes a sequence (e.g. an RMW on shared state) indivisible with respect to interrupts by masking them. Cost: it adds interrupt latency/jitter for the duration, so keep critical sections as short as possible.",
-              "hint": "Atomicity by exclusion, paid for in latency."
-            },
-            {
-              "id": "embedded-c-volatile-l3-mcq-isb-use",
-              "type": "mcq",
-              "prompt": "After raising BASEPRI to mask certain interrupt priorities, why might you issue an __ISB()?",
-              "choices": [
-                "To flush the data cache",
-                "To ensure the new masking takes effect before subsequent instructions that depend on it execute",
-                "To make the BASEPRI write atomic",
-                "ISB has no effect on BASEPRI"
+                "reg = (1u << 5);",
+                "reg |= (1u << 5);",
+                "reg &= ~(1u << 5);",
+                "reg ^= (1u << 5);"
               ],
               "answerIndex": 1,
-              "explanation": "Changing priority masking via a system register can require an ISB so the pipeline is flushed and the new mask is in force before dependent instructions run; otherwise an interrupt could slip through the window."
+              "explanation": "`|=` with a one-bit mask forces just that bit to 1 and leaves the rest unchanged. `reg = (1u<<5);` would overwrite ALL bits; `&= ~` clears the bit; `^=` toggles it.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/embedded-c-volatile-4.svg"
+            },
+            {
+              "id": "embedded-c-volatile-l3-mcq-clear-bit",
+              "type": "mcq",
+              "prompt": "Which expression CLEARS bit 5 of `reg` to 0, leaving the others alone?",
+              "choices": [
+                "reg &= ~(1u << 5);",
+                "reg |= (1u << 5);",
+                "reg ^= (1u << 5);",
+                "reg = 0;"
+              ],
+              "answerIndex": 0,
+              "explanation": "`~(1u<<5)` is all 1s except a 0 in position 5. ANDing with it forces bit 5 to 0 and keeps every other bit. `reg = 0;` would clear the whole register, not just one bit.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/embedded-c-volatile-4.svg"
+            },
+            {
+              "id": "embedded-c-volatile-l3-mcq-toggle-bit",
+              "type": "mcq",
+              "prompt": "How do you TOGGLE bit 5 (flip 0 to 1 or 1 to 0)?",
+              "choices": [
+                "reg |= (1u << 5);",
+                "reg &= ~(1u << 5);",
+                "reg ^= (1u << 5);",
+                "reg += (1u << 5);"
+              ],
+              "answerIndex": 2,
+              "explanation": "Exclusive-OR (`^=`) with a one-bit mask flips that bit each time: 0 becomes 1, 1 becomes 0. `|=` only ever sets, `&= ~` only clears, and `+=` can carry into neighboring bits — not a clean toggle.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/embedded-c-volatile-4.svg"
+            },
+            {
+              "id": "embedded-c-volatile-l3-mcq-test-bit",
+              "type": "mcq",
+              "prompt": "How do you TEST whether bit 5 of `reg` is currently 1?",
+              "choices": [
+                "if (reg == 5)",
+                "if (reg & (1u << 5))",
+                "if (reg | (1u << 5))",
+                "if (reg = (1u << 5))"
+              ],
+              "answerIndex": 1,
+              "explanation": "ANDing with the mask keeps only bit 5; the result is non-zero (true) exactly when bit 5 is 1. `==` compares the whole value; `|` always yields a set bit; and `=` is assignment, a common bug.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/embedded-c-volatile-4.svg"
+            },
+            {
+              "id": "embedded-c-volatile-l3-mcq-rmw-fix",
+              "type": "mcq",
+              "prompt": "What is a correct way to set one bit safely so an interrupt can't clobber another bit during a read-modify-write?",
+              "choices": [
+                "Just add volatile to the register",
+                "Use a hardware register that sets/clears bits in a single write (no read step), or briefly disable interrupts around the change",
+                "Read the register twice in a row",
+                "Use a floating-point variable"
+              ],
+              "answerIndex": 1,
+              "explanation": "The hazard comes from the separate read and write. A single-write set/clear register removes the read step entirely, and briefly masking interrupts makes the read-modify-write indivisible. volatile alone does nothing for this — it only forces the accesses to be real.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/embedded-c-volatile-5.svg"
+            },
+            {
+              "id": "embedded-c-volatile-l3-mcq-ordering-barrier",
+              "type": "mcq",
+              "prompt": "You need the processor itself to actually finish and order some memory writes to hardware. Which tool is that, and does volatile provide it?",
+              "choices": [
+                "volatile provides it automatically",
+                "A memory barrier instruction (e.g. ARM __DMB/__DSB) — volatile does NOT emit one",
+                "A larger data type provides it",
+                "Disabling the LED provides it"
+              ],
+              "answerIndex": 1,
+              "explanation": "volatile constrains the compiler's ordering of volatile accesses, but it emits no instruction, so the hardware can still reorder or delay the real memory traffic. To force the processor to order/complete accesses you add a memory barrier such as __DMB/__DSB — a separate tool.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/embedded-c-volatile-5.svg"
+            },
+            {
+              "id": "embedded-c-volatile-l3-mcq-mask-meaning",
+              "type": "mcq",
+              "prompt": "What is the value of the mask `(1u << 5)` and what is it for?",
+              "choices": [
+                "The number 5; it counts bits",
+                "A value with a single 1 in bit position 5 (binary 00100000); it picks out that one bit",
+                "All bits set to 1; it clears the register",
+                "A pointer to bit 5"
+              ],
+              "answerIndex": 1,
+              "explanation": "`1u << 5` shifts a single 1 left five places, giving 00100000 (decimal 32). That single-1 'mask' lets bitwise operators act on exactly bit 5 and no others. It is not the number 5 and not a pointer.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/embedded-c-volatile-4.svg"
             }
           ]
         },
         {
-          "id": "embedded-c-volatile-embedded-c-volatile-l4-types-packing-overlay",
-          "title": "Fixed-Width Types, Packed Structs & Register Overlays",
+          "id": "embedded-c-volatile-embedded-c-volatile-l4-types-and-structs",
+          "title": "Fixed-Width Types, bool, and Register Structs",
           "order": 4,
           "difficulty": 3,
-          "content": "Embedded layout work demands precise types. Always use `<stdint.h>` fixed-width types (`uint32_t`, `int16_t`, ...) for registers and protocol fields -- never plain `int`/`long`, whose width is implementation-defined and whose signedness/promotion rules cause silent bugs. Use `bool` from `<stdbool.h>` for flags.\n\nThe register-block overlay pattern maps a whole peripheral as a `volatile` struct, with each field at the byte offset from the reference manual:\n\n```c\ntypedef struct {\n    volatile uint32_t MODER;   /* +0x00 */\n    volatile uint32_t OTYPER;  /* +0x04 */\n    uint32_t          _rsv0[3];/* padding to next field's offset */\n    volatile uint32_t ODR;     /* +0x14 */\n    volatile uint32_t BSRR;    /* +0x18 */\n} GPIO_TypeDef;\n\n#define GPIOA ((GPIO_TypeDef *)0x40020000UL)\nGPIOA->BSRR = (1u << 5);       /* atomic set, named access */\n```\n\nThe layout only matches the hardware if every field lands at the right offset, so you insert reserved padding members and rely on the natural alignment of `uint32_t`. **Do not** reach for register layout with bitfields: C does not standardize bitfield ordering or straddling, so portable register access uses explicit masks/shifts, not `struct { uint32_t a:1; ... }`.\n\nPacked structs (`__attribute__((packed))`) are for *protocol/wire* layout, where you must match an exact byte sequence with no padding. The trap: a packed struct can place a multi-byte field on an unaligned address. Taking a pointer to that field and dereferencing it as a normal `uint32_t*` triggers an unaligned access -- which on Cortex-M0/M0+ (and for some access types) is a HardFault, and elsewhere is slower. Read packed fields by value (the compiler emits safe byte accesses) or `memcpy` them out; never alias an unaligned member with a wide pointer. And remember endianness: a packed struct over a wire does not byte-swap for you.",
+          "content": "**Hook.** When you talk to hardware, the *size* of a value matters as much as the value itself. A 32-bit register must be read and written as a 32-bit value. Plain C types don't promise a fixed size — so embedded code uses special ones.\n\n**Build — fixed-width types.** The type `int` does not have a guaranteed size: on one chip it may be 16 bits, on another 32. For hardware that is unacceptable. The header `<stdint.h>` gives **fixed-width types** that say exactly how many bits a box has:\n\n```c\n#include <stdint.h>\nuint8_t  small;   // exactly 8 bits, 0..255\nuint16_t medium;  // exactly 16 bits\nuint32_t big;     // exactly 32 bits (matches a 32-bit register)\n```\n\nThe `u` means unsigned (no negatives). For a simple true/false flag, `<stdbool.h>` gives **`bool`** with the values `true` and `false`. Using these makes your intent and your sizes exact and portable across chips.\n\n**Build — register structs (overlay).** Instead of casting many separate addresses, a common pattern lays a **`volatile` struct** over a peripheral's whole block of registers. Each field sits at the right byte offset, so you can name registers instead of juggling raw addresses:\n\n```c\ntypedef struct {\n    volatile uint32_t MODER;   // at offset +0x00\n    volatile uint32_t OTYPER;  // at offset +0x04\n    uint32_t          _reserved[3];  // padding to line up offsets\n    volatile uint32_t ODR;     // at offset +0x14\n} GPIO_TypeDef;\n\n#define GPIOA ((GPIO_TypeDef *)0x40020000)\nGPIOA->ODR = 32;   // clear, named access to the right register\n```\n\nA related keyword, **packed** (`__attribute__((packed))`), tells the compiler to remove the gaps it normally inserts between struct fields. It is used to match an exact byte layout coming over a wire. The catch: a packed field can land at an odd address, and reading it through a wide pointer can cause an *unaligned access* fault on some chips — so read packed fields carefully (by value or by copying). For mapping registers, you use the natural-alignment struct above, not packing.\n\n**Recap.** Use `<stdint.h>` fixed-width types (`uint8_t`/`uint16_t`/`uint32_t`) so sizes match the hardware, `bool` for flags, and a `volatile` struct overlay to name a peripheral's registers. Packed structs are for exact wire layouts and carry an alignment trap.",
           "items": [
             {
-              "id": "embedded-c-volatile-l4-fc-why-fixed-width",
-              "type": "flashcard",
-              "front": "Why use uint32_t instead of unsigned int for a register or protocol field?",
-              "back": "int/long widths are implementation-defined; fixed-width types from <stdint.h> guarantee exact size and signedness, so layout and arithmetic behave identically across compilers and targets.",
-              "hint": "Portability and exact size."
-            },
-            {
-              "id": "embedded-c-volatile-l4-fc-overlay-pattern",
-              "type": "flashcard",
-              "front": "Describe the volatile struct register-overlay pattern.",
-              "back": "Define a struct whose volatile fields sit at the reference manual's byte offsets (with reserved padding members), then #define the peripheral as a pointer to that struct at its base address. Access registers by name: PERIPH->REG.",
-              "hint": "Struct layout mirrors the memory map; base address cast to the struct pointer."
-            },
-            {
-              "id": "embedded-c-volatile-l4-fc-reserved-padding",
-              "type": "flashcard",
-              "front": "Why do register-overlay structs contain reserved/dummy array members?",
-              "back": "To pad gaps so each real register field lands at its exact datasheet offset. Without the padding the struct's fields would not line up with the hardware addresses.",
-              "hint": "Offsets must match the memory map exactly."
-            },
-            {
-              "id": "embedded-c-volatile-l4-mcq-no-bitfields-for-registers",
+              "id": "embedded-c-volatile-l4-mcq-why-fixed-width",
               "type": "mcq",
-              "prompt": "Why are C bitfields a poor choice for mapping a hardware register's individual bits portably?",
+              "prompt": "Why use `uint32_t` instead of plain `int` for a 32-bit hardware register?",
               "choices": [
-                "Bitfields cannot be volatile",
-                "The C standard does not fix bitfield allocation order, straddling, or storage-unit layout, so the bit positions are not guaranteed to match the hardware",
-                "Bitfields always generate a HardFault",
-                "Bitfields force 64-bit accesses"
+                "uint32_t is always faster than int",
+                "int has no guaranteed size (it may be 16 or 32 bits on different chips), while uint32_t is always exactly 32 bits to match the register",
+                "int cannot be unsigned",
+                "uint32_t automatically becomes volatile"
               ],
               "answerIndex": 1,
-              "explanation": "Bitfield layout (order within a unit, straddling, alignment) is implementation-defined. Portable register code uses explicit masks and shifts on a fixed-width volatile word instead."
+              "explanation": "The width of `int` is not fixed by C — it varies by platform. A register has a definite size, so you use a fixed-width type like `uint32_t` to match it exactly. It is about size correctness, not speed, and uint32_t is not automatically volatile.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/embedded-c-volatile-6.svg"
             },
             {
-              "id": "embedded-c-volatile-l4-mcq-packed-unaligned-fault",
+              "id": "embedded-c-volatile-l4-mcq-uint8-range",
               "type": "mcq",
-              "prompt": "A __packed struct places a uint32_t field at an odd offset. You do `uint32_t *p = &s.field; uint32_t v = *p;` on a Cortex-M0+. What happens?",
+              "prompt": "How many bits does `uint8_t` hold, and what range of values can it store?",
               "choices": [
-                "It works because Cortex-M handles all unaligned accesses",
-                "An unaligned word access that HardFaults on M0/M0+ (which lack unaligned-access support for this case)",
-                "The compiler swaps endianness automatically",
-                "It always works but is just slower"
+                "8 bits, 0 to 255",
+                "8 bytes, 0 to 8",
+                "16 bits, -32768 to 32767",
+                "It depends on the chip"
+              ],
+              "answerIndex": 0,
+              "explanation": "`uint8_t` is exactly 8 bits and unsigned, so it stores 0 through 255. The whole point of the fixed-width types is that the answer does NOT depend on the chip — that's why embedded code prefers them.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/embedded-c-volatile-6.svg"
+            },
+            {
+              "id": "embedded-c-volatile-l4-mcq-stdint-header",
+              "type": "mcq",
+              "prompt": "Which header do you include to get `uint8_t`, `uint16_t`, and `uint32_t`?",
+              "choices": [
+                "<stdio.h>",
+                "<stdint.h>",
+                "<stdbool.h>",
+                "<volatile.h>"
               ],
               "answerIndex": 1,
-              "explanation": "Taking a wide pointer to a misaligned packed member and dereferencing it does a single unaligned word load. Cortex-M0/M0+ fault on it. Read the field by value or memcpy so the compiler emits safe byte-wise accesses."
+              "explanation": "`<stdint.h>` defines the fixed-width integer types. `<stdbool.h>` provides `bool`/`true`/`false`, `<stdio.h>` is for input/output, and there is no `<volatile.h>` — volatile is a built-in keyword.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/embedded-c-volatile-6.svg"
+            },
+            {
+              "id": "embedded-c-volatile-l4-mcq-bool",
+              "type": "mcq",
+              "prompt": "What is `bool` (from <stdbool.h>) best used for in embedded code?",
+              "choices": [
+                "Storing a 32-bit register value",
+                "Holding a simple true/false flag",
+                "Pointing to an address",
+                "Replacing all integers"
+              ],
+              "answerIndex": 1,
+              "explanation": "`bool` expresses a simple yes/no condition with the values `true` and `false`, making flag code clear. For a multi-bit register value you'd use a fixed-width integer like uint32_t, not bool.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/embedded-c-volatile-6.svg"
+            },
+            {
+              "id": "embedded-c-volatile-l4-mcq-overlay-purpose",
+              "type": "mcq",
+              "prompt": "What is the point of laying a `volatile` struct over a peripheral's register block?",
+              "choices": [
+                "It makes the registers run faster",
+                "It lets you access registers by clear names (like GPIOA->ODR) instead of juggling many raw addresses, with each field at its correct offset",
+                "It copies the registers into RAM",
+                "It removes the need for volatile"
+              ],
+              "answerIndex": 1,
+              "explanation": "The struct overlay maps each register to a named field at the right byte offset, so code reads cleanly as `PERIPH->REG`. The fields are still `volatile` so accesses stay real; the overlay is about readability, not speed.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/embedded-c-volatile-1.svg"
+            },
+            {
+              "id": "embedded-c-volatile-l4-mcq-reserved-fields",
+              "type": "mcq",
+              "prompt": "Why do register-overlay structs include `_reserved` padding array members?",
+              "choices": [
+                "To store backup copies of registers",
+                "To fill gaps so each real register field lands at its exact byte offset from the manual",
+                "To make the struct atomic",
+                "They are leftover bugs and can be deleted"
+              ],
+              "answerIndex": 1,
+              "explanation": "The hardware fixes each register's address. Padding members fill the gaps between used registers so every field lines up with its exact offset. Remove them and the fields would point at the wrong addresses.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/embedded-c-volatile-1.svg"
             },
             {
               "id": "embedded-c-volatile-l4-mcq-packed-purpose",
               "type": "mcq",
-              "prompt": "What is the correct use of __attribute__((packed))?",
+              "prompt": "What does `__attribute__((packed))` do to a struct, and when is it used?",
               "choices": [
-                "To map memory-mapped peripheral registers",
-                "To force atomic access to a struct",
-                "To match an exact on-the-wire/protocol byte layout with no compiler padding",
-                "To make a struct fit in a CPU register"
+                "It removes the gaps (padding) between fields to match an exact byte layout, e.g. a message coming over a wire",
+                "It makes the struct volatile",
+                "It is the normal way to map hardware registers",
+                "It encrypts the struct"
               ],
-              "answerIndex": 2,
-              "explanation": "Packing removes inter-field padding so the struct matches an external byte layout (a protocol frame, a flash record). Register overlays use natural alignment, not packing; packing registers would invite unaligned faults."
+              "answerIndex": 0,
+              "explanation": "Packing removes the padding the compiler normally inserts, so the struct matches an exact external byte layout (a protocol frame). Register overlays use natural alignment, not packing — packing registers can cause unaligned-access faults.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/embedded-c-volatile-1.svg"
             },
             {
-              "id": "embedded-c-volatile-l4-fc-safe-packed-read",
-              "type": "flashcard",
-              "front": "How do you safely read a multi-byte field out of a packed struct?",
-              "back": "Read it by value (member access) so the compiler emits aligned/byte-wise accesses, or memcpy the bytes into a properly aligned variable. Never take a wide pointer to a possibly-unaligned member and dereference it.",
-              "hint": "By value or memcpy, not by aliasing a wide pointer."
-            },
-            {
-              "id": "embedded-c-volatile-l4-fc-endianness-packed",
-              "type": "flashcard",
-              "front": "Does a packed struct over a serial link handle endianness for you?",
-              "back": "No. Packing only removes padding. Multi-byte fields are stored in the target's native byte order; you must byte-swap explicitly to match the wire/protocol endianness.",
-              "hint": "Packing != byte-swapping."
-            },
-            {
-              "id": "embedded-c-volatile-l4-mcq-integer-promotion",
+              "id": "embedded-c-volatile-l4-mcq-packed-trap",
               "type": "mcq",
-              "prompt": "`uint8_t a = 0xFF, b = 0xFF; if ((a + b) > 0xFF) ...` -- why does this behave differently than a naive 8-bit mental model?",
+              "prompt": "What is the main hazard of a packed struct?",
               "choices": [
-                "a + b overflows uint8_t and wraps to 0xFE",
-                "Both operands are promoted to int, so a + b is 0x1FE (510) and the comparison is true",
-                "The comparison is undefined behavior",
-                "uint8_t arithmetic saturates at 0xFF"
+                "It uses too much memory",
+                "A field can land at an odd (unaligned) address, and reading it through a wide pointer can cause an unaligned-access fault on some chips",
+                "It cannot hold integers",
+                "It makes the program too fast"
               ],
               "answerIndex": 1,
-              "explanation": "Integer promotion widens both uint8_t operands to int before the addition, giving 0x1FE, not a wrapped 8-bit value. Forgetting promotion is a common source of mask/shift and overflow bugs; it is merely sloppy on a desktop but can be fatal in firmware."
-            },
-            {
-              "id": "embedded-c-volatile-l4-fc-static-storage",
-              "type": "flashcard",
-              "front": "What does declaring a large ISR-shared buffer `static` (file scope) gain you over a local?",
-              "back": "Static storage duration: it lives in .bss/.data (fixed address, zero-initialized), not on the stack, so it persists across calls and avoids blowing a tiny stack. Combine with volatile if an ISR/DMA touches it.",
-              "hint": "Where it is stored and how long it lives."
+              "explanation": "Removing padding can place a multi-byte field at a misaligned address. Reaching it through a wide pointer may trigger an unaligned-access fault on chips that don't allow it. Read packed fields by value or by copying so the compiler emits safe accesses.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/embedded-c-volatile-1.svg"
             }
           ]
         }
