@@ -4,255 +4,705 @@
   "order": 7,
   "lessons": [
     {
-      "id": "timers-pwm-l1-fundamentals",
-      "title": "Counter Fundamentals: Clock, Prescaler, Auto-Reload",
+      "id": "timers-pwm-l1-what-is-a-timer",
+      "title": "What a Timer Is: Counting Ticks Automatically",
       "order": 1,
       "difficulty": 1,
-      "content": "At its core a hardware timer is a free-running **counter register** (`CNT`) that increments (or decrements) on each tick of a clock. Three knobs turn that raw clock into a useful time base.\n\n**Clock source.** The counter is driven by a timer clock $f_{clk}$ derived from the bus clock (APB on STM32). Note the APB-timer-clock doubling quirk: if an APB prescaler $>1$ is set, the timer clock is *twice* the bus clock.\n\n**Prescaler (`PSC`).** A 16-bit divider that slows the input clock. The counter advances at\n\n$$f_{cnt} = \\frac{f_{clk}}{PSC + 1}$$\n\nThe $+1$ matters: writing `PSC=0` divides by 1, not 0.\n\n**Auto-reload (`ARR`).** The counter counts $0 \\to ARR$, then an **update event** reloads it to 0 (up-counting). So the overflow/period frequency is\n\n$$f_{period} = \\frac{f_{clk}}{(PSC+1)(ARR+1)}$$\n\nFor a 84 MHz timer clock, `PSC=83`, `ARR=999` gives $84\\times10^6 / (84 \\cdot 1000) = 1\\text{ kHz}$.\n\n**Resolution vs range.** `ARR` sets how many ticks make a period — that is your duty/timing *resolution*. The prescaler trades resolution for *range*: a big `PSC` lets you reach slow periods but coarsens each tick. As an ex-radar tech you will recognize this as the same range-bin vs unambiguous-range tradeoff. Pick the smallest `PSC` that still lets `ARR` fit in its register (16- or 32-bit) for the longest period you need.",
+      "content": "Think of a kitchen timer: you set it, walk away, and later it dings. You did not sit there counting seconds. A microcontroller (the small computer chip, or MCU, that runs embedded gadgets) has the same helper built in, called a **timer**.\n\n**A timer is just a counter that ticks up by itself.** The chip has a steady internal clock, like a metronome, producing a stream of pulses (\"ticks\"). The timer counts those ticks in a special memory slot called the **count register** (often written `CNT`). The key idea: this counting happens in hardware, automatically, so the main program (the CPU) does not have to sit in a loop counting. The CPU is free to do other work and can check the timer or be interrupted by it later.\n\n**Why bother?** Counting time in software is wasteful and inaccurate. A hardware timer keeps perfect, steady time in the background. That lets the MCU measure how long something takes, or make something happen at a precise, regular rate.\n\n**The clock is usually too fast.** The raw chip clock might tick millions of times per second, far faster than you need. So a timer has a **prescaler**: a divider that slows the incoming clock down. Set the prescaler to divide by 1000 and the counter advances 1000 times slower. (We will set how high it counts in the next lesson.)\n\n**Recap:** a timer is a hardware counter that automatically counts ticks from the chip's clock; a prescaler divides that clock to a slower, more useful rate. This frees the CPU from counting time itself.",
       "items": [
         {
-          "id": "timers-pwm-l1-fc-period",
-          "type": "flashcard",
-          "front": "Write the timer period (overflow) frequency in terms of f_clk, PSC, and ARR.",
-          "back": "f_period = f_clk / ((PSC+1)(ARR+1)). Both registers are off-by-one dividers, hence the +1 on each."
-        },
-        {
-          "id": "timers-pwm-l1-fc-psc-plus1",
-          "type": "flashcard",
-          "front": "Why is there a +1 on the prescaler value in the frequency formula?",
-          "back": "The prescaler divides by (PSC+1), so PSC=0 divides by 1. The register holds 'divisor minus one' to allow a divide-by-1 and to use the full 16-bit range (1..65536).",
-          "hint": "Think about what PSC=0 should mean."
-        },
-        {
-          "id": "timers-pwm-l1-fc-arr-role",
-          "type": "flashcard",
-          "front": "What event happens when the up-counter reaches ARR, and what is it called?",
-          "back": "On reaching ARR the next tick generates an Update Event (UEV): the counter reloads to 0, shadow registers (ARR/CCR/PSC) are latched, and the update interrupt/DMA request can fire."
-        },
-        {
-          "id": "timers-pwm-l1-fc-res-range",
-          "type": "flashcard",
-          "front": "How do PSC and ARR each affect resolution vs range of a time base?",
-          "back": "ARR sets the number of ticks per period = timing/duty resolution. PSC slows each tick to extend the achievable period (range) but coarsens resolution. Minimize PSC so ARR carries the count."
-        },
-        {
-          "id": "timers-pwm-l1-fc-clk-quirk",
-          "type": "flashcard",
-          "front": "On STM32, what happens to the timer clock relative to the APB bus clock when the APB prescaler is > 1?",
-          "back": "The timer kernel clock is DOUBLED: f_timer = 2 x f_APB when the APB prescaler is not 1. A classic 2x frequency-off bug if you forget it."
-        },
-        {
-          "id": "timers-pwm-l1-mcq-compute",
+          "id": "timers-pwm-l1-mcq-define",
           "type": "mcq",
-          "prompt": "Timer clock is 72 MHz. You set PSC=71 and ARR=999. What is the update (period) frequency?",
-          "choices": ["1 kHz", "1 MHz", "100 Hz", "72 kHz"],
-          "answerIndex": 0,
-          "explanation": "f = 72e6 / ((71+1)(999+1)) = 72e6 / (72 x 1000) = 1000 Hz = 1 kHz."
-        },
-        {
-          "id": "timers-pwm-l1-mcq-psc-for-1mhz",
-          "type": "mcq",
-          "prompt": "From an 84 MHz timer clock you want the counter to tick at exactly 1 MHz (1 us per tick). What PSC value achieves this?",
-          "choices": ["83", "84", "1000000", "42"],
-          "answerIndex": 0,
-          "explanation": "f_cnt = f_clk/(PSC+1). For 1 MHz: PSC+1 = 84e6/1e6 = 84, so PSC = 83."
-        },
-        {
-          "id": "timers-pwm-l1-mcq-resolution",
-          "type": "mcq",
-          "prompt": "You need a 50 Hz PWM with the finest possible duty resolution from an 84 MHz clock using a 16-bit ARR. Which approach is best?",
+          "prompt": "In the simplest terms, what is a hardware timer in a microcontroller?",
           "choices": [
-            "Use the smallest PSC such that ARR still fits in 16 bits (largest ARR)",
-            "Use the largest possible PSC to keep ARR small",
-            "Set PSC=ARR for symmetry",
-            "Set ARR=49 so the number matches the frequency"
+            "A counter that automatically counts ticks from the chip's clock, in hardware",
+            "A software loop the CPU runs to count seconds",
+            "A clock you read off the screen to tell the time of day",
+            "A type of memory used only to store program code"
           ],
           "answerIndex": 0,
-          "explanation": "Resolution = number of ticks per period = ARR+1. Maximize ARR (minimize PSC) while ARR <= 65535. 84e6/50 = 1,680,000 ticks; with PSC=25 -> ARR=64615, which fits and gives ~16-bit duty resolution."
+          "explanation": "A timer is a hardware counter that ticks up on its own from the chip's clock. The whole point is that it counts WITHOUT the CPU running a software loop, so the CPU stays free for other work.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-2.svg"
         },
         {
-          "id": "timers-pwm-l1-mcq-direction",
+          "id": "timers-pwm-l1-mcq-why-hardware",
           "type": "mcq",
-          "prompt": "In center-aligned (up-down) counting mode versus edge-aligned (up only), the effective period for the same ARR is:",
+          "prompt": "Why is using a hardware timer better than having the CPU count time in a software loop?",
           "choices": [
-            "Roughly doubled, because the counter ramps up then back down",
-            "Halved",
-            "Identical",
-            "Determined only by PSC"
+            "The hardware keeps steady, accurate time in the background and frees the CPU to do other work",
+            "Software loops cannot count past 100",
+            "The CPU is physically unable to add numbers",
+            "Hardware timers use no electricity at all"
           ],
           "answerIndex": 0,
-          "explanation": "Center-aligned counts 0->ARR then ARR->0, so it traverses ~2xARR ticks per period, roughly doubling the period (and halving the PWM frequency) compared to edge-aligned."
+          "explanation": "A software counting loop ties up the CPU and drifts in accuracy. The hardware timer counts steadily on its own in the background, so the CPU is free and the timing stays precise.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-2.svg"
+        },
+        {
+          "id": "timers-pwm-l1-mcq-cnt",
+          "type": "mcq",
+          "prompt": "What does the count register (CNT) hold?",
+          "choices": [
+            "The timer's current count value, which goes up as ticks arrive",
+            "The address of the program in flash memory",
+            "The voltage on a pin",
+            "The name of the connected device"
+          ],
+          "answerIndex": 0,
+          "explanation": "CNT is the running count. Each tick from the (prescaled) clock increases it. The other choices describe unrelated things; CNT is simply where the timer keeps its current number.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-2.svg"
+        },
+        {
+          "id": "timers-pwm-l1-mcq-prescaler-role",
+          "type": "mcq",
+          "prompt": "What does the prescaler do?",
+          "choices": [
+            "It divides (slows down) the incoming clock before it reaches the counter",
+            "It speeds the clock up so the counter ticks faster",
+            "It decides which pin the timer controls",
+            "It stores the count when the timer overflows"
+          ],
+          "answerIndex": 0,
+          "explanation": "The prescaler is a divider. It slows the fast chip clock to a more useful rate before the counter sees it. It does not speed anything up, and it does not pick pins.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-2.svg"
+        },
+        {
+          "id": "timers-pwm-l1-mcq-prescaler-effect",
+          "type": "mcq",
+          "prompt": "A clock ticks 8,000,000 times per second. You set the prescaler to divide by 8. How fast does the counter now advance?",
+          "choices": [
+            "1,000,000 ticks per second",
+            "64,000,000 ticks per second",
+            "8,000,000 ticks per second",
+            "8 ticks per second"
+          ],
+          "answerIndex": 0,
+          "explanation": "Dividing 8,000,000 by 8 gives 1,000,000 counts per second. Dividing slows the rate down; it does not multiply (that would be 64,000,000) or leave it unchanged.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-2.svg"
+        },
+        {
+          "id": "timers-pwm-l1-mcq-analogy",
+          "type": "mcq",
+          "prompt": "Which everyday object is the closest analogy to a hardware timer?",
+          "choices": [
+            "A kitchen timer that counts down on its own and dings, while you do other things",
+            "A calculator you press buttons on for each sum",
+            "A light switch you flip by hand",
+            "A ruler used to measure length"
+          ],
+          "answerIndex": 0,
+          "explanation": "A kitchen timer runs on its own and alerts you later, just as a hardware timer counts in the background and can fire an event. A calculator and light switch both need you to act each time; a ruler measures distance, not time.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-2.svg"
+        },
+        {
+          "id": "timers-pwm-l1-mcq-cpu-free",
+          "type": "mcq",
+          "prompt": "While a hardware timer is counting in the background, what can the CPU do?",
+          "choices": [
+            "Run other parts of the program; it does not need to watch the timer tick by tick",
+            "Nothing; it must stay frozen until the timer finishes",
+            "Only count the same ticks itself to stay in sync",
+            "Turn the clock off"
+          ],
+          "answerIndex": 0,
+          "explanation": "Because the counting is done in hardware, the CPU is free to do other work and can be notified later. It does not have to freeze or shadow-count the ticks.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-2.svg"
+        },
+        {
+          "id": "timers-pwm-l1-mcq-clock-too-fast",
+          "type": "mcq",
+          "prompt": "Why does a timer usually need a prescaler at all, rather than counting the raw clock directly?",
+          "choices": [
+            "The raw chip clock is often far faster than needed, so it must be slowed to a useful rate",
+            "The raw clock is too slow and must be sped up",
+            "Counters can only count even numbers without one",
+            "Pins cannot turn on unless the prescaler is set"
+          ],
+          "answerIndex": 0,
+          "explanation": "Chip clocks tick millions of times per second. The prescaler divides that down so the counter advances at a rate you can actually work with. It is about slowing a too-fast clock, not speeding a slow one.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-2.svg"
+        },
+        {
+          "id": "timers-pwm-l1-mcq-where-counting",
+          "type": "mcq",
+          "prompt": "Where does the actual counting happen in a hardware timer?",
+          "choices": [
+            "In dedicated hardware inside the chip, separate from the CPU running the program",
+            "Inside the C program's main loop, one count per line of code",
+            "On the host computer used to write the code",
+            "In the power supply"
+          ],
+          "answerIndex": 0,
+          "explanation": "The timer is dedicated hardware on the chip. It counts independently of the CPU and the program loop, which is exactly why it can keep accurate time without slowing the program down.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-2.svg"
         }
       ]
     },
     {
-      "id": "timers-pwm-l2-pwm-capture",
-      "title": "PWM Generation and Input Capture",
+      "id": "timers-pwm-l2-periodic-tick",
+      "title": "Making a Steady Tick: Auto-Reload, SysTick, and a millis() Clock",
       "order": 2,
-      "difficulty": 3,
-      "content": "With a time base running, the **capture/compare** channels turn a timer into an actuator or a measurement instrument.\n\n**Output compare / PWM.** Each channel has a compare register `CCR`. In edge-aligned PWM the output is high while `CNT < CCR` and low otherwise (PWM mode 1), so\n\n$$\\text{duty} = \\frac{CCR}{ARR + 1}$$\n\nWrite `CCR` to set duty without touching frequency. See the diagram for the ramp-vs-output relationship.\n\n**Alignment.** *Edge-aligned* (sawtooth) is simplest. *Center-aligned* (up/down) keeps the pulse centered in the period, which lowers harmonic content and is preferred for motor/inverter drive.\n\n**Dead-time.** Complementary outputs (`OCx` / `OCxN`) drive a half-bridge. A programmable **dead-time** delays the turn-on of one transistor after the other turns off, preventing shoot-through (both FETs conducting and shorting the rail). Advanced-control timers (TIM1/TIM8) provide this plus a break input for fault shutdown.\n\n**Input capture.** Configure a channel to latch `CNT` into `CCR` on a selected edge. Capturing successive rising edges gives the period in ticks; frequency is\n\n$$f_{in} = \\frac{f_{clk}}{(PSC+1)\\,\\Delta CNT}$$\n\nwhere $\\Delta CNT$ is the tick count between captures (handle wrap with the update-overflow count). **PWM-input mode** wires two channels to one pin to measure period and high-time (duty) simultaneously — exactly how you would time an ultrasonic echo or tachometer pulse.",
+      "difficulty": 2,
+      "content": "Now we make the timer do something useful: fire an event at a steady rate, like a heartbeat. This steady event is called a **periodic tick**.\n\n**The auto-reload value sets the top.** A counter does not count up forever. You set a top value, called the **auto-reload** value (`ARR`, for Auto-Reload Register). The counter climbs 0, 1, 2, ... up to that top, and on the next tick it **wraps back to 0** and fires an **event**. This wrap-and-fire is the moment the timer signals \"a period just finished.\" That event can trigger an **interrupt** (a signal that briefly pauses the CPU so it can run a small handler routine).\n\n**Working out the rate.** The counter advances at (clock / prescaler). It wraps after counting (auto-reload + 1) steps (the +1 is because counting includes 0). So:\n\n$$\\text{event rate} = \\frac{\\text{clock}}{(\\text{prescaler}) \\times (\\text{auto-reload} + 1)}$$\n\nExample: a 1,000,000-ticks-per-second counter with auto-reload = 999 wraps after 1000 steps, firing 1000 times per second, i.e. once every 1 millisecond (ms).\n\n**SysTick.** Most MCUs include a small standard timer called **SysTick** dedicated to this job. It is the usual source of the regular \"system tick\" (commonly every 1 ms).\n\n**Building a clock from ticks.** Keep a variable and add 1 to it in the tick handler. With a 1 ms tick, that variable counts milliseconds since power-on. That is exactly what the popular `millis()` function returns; counting a faster tick gives `micros()` (microseconds, millionths of a second).\n\n**Recap:** the auto-reload value sets how high the counter goes before wrapping and firing a periodic event; counting those events lets you keep time.",
       "items": [
         {
-          "id": "timers-pwm-l2-fc-duty",
-          "type": "flashcard",
-          "front": "In edge-aligned PWM mode 1, give the duty cycle in terms of CCR and ARR.",
-          "back": "duty = CCR / (ARR+1). The output is high while CNT < CCR. Changing CCR adjusts duty without changing the period set by ARR/PSC.",
+          "id": "timers-pwm-l2-mcq-arr-role",
+          "type": "mcq",
+          "prompt": "What does the auto-reload value (ARR) decide?",
+          "choices": [
+            "How high the counter climbs before it wraps back to 0 and fires an event",
+            "How fast the chip's main clock runs",
+            "Which pin the timer output appears on",
+            "The voltage level of the output"
+          ],
+          "answerIndex": 0,
+          "explanation": "The auto-reload value is the top of the count. Reaching it makes the counter wrap to 0 and fire the period event. It does not change the clock speed or pick pins.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-3.svg"
+        },
+        {
+          "id": "timers-pwm-l2-mcq-wrap-event",
+          "type": "mcq",
+          "prompt": "What happens when an up-counting timer reaches its auto-reload value and gets one more tick?",
+          "choices": [
+            "It wraps back to 0 and fires an event (which can trigger an interrupt)",
+            "It stops permanently and must be reset by hand",
+            "It keeps climbing past the top with no limit",
+            "It doubles its clock speed"
+          ],
+          "answerIndex": 0,
+          "explanation": "At the top, the next tick wraps the counter to 0 and generates the period event, optionally causing an interrupt. It does not halt forever or count past the top.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-3.svg"
+        },
+        {
+          "id": "timers-pwm-l2-mcq-compute-1khz",
+          "type": "mcq",
+          "prompt": "The counter advances at 1,000,000 ticks per second and the auto-reload value is 999. How often does the period event fire?",
+          "choices": [
+            "1000 times per second (once every 1 ms)",
+            "Once per second",
+            "1,000,000 times per second",
+            "999 times per second"
+          ],
+          "answerIndex": 0,
+          "explanation": "It wraps every (999 + 1) = 1000 ticks. 1,000,000 / 1000 = 1000 events per second, i.e. once every millisecond. The +1 matters: there are 1000 steps including 0.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-3.svg"
+        },
+        {
+          "id": "timers-pwm-l2-mcq-compute-full",
+          "type": "mcq",
+          "prompt": "A chip clock is 8,000,000 ticks/second. The prescaler divides by 8, and the auto-reload value is 999. What is the period event rate?",
+          "choices": [
+            "1000 events per second (every 1 ms)",
+            "8000 events per second",
+            "100 events per second",
+            "1,000,000 events per second"
+          ],
+          "answerIndex": 0,
+          "explanation": "Counter rate = 8,000,000 / 8 = 1,000,000 per second. Wrap rate = 1,000,000 / (999 + 1) = 1000 per second. So one event every 1 ms.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-3.svg"
+        },
+        {
+          "id": "timers-pwm-l2-mcq-plus-one",
+          "type": "mcq",
+          "prompt": "Why is the number of steps per period (auto-reload + 1) rather than just the auto-reload value?",
+          "choices": [
+            "Because counting starts at 0, so values 0 through ARR are (ARR + 1) distinct steps",
+            "Because the clock always adds one extra tick at random",
+            "Because the prescaler adds one",
+            "It is a mistake; the period is exactly ARR steps"
+          ],
+          "answerIndex": 0,
+          "explanation": "The counter visits 0, 1, 2, ..., ARR before wrapping. Counting 0 itself, that is ARR + 1 values. Forgetting the +1 is a classic off-by-one timing error.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-3.svg"
+        },
+        {
+          "id": "timers-pwm-l2-mcq-systick",
+          "type": "mcq",
+          "prompt": "What is SysTick typically used for?",
+          "choices": [
+            "Providing a regular system tick (often every 1 ms) to keep time and pace the program",
+            "Generating analog audio",
+            "Storing the program permanently",
+            "Supplying power to the chip"
+          ],
+          "answerIndex": 0,
+          "explanation": "SysTick is a small standard timer found in most MCUs, used to produce the regular system tick that drives timekeeping and scheduling. It is not for audio, storage, or power.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-3.svg"
+        },
+        {
+          "id": "timers-pwm-l2-mcq-millis",
+          "type": "mcq",
+          "prompt": "How do you build a millis() clock (milliseconds since power-on) from a 1 ms periodic tick?",
+          "choices": [
+            "Add 1 to a counter variable inside the tick handler each time the tick fires",
+            "Read the chip's temperature each tick",
+            "Multiply the prescaler by the clock every loop",
+            "Reset the timer to 0 every second"
+          ],
+          "answerIndex": 0,
+          "explanation": "Each 1 ms tick runs a tiny handler that increments a counter; that counter is the elapsed milliseconds. The other options do not accumulate elapsed time.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-3.svg"
+        },
+        {
+          "id": "timers-pwm-l2-mcq-micros",
+          "type": "mcq",
+          "prompt": "What is the difference between millis() and micros()?",
+          "choices": [
+            "millis() counts milliseconds; micros() counts microseconds (a thousand times finer)",
+            "millis() is for motors; micros() is for LEDs",
+            "They are the same function with different names",
+            "micros() counts hours, millis() counts minutes"
+          ],
+          "answerIndex": 0,
+          "explanation": "A millisecond is 1/1000 of a second; a microsecond is 1/1,000,000. micros() gives finer resolution by counting a faster tick. Neither is tied to a specific device.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-3.svg"
+        },
+        {
+          "id": "timers-pwm-l2-mcq-interrupt",
+          "type": "mcq",
+          "prompt": "An interrupt fired by the timer's period event does what?",
+          "choices": [
+            "Briefly pauses the CPU's normal work to run a short handler, then returns",
+            "Permanently stops the program",
+            "Slows the chip clock in half",
+            "Erases the counter's value from memory forever"
+          ],
+          "answerIndex": 0,
+          "explanation": "An interrupt is a signal that temporarily diverts the CPU to a small handler routine and then resumes normal execution. It does not halt the program or alter the clock.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-3.svg"
+        }
+      ]
+    },
+    {
+      "id": "timers-pwm-l3-pwm",
+      "title": "PWM: Controlling Average Power by Switching On and Off",
+      "order": 3,
+      "difficulty": 3,
+      "content": "Here is a neat trick. Imagine dimming a light by flipping its switch on and off so fast your eye cannot see the flicker; it just looks dimmer. A microwave on \"50% power\" does the same thing: it runs full power, then off, then on, cycling so the food gets about half the energy. This is **Pulse-Width Modulation**, or **PWM**.\n\n**How it works.** A timer switches a pin ON and OFF very quickly. Each on/off cycle has the same length (the period). What you change is the **duty cycle**: the fraction of each cycle that the pin is ON.\n\n$$\\text{duty cycle} = \\frac{\\text{time ON}}{\\text{whole period}}$$\n\nA 25% duty cycle means ON one quarter of the time; 75% means ON three quarters of the time.\n\n**Why it matters.** Because the switching is so fast, what a device (and your eye) feels is the **average** power. More ON time = higher average. So:\n\n- An **LED** at 25% duty looks dim; at 75% it looks bright. (Dimming.)\n- A **motor** at higher duty spins faster, because it gets more average power.\n- A **servo** (a motor that turns to a commanded angle) reads the *width* of the ON pulse to decide its position, e.g. a 1 ms pulse vs a 2 ms pulse points it to different angles.\n\n**Setting the duty.** Inside the timer, a compare value decides the switch point: the pin is ON while the counter is below it and OFF above it. Raise that value and the pin stays ON longer. The period (frequency) stays the same; only the ON fraction moves.\n\n**Alignment, briefly.** \"Edge-aligned\" PWM lines pulses up at the start of each period and is fine for LEDs and servos. \"Center-aligned\" centers the pulse and is smoother for driving motors. You can ignore the details for now.\n\n**Recap:** PWM switches a pin on and off fast; the duty cycle (ON fraction) sets the average power, letting you dim LEDs, set motor speed, or position a servo.",
+      "items": [
+        {
+          "id": "timers-pwm-l3-mcq-define",
+          "type": "mcq",
+          "prompt": "What does PWM (Pulse-Width Modulation) actually do to a pin?",
+          "choices": [
+            "Switches it ON and OFF rapidly, varying the fraction of time it is ON",
+            "Slowly raises the exact voltage to any level you like",
+            "Connects the pin to the chip clock directly",
+            "Reads how much current flows into the pin"
+          ],
+          "answerIndex": 0,
+          "explanation": "PWM rapidly toggles the pin between fully ON and fully OFF, changing the ON fraction (duty cycle). It does not produce a smooth adjustable voltage directly, and it is an output technique, not a measurement.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-4.svg"
+        },
+        {
+          "id": "timers-pwm-l3-mcq-duty-def",
+          "type": "mcq",
+          "prompt": "What is the duty cycle?",
+          "choices": [
+            "The fraction of each cycle that the pin is ON",
+            "The number of cycles per second",
+            "The total voltage of the supply",
+            "How many timers the chip has"
+          ],
+          "answerIndex": 0,
+          "explanation": "Duty cycle = time ON divided by the whole period. The number of cycles per second is the frequency, a different quantity.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-4.svg"
+        },
+        {
+          "id": "timers-pwm-l3-mcq-brightness",
+          "type": "mcq",
+          "prompt": "You raise an LED's PWM duty cycle from 25% to 75%. What happens to its brightness, and why?",
+          "choices": [
+            "It gets brighter, because a higher duty cycle delivers more average power",
+            "It gets dimmer, because more switching wastes power",
+            "Nothing changes, because the frequency stayed the same",
+            "It turns off, because 75% is too high"
+          ],
+          "answerIndex": 0,
+          "explanation": "Higher duty means the LED is ON a larger fraction of the time, so its average power (and apparent brightness) goes up. Frequency staying constant is exactly why only the average changed.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-4.svg"
+        },
+        {
+          "id": "timers-pwm-l3-mcq-average",
+          "type": "mcq",
+          "prompt": "Why does PWM let you control average power instead of just full-on or full-off?",
+          "choices": [
+            "The switching is so fast that the device responds to the average of ON and OFF time",
+            "PWM changes the supply voltage to a fraction",
+            "PWM heats the pin to reduce its output",
+            "PWM only ever delivers exactly half power"
+          ],
+          "answerIndex": 0,
+          "explanation": "Because it toggles faster than the device (or your eye) can react, what is felt is the average level, set by the duty cycle. The supply voltage itself is not changed.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-4.svg"
+        },
+        {
+          "id": "timers-pwm-l3-mcq-microwave",
+          "type": "mcq",
+          "prompt": "A microwave set to 50% power cycles fully on, then off, then on, and so on. This is an everyday example of:",
+          "choices": [
+            "PWM: controlling average power by varying ON time, not by halving the actual power",
+            "A broken microwave",
+            "Lowering the wall voltage to half",
+            "Input capture measuring the food"
+          ],
+          "answerIndex": 0,
+          "explanation": "The microwave delivers full power part of the time and none the rest, averaging to about half. That is exactly the PWM idea: average power set by duty, not a true half-power setting.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-4.svg"
+        },
+        {
+          "id": "timers-pwm-l3-mcq-compute-on",
+          "type": "mcq",
+          "prompt": "A PWM signal has a period of 20 ms and a duty cycle of 25%. How long is the pin ON during each cycle?",
+          "choices": [
+            "5 ms",
+            "25 ms",
+            "20 ms",
+            "0.25 ms"
+          ],
+          "answerIndex": 0,
+          "explanation": "ON time = duty x period = 0.25 x 20 ms = 5 ms. The remaining 15 ms it is OFF. Duty is a fraction of the period, not a number of milliseconds by itself.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-4.svg"
+        },
+        {
+          "id": "timers-pwm-l3-mcq-servo",
+          "type": "mcq",
+          "prompt": "How does a hobby servo decide what angle to turn to?",
+          "choices": [
+            "From the width of the ON pulse it receives (e.g. 1 ms vs 2 ms picks different angles)",
+            "From the color of the wire",
+            "From the chip's temperature",
+            "From how many pins are connected"
+          ],
+          "answerIndex": 0,
+          "explanation": "A servo reads the ON-pulse width and moves to the matching position; common servos use roughly 1 to 2 ms pulses for their range. The other options have nothing to do with servo control.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-4.svg"
+        },
+        {
+          "id": "timers-pwm-l3-mcq-compare",
+          "type": "mcq",
+          "prompt": "Inside the timer, raising the compare value (the switch point) while keeping the auto-reload the same will:",
+          "choices": [
+            "Increase the duty cycle (pin ON longer) without changing the frequency",
+            "Increase the frequency without changing the duty",
+            "Turn the timer off",
+            "Halve the clock speed"
+          ],
+          "answerIndex": 0,
+          "explanation": "The pin is ON while the counter is below the compare value. A higher compare value keeps it ON longer each period, raising duty. The period (set by auto-reload) and thus the frequency stay put.",
           "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-1.svg"
         },
         {
-          "id": "timers-pwm-l2-fc-deadtime",
-          "type": "flashcard",
-          "front": "What is dead-time in complementary PWM and what failure does it prevent?",
-          "back": "A short delay inserted between turning one half-bridge transistor off and the complementary one on. It prevents shoot-through (both FETs conducting simultaneously, shorting the supply rail)."
-        },
-        {
-          "id": "timers-pwm-l2-fc-alignment",
-          "type": "flashcard",
-          "front": "Why prefer center-aligned PWM over edge-aligned for motor/inverter drive?",
-          "back": "Center-aligned keeps pulses symmetric within the period, reducing harmonic content/EMI and giving cleaner current waveforms. Edge-aligned is simpler and fine for LED dimming or servos."
-        },
-        {
-          "id": "timers-pwm-l2-fc-capture",
-          "type": "flashcard",
-          "front": "How does input capture measure an external signal's period?",
-          "back": "On the selected edge the hardware latches CNT into CCR. The difference between two successive captures (delta CNT, accounting for overflows) is the period in timer ticks; convert with the tick rate.",
-          "hint": "What does the channel copy on each edge?"
-        },
-        {
-          "id": "timers-pwm-l2-fc-pwm-input",
-          "type": "flashcard",
-          "front": "What does PWM-input mode give you that single-edge capture does not?",
-          "back": "It routes one input pin to two capture channels triggering on opposite edges, so one channel measures the full period and the other measures the high-time, yielding frequency AND duty cycle in one pass."
-        },
-        {
-          "id": "timers-pwm-l2-mcq-set-duty",
+          "id": "timers-pwm-l3-mcq-motor",
           "type": "mcq",
-          "prompt": "A PWM has ARR=999. You want 25% duty. What CCR value do you write (edge-aligned mode 1)?",
-          "choices": ["250", "25", "750", "999"],
-          "answerIndex": 0,
-          "explanation": "duty = CCR/(ARR+1) = CCR/1000. For 25%, CCR = 0.25 x 1000 = 250."
-        },
-        {
-          "id": "timers-pwm-l2-mcq-capture-freq",
-          "type": "mcq",
-          "prompt": "Timer ticks at 1 MHz (1 us/tick). Two successive rising-edge captures read 1200 and 1700 ticks. What is the input frequency?",
-          "choices": ["2 kHz", "500 Hz", "1.7 kHz", "5 kHz"],
-          "answerIndex": 0,
-          "explanation": "Period = (1700-1200) = 500 ticks x 1 us = 500 us. f = 1/500us = 2000 Hz = 2 kHz."
-        },
-        {
-          "id": "timers-pwm-l2-mcq-overflow",
-          "type": "mcq",
-          "prompt": "When measuring a slow signal whose period exceeds the 16-bit counter range, what must input-capture code account for?",
+          "prompt": "Driving a small DC motor with PWM, what does increasing the duty cycle do?",
           "choices": [
-            "Counter overflow/update events between captures, adding ARR+1 per wrap",
-            "Nothing; CCR is 32-bit so it cannot wrap",
-            "The prescaler automatically extends the count",
-            "Dead-time insertion"
+            "Increases the average power, so the motor spins faster",
+            "Reverses the motor's direction",
+            "Lowers the average power, slowing it",
+            "Changes the PWM frequency"
           ],
           "answerIndex": 0,
-          "explanation": "If the period exceeds (ARR+1) ticks the counter wraps. You must count update (overflow) interrupts and add (ARR+1) per overflow to the captured delta, or the measured period will be too short."
+          "explanation": "More ON time means more average power to the motor, so it speeds up. Direction is set by polarity, not duty, and a higher duty does not reduce power or alter the frequency.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-4.svg"
         },
         {
-          "id": "timers-pwm-l2-mcq-shoot-through",
+          "id": "timers-pwm-l3-mcq-alignment",
           "type": "mcq",
-          "prompt": "Which timer feature, in addition to dead-time, protects a motor half-bridge by forcing outputs to a safe state on an over-current or fault signal?",
-          "choices": ["The break (BRK) input", "The prescaler", "Center alignment", "The repetition counter"],
+          "prompt": "Edge-aligned versus center-aligned PWM mainly differ in:",
+          "choices": [
+            "Where the ON pulse sits in each period; center-aligned is smoother for motor drive",
+            "Whether the pin turns on at all",
+            "The number of pins used",
+            "The color of the output signal"
+          ],
           "answerIndex": 0,
-          "explanation": "Advanced-control timers (TIM1/TIM8) have a break input that asynchronously disables PWM outputs on a fault (e.g., over-current comparator), driving them to a programmed safe level."
+          "explanation": "Both produce the same duty; edge-aligned puts the pulse at the period's start, center-aligned centers it (smoother for motors). It is a placement detail, not whether the pin works.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-4.svg"
         }
       ]
     },
     {
-      "id": "timers-pwm-l3-systems",
-      "title": "Timer-Triggered Peripherals, Watchdogs, and Time Bases",
-      "order": 3,
-      "difficulty": 5,
-      "content": "Timers do more than wiggle pins; they are the synchronization backbone of a deterministic system.\n\n**One-shot vs continuous.** In continuous mode the counter auto-reloads forever. In **one-pulse / one-shot mode** the timer counts a single period then stops (sets `OPM`), useful for a precise single delay or a one-off trigger pulse.\n\n**Timer-triggered ADC/DMA.** A timer's update or compare event can be routed as a **trigger output (TRGO)** to start an ADC conversion at an exact rate, and the ADC's end-of-conversion can request **DMA** to move the sample to RAM — all with zero CPU involvement. This peripheral-to-peripheral chaining is how you get jitter-free, evenly-sampled buffers, the literal front end of a radar/DSP acquisition pipeline (Module 15).\n\n**Watchdogs.** An **independent watchdog (IWDG)** runs from its own low-speed RC oscillator and resets the MCU unless periodically *kicked*; it survives a hung main clock. A **window watchdog (WWDG)** additionally faults if you kick too *early*, catching code that runs too fast or skips steps. Kick from a sane place, never blindly from a timer ISR.\n\n**SysTick and time bases.** The Cortex-M core's **SysTick** is a 24-bit down-counter that generates the canonical periodic tick (often 1 kHz) for `millis()` and RTOS scheduling. Build `millis()` by incrementing a `volatile uint32_t` in the SysTick handler; build `micros()` by combining that count with the live counter:\n\n$$\\text{micros} = ms \\times 1000 + \\frac{LOAD - VAL}{f_{clk}/10^6}$$\n\nRead `ms` then `VAL`, and re-check for a tick that fired in between to avoid a race at the rollover boundary.",
+      "id": "timers-pwm-l4-input-capture",
+      "title": "Input Capture: Measuring an Incoming Pulse",
+      "order": 4,
+      "difficulty": 4,
+      "content": "So far the timer has been making things happen. It can also *measure* things coming in. This is called **input capture**.\n\n**The idea.** Suppose a sensor sends a pulse and you want to know how long it lasts, or how often pulses arrive. You could try to watch the pin in software with a stopwatch, but that is jittery and ties up the CPU. Input capture lets the hardware do it precisely.\n\n**How it works.** You point a timer channel at an input pin and tell it to watch for an **edge** (a moment the signal switches, either a rising edge OFF-to-ON or a falling edge ON-to-OFF). The moment that edge happens, the timer **copies its current count** into a capture register. That copied number is a timestamp: \"the count was this when the edge arrived.\"\n\n**Measuring pulse width.** Capture the count at the rising edge, then again at the falling edge. Subtract the two. The difference is the pulse width, measured in ticks. Multiply by the tick duration to get real time.\n\n$$\\text{pulse width} = (\\text{count at end} - \\text{count at start}) \\times \\text{seconds per tick}$$\n\nExample: the counter ticks every 1 microsecond. Rising edge captured 1200, falling edge captured 1700. Width = (1700 - 1200) = 500 ticks = 500 microseconds.\n\n**Measuring frequency.** Capture two rising edges in a row. The difference is the period (one full cycle) in ticks. Frequency is just 1 divided by the period. A pulse arriving every 500 microseconds is 1 / 0.0005 s = 2000 times per second (2 kHz).\n\n**One catch: wrap-around.** The counter can wrap back to 0 (from the last lesson) between two edges. If the gap is long, you must also count how many times it wrapped and add those, or your measured time will be too short.\n\n**Real uses:** timing an ultrasonic distance sensor's echo, reading a wheel-speed (tachometer) sensor, or decoding a signal's frequency.\n\n**Recap:** input capture stamps the timer's count at each chosen edge; subtracting timestamps gives a pulse's width or period precisely, in hardware.",
       "items": [
         {
-          "id": "timers-pwm-l3-fc-oneshot",
-          "type": "flashcard",
-          "front": "What distinguishes one-pulse (one-shot) mode from continuous timer mode?",
-          "back": "In one-pulse mode (OPM set) the counter runs through a single period and stops automatically; continuous mode auto-reloads and keeps counting. One-shot is for a single precise delay or trigger pulse."
-        },
-        {
-          "id": "timers-pwm-l3-fc-trgo",
-          "type": "flashcard",
-          "front": "How can a timer trigger an ADC conversion at a precise rate without the CPU?",
-          "back": "The timer's update or compare event is routed as a Trigger Output (TRGO) to the ADC's external trigger input. The ADC samples on each event; its EOC then requests DMA to store the sample. CPU is uninvolved."
-        },
-        {
-          "id": "timers-pwm-l3-fc-iwdg-wwdg",
-          "type": "flashcard",
-          "front": "Contrast the independent watchdog (IWDG) and the window watchdog (WWDG).",
-          "back": "IWDG runs from its own LSI RC clock, surviving a stalled main clock; it resets if not kicked in time. WWDG runs on the APB clock and faults if kicked too EARLY (outside its window) as well as too late, catching code running too fast / skipping logic."
-        },
-        {
-          "id": "timers-pwm-l3-fc-systick",
-          "type": "flashcard",
-          "front": "What is SysTick and why is it the canonical RTOS/OS tick?",
-          "back": "A 24-bit core down-counter in every Cortex-M, independent of vendor timers. It reloads from LOAD and fires an exception at a fixed rate (e.g. 1 kHz), driving millis() and the RTOS scheduler tick portably across parts."
-        },
-        {
-          "id": "timers-pwm-l3-fc-micros",
-          "type": "flashcard",
-          "front": "Why must reading millis() and the live SysTick VAL be done carefully when building micros()?",
-          "back": "A SysTick rollover can occur between reading the ms counter and reading VAL, causing the fractional part to span a tick boundary. Read ms, read VAL, then re-read ms / check the COUNTFLAG and retry if a tick fired in between.",
-          "hint": "Two reads, a tick can land between them."
-        },
-        {
-          "id": "timers-pwm-l3-fc-iwdg-kick",
-          "type": "flashcard",
-          "front": "Why is it bad practice to kick (refresh) the watchdog from inside a timer interrupt?",
-          "back": "The timer ISR keeps running even if the main application has hung in a loop, so the watchdog never trips and the very fault it exists to catch goes undetected. Kick from the main control flow that exercises real work."
-        },
-        {
-          "id": "timers-pwm-l3-mcq-determinism",
+          "id": "timers-pwm-l4-mcq-define",
           "type": "mcq",
-          "prompt": "Why is timer->TRGO->ADC->DMA chaining preferred over a SysTick ISR that calls an ADC read for evenly-sampled acquisition?",
+          "prompt": "What does input capture do?",
           "choices": [
-            "Hardware triggering removes software/interrupt-latency jitter, giving sample timing fixed by the timer clock",
-            "It uses less flash",
-            "DMA is slower so it averages noise",
-            "SysTick cannot generate interrupts"
+            "Copies (timestamps) the timer's count the instant a chosen edge appears on an input pin",
+            "Sets the duty cycle of an output pin",
+            "Stores program code into flash",
+            "Generates a steady output frequency"
           ],
           "answerIndex": 0,
-          "explanation": "Software-initiated sampling inherits interrupt latency and code-path jitter. A hardware trigger fires the conversion on the exact timer event, so sample spacing is determined by the timer clock, not CPU timing - essential for clean FFTs."
+          "explanation": "Input capture latches the current count when an edge arrives, giving a precise timestamp. Setting duty and generating frequency are output (compare/PWM) jobs, not capture.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-5.svg"
         },
         {
-          "id": "timers-pwm-l3-mcq-systick-load",
+          "id": "timers-pwm-l4-mcq-edge",
           "type": "mcq",
-          "prompt": "Core/SysTick clock is 168 MHz. What LOAD (reload) value gives a 1 ms tick?",
-          "choices": ["167999", "168000", "168", "1000"],
-          "answerIndex": 0,
-          "explanation": "SysTick counts down LOAD+1 cycles per tick. For 1 ms at 168 MHz you need 168000 cycles, so LOAD = 168000 - 1 = 167999."
-        },
-        {
-          "id": "timers-pwm-l3-mcq-wwdg-window",
-          "type": "mcq",
-          "prompt": "A WWDG is configured with a window. The firmware refreshes it correctly when on time, but a buggy build refreshes it twice as fast. What happens?",
+          "prompt": "In this context, what is an \"edge\"?",
           "choices": [
-            "The WWDG triggers a reset because the early refresh falls outside (before) the window",
-            "Nothing; refreshing early is always safe",
-            "The MCU enters low-power mode",
-            "The watchdog disables itself"
+            "The moment a signal switches level (OFF-to-ON is a rising edge, ON-to-OFF is a falling edge)",
+            "The physical corner of the chip package",
+            "The highest voltage the pin can reach",
+            "The boundary of the program's memory"
           ],
           "answerIndex": 0,
-          "explanation": "Unlike a plain watchdog, the WWDG resets if refreshed BEFORE the down-counter reaches the window value. Refreshing too early (running too fast / skipping work) is treated as a fault, exactly its purpose."
+          "explanation": "An edge is a transition of the signal level. Input capture triggers on rising or falling edges. It is not a physical chip corner or a voltage limit.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-5.svg"
         },
         {
-          "id": "timers-pwm-l3-mcq-micros-race",
+          "id": "timers-pwm-l4-mcq-width",
           "type": "mcq",
-          "prompt": "A micros() routine reads the millis counter, then reads SysTick VAL, and combines them. Occasionally micros() jumps backward by ~1000 us. The most likely cause is:",
+          "prompt": "The counter ticks every 1 microsecond. A rising edge is captured at count 1200 and the following falling edge at 1700. What is the pulse width?",
           "choices": [
-            "A SysTick reload occurred between the two reads, so the fractional part belongs to the next ms but was added to the old ms",
-            "The timer prescaler is wrong",
-            "DMA corrupted the counter",
-            "The FPU is disabled"
+            "500 microseconds",
+            "1700 microseconds",
+            "2900 microseconds",
+            "1200 microseconds"
           ],
           "answerIndex": 0,
-          "explanation": "Classic read-tear at the rollover: if VAL wraps between reading ms and VAL, the small VAL-derived fraction is paired with the stale (smaller) ms, producing a backward jump. Re-read ms / check COUNTFLAG and retry to make the read atomic."
+          "explanation": "Width = (1700 - 1200) ticks = 500 ticks, and each tick is 1 microsecond, so 500 microseconds. You subtract the timestamps; you do not add them or use just one.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-5.svg"
+        },
+        {
+          "id": "timers-pwm-l4-mcq-freq",
+          "type": "mcq",
+          "prompt": "Two successive rising edges are captured 500 microseconds apart. What is the signal's frequency?",
+          "choices": [
+            "2000 Hz (2 kHz)",
+            "500 Hz",
+            "5000 Hz",
+            "200 Hz"
+          ],
+          "answerIndex": 0,
+          "explanation": "The gap between successive rising edges is one period = 500 microseconds = 0.0005 s. Frequency = 1 / 0.0005 = 2000 Hz. Frequency is the reciprocal of the period.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-5.svg"
+        },
+        {
+          "id": "timers-pwm-l4-mcq-why-hardware",
+          "type": "mcq",
+          "prompt": "Why use input capture instead of watching the pin in a software loop with a stopwatch?",
+          "choices": [
+            "Hardware timestamps the edge precisely and does not tie up the CPU, avoiding jitter",
+            "Software loops cannot read pins at all",
+            "Input capture is the only way to turn an LED on",
+            "Software is always more accurate than hardware"
+          ],
+          "answerIndex": 0,
+          "explanation": "Hardware capture records the exact moment of the edge with no software delay, so timing is precise and the CPU stays free. A software loop adds jitter and busy-waits.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-5.svg"
+        },
+        {
+          "id": "timers-pwm-l4-mcq-period-vs-width",
+          "type": "mcq",
+          "prompt": "To measure a signal's period (for frequency) rather than its high-pulse width, which two captures do you compare?",
+          "choices": [
+            "Two edges of the same kind in a row (e.g. rising to the next rising)",
+            "A rising edge and the very next falling edge",
+            "Two captures from two different pins",
+            "The same single capture twice"
+          ],
+          "answerIndex": 0,
+          "explanation": "Rising-to-next-rising spans one full cycle (the period). Rising-to-falling measures only the high time (pulse width), not the whole period.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-5.svg"
+        },
+        {
+          "id": "timers-pwm-l4-mcq-wrap",
+          "type": "mcq",
+          "prompt": "If the time between two edges is long, the counter may wrap back to 0 in between. What must your code do?",
+          "choices": [
+            "Count the wraps and add their full counts, or the measured time will be too short",
+            "Ignore it; the count never wraps",
+            "Double the clock speed automatically",
+            "Switch the pin to an output"
+          ],
+          "answerIndex": 0,
+          "explanation": "Each wrap means a full counter range elapsed that the simple subtraction misses. You add those wrapped counts back in, otherwise the measurement is too small. The counter certainly can wrap.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-5.svg"
+        },
+        {
+          "id": "timers-pwm-l4-mcq-timestamp",
+          "type": "mcq",
+          "prompt": "The number copied into the capture register at an edge represents:",
+          "choices": [
+            "A timestamp: what the timer's count was at the instant of that edge",
+            "The voltage of the signal in volts",
+            "The duty cycle of an output",
+            "The chip's serial number"
+          ],
+          "answerIndex": 0,
+          "explanation": "The captured value is the counter's reading at the moment of the edge, i.e. a time stamp in ticks. It is not a voltage or a duty cycle.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-5.svg"
+        },
+        {
+          "id": "timers-pwm-l4-mcq-uses",
+          "type": "mcq",
+          "prompt": "Which task is a natural fit for input capture?",
+          "choices": [
+            "Timing the echo pulse from an ultrasonic distance sensor",
+            "Setting an LED's brightness",
+            "Spinning a motor faster",
+            "Storing a calibration value in flash"
+          ],
+          "answerIndex": 0,
+          "explanation": "An ultrasonic sensor reports distance as a pulse whose width you measure, exactly what input capture does. Dimming LEDs and driving motors are PWM (output) tasks; flash storage is unrelated.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-5.svg"
+        }
+      ]
+    },
+    {
+      "id": "timers-pwm-l5-watchdog-and-triggers",
+      "title": "Watchdogs, One-Shots, and Timer-Triggered Sampling",
+      "order": 5,
+      "difficulty": 5,
+      "content": "A few more timer jobs round out the picture. These are higher-level uses; you only need the ideas.\n\n**One-shot mode.** Normally a timer reloads and repeats forever (continuous mode). In **one-shot mode** it runs through a single period and then stops. That is handy for a one-time precise delay or a single trigger pulse.\n\n**Watchdog timers.** Firmware sometimes hangs (gets stuck in a loop and stops responding). A **watchdog timer** guards against this. It is a countdown timer that will **reset the whole chip** if it ever reaches zero. Healthy firmware must regularly restart it before it expires, a habit called *kicking* (or *feeding*) the watchdog. If the program hangs, the kicks stop, the watchdog hits zero, and it reboots the system back to a known good state. Think of a smoke alarm you must press \"OK\" on every minute, otherwise it assumes trouble and acts.\n\n- An **independent watchdog** runs from its own separate clock, so it still works even if the main clock fails.\n- A **window watchdog** is stricter: it complains if you kick too *early* as well as too late, catching code that is running wrong, not just code that is stuck.\n- Best practice: kick the watchdog from your real main work, not from inside a timer interrupt. A timer interrupt can keep firing and kicking even while the main program is hung, which would hide the very fault the watchdog exists to catch.\n\n**Timer-triggered ADC and DMA.** An **ADC** (Analog-to-Digital Converter) turns a real-world voltage (like a temperature reading) into a number. To sample it at perfectly even intervals, you let a timer's period event *trigger* each conversion automatically, instead of the CPU asking each time. Then **DMA** (Direct Memory Access, a helper that moves data without the CPU) copies each result straight into memory. The result: a stream of evenly spaced samples collected with zero CPU effort and no timing jitter. This even, hands-off sampling is the foundation of clean signal measurement.\n\n**Recap:** one-shot mode fires once and stops; a watchdog reboots a hung system unless regularly kicked; and a timer can trigger an ADC (with DMA) to collect perfectly even samples on its own.",
+      "items": [
+        {
+          "id": "timers-pwm-l5-mcq-oneshot",
+          "type": "mcq",
+          "prompt": "What does one-shot mode do differently from continuous mode?",
+          "choices": [
+            "It runs through a single period and then stops, instead of repeating forever",
+            "It counts twice as fast",
+            "It never fires an event",
+            "It controls two pins at once"
+          ],
+          "answerIndex": 0,
+          "explanation": "One-shot runs one period and halts, useful for a single delay or trigger pulse. Continuous mode reloads and repeats. Speed and pin count are unrelated to this setting.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-3.svg"
+        },
+        {
+          "id": "timers-pwm-l5-mcq-watchdog-purpose",
+          "type": "mcq",
+          "prompt": "What problem does a watchdog timer solve?",
+          "choices": [
+            "It reboots the chip if the firmware hangs and stops responding",
+            "It dims LEDs smoothly",
+            "It measures incoming pulse widths",
+            "It stores the program in flash"
+          ],
+          "answerIndex": 0,
+          "explanation": "A watchdog resets the system when firmware gets stuck, returning it to a known good state. Dimming is PWM, measuring pulses is input capture, and storage is unrelated.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-3.svg"
+        },
+        {
+          "id": "timers-pwm-l5-mcq-kick",
+          "type": "mcq",
+          "prompt": "What does it mean to \"kick\" (or feed) the watchdog?",
+          "choices": [
+            "Restart its countdown before it reaches zero, to show the firmware is still healthy",
+            "Turn the watchdog off permanently",
+            "Reset the entire chip on purpose",
+            "Increase the PWM duty cycle"
+          ],
+          "answerIndex": 0,
+          "explanation": "Kicking restarts the watchdog's countdown, signalling that the program is alive. If kicks stop, the countdown expires and the chip reboots. Kicking does not disable it or reboot the chip itself.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-3.svg"
+        },
+        {
+          "id": "timers-pwm-l5-mcq-no-kick",
+          "type": "mcq",
+          "prompt": "The firmware hangs in an endless loop and never kicks the watchdog again. What happens?",
+          "choices": [
+            "The watchdog reaches zero and resets the chip back to a known good state",
+            "Nothing; the watchdog waits forever",
+            "The watchdog speeds up the CPU to escape the loop",
+            "The watchdog deletes the buggy code"
+          ],
+          "answerIndex": 0,
+          "explanation": "With no kicks, the watchdog times out and reboots the system, recovering from the hang. It cannot fix the bug or speed up the CPU; it just forces a reset.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-3.svg"
+        },
+        {
+          "id": "timers-pwm-l5-mcq-independent",
+          "type": "mcq",
+          "prompt": "Why does an independent watchdog run from its own separate clock?",
+          "choices": [
+            "So it still works to reset the chip even if the main clock fails",
+            "So it can dim LEDs without the timer",
+            "So it runs slower than everything else for fun",
+            "So it can store more data"
+          ],
+          "answerIndex": 0,
+          "explanation": "A separate clock means the watchdog keeps running even if the main clock stops, covering a serious failure mode. The other options are unrelated to its purpose.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-3.svg"
+        },
+        {
+          "id": "timers-pwm-l5-mcq-window",
+          "type": "mcq",
+          "prompt": "How is a window watchdog stricter than an ordinary one?",
+          "choices": [
+            "It also faults if you kick it too early, not just too late, catching code running wrong",
+            "It never resets the chip",
+            "It only works while the LED is on",
+            "It requires no kicking at all"
+          ],
+          "answerIndex": 0,
+          "explanation": "A window watchdog defines an allowed time window; kicking too soon is treated as a fault, which catches misbehaving code that runs too fast or skips steps. An ordinary watchdog only minds being kicked too late.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-3.svg"
+        },
+        {
+          "id": "timers-pwm-l5-mcq-kick-from-isr",
+          "type": "mcq",
+          "prompt": "Why is it bad practice to kick the watchdog from inside a timer interrupt?",
+          "choices": [
+            "The interrupt may keep firing and kicking even while the main program is hung, hiding the fault",
+            "Interrupts cannot access the watchdog at all",
+            "It would make the LED too bright",
+            "It would speed up the chip clock"
+          ],
+          "answerIndex": 0,
+          "explanation": "A timer interrupt can keep running independently of the main loop, so it would keep kicking even during a hang, defeating the watchdog. Kick from real main-line work instead.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-3.svg"
+        },
+        {
+          "id": "timers-pwm-l5-mcq-adc",
+          "type": "mcq",
+          "prompt": "What does an ADC (Analog-to-Digital Converter) do?",
+          "choices": [
+            "Turns a real-world voltage into a number the chip can use",
+            "Turns a number into a PWM signal",
+            "Stores the program in flash",
+            "Generates the chip's clock"
+          ],
+          "answerIndex": 0,
+          "explanation": "An ADC measures an analog voltage (such as from a sensor) and converts it to a digital value. It is the input counterpart to converting numbers back to signals.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-3.svg"
+        },
+        {
+          "id": "timers-pwm-l5-mcq-trigger",
+          "type": "mcq",
+          "prompt": "Why let a timer trigger each ADC conversion, with DMA storing the results, instead of the CPU requesting each sample?",
+          "choices": [
+            "It gives perfectly even sample spacing with no CPU effort and no timing jitter",
+            "It makes the samples random for security",
+            "It uses the LED to time the samples",
+            "It is the only way an ADC can ever work"
+          ],
+          "answerIndex": 0,
+          "explanation": "A timer fires conversions at exact intervals and DMA moves results without the CPU, so samples are evenly spaced and jitter-free. CPU-requested sampling adds variable delay; an ADC can also be triggered by software, just less precisely.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-3.svg"
+        },
+        {
+          "id": "timers-pwm-l5-mcq-dma",
+          "type": "mcq",
+          "prompt": "What is DMA (Direct Memory Access)?",
+          "choices": [
+            "A helper that moves data (e.g. ADC results) into memory without using the CPU",
+            "A faster type of CPU",
+            "A way to dim an LED",
+            "A watchdog clock"
+          ],
+          "answerIndex": 0,
+          "explanation": "DMA transfers data between a peripheral and memory on its own, freeing the CPU. It is not a CPU, an LED dimmer, or a watchdog.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/timers-pwm-3.svg"
         }
       ]
     }
