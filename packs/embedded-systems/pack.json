@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "id": "embedded-systems",
   "title": "Embedded Systems",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "description": "Embedded systems from scratch (beginner rework in progress): 15 sub-topics from the bare-metal memory map through RTOS, real-time, and DSP-on-MCU. Beginner-first readings, diagrams, tiered easy to hard.",
   "requires": [
     "digital-electronics"
@@ -5456,352 +5456,566 @@
           "title": "Superloop vs RTOS: When You Actually Need a Scheduler",
           "order": 1,
           "difficulty": 1,
-          "content": "You already think in concurrency, so the question here is not *what* concurrency is but *when the embedded constraints justify paying for a scheduler*.\n\n**The bare-metal superloop** is the baseline: `main()` initializes peripherals, then loops forever, polling flags and dispatching work. Asynchronous events are handled by interrupts (Module 6) that set `volatile` flags or push into ring buffers; the superloop drains them. This is sometimes called a *foreground/background* system — ISRs are the foreground, the loop is the background. It is deterministic, has no scheduler overhead, needs no extra RAM for per-task stacks, and is trivial to reason about. For a sensor that samples and streams, this is often *enough*.\n\nThe superloop breaks down when you have **multiple independent activities with different timing requirements** that don't compose cleanly into one loop. The classic smell: a long-running task (e.g. flushing a buffer over slow UART) starves a time-sensitive one, and you find yourself manually interleaving them with state machines and counters — hand-rolling a scheduler badly.\n\nAn **RTOS** gives you that scheduler for free: each activity becomes a *task* (a thread with its own stack and priority), and the kernel decides who runs. You get blocking primitives (`vTaskDelay`, queue waits) so a task can *say* \"wake me when data arrives\" instead of polling. The cost is real: per-task stacks (RAM), context-switch time, tick interrupt overhead, and a new class of bug — priority inversion, deadlock, stack overflow.\n\nRule of thumb: stay bare-metal until you have 3+ asynchronous activities with conflicting deadlines, or you need blocking semantics to keep the code sane. Don't add an RTOS for ceremony.",
+          "content": "**Hook.** Imagine one cook running a whole kitchen alone, doing every step in strict order: chop, then stir, then plate, over and over. That is how the simplest tiny-computer programs work. But what if several dishes need attention at the same time and none can be left to burn? You need a smarter way to juggle. That is what this lesson is about.\n\n**Build.** A *microcontroller* is a tiny computer on a single chip that runs one program. The simplest way to write that program is a **superloop** (also called a *bare-metal* program): you set things up once, then run one big loop forever. Each time around, the program does each job in turn — read a sensor, update a display, talk to wifi — then starts the loop again. This is easy to understand and uses very little memory.\n\nThe trouble starts when a device must juggle several jobs that each have their own timing. If one job is slow (say, sending data over a slow wifi link), every other job has to wait its turn — and a job that needed quick attention might miss its moment. You end up writing tangled code that tries to chop each job into tiny pieces by hand.\n\nAn **RTOS** (Real-Time Operating System) is a small helper program that solves this. \"Real-time\" means the device must respond by a *deadline*, reliably — not just eventually. With an RTOS you write each job as its own small, simple program called a **task**. A part of the RTOS called the **scheduler** rapidly switches the single CPU between the tasks, so they all *seem* to run at once — like a chef quickly moving between dishes so none burns.\n\n**Recap.** Use a superloop when there is one job, or a few simple ones in order. Reach for an RTOS when a device must juggle several jobs at once and still meet deadlines. An RTOS costs a little extra memory and complexity, so do not add one just for show.",
           "items": [
             {
-              "id": "rtos-fc-superloop-def",
-              "type": "flashcard",
-              "front": "What is a 'superloop' (foreground/background) architecture?",
-              "back": "A bare-metal structure where main() initializes hardware then loops forever polling/dispatching work (background), while ISRs handle async events (foreground), typically by setting volatile flags or filling ring buffers that the loop drains.",
-              "hint": "Foreground = ISRs, background = the loop."
-            },
-            {
-              "id": "rtos-fc-rtos-task",
-              "type": "flashcard",
-              "front": "In an RTOS, what is a 'task' (a.k.a. thread)?",
-              "back": "An independent unit of execution with its own stack and priority. The kernel's scheduler decides which ready task runs on the CPU. Tasks can block on events (queues, semaphores, delays) instead of polling.",
-              "hint": "Each one owns a stack and a priority."
-            },
-            {
-              "id": "rtos-fc-rtos-costs",
-              "type": "flashcard",
-              "front": "Name three real costs of adding an RTOS to a small MCU project.",
-              "back": "RAM for per-task stacks (each task needs its own), context-switch CPU time, periodic tick-interrupt overhead, the kernel's code/data footprint, and a new class of bugs (priority inversion, deadlock, stack overflow).",
-              "hint": "Think RAM, CPU cycles, and new failure modes."
-            },
-            {
-              "id": "rtos-fc-blocking-vs-polling",
-              "type": "flashcard",
-              "front": "What capability does an RTOS give you that a superloop lacks, that most improves code clarity?",
-              "back": "Blocking primitives: a task can say 'sleep until this event/data arrives' (block on a queue/semaphore/delay) and yield the CPU, instead of busy-polling a flag. The kernel reschedules it when the event fires.",
-              "hint": "It is about how a task waits."
-            },
-            {
-              "id": "rtos-mcq-when-rtos",
+              "id": "rtos-img-superloop-vs-rtos",
               "type": "mcq",
-              "prompt": "Which scenario most justifies moving from a superloop to an RTOS?",
+              "prompt": "In the diagram, what is the scheduler's job in the RTOS (right) side?",
               "choices": [
-                "A single periodic ADC read streamed over UART with no other activity",
-                "Three concurrent activities with conflicting deadlines where you're hand-coding interleaving with state machines and counters",
-                "You want the firmware to look more 'professional' on your resume",
-                "You need to toggle one LED at a fixed rate using a timer interrupt"
+                "It runs all the tasks truly simultaneously on separate CPUs",
+                "It picks which task runs on the single CPU and switches between them quickly",
+                "It deletes tasks that are too slow",
+                "It replaces the need for a sensor"
               ],
               "answerIndex": 1,
-              "explanation": "An RTOS pays off when multiple independent activities with different timing needs no longer compose cleanly into one loop and you're effectively writing a scheduler by hand. The single-activity and LED cases are textbook superloop territory; 'looks professional' is not an engineering reason."
+              "explanation": "A small chip usually has one CPU, so only one task can actually run at a time. The scheduler's job is to pick which task gets the CPU and switch between them fast enough that they all seem to run at once. It does not run them truly in parallel, and it does not delete or replace hardware.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-3.svg"
+            },
+            {
+              "id": "rtos-mcq-what-is-superloop",
+              "type": "mcq",
+              "prompt": "What best describes a 'superloop' (bare-metal) program?",
+              "choices": [
+                "A program that sets things up once, then runs one big loop forever, doing each job in turn",
+                "A program that needs a desktop operating system like Windows to run",
+                "A program that can only blink a single LED",
+                "A program written in a special looping language"
+              ],
+              "answerIndex": 0,
+              "explanation": "A superloop sets up the hardware once, then loops forever, handling each job in order each time around. It does not need a desktop OS (it runs directly on the chip), and it can do far more than blink one LED. The name describes the structure, not a language.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-3.svg"
+            },
+            {
+              "id": "rtos-mcq-superloop-vs-rtos-when",
+              "type": "mcq",
+              "prompt": "Superloop vs RTOS — when do you actually need an RTOS?",
+              "choices": [
+                "Whenever your program is longer than ten lines",
+                "When a device must juggle several jobs at once and still meet timing deadlines, so a plain loop gets tangled",
+                "Only when you have more than one physical CPU",
+                "Whenever you want the code to look more advanced"
+              ],
+              "answerIndex": 1,
+              "explanation": "An RTOS earns its keep when several independent jobs with their own timing no longer fit cleanly into one loop — the scheduler handles the juggling for you. Program length, looking advanced, or having multiple CPUs are not the deciding factors; a single CPU is the normal case where an RTOS helps most.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-3.svg"
+            },
+            {
+              "id": "rtos-mcq-real-time-meaning",
+              "type": "mcq",
+              "prompt": "What does the 'real-time' in Real-Time Operating System mean?",
+              "choices": [
+                "The system shows a clock on screen",
+                "The system runs as fast as physically possible at all times",
+                "The system must respond by a deadline, reliably and predictably",
+                "The system only works while connected to the internet"
+              ],
+              "answerIndex": 2,
+              "explanation": "Real-time means reliable, predictable timing: the system must meet its deadlines, not merely finish eventually. It is about being on time, not about raw speed, a visible clock, or an internet connection.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-3.svg"
+            },
+            {
+              "id": "rtos-mcq-task-meaning",
+              "type": "mcq",
+              "prompt": "In an RTOS, what is a 'task'?",
+              "choices": [
+                "A to-do note for the programmer",
+                "One of the device's jobs written as its own small, self-contained program",
+                "A type of sensor",
+                "The single big loop in a bare-metal program"
+              ],
+              "answerIndex": 1,
+              "explanation": "An RTOS lets you write each job (read the sensor, update the display, talk to wifi) as its own small program called a task. It is not a programmer's note or a sensor, and the whole point is that you no longer cram everything into one big loop.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-3.svg"
+            },
+            {
+              "id": "rtos-mcq-kitchen-analogy",
+              "type": "mcq",
+              "prompt": "Using the kitchen analogy, which pairing is correct?",
+              "choices": [
+                "Superloop = a chef switching between many dishes; RTOS = one cook doing everything in strict order",
+                "Superloop = one cook doing everything in strict order; RTOS = a chef rapidly switching between dishes so none burns",
+                "Both are the same as a single cook",
+                "RTOS means hiring a second physical cook (CPU)"
+              ],
+              "answerIndex": 1,
+              "explanation": "The superloop is like one cook doing every step in a fixed order. The RTOS scheduler is like a chef quickly switching between dishes so none burns — still one cook (one CPU), just clever switching. Hiring a second cook would be adding a second CPU, which is a different thing.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-3.svg"
             },
             {
               "id": "rtos-mcq-superloop-failure",
               "type": "mcq",
-              "prompt": "In a superloop, what is the typical failure mode that signals you've outgrown it?",
+              "prompt": "What is the typical sign that a superloop has been outgrown?",
               "choices": [
-                "Interrupts stop firing entirely",
-                "A long-running background activity starves a time-sensitive one, forcing manual interleaving",
-                "The CPU clock drifts out of spec",
-                "The linker can no longer place the .bss section"
+                "The chip physically overheats",
+                "One slow job holds up the others, so a time-sensitive job misses its moment",
+                "The program file becomes too large to compile",
+                "The LED gets too bright"
               ],
               "answerIndex": 1,
-              "explanation": "The classic smell is one long activity (e.g. a slow UART flush) blocking a deadline-sensitive one, so you start manually chopping work into chunks with state machines — hand-rolling a scheduler poorly. The other options are unrelated hardware/build issues."
+              "explanation": "The classic warning sign is that a slow job (like a long wifi send) keeps the loop busy, so a job needing prompt attention is delayed and misses its deadline. This is a timing/structure problem, not overheating, file size, or LED brightness.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-3.svg"
             },
             {
-              "id": "rtos-mcq-superloop-async",
+              "id": "rtos-mcq-rtos-cost",
               "type": "mcq",
-              "prompt": "In a bare-metal superloop, how are asynchronous hardware events normally handled?",
+              "prompt": "What is a real cost of adding an RTOS that means you should not add one needlessly?",
               "choices": [
-                "By an RTOS tick interrupt",
-                "By interrupts that set volatile flags or fill ring buffers, which the loop later drains",
-                "By spawning a thread per event",
-                "By disabling interrupts and polling in a tight busy-wait"
+                "It always makes the program run slower than a superloop in every case",
+                "It uses extra memory and adds complexity (each task needs its own working space, plus new kinds of bugs)",
+                "It requires the chip to have a screen",
+                "It deletes your sensor data"
               ],
               "answerIndex": 1,
-              "explanation": "ISRs are the 'foreground': they do minimal work (set a volatile flag, push into a ring buffer) and the 'background' loop drains them. There is no RTOS tick and no threads in a pure superloop, and disabling interrupts to busy-wait would defeat responsiveness."
+              "explanation": "An RTOS uses extra memory (each task needs its own stack), adds the scheduler's overhead, and introduces new kinds of bugs to watch for. That is why you avoid adding one just for show. It does not require a screen or destroy data, and it is not slower in every case.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-3.svg"
             },
             {
-              "id": "rtos-fc-rule-of-thumb",
-              "type": "flashcard",
-              "front": "What's a reasonable rule of thumb for choosing bare-metal vs RTOS?",
-              "back": "Stay bare-metal until you have ~3+ asynchronous activities with conflicting deadlines, or you genuinely need blocking semantics to keep the code maintainable. Don't add an RTOS just for ceremony — it costs RAM, cycles, and new bug classes.",
-              "hint": "Count the conflicting concurrent activities."
+              "id": "rtos-mcq-good-superloop-case",
+              "type": "mcq",
+              "prompt": "Which job is perfectly fine to leave as a simple superloop?",
+              "choices": [
+                "A device that simultaneously streams audio, runs a touchscreen UI, and keeps a network connection alive",
+                "A sensor that reads a value every second and sends it out, with nothing else going on",
+                "A robot coordinating motors, vision, and radio at once",
+                "A system that must answer three different deadlines at the same time"
+              ],
+              "answerIndex": 1,
+              "explanation": "A single, simple, periodic job with nothing else competing for attention is textbook superloop territory — an RTOS would just add cost. The other choices involve several deadline-sensitive jobs at once, which is exactly where an RTOS helps.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-3.svg"
             }
           ]
         },
         {
           "id": "rtos-rtos-l2-scheduler-context-switch",
-          "title": "Tasks, the Scheduler, and the Context Switch",
+          "title": "Tasks, the Scheduler, and Switching Between Them",
           "order": 2,
           "difficulty": 1,
-          "content": "A **task** is just a function that never returns, plus a *Task Control Block* (TCB) and a dedicated stack. The TCB holds the task's priority, state, and — critically — a saved copy of its CPU register context when it isn't running.\n\n**Task states** form a small state machine. A task is *Running* (on the CPU — only one per core), *Ready* (runnable, waiting its turn), *Blocked* (waiting on an event or timeout — e.g. a queue, semaphore, or `vTaskDelay`), or *Suspended* (explicitly parked). The scheduler's job is to pick, among all Ready tasks, the one that should run.\n\nThe **context switch** is the mechanism. When the scheduler decides to switch from task A to task B, it must *save A's volatile state* — the CPU registers R0–R12, the stack pointer, LR, PC, and xPSR (Module 3) — into A's stack/TCB, then *restore B's* previously saved state. On Cortex-M this is done in the **PendSV** exception handler: the kernel raises PendSV at the lowest exception priority so the switch happens *after* all pending ISRs, and the hardware's automatic stacking/unstacking of the exception frame does half the work. Each task uses its own **Process Stack Pointer (PSP)**, while handlers run on the **Main Stack Pointer (MSP)**.\n\nWhat *triggers* a switch? Either a task blocks/yields voluntarily, or the periodic **tick interrupt** (often SysTick, Module 7) fires and the kernel notices a higher-priority task became Ready. The tick is the kernel's heartbeat: it ages delays, expires timeouts, and drives time slicing.\n\nThe context switch is not free — it's tens to low hundreds of cycles — which is why you keep ISRs short and don't switch gratuitously. But it's deterministic and bounded, which is the whole point of an RTOS over a general-purpose OS.",
+          "content": "**Hook.** A chef can only physically work on one dish at a time, yet a whole table of dishes comes out hot together. The trick is fast switching: a few seconds here, a few seconds there. An RTOS does the same with tasks on one CPU.\n\n**Build.** Recall a **task** is one of the device's jobs, written as its own small program. At any instant the single CPU can only run *one* task. The **scheduler** is the part of the RTOS that decides which task runs right now and switches between them.\n\nTo keep track, the RTOS gives each task a *state*. A task is **Running** if it is on the CPU right now (only one at a time). It is **Ready** if it could run but is waiting its turn. It is **Blocked** if it is waiting for something — for example, data that has not arrived yet, or a fixed delay to finish; a blocked task uses no CPU at all, which is a big advantage over a loop that keeps checking. From the Ready group, the scheduler picks one to make Running.\n\nWhen the scheduler moves the CPU from task A to task B, it must do a **context switch**. \"Context\" means everything the CPU was holding for task A — the numbers it was working on and the exact spot in the code. The RTOS *saves* all of that for A, then *restores* B's saved context so B continues exactly where it left off, as if it had never paused.\n\nWhat makes the scheduler switch? A task can give up the CPU itself (for example, by asking to wait for data or to sleep for a while), or a small repeating timer called the **tick** — the RTOS's heartbeat — fires and gives the scheduler a chance to hand the CPU to another task.\n\n**Recap.** One CPU, many tasks, each in a state (Running, Ready, or Blocked). The scheduler picks the next task; a context switch saves one task and restores another so the switch is invisible to the code.",
           "items": [
             {
+              "id": "rtos-img-time-slicing",
+              "type": "mcq",
+              "prompt": "In the timeline diagram, why do the tasks appear to all run 'at the same time'?",
+              "choices": [
+                "Each task secretly has its own CPU",
+                "The CPU runs each task for a short turn, then switches, fast enough that they all seem active at once",
+                "The tasks are merged into one big program before running",
+                "Only the fastest task ever actually runs"
+              ],
+              "answerIndex": 1,
+              "explanation": "The diagram shows the single CPU giving each task a short turn, then switching to the next. Because the turns are short and rapid, the tasks appear to run together even though only one runs at any instant. They are not given separate CPUs, not merged, and none is starved out.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-4.svg"
+            },
+            {
               "id": "rtos-img-task-states",
-              "type": "flashcard",
-              "front": "RTOS task state diagram (Running / Ready / Blocked / Suspended)",
-              "back": "State diagram showing Running, Ready, Blocked, and Suspended task states with transitions: scheduler dispatch, preemption/time-slice, blocking on take(), and event/give (often from ISR).",
+              "type": "mcq",
+              "prompt": "Looking at the task-state diagram, which statement is true?",
+              "choices": [
+                "Many tasks can be in the Running state at the same time on one CPU",
+                "Only one task is Running at a time; others wait in Ready or Blocked",
+                "A Blocked task is constantly checking and so uses lots of CPU",
+                "A Ready task is one that has finished forever"
+              ],
+              "answerIndex": 1,
+              "explanation": "On one CPU exactly one task is Running; the rest are Ready (could run, waiting their turn) or Blocked (waiting for an event or timeout). A Blocked task uses no CPU — that is the benefit of blocking over busy-checking — and Ready does not mean finished.",
               "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-1.svg"
             },
             {
-              "id": "rtos-fc-tcb",
-              "type": "flashcard",
-              "front": "What is a Task Control Block (TCB) and what does it hold?",
-              "back": "The kernel's bookkeeping struct for a task. It holds the task's priority and state, a pointer to its stack, and (when the task isn't running) its saved CPU register context so it can be resumed exactly where it left off.",
-              "hint": "Per-task metadata + saved context."
+              "id": "rtos-mcq-scheduler-role",
+              "type": "mcq",
+              "prompt": "What is the scheduler's main responsibility?",
+              "choices": [
+                "To compile your program",
+                "To decide which task gets the CPU next and switch between tasks",
+                "To store the device's data permanently",
+                "To draw the user interface"
+              ],
+              "answerIndex": 1,
+              "explanation": "The scheduler chooses which Ready task runs next and performs the switches. It is not the compiler, not storage, and not a UI — it is purely the part that hands the single CPU around among tasks.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-4.svg"
             },
             {
-              "id": "rtos-fc-context-switch",
-              "type": "flashcard",
-              "front": "What exactly happens during a context switch on Cortex-M?",
-              "back": "The kernel saves the outgoing task's CPU register context (R0-R12, SP/PSP, LR, PC, xPSR) onto its stack/TCB, then restores the incoming task's saved context. Hardware auto-stacks part of the frame on exception entry; the rest is done in the PendSV handler.",
-              "hint": "Save A's registers, restore B's — half by hardware."
+              "id": "rtos-mcq-running-count",
+              "type": "mcq",
+              "prompt": "On a chip with one CPU, how many tasks can be in the Running state at the same time?",
+              "choices": [
+                "As many as you create",
+                "Exactly one",
+                "Two: one foreground and one background",
+                "None — tasks never actually run"
+              ],
+              "answerIndex": 1,
+              "explanation": "One CPU can execute exactly one task at any instant, so only one task is Running at a time. The others are Ready or Blocked. Creating many tasks does not give you many CPUs.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-1.svg"
             },
             {
-              "id": "rtos-fc-pendsv",
-              "type": "flashcard",
-              "front": "Why do Cortex-M RTOSes perform the context switch in the PendSV handler at lowest priority?",
-              "back": "So the switch runs only after all higher-priority ISRs have finished. Raising PendSV (lowest exception priority) defers the switch to a clean point, avoiding switching mid-ISR and keeping interrupt latency low.",
-              "hint": "It should happen after pending interrupts, not during them."
+              "id": "rtos-mcq-blocked-state",
+              "type": "mcq",
+              "prompt": "A task asks to wait until new sensor data arrives. What state does it enter, and what is the benefit?",
+              "choices": [
+                "Running; it keeps the CPU so it reacts instantly",
+                "Blocked; it gives up the CPU and uses no CPU time while waiting, so other tasks can run",
+                "Ready; it spins in a tight loop checking for data",
+                "It is deleted and re-created when data arrives"
+              ],
+              "answerIndex": 1,
+              "explanation": "Waiting for data puts the task in the Blocked state, where it uses no CPU at all — the scheduler can run other tasks meanwhile and wake this one when data arrives. Busy-spinning while Ready would waste CPU, and the task is not deleted.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-1.svg"
             },
             {
-              "id": "rtos-fc-msp-psp",
-              "type": "flashcard",
-              "front": "How do MSP and PSP map onto RTOS tasks vs handlers on Cortex-M?",
-              "back": "Each task runs on its own stack via the Process Stack Pointer (PSP); exception/interrupt handlers run on the Main Stack Pointer (MSP). This separation means an ISR can't corrupt a task's stack and lets each task be independently sized.",
-              "hint": "Threads = PSP, handlers = MSP."
+              "id": "rtos-mcq-context-meaning",
+              "type": "mcq",
+              "prompt": "In 'context switch,' what does the word context refer to?",
+              "choices": [
+                "The comments the programmer wrote",
+                "Everything the CPU was holding for a task: its working numbers and the exact spot in the code",
+                "The wiring diagram of the chip",
+                "The name the programmer gave the task"
+              ],
+              "answerIndex": 1,
+              "explanation": "Context is the CPU's working state for a task — the values it was using and the precise place in the code it had reached. Saving and restoring this is what lets a task resume as if it never paused. It is not comments, wiring, or a name.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-4.svg"
             },
             {
-              "id": "rtos-fc-tick",
-              "type": "flashcard",
-              "front": "What is the RTOS 'tick' and what does it do?",
-              "back": "A periodic timer interrupt (commonly SysTick) that is the kernel's heartbeat. Each tick ages task delays, expires timeouts, drives time slicing among equal-priority tasks, and lets the scheduler notice a newly-ready higher-priority task.",
-              "hint": "The kernel's periodic heartbeat, often SysTick."
+              "id": "rtos-mcq-context-switch-steps",
+              "type": "mcq",
+              "prompt": "When the scheduler switches the CPU from task A to task B, what must it do?",
+              "choices": [
+                "Throw away task A entirely and start task B from the beginning",
+                "Save task A's context, then restore task B's saved context so B continues where it left off",
+                "Run both A and B at once on the same CPU",
+                "Ask the user which task to keep"
+              ],
+              "answerIndex": 1,
+              "explanation": "A context switch saves A's working state and restores B's previously saved state, so B resumes exactly where it had paused. A is not discarded (it resumes later), the two do not run at once on one CPU, and no user input is involved.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-4.svg"
+            },
+            {
+              "id": "rtos-mcq-tick",
+              "type": "mcq",
+              "prompt": "What is the RTOS 'tick'?",
+              "choices": [
+                "A bug that makes the program stutter",
+                "A small repeating timer — the RTOS heartbeat — that regularly gives the scheduler a chance to switch tasks and measure delays",
+                "The sound the chip makes",
+                "A one-time event at startup only"
+              ],
+              "answerIndex": 1,
+              "explanation": "The tick is a periodic timer interrupt that acts as the RTOS heartbeat: each tick lets the scheduler check whether to switch tasks and helps count down delays. It is not a bug, a sound, or a one-time event.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-4.svg"
             },
             {
               "id": "rtos-mcq-switch-trigger",
               "type": "mcq",
-              "prompt": "Which of these does NOT directly trigger a context switch?",
+              "prompt": "Which of these can cause the scheduler to switch tasks?",
               "choices": [
-                "A running task calls a blocking queue-receive and no data is available",
-                "The tick interrupt fires and a higher-priority task has become Ready",
-                "A task voluntarily yields the CPU",
-                "A non-volatile local variable goes out of scope inside a function"
+                "A task voluntarily asking to wait (for data or a delay), or the tick timer firing",
+                "Renaming a variable in the source code",
+                "Adding a comment to the program",
+                "Nothing — once a task starts it always runs to the very end"
               ],
-              "answerIndex": 3,
-              "explanation": "A local variable leaving scope is ordinary C execution with no kernel involvement. Blocking, yielding, and the tick making a higher-priority task ready are all classic reschedule points."
-            },
-            {
-              "id": "rtos-mcq-states",
-              "type": "mcq",
-              "prompt": "A task calls vTaskDelay(10). What state does it enter and how does it leave?",
-              "choices": [
-                "Suspended; it leaves only when another task calls resume",
-                "Blocked; it becomes Ready when the delay expires (tick-driven), then runs when it's the highest-priority Ready task",
-                "Running; delays don't change task state",
-                "Ready; it spins until the time passes"
-              ],
-              "answerIndex": 1,
-              "explanation": "vTaskDelay blocks the task on a timeout. The tick ages the delay; when it expires the task moves to Ready, and the scheduler runs it once it's the highest-priority Ready task. Suspended requires an explicit suspend call, and a well-designed RTOS never spins (busy-waits) for a delay."
+              "answerIndex": 0,
+              "explanation": "Switches happen when a task gives up the CPU (waiting for data or sleeping) or when the periodic tick gives the scheduler a chance to act. Renaming variables and comments are just source code and have no runtime effect, and tasks do not have to run to completion before another can run.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-4.svg"
             }
           ]
         },
         {
-          "id": "rtos-rtos-l3-scheduling-sync-isr",
-          "title": "Scheduling, Synchronization, and ISR-to-Task Handoff",
+          "id": "rtos-rtos-l3-priorities-sharing",
+          "title": "Priorities, Preemption, and Sharing Data Safely",
           "order": 3,
           "difficulty": 2,
-          "content": "**Scheduling.** FreeRTOS and Zephyr default to **preemptive, priority-based** scheduling: the highest-priority Ready task always runs, and the moment a higher-priority task becomes Ready it *preempts* the current one. Tasks of *equal* priority can be **time-sliced** (round-robin) on each tick. When nothing is Ready, the kernel runs the **idle task**, which can hook a low-power sleep. **Tickless idle** goes further: instead of waking every tick to do nothing, the kernel programs a timer to wake only at the next real deadline and sleeps deeply in between — essential for battery devices.\n\n**Synchronization & IPC** is your home turf, but the primitives have embedded flavor:\n- **Binary/counting semaphores** — signaling and resource counting.\n- **Mutexes** — like a binary semaphore but with *ownership* and *priority inheritance* (next lesson). Use a mutex, not a bare semaphore, to guard a shared resource.\n- **Queues** — copy-by-value message passing between tasks; the canonical safe way to hand data across.\n- **Event groups/flags** — a set of bits a task can wait on (any/all).\n- **Task notifications** — a lightweight, fast, per-task signal/value that avoids allocating a separate object; often the fastest ISR-to-task path.\n\n**The give-from-ISR pattern** is the heart of responsive firmware. An ISR must never block, so it can't take a mutex or do a normal blocking queue send. Instead it uses the `...FromISR` variants — `xSemaphoreGiveFromISR`, `xQueueSendFromISR`, `vTaskNotifyGiveFromISR`. These signal a waiting task and set a `xHigherPriorityTaskWoken` flag; you then call `portYIELD_FROM_ISR(woken)` so that if the unblocked task outranks the interrupted one, the scheduler switches to it *immediately on ISR exit* (deferred interrupt handling / 'bottom half'). This is exactly Module 6's top-half/bottom-half split, now with a real scheduler doing the handoff.",
+          "content": "**Hook.** In a busy kitchen, some things cannot wait: if a pot is boiling over, the chef drops the salad and deals with it *now*. An RTOS works the same way — some tasks are more urgent than others, and an urgent one can interrupt a less urgent one.\n\n**Build.** Each task is given a **priority** — a number saying how urgent it is. The scheduler follows a simple rule called **preemptive priority scheduling**: the most urgent task that is Ready always runs. If a more urgent task becomes Ready while a less urgent one is running, the scheduler *immediately* takes the CPU away from the less urgent task and gives it to the urgent one. This interrupting is called **preemption**. If two tasks have the *same* priority, the scheduler can share the CPU between them by giving each a short turn in rotation — this is **time slicing**.\n\nNow, tasks often need to share information, and doing this carelessly causes corruption. Three tools help:\n\n- A **queue** is like a mailbox line: one task drops a copy of a message in one end, another task takes it out the other end. It is the safe, normal way to pass data between tasks.\n- A **semaphore** is a simple signal: one task (or a hardware event) raises a flag to say \"something happened,\" and a waiting task notices and acts. It is how you wake a task when an event occurs.\n- A **mutex** (short for *mutual exclusion*) is a single key. Before a task touches a shared item, it must take the key; it returns the key when done. Because there is only one key, just one task changes the item at a time, so the data never gets half-updated by two tasks at once.\n\n*Why protect shared data at all?* If two tasks update the same value at the same time, one can overwrite the other midway, leaving a garbled result. The mutex's one-key rule prevents this.\n\n**Special case — hardware events.** A *hardware event* (like a button press) is handled by a short piece of code called an *interrupt handler*. Such code must never wait, so it cannot use the normal blocking calls. Instead it uses a special \"from-interrupt\" version (often described as \"give from ISR,\" where ISR means Interrupt Service Routine) to *signal* a waiting task to do the real work.\n\n**Recap.** Priorities plus preemption make urgent work happen first; time slicing shares the CPU among equals. Queues pass data, semaphores signal events, and a mutex's single key keeps shared data from being corrupted.",
           "items": [
             {
-              "id": "rtos-fc-preemptive",
-              "type": "flashcard",
-              "front": "What does 'preemptive priority-based scheduling' guarantee?",
-              "back": "The highest-priority Ready task always runs; the instant a higher-priority task becomes Ready it preempts (interrupts) the lower-priority running task. Equal-priority tasks may be time-sliced round-robin.",
-              "hint": "Highest-priority Ready task always wins, immediately."
-            },
-            {
-              "id": "rtos-fc-idle-tickless",
-              "type": "flashcard",
-              "front": "What is the idle task, and what does tickless idle add?",
-              "back": "The idle task runs when no other task is Ready and can hook a low-power sleep. Tickless idle suppresses the periodic tick while idle, reprogramming a timer to wake only at the next real deadline so the MCU sleeps deeply — critical for battery life.",
-              "hint": "Idle = nothing to do; tickless = don't wake just to tick."
-            },
-            {
-              "id": "rtos-fc-mutex-vs-sem",
-              "type": "flashcard",
-              "front": "Why use a mutex rather than a binary semaphore to guard a shared resource?",
-              "back": "A mutex has ownership (only the taker can give it back) and supports priority inheritance, which prevents/limits priority inversion. A bare binary semaphore has neither, so using one for mutual exclusion invites unbounded inversion.",
-              "hint": "Ownership + priority inheritance."
-            },
-            {
-              "id": "rtos-fc-queue",
-              "type": "flashcard",
-              "front": "What is a queue in an RTOS and why is it the canonical inter-task data path?",
-              "back": "A queue passes messages by copy (by value) between tasks, with built-in blocking on full/empty. Copying avoids shared-pointer lifetime/ownership races, making it the safe default for handing data from a producer task to a consumer task.",
-              "hint": "Copy-by-value message passing with blocking."
-            },
-            {
-              "id": "rtos-fc-task-notification",
-              "type": "flashcard",
-              "front": "What are task notifications and when are they preferred?",
-              "back": "A lightweight per-task signal/value built into the TCB — no separate kernel object to allocate. They're the fastest, lowest-RAM signaling/IPC path, ideal for a single ISR or task signaling one specific task (e.g. the fast ISR-to-task wakeup).",
-              "hint": "Fastest signal, no separate object, one target task."
-            },
-            {
-              "id": "rtos-fc-give-from-isr",
-              "type": "flashcard",
-              "front": "Describe the 'give from ISR' pattern and the role of xHigherPriorityTaskWoken.",
-              "back": "An ISR can't block, so it uses the ...FromISR API (xSemaphoreGiveFromISR / xQueueSendFromISR / vTaskNotifyGiveFromISR) to signal a waiting task. These set xHigherPriorityTaskWoken; the ISR then calls portYIELD_FROM_ISR(woken) so the scheduler switches to the unblocked task on ISR exit if it outranks the interrupted task.",
-              "hint": "FromISR variant + yield flag = immediate handoff (bottom half)."
-            },
-            {
-              "id": "rtos-mcq-isr-blocking",
+              "id": "rtos-img-queue",
               "type": "mcq",
-              "prompt": "Why must you call xSemaphoreGiveFromISR instead of xSemaphoreGive inside an interrupt handler?",
+              "prompt": "In the queue diagram, how does data get from the producer task to the consumer task?",
               "choices": [
-                "The FromISR version is faster but otherwise identical",
-                "The normal version may block/reschedule, which is illegal in ISR context; the FromISR version is non-blocking and reports whether a higher-priority task was woken",
-                "ISRs cannot touch any kernel object, so FromISR bypasses the kernel entirely",
-                "The normal version only works on the idle task"
+                "Both tasks edit the same variable at the same time",
+                "The producer puts a copy into one end of the queue; the consumer takes it from the other end",
+                "The consumer reaches into the producer's memory directly",
+                "The scheduler emails it"
               ],
               "answerIndex": 1,
-              "explanation": "ISRs run to completion and must never block or trigger a context switch mid-handler. The FromISR API is interrupt-safe (non-blocking) and returns the xHigherPriorityTaskWoken flag so you can request a yield on exit. It does still interact with the kernel — safely."
+              "explanation": "A queue works like a mailbox line: the producer drops a copy in one end and the consumer takes it from the other. Because a copy is passed, the two tasks never have to poke at the same memory at once, which is what makes it safe. Editing one shared variable simultaneously is exactly the unsafe pattern queues avoid.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-5.svg"
             },
             {
-              "id": "rtos-mcq-deferred",
+              "id": "rtos-mcq-priority-meaning",
               "type": "mcq",
-              "prompt": "After an ISR gives a semaphore that unblocks a high-priority task, how do you ensure that task runs immediately rather than after the next tick?",
+              "prompt": "What does a task's 'priority' represent?",
               "choices": [
-                "Call vTaskDelay(0) at the end of the ISR",
-                "Disable interrupts until the task runs",
-                "Pass the xHigherPriorityTaskWoken result to portYIELD_FROM_ISR() at the end of the ISR",
-                "Raise the ISR's NVIC priority above the task's priority"
-              ],
-              "answerIndex": 2,
-              "explanation": "portYIELD_FROM_ISR(woken) requests a context switch on ISR exit when a higher-priority task was woken, giving the deferred 'bottom half' immediate service. vTaskDelay is illegal in an ISR, disabling interrupts hurts latency, and NVIC priority is unrelated to RTOS task priority."
-            },
-            {
-              "id": "rtos-mcq-event-group",
-              "type": "mcq",
-              "prompt": "A task must wait until BOTH a sensor-ready event AND a config-loaded event have occurred. Which primitive fits best?",
-              "choices": [
-                "A single counting semaphore",
-                "An event group, waiting on both bits with 'wait for all'",
-                "A queue of length 1",
-                "A mutex"
+                "How much memory it uses",
+                "How urgent it is — used by the scheduler to decide who runs first",
+                "The order it was written in the source file",
+                "Its color in the debugger"
               ],
               "answerIndex": 1,
-              "explanation": "Event groups let a task block until a specified set of bits is set, with any/all semantics — exactly the 'wait for all of N conditions' case. A semaphore counts but can't express two distinct conditions, a queue passes data not conjunctive conditions, and a mutex is for mutual exclusion."
+              "explanation": "Priority is a measure of urgency that the scheduler uses to pick which Ready task runs. It is not about memory use, source order, or any display color.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-5.svg"
+            },
+            {
+              "id": "rtos-mcq-preemption",
+              "type": "mcq",
+              "prompt": "A low-urgency task is running when a high-urgency task becomes Ready. Under preemptive priority scheduling, what happens?",
+              "choices": [
+                "The high-urgency task waits politely until the low one finishes",
+                "The scheduler immediately takes the CPU from the low task and runs the high task",
+                "Both run at half speed",
+                "The high task is dropped because the CPU is busy"
+              ],
+              "answerIndex": 1,
+              "explanation": "Preemption means a more urgent Ready task interrupts a less urgent running one right away — that is the whole point. The urgent task does not wait its turn, the CPU does not split (one CPU runs one task), and the urgent task is certainly not dropped.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-4.svg"
+            },
+            {
+              "id": "rtos-mcq-time-slicing",
+              "type": "mcq",
+              "prompt": "What does 'time slicing' do?",
+              "choices": [
+                "Permanently picks one task and ignores the rest",
+                "Shares the CPU among tasks of equal priority by giving each a short turn in rotation",
+                "Cuts the program into separate files",
+                "Slows the CPU clock to save power"
+              ],
+              "answerIndex": 1,
+              "explanation": "Time slicing fairly rotates the CPU among equal-priority tasks, giving each a short turn so none is starved. It does not pick a single permanent winner, split source files, or change the clock speed.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-4.svg"
+            },
+            {
+              "id": "rtos-mcq-queue-purpose",
+              "type": "mcq",
+              "prompt": "What is a queue used for in an RTOS?",
+              "choices": [
+                "Locking a shared resource so only one task uses it",
+                "Passing messages/data from one task to another by copy, like a mailbox line",
+                "Measuring how long a task runs",
+                "Giving a task a higher priority"
+              ],
+              "answerIndex": 1,
+              "explanation": "A queue carries copies of messages from one task to another in first-in-first-out order — the safe, normal way to hand data across tasks. Locking a resource is a mutex's job, and a queue neither measures time nor changes priority.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-5.svg"
+            },
+            {
+              "id": "rtos-mcq-what-is-mutex",
+              "type": "mcq",
+              "prompt": "What is a mutex, and why protect shared data with it?",
+              "choices": [
+                "A faster kind of CPU; it makes shared data load quicker",
+                "A single 'key' a task must hold before touching a shared item, so only one task changes it at a time and the data is never left half-updated",
+                "A message line that copies data between tasks",
+                "A timer that wakes a task after a delay"
+              ],
+              "answerIndex": 1,
+              "explanation": "A mutex (mutual exclusion) is a single key: a task must take it before touching shared data and return it after. Because only one key exists, only one task edits the data at a time, so two tasks can't garble it by writing at once. A message line is a queue, and a delay timer is unrelated; a mutex is not hardware.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-5.svg"
+            },
+            {
+              "id": "rtos-mcq-why-protect",
+              "type": "mcq",
+              "prompt": "Why is it dangerous for two tasks to update the same value at the same time without protection?",
+              "choices": [
+                "It uses too much electricity",
+                "One task can overwrite the other partway through, leaving a garbled, half-updated value",
+                "It always crashes the compiler",
+                "The chip forgets the value forever"
+              ],
+              "answerIndex": 1,
+              "explanation": "Updating a value isn't instant, so two unprotected tasks can interleave and one overwrites the other midway, producing a corrupted result. A mutex prevents this by allowing only one updater at a time. It is not about electricity, the compiler, or permanent memory loss.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-5.svg"
+            },
+            {
+              "id": "rtos-mcq-semaphore",
+              "type": "mcq",
+              "prompt": "What is a semaphore most commonly used for?",
+              "choices": [
+                "Copying large data buffers between tasks",
+                "Signaling — one task or event raises a flag, and a waiting task notices and acts",
+                "Compiling the program faster",
+                "Giving every task the same priority"
+              ],
+              "answerIndex": 1,
+              "explanation": "A semaphore is a simple signal: it says 'something happened,' waking a waiting task to respond. Copying bulk data is what a queue does; a semaphore does not compile code or set priorities.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-5.svg"
+            },
+            {
+              "id": "rtos-mcq-give-from-isr",
+              "type": "mcq",
+              "prompt": "A button press is handled by a short interrupt handler that must never wait. How should it hand the real work to a task?",
+              "choices": [
+                "By doing all the work inside the handler and blocking until it finishes",
+                "By using a special 'from-interrupt' signal (give from ISR) to wake a waiting task that does the real work",
+                "By renaming the task to make it run",
+                "By turning off the scheduler"
+              ],
+              "answerIndex": 1,
+              "explanation": "Interrupt handlers must stay short and never block, so they use the special 'from-ISR' signal to wake a normal task that does the heavier work. Doing it all in the handler (and blocking) is exactly what's forbidden; renaming tasks or disabling the scheduler does nothing useful here.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-5.svg"
+            },
+            {
+              "id": "rtos-mcq-queue-vs-mutex",
+              "type": "mcq",
+              "prompt": "You want to send a stream of sensor readings from one task to another. Which tool fits best?",
+              "choices": [
+                "A mutex, because it passes data",
+                "A queue, which carries each reading as a message from producer to consumer",
+                "A priority change, which moves the data",
+                "Nothing — just let both tasks write the same variable"
+              ],
+              "answerIndex": 1,
+              "explanation": "A queue is built for handing a stream of messages from a producer task to a consumer task safely. A mutex only locks shared data (it doesn't transport messages), changing priority doesn't move data, and letting both write one variable is the unsafe pattern queues exist to avoid.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-5.svg"
             }
           ]
         },
         {
           "id": "rtos-rtos-l4-inversion-stacks-modern",
-          "title": "Priority Inversion, Stack Sizing, and Modern Rust (RTIC/Embassy)",
+          "title": "Priority Inversion, Task Stacks, and the RTOS Landscape",
           "order": 4,
           "difficulty": 3,
-          "content": "**Priority inversion** is the headline failure. Setup: a low-priority task **L** holds a mutex; a high-priority task **H** wakes and wants that mutex, so **H blocks**. Fine so far — H must wait for L. The disaster is a *medium*-priority task **M** that is Ready: it preempts L (it outranks L), L never gets to run to release the mutex, and so **M effectively delays H** even though M is lower priority than H. H's deadline can be missed unboundedly. This is exactly what stalled NASA's **Mars Pathfinder** (1997): a high-rate bus-management task blocked on a mutex held by a low-rate meteorological task while medium-priority comms tasks ran, repeatedly tripping a watchdog that reset the lander.\n\n**The fixes:**\n- **Priority inheritance** — while H is blocked on L's mutex, the kernel *temporarily boosts L to H's priority* so M can't preempt it; L releases the mutex quickly and drops back. (FreeRTOS mutexes do this; Pathfinder's fix was to enable it.)\n- **Priority ceiling** — each mutex carries a priority equal to the highest task that can take it; any holder immediately runs at that ceiling. More deterministic, prevents some deadlocks, common in safety-critical systems.\n\n**Other hazards:** **Deadlock** (two tasks each holding one mutex and waiting for the other — fix by consistent lock ordering); **starvation** (a low task never runs because higher ones hog the CPU). **Per-task stack sizing** has no MMU safety net on most MCUs: undersize a stack and you get silent corruption. Enable **stack-overflow detection** and size from the measured high-water mark plus margin.\n\n**FreeRTOS vs Zephyr.** FreeRTOS is a small kernel you *link* into your app — minimal, ubiquitous. **Zephyr** is a full RTOS plus driver model, **device tree** (hardware described declaratively, as in Linux), **Kconfig** (menu-driven build config), networking, and MCUboot — the conceptual bridge to embedded Linux.\n\n**Modern Rust.** Two alternatives: **RTIC** — interrupt-driven, *compile-time*-scheduled tasks bound to hardware interrupts, no classic kernel. **Embassy** — `async`/`await` tasks are cooperatively-scheduled futures; blocking becomes `.await`, giving thread-like ergonomics on one stack with tiny RAM. Both use Rust ownership to make data races compile errors.",
+          "content": "**Hook.** Picture an urgent task stuck waiting on a key that a slow, low-urgency task is holding — and the slow task keeps getting shoved aside by other work, so it never returns the key. The urgent task waits and waits. This famous trap is called *priority inversion*, and it once kept resetting a robot on Mars.\n\n**Build.** Set up three tasks: **L** (low urgency), **M** (medium), and **H** (high). Task L takes a mutex (the single key) to use a shared item. Then H wakes up and wants that same key, so H has to wait for L — reasonable so far. The trouble: a medium task M becomes Ready. Because M is more urgent than L, the scheduler runs M instead of L. So L never gets the CPU to finish and return the key, which means H stays stuck — effectively M, a *less* urgent task than H, is now delaying H. That backwards situation is **priority inversion**.\n\nThe common fix is **priority inheritance**: while H is waiting on the key that L holds, the RTOS *temporarily* raises L to H's urgency. Now M cannot push L aside; L quickly finishes, returns the key, and drops back down, so H proceeds. (Enabling exactly this fix is what rescued NASA's Mars Pathfinder lander in 1997.)\n\n**Task stacks.** Each task needs its own private scratch space in memory called a **stack**, used for its function calls and local values. You must give each task *enough* stack. On these tiny chips there is usually no safety net: if a task uses more than its stack allows, it quietly overruns into other memory and causes mysterious corruption — a **stack overflow**. The cure is to size each stack generously and turn on the RTOS's stack-overflow checking.\n\n**The landscape.** **FreeRTOS** is a small, popular RTOS you simply include in your program — minimal and everywhere. **Zephyr** is a much bigger system: a full RTOS plus drivers, a way to describe the hardware (a *device tree*), a build-configuration menu, and networking — more like a small Linux. There are also modern approaches in the *Rust* language: **RTIC** organizes tasks around hardware events with the schedule worked out before the program even runs, and **Embassy** uses *async* tasks (jobs that pause and resume at marked points) sharing a single stack to save memory. The big idea for all of them is the same: write each job separately and let the system juggle them.\n\n**Recap.** Priority inversion is a high task stuck behind a low one holding a needed key while a medium task hogs the CPU; priority inheritance fixes it. Give every task enough stack and enable overflow checks. FreeRTOS is the small classic, Zephyr the larger Linux-like option, with Rust's RTIC and Embassy as modern alternatives.",
           "items": [
             {
               "id": "rtos-img-inversion",
-              "type": "flashcard",
-              "front": "Priority-inversion timeline and the priority-inheritance fix",
-              "back": "Timeline showing low task L holding a mutex, high task H blocking on it, and medium task M preempting L (inversion); plus the fix where L inherits H's priority so M cannot preempt and H runs sooner.",
+              "type": "mcq",
+              "prompt": "In the priority-inversion timeline, what causes high task H to be delayed in the 'without inheritance' scenario?",
+              "choices": [
+                "H has the lowest priority of all",
+                "Medium task M keeps running instead of low task L, so L never finishes and returns the key H needs",
+                "The CPU has overheated",
+                "H forgot to ask for the key"
+              ],
+              "answerIndex": 1,
+              "explanation": "H is blocked waiting for the key (mutex) that L holds. Because M outranks L, M runs instead of L, so L can't finish and release the key — leaving H stuck behind a less urgent task. H is actually the highest priority; the delay is the inversion, not overheating, and H did request the key.",
               "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-2.svg"
             },
             {
-              "id": "rtos-fc-inversion-def",
-              "type": "flashcard",
-              "front": "Define unbounded priority inversion using tasks H, M, L and a mutex.",
-              "back": "L (low) holds a mutex; H (high) wakes and blocks waiting for it. A medium task M, being higher priority than L, preempts L — so L can't run to release the mutex, and M (lower than H) indefinitely delays H. H's deadline can be missed for as long as M keeps running.",
-              "hint": "M starves L, so H can't get the lock L holds."
-            },
-            {
-              "id": "rtos-fc-pathfinder",
-              "type": "flashcard",
-              "front": "What was the Mars Pathfinder (1997) priority-inversion incident and its fix?",
-              "back": "A high-rate bus-management task blocked on a mutex held by a low-rate meteorological task while medium-priority comms tasks ran, so a watchdog kept resetting the lander. The fix: enable priority inheritance on that mutex (a config flag toggled remotely).",
-              "hint": "The famous one that reset the lander; fixed by flipping inheritance on."
-            },
-            {
-              "id": "rtos-fc-inheritance",
-              "type": "flashcard",
-              "front": "How does priority inheritance fix priority inversion?",
-              "back": "While a high-priority task H is blocked on a mutex held by low-priority task L, the kernel temporarily boosts L to H's priority. Now medium task M can't preempt L; L finishes its critical section quickly, releases the mutex, and drops back to its base priority — bounding H's wait.",
-              "hint": "Temporarily promote the lock holder to the blocked task's priority."
-            },
-            {
-              "id": "rtos-fc-ceiling",
-              "type": "flashcard",
-              "front": "What is the priority-ceiling protocol and how does it differ from inheritance?",
-              "back": "Each mutex is assigned a ceiling = the priority of the highest task that can ever take it; any task that holds the mutex immediately runs at that ceiling. It's more deterministic than inheritance and can prevent certain deadlocks, so it's favored in safety-critical systems.",
-              "hint": "Holder runs at the mutex's pre-assigned highest-user priority."
-            },
-            {
-              "id": "rtos-fc-stack-overflow",
-              "type": "flashcard",
-              "front": "How do you size and protect per-task stacks on an MMU-less MCU?",
-              "back": "There's no hardware safety net, so undersized stacks silently corrupt memory. Enable stack-overflow detection (e.g. FreeRTOS configCHECK_FOR_STACK_OVERFLOW), watch the high-water mark (uxTaskGetStackHighWaterMark), and size as peak usage plus a safety margin.",
-              "hint": "High-water mark plus margin; turn on overflow checking."
-            },
-            {
-              "id": "rtos-fc-zephyr-dt-kconfig",
-              "type": "flashcard",
-              "front": "What do device tree and Kconfig provide in Zephyr?",
-              "back": "Device tree declaratively describes the hardware (peripherals, pins, buses) decoupled from code, as in Linux. Kconfig provides menu-driven, dependency-aware build configuration (which subsystems/drivers/features are compiled in). Together they make Zephyr a Linux-like, configurable platform rather than a linked library.",
-              "hint": "DT = describe hardware; Kconfig = choose features."
-            },
-            {
-              "id": "rtos-fc-rtic-embassy",
-              "type": "flashcard",
-              "front": "Contrast Rust RTIC and Embassy as RTOS alternatives.",
-              "back": "RTIC binds tasks to hardware interrupts with compile-time (static) priority scheduling and no classic kernel; resource sharing is checked by the type system. Embassy uses async/await: tasks are cooperatively-scheduled futures sharing one stack (tiny RAM), where blocking becomes .await. Both use Rust ownership to turn data races/UAF into compile errors.",
-              "hint": "RTIC = interrupt-driven, compile-time; Embassy = async/await futures."
-            },
-            {
-              "id": "rtos-mcq-inversion-fix",
+              "id": "rtos-mcq-inversion-def",
               "type": "mcq",
-              "prompt": "A high-priority task intermittently misses its deadline whenever a medium task is busy, and it shares a mutex with a low task. The most likely cause and fix?",
+              "prompt": "Which scenario is 'priority inversion'?",
               "choices": [
-                "Tick rate too low; raise configTICK_RATE_HZ",
-                "Priority inversion; switch the guarding primitive to a mutex with priority inheritance (or apply a priority ceiling)",
-                "Stack overflow; increase every task's stack",
-                "The idle task is starving it; lower the idle priority"
+                "A high-urgency task runs before a low-urgency one — exactly as intended",
+                "A high-urgency task is stuck waiting on a key held by a low task, while a medium task keeps the low task from finishing",
+                "Two tasks swap their priority numbers in the code",
+                "A task runs faster than expected"
               ],
               "answerIndex": 1,
-              "explanation": "Symptoms — high task delayed specifically when a medium task runs, while a low task holds a shared lock — are textbook priority inversion. The fix is a mutex with priority inheritance or a priority-ceiling protocol so the lock holder can't be preempted by the medium task. Tick rate, stack size, and idle priority don't explain the dependence on the medium task."
+              "explanation": "Priority inversion is when a high task is effectively delayed by a medium task, because the low task holding the needed key can't get CPU time to release it. The high task running first is normal (not inversion), and it isn't about editing priority numbers or running fast.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-2.svg"
             },
             {
-              "id": "rtos-mcq-deadlock",
+              "id": "rtos-mcq-inversion-role-m",
               "type": "mcq",
-              "prompt": "Two tasks each hold one mutex and block forever waiting for the other's. What is this, and the standard prevention?",
+              "prompt": "In the classic inversion setup, what role does the medium task M play?",
               "choices": [
-                "Starvation; raise both tasks' priorities",
-                "Priority inversion; enable inheritance",
-                "Deadlock; enforce a consistent global lock-acquisition order",
-                "Livelock; add a random backoff"
+                "It holds the key that H wants",
+                "It is more urgent than L, so it keeps running and prevents L from finishing and releasing the key",
+                "It is the highest-priority task and should run",
+                "It has nothing to do with the problem"
               ],
-              "answerIndex": 2,
-              "explanation": "Mutual circular waiting on two locks is deadlock. The simplest, robust prevention is a consistent lock ordering (always acquire A before B), breaking the circular-wait condition. Priorities/inheritance don't address a circular wait, and this is deadlock (stuck), not livelock (busy but no progress)."
+              "answerIndex": 1,
+              "explanation": "M is the troublemaker: being more urgent than L, it gets the CPU instead of L, so L can't release the key that H needs. M does not hold the key (L does), and M is not the highest priority — H is. M is central to the problem.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-2.svg"
+            },
+            {
+              "id": "rtos-mcq-inheritance-fix",
+              "type": "mcq",
+              "prompt": "How does 'priority inheritance' fix priority inversion?",
+              "choices": [
+                "It permanently makes every task high priority",
+                "While the high task waits, it temporarily raises the low task (holding the key) to the high task's urgency, so the medium task can't push it aside",
+                "It deletes the medium task",
+                "It removes the mutex so no key is needed"
+              ],
+              "answerIndex": 1,
+              "explanation": "Priority inheritance temporarily boosts the key-holding low task up to the waiting high task's urgency. Now the medium task can't preempt it, so it finishes and releases the key quickly, then drops back down. It does not permanently change priorities, delete tasks, or remove the lock.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-2.svg"
+            },
+            {
+              "id": "rtos-mcq-pathfinder",
+              "type": "mcq",
+              "prompt": "What is the well-known real-world example of priority inversion mentioned here?",
+              "choices": [
+                "A phone battery that drained too fast",
+                "NASA's Mars Pathfinder lander, which kept resetting until priority inheritance was enabled",
+                "A car engine that stalled",
+                "A laptop that overheated"
+              ],
+              "answerIndex": 1,
+              "explanation": "The famous case is NASA's 1997 Mars Pathfinder, where priority inversion repeatedly triggered resets until engineers enabled priority inheritance. The other examples are unrelated to inversion.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-2.svg"
+            },
+            {
+              "id": "rtos-mcq-stack-meaning",
+              "type": "mcq",
+              "prompt": "What is a task's 'stack'?",
+              "choices": [
+                "A pile of finished tasks waiting to be deleted",
+                "The task's own private scratch memory for its function calls and local values",
+                "The list of all tasks in priority order",
+                "The chip's main power supply"
+              ],
+              "answerIndex": 1,
+              "explanation": "Each task gets its own stack: private working memory for its function calls and local variables. It is not a pile of dead tasks, the scheduler's priority list, or anything to do with power.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-1.svg"
+            },
+            {
+              "id": "rtos-mcq-stack-overflow",
+              "type": "mcq",
+              "prompt": "What is a 'stack overflow' on a small microcontroller, and why is it dangerous?",
+              "choices": [
+                "The task runs too fast; this just wastes power",
+                "A task uses more stack than it was given and overruns into other memory, causing silent corruption because there is usually no safety net",
+                "Two tasks are given the same name",
+                "The display shows too many lines"
+              ],
+              "answerIndex": 1,
+              "explanation": "If a task needs more stack space than allotted, it spills into neighboring memory, corrupting it — and tiny chips usually lack hardware to catch this, so failures are mysterious. The fix is to size stacks generously and enable overflow checking. It is not about speed, names, or display lines.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-1.svg"
             },
             {
               "id": "rtos-mcq-freertos-vs-zephyr",
               "type": "mcq",
-              "prompt": "Which statement best captures the FreeRTOS vs Zephyr distinction?",
+              "prompt": "Which best captures the difference between FreeRTOS and Zephyr?",
               "choices": [
-                "FreeRTOS is a full OS with device tree; Zephyr is just a scheduler you link",
-                "FreeRTOS is a small kernel you link into your app; Zephyr is a full RTOS with a driver model, device tree, Kconfig, networking, and MCUboot",
-                "They are identical APIs with different names",
-                "Zephyr cannot do preemptive scheduling; FreeRTOS can"
+                "FreeRTOS is a full Linux-like system; Zephyr is just a tiny scheduler",
+                "FreeRTOS is a small RTOS you include in your program; Zephyr is a much larger system with drivers, hardware description (device tree), build configuration, and networking — more like a small Linux",
+                "They are the same product with different names",
+                "Zephyr can't switch between tasks; FreeRTOS can"
               ],
               "answerIndex": 1,
-              "explanation": "FreeRTOS is a minimal, ubiquitous kernel you link against. Zephyr is a far larger, Linux-like platform: driver model, device tree, Kconfig, networking stacks, and MCUboot integration. Both do preemptive priority scheduling; the first option inverts the two."
+              "explanation": "FreeRTOS is a minimal RTOS you simply link into your app, while Zephyr is a far bigger, Linux-like platform with drivers, a device tree, configuration menus, and networking. The first choice reverses them, and both can certainly schedule tasks.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-1.svg"
+            },
+            {
+              "id": "rtos-mcq-rust-options",
+              "type": "mcq",
+              "prompt": "What are RTIC and Embassy?",
+              "choices": [
+                "Two brands of microcontroller chips",
+                "Modern approaches in the Rust language for organizing concurrent embedded tasks (RTIC around hardware events; Embassy using async tasks on a shared stack)",
+                "Replacements for the CPU's stack",
+                "Two kinds of sensors"
+              ],
+              "answerIndex": 1,
+              "explanation": "RTIC and Embassy are modern Rust-based ways to structure embedded concurrency: RTIC arranges tasks around hardware events with a schedule fixed before runtime, and Embassy uses async tasks sharing one stack to save memory. They are not chips, sensors, or stack replacements.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-1.svg"
+            },
+            {
+              "id": "rtos-mcq-diagnose-inversion",
+              "type": "mcq",
+              "prompt": "A high-urgency task occasionally misses its deadline, but only when a medium task is busy, and it shares a mutex with a low task. Most likely cause and fix?",
+              "choices": [
+                "The stack is too small; make every stack tiny",
+                "Priority inversion; use a mutex with priority inheritance so the low key-holder can't be pushed aside",
+                "The tick is too fast; turn the RTOS off",
+                "The display is too slow; remove the screen"
+              ],
+              "answerIndex": 1,
+              "explanation": "The symptom — a high task delayed specifically when a medium task runs, while a low task holds the shared key — is textbook priority inversion. Enabling priority inheritance on that mutex lets the low holder finish and release the key. Shrinking stacks, disabling the RTOS, or removing a screen address none of this.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/rtos-2.svg"
             }
           ]
         }
