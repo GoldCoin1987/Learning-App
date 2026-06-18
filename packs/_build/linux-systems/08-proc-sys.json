@@ -5,289 +5,636 @@
   "lessons": [
     {
       "id": "proc-sys-l1",
-      "title": "procfs: Reading the Kernel as Files",
+      "title": "What /proc and /sys Are: Virtual Files",
       "order": 1,
       "difficulty": 1,
-      "content": "`/proc` is a *virtual* filesystem (procfs). Nothing in it lives on disk; every `read()` is a controlled trip into kernel data structures rendered as text. This is the everything-is-a-file philosophy applied to live kernel state, and it means you can answer most system questions with `cat`, no special tooling required.\n\nTwo halves live under `/proc`. First, **global kernel info**: `/proc/cpuinfo` (one block per logical CPU), `/proc/meminfo` (the canonical memory accounting that `free` parses), `/proc/loadavg` (1/5/15-minute run-queue averages plus running/total tasks), `/proc/mounts` (the kernel's live mount table), `/proc/version`, `/proc/cmdline` (the kernel command line from boot), and `/proc/interrupts` (per-CPU IRQ counts). Second, a numbered directory **per process**, named by PID.\n\nUnlike a regular file, a procfs file has size 0 until you read it; the content is generated on demand. That is why `ls -l /proc/meminfo` shows 0 bytes but `cat` returns data.\n\n```bash\n# Who am I, how loaded is the box, what booted it?\ncat /proc/loadavg            # 0.12 0.18 0.21 2/431 18922\ncat /proc/cmdline            # root=UUID=... ro quiet\nnproc                        # count of [proc/cpuinfo] processor blocks\ngrep -c ^processor /proc/cpuinfo\n\n# Is a mount really there? (more truthful than /etc/mtab)\ngrep ' /home ' /proc/mounts\n```\n\nThe key mental shift from your radar-tech days: these are not log files being written somewhere, they are a *window* the kernel opens when you look. Reading is cheap and side-effect-free, so explore freely.",
+      "content": "You already know the Linux idea that \"everything is a file\" — you open, read, and list things on disk with commands like `cat` and `ls`. This lesson adds a surprising twist: a few special folders contain files that aren't really on the disk at all.\n\n**Hook.** Imagine the dashboard of a car. The fuel gauge doesn't store a number anywhere; it shows you a live reading of what's happening right now. `/proc` and `/sys` are folders full of \"gauges\" like that for your running computer.\n\n**Build.** `/proc` and `/sys` are *virtual* (also called *pseudo*) filesystems. A filesystem is just the tree of folders and files you browse. \"Virtual\" means there is no real data sitting on the disk underneath. Instead, when you read one of these files, the kernel (the core program that runs the computer and manages its hardware and memory) builds the answer for you on the spot.\n\nSo reading a virtual file is really *asking the kernel a live question*. \"How much memory is free?\" \"What kernel version is running?\" The kernel computes the answer and hands it back as ordinary text — which means you can use the same plain commands you already know:\n\n```bash\ncat /proc/version    # which kernel is running right now\ncat /proc/loadavg    # how busy the system is\n```\n\nA neat clue that these aren't normal files: `ls -l /proc/meminfo` reports a size of 0 bytes, yet `cat /proc/meminfo` prints lines of text. The size is 0 because nothing is stored; the text only exists for the instant you read it.\n\n**Recap.** `/proc` and `/sys` are windows into the running system. Reading them is cheap and safe — it just asks the kernel a question and shows the answer as text.",
       "items": [
-        {
-          "id": "proc-sys-l1-f1",
-          "type": "flashcard",
-          "front": "What kind of filesystem is /proc, and where does its content physically live?",
-          "back": "It is a virtual/pseudo filesystem (procfs). The content lives nowhere on disk — it is generated on demand from in-kernel data structures each time you read a file.",
-          "hint": "Think about why ls shows size 0."
-        },
-        {
-          "id": "proc-sys-l1-f2",
-          "type": "flashcard",
-          "front": "Which /proc file holds the canonical memory accounting, and what userspace tool parses it?",
-          "back": "/proc/meminfo. Tools like `free` (and `vmstat`, `top`) read and reformat /proc/meminfo rather than measuring memory themselves.",
-          "hint": "free -h is just a pretty-printer."
-        },
-        {
-          "id": "proc-sys-l1-f3",
-          "type": "flashcard",
-          "front": "What does /proc/loadavg report?",
-          "back": "The 1-, 5-, and 15-minute load averages (run-queue length, including uninterruptible/D-state tasks), followed by running/total task counts and the last-created PID.",
-          "hint": "Three decimals plus a runnable/total fraction."
-        },
-        {
-          "id": "proc-sys-l1-f4",
-          "type": "flashcard",
-          "front": "Why does `ls -l /proc/cpuinfo` show a size of 0 bytes even though `cat` returns text?",
-          "back": "procfs files are generated on demand; they have no stored length. The kernel produces the bytes only when a process actually reads the file, so the stat size is reported as 0.",
-          "hint": "Generated, not stored."
-        },
-        {
-          "id": "proc-sys-l1-f5",
-          "type": "flashcard",
-          "front": "Which /proc file gives the kernel command line the system booted with?",
-          "back": "/proc/cmdline — e.g. `root=UUID=... ro quiet console=ttyS0`. It reflects what the bootloader passed to the kernel.",
-          "hint": "Ties back to the boot-chain module."
-        },
         {
           "id": "proc-sys-l1-m1",
           "type": "mcq",
-          "prompt": "You want to count the number of logical CPUs without running any tool other than reading a file. Which command works?",
+          "prompt": "What does it mean that /proc is a \"virtual\" filesystem?",
           "choices": [
-            "grep -c ^processor /proc/cpuinfo",
-            "cat /proc/loadavg | wc -l",
-            "wc -l /proc/meminfo",
-            "stat /proc/cpuinfo"
+            "Its files are stored on disk but hidden from normal users",
+            "Its files aren't stored on disk; the kernel generates their contents when you read them",
+            "It only works inside virtual machines",
+            "It is a backup copy of the real filesystem"
           ],
-          "answerIndex": 0,
-          "explanation": "/proc/cpuinfo emits one block per logical CPU, each beginning with a `processor` line, so counting those lines yields the logical-CPU count (the same figure `nproc` reports)."
+          "answerIndex": 1,
+          "explanation": "Virtual (or pseudo) means there is no data on disk. Each read is answered live by the kernel and returned as text. The first choice describes hidden disk files, which is something different."
         },
         {
           "id": "proc-sys-l1-m2",
           "type": "mcq",
-          "prompt": "Which statement about /proc/mounts is most accurate?",
+          "prompt": "A /proc file like /proc/cpuinfo isn't a real file on disk. So what is it really?",
           "choices": [
-            "It is a static file edited by the administrator at install time",
-            "It is the kernel's live view of currently mounted filesystems",
-            "It only lists disk partitions, never virtual mounts like tmpfs",
-            "It is identical to /etc/fstab"
+            "A snapshot saved at boot time and never updated",
+            "A log file the kernel keeps writing to",
+            "A live question to the kernel — reading it returns up-to-date information as text",
+            "A program you must compile before running"
           ],
-          "answerIndex": 1,
-          "explanation": "/proc/mounts is the kernel's authoritative live mount table (including tmpfs, proc, sysfs, etc.). /etc/fstab is the desired-state config; the two often differ."
+          "answerIndex": 2,
+          "explanation": "Reading a /proc file asks the kernel for current information, and the answer comes back as text. It is not a saved snapshot or a log being written; the content is produced fresh on each read."
         },
         {
           "id": "proc-sys-l1-m3",
           "type": "mcq",
-          "prompt": "Reading files under /proc is best characterized as:",
+          "prompt": "Why does `ls -l /proc/meminfo` show a size of 0 bytes even though `cat /proc/meminfo` prints plenty of text?",
           "choices": [
-            "Expensive disk I/O that should be cached",
-            "A side-effect-free, cheap inspection of kernel state",
-            "Something that requires root for every file",
-            "Equivalent to issuing a reboot-class syscall"
+            "The file is empty and cat is making up the output",
+            "Nothing is stored on disk, so there is no length to report; the text is built only when you read it",
+            "The file is compressed to 0 bytes",
+            "You need root permission to see the real size"
           ],
           "answerIndex": 1,
-          "explanation": "Reads hit in-memory kernel structures, are cheap, and have no side effects, so /proc is safe to explore freely. (A few per-PID files are root- or owner-restricted, but reading is not destructive.)"
+          "explanation": "Because the content is generated on demand and not stored, there is no fixed length, so the size shows as 0. The data appears only at the moment of reading."
         },
         {
           "id": "proc-sys-l1-m4",
           "type": "mcq",
-          "prompt": "Which /proc file would you read to see per-CPU interrupt counts — directly relevant to your radar/hardware instincts?",
+          "prompt": "Which everyday command can you use to read most files under /proc?",
           "choices": [
-            "/proc/version",
-            "/proc/loadavg",
-            "/proc/interrupts",
-            "/proc/cmdline"
+            "A special tool you must install first",
+            "Ordinary file commands like cat",
+            "Only programs written in C",
+            "The reboot command"
           ],
-          "answerIndex": 2,
-          "explanation": "/proc/interrupts shows one row per IRQ with counts per CPU and the handling device/driver — ideal for spotting which hardware is generating the most interrupts."
+          "answerIndex": 1,
+          "explanation": "Because the kernel hands back plain text, normal commands such as cat work directly. That is the whole convenience of the everything-is-a-file approach — no special tooling needed."
+        },
+        {
+          "id": "proc-sys-l1-m5",
+          "type": "mcq",
+          "prompt": "A good everyday analogy for /proc and /sys is:",
+          "choices": [
+            "A filing cabinet full of old paperwork",
+            "A car dashboard whose gauges show the live state of the running system",
+            "A photo album of past events",
+            "A locked safe you can never open"
+          ],
+          "answerIndex": 1,
+          "explanation": "Like dashboard gauges, these files show a live reading of what's happening right now. A filing cabinet or photo album would imply stored, unchanging data, which is the opposite of these live virtual files."
+        },
+        {
+          "id": "proc-sys-l1-m6",
+          "type": "mcq",
+          "prompt": "What is the kernel, in plain terms?",
+          "choices": [
+            "A text editor used to read /proc",
+            "The core program that runs the computer and manages its hardware, memory, and processes",
+            "Another name for the hard disk",
+            "The user account that owns /proc"
+          ],
+          "answerIndex": 1,
+          "explanation": "The kernel is the central piece of the operating system. /proc and /sys are how it surfaces its internal state to you as files."
+        },
+        {
+          "id": "proc-sys-l1-m7",
+          "type": "mcq",
+          "prompt": "Is it risky to poke around reading files in /proc just to explore?",
+          "choices": [
+            "Yes, reading any /proc file can crash the system",
+            "No — reading is cheap and has no side effects, so it's safe to explore",
+            "Yes, every read permanently changes a setting",
+            "No, but only because /proc is read at boot and then deleted"
+          ],
+          "answerIndex": 1,
+          "explanation": "Reading simply asks the kernel a question; it changes nothing. (Writing to a few special files can change settings, but plain reading is harmless.)"
+        },
+        {
+          "id": "proc-sys-l1-m8",
+          "type": "mcq",
+          "prompt": "Which command would you use to see which kernel version is currently running?",
+          "choices": [
+            "cat /proc/version",
+            "rm /proc/version",
+            "mkdir /proc/version",
+            "chmod 777 /proc/version"
+          ],
+          "answerIndex": 0,
+          "explanation": "cat /proc/version reads back the running kernel's version as text. The other commands try to delete, create, or change permissions — none of which is how you ask the kernel a question."
+        },
+        {
+          "id": "proc-sys-l1-m9",
+          "type": "mcq",
+          "prompt": "Both /proc and /sys share which key trait?",
+          "choices": [
+            "They store large files that fill up the disk",
+            "They are virtual filesystems whose contents come from the kernel, not the disk",
+            "They can only be read by automated tools, never by a person",
+            "They disappear whenever you log out"
+          ],
+          "answerIndex": 1,
+          "explanation": "Both are virtual filesystems: reads (and a few writes) go to the kernel's in-memory state rather than to disk. The other options describe ordinary disk files or are simply untrue.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/proc-sys-2.svg"
         }
       ]
     },
     {
       "id": "proc-sys-l2",
-      "title": "Per-Process Introspection: memory, open fds, and the device tree",
+      "title": "Reading the Basics: cpuinfo, meminfo, loadavg",
       "order": 2,
-      "difficulty": 2,
-      "content": "Every running process gets `/proc/<pid>/`, the answer key for \"what is this process doing.\" The high-value entries:\n\n- **cmdline** — the exact argv, NUL-separated (`tr '\\0' ' '` to read it).\n- **status** — human-readable: state, PPID, UIDs, and the memory fields `VmRSS` (resident set, real RAM) and `VmSize` (virtual address space). For \"how much memory is this process *actually* using,\" `VmRSS` is your answer.\n- **fd/** — a symlink per open file descriptor. Listing it answers \"what files/sockets does this process have open.\"\n- **maps** — every memory region: code, heap, stack, and each mapped library with its permissions.\n- **limits**, **cwd**, **root**, **environ**, **stat** round it out.\n\n```bash\npid=$(pgrep -n sshd)               # newest sshd\ncat /proc/$pid/cmdline | tr '\\0' ' '; echo\ngrep -E 'VmRSS|VmSize|^State' /proc/$pid/status\nls -l /proc/$pid/fd                # each fd -> file/socket/pipe it points to\nawk '{print $6}' /proc/$pid/maps | sort -u | head   # mapped objects\n```\n\nNow **sysfs** (`/sys`): where `/proc` is process-centric, `/sys` is the kernel **device model** laid out as directories. The real tree is `/sys/devices`; `/sys/class/<type>` (e.g. `net`, `block`) and `/sys/block` are curated *symlink views* into it, and `/sys/module/<name>` exposes loaded modules' parameters and reference counts. Map a network interface to its driver and link state without `ip`:\n\n```bash\nls /sys/class/net                  # lo eth0 wlan0 ...\ncat /sys/class/net/eth0/operstate  # up / down\ncat /sys/class/net/eth0/address    # MAC, same as `ip link`\nreadlink -f /sys/class/net/eth0    # -> the real /sys/devices/... path\n```",
+      "difficulty": 1,
+      "content": "Now that you know `/proc` files are live questions to the kernel, let's read a few of the most useful ones. You only need `cat`.\n\n**Hook.** Want to know what's inside your machine and how hard it's working — without installing anything? A handful of `/proc` files answer exactly that.\n\n**Build.** Three files cover most quick checks:\n\n- `/proc/cpuinfo` — a description of the processor(s). It prints one block per logical CPU, each starting with a line that begins `processor`. So the number of those lines is the number of CPUs the system sees.\n- `/proc/meminfo` — the system's memory accounting. The first lines are the most useful: `MemTotal` (how much RAM exists) and `MemFree` / `MemAvailable` (how much is unused or could be made available). RAM (random-access memory) is the fast working memory programs run in.\n- `/proc/loadavg` — the \"load average\": three numbers showing how busy the system was over the last 1, 5, and 15 minutes. Roughly, it's the average number of tasks waiting to run. Higher means busier.\n\n```bash\ncat /proc/cpuinfo            # one block per CPU\ngrep -c processor /proc/cpuinfo   # count the CPUs\ncat /proc/meminfo            # MemTotal, MemFree, MemAvailable...\ncat /proc/loadavg            # e.g. 0.12 0.18 0.21 2/431 18922\n```\n\nThese same numbers are what friendly tools show: `free` (memory) is essentially a tidy reprint of `/proc/meminfo`, and `uptime` (load) reprints `/proc/loadavg`. The tools READ the same files you can read by hand.\n\n**Recap.** To answer \"what CPUs do I have, how much memory is free, how busy is the box?\" just `cat` `/proc/cpuinfo`, `/proc/meminfo`, and `/proc/loadavg`.",
       "items": [
-        {
-          "id": "proc-sys-l2-f1",
-          "type": "flashcard",
-          "front": "To answer 'how much real RAM is this process using?', which /proc/<pid>/status field do you read — and why not VmSize?",
-          "back": "Read VmRSS (Resident Set Size = pages actually in physical RAM). VmSize is the total virtual address space, which includes unmapped/never-touched and swapped regions, so it overstates real usage.",
-          "hint": "Resident vs virtual."
-        },
-        {
-          "id": "proc-sys-l2-f2",
-          "type": "flashcard",
-          "front": "How do you list every file, socket, and pipe a process has open using only /proc?",
-          "back": "List /proc/<pid>/fd/ — each numbered entry is a symlink to the open file, socket (socket:[inode]), or pipe. `ls -l /proc/<pid>/fd` resolves them. This is what `lsof -p` reads under the hood.",
-          "hint": "A directory of symlinks per descriptor."
-        },
-        {
-          "id": "proc-sys-l2-f3",
-          "type": "flashcard",
-          "front": "What does /proc/<pid>/maps show, and name two regions you'd expect to see.",
-          "back": "The process's virtual memory map: one line per region with address range, permissions (r/w/x/p), offset, and backing object. Expect to see the executable's text, the heap, the stack, and each mapped shared library (.so).",
-          "hint": "Per-region permissions and backing file."
-        },
-        {
-          "id": "proc-sys-l2-f4",
-          "type": "flashcard",
-          "front": "In sysfs, what is the relationship between /sys/class/net/eth0 and /sys/devices/...?",
-          "back": "/sys/class/net/eth0 is a symlink into the real device tree under /sys/devices/. /sys/class and /sys/block are convenience *views* organized by function; /sys/devices is the canonical hierarchy.",
-          "hint": "readlink -f reveals it."
-        },
-        {
-          "id": "proc-sys-l2-f5",
-          "type": "flashcard",
-          "front": "Why is /proc/<pid>/cmdline awkward to cat directly, and how do you fix it?",
-          "back": "Its arguments are separated by NUL bytes, not spaces, so they run together on a terminal. Pipe through `tr '\\0' ' '` (then echo a newline) to read it.",
-          "hint": "Separator is \\0, not a space."
-        },
         {
           "id": "proc-sys-l2-m1",
           "type": "mcq",
-          "prompt": "A monitoring script must report a daemon's real RAM footprint using only /proc. What should it read?",
+          "prompt": "You want to know how much memory is free right now. Which file do you read?",
           "choices": [
-            "VmSize from /proc/<pid>/status",
-            "VmRSS from /proc/<pid>/status",
-            "MemTotal from /proc/meminfo",
-            "the byte size of /proc/<pid>/maps"
+            "/proc/cpuinfo",
+            "/proc/meminfo",
+            "/proc/loadavg",
+            "/proc/version"
           ],
           "answerIndex": 1,
-          "explanation": "VmRSS is the resident set — pages actually backed by physical RAM — which is the closest single field to 'real memory used.' VmSize is virtual reservation; MemTotal is system-wide."
+          "explanation": "/proc/meminfo holds the memory accounting, including MemFree and MemAvailable. /proc/cpuinfo is about processors and /proc/loadavg is about how busy the system is."
         },
         {
           "id": "proc-sys-l2-m2",
           "type": "mcq",
-          "prompt": "You need to know which network interface a driver created and its current up/down state, but `ip` is unavailable. Best source?",
+          "prompt": "How can you count the number of CPUs the system sees by reading a file?",
           "choices": [
-            "/proc/interrupts",
-            "/sys/class/net/<iface>/operstate and .../address",
-            "/proc/<pid>/maps",
-            "/etc/network/interfaces"
+            "Count the 'processor' lines in /proc/cpuinfo",
+            "Read the single number in /proc/meminfo",
+            "Count the lines in /proc/version",
+            "Divide MemTotal by MemFree"
           ],
-          "answerIndex": 1,
-          "explanation": "/sys/class/net/<iface>/ exposes operstate (up/down), address (MAC), speed, etc. — the same data `ip link` formats. /etc/network/interfaces is config, not live state."
+          "answerIndex": 0,
+          "explanation": "/proc/cpuinfo prints one block per logical CPU, each starting with a 'processor' line, so counting those lines gives the CPU count. The other options don't relate to CPU count."
         },
         {
           "id": "proc-sys-l2-m3",
           "type": "mcq",
-          "prompt": "What does `readlink -f /sys/class/net/eth0` return?",
+          "prompt": "The friendly `free` command shows memory usage. Where does it get its numbers?",
           "choices": [
-            "The IP address bound to eth0",
-            "An error, because /sys is not browsable",
-            "The canonical /sys/devices/... path the class entry points to",
-            "The contents of /proc/net/dev"
+            "It measures the RAM chips directly",
+            "It reads and reprints /proc/meminfo",
+            "It guesses based on the CPU speed",
+            "It downloads them from the internet"
           ],
-          "answerIndex": 2,
-          "explanation": "/sys/class/net entries are symlinks into the real device hierarchy under /sys/devices/...; readlink -f resolves the link to that canonical path."
+          "answerIndex": 1,
+          "explanation": "free is essentially a tidy front-end over /proc/meminfo — it reads the same file you can read by hand. It does not talk to the hardware itself."
         },
         {
           "id": "proc-sys-l2-m4",
           "type": "mcq",
-          "prompt": "Which sysfs subtree would you inspect to see a loaded kernel module's parameters and reference count?",
+          "prompt": "What does /proc/loadavg tell you?",
           "choices": [
-            "/sys/block/<mod>",
-            "/sys/class/<mod>",
-            "/sys/module/<mod>",
-            "/proc/<mod>/status"
+            "The amount of disk space left",
+            "How busy the system has been over the last 1, 5, and 15 minutes",
+            "The MAC address of the network card",
+            "The kernel command line from boot"
           ],
-          "answerIndex": 2,
-          "explanation": "/sys/module/<name>/ exposes the module's parameters (parameters/), refcnt, and related attributes for each loaded module."
+          "answerIndex": 1,
+          "explanation": "The load average is three numbers describing recent busyness (roughly, how many tasks were waiting to run) over 1, 5, and 15 minutes. The other items live in different files."
+        },
+        {
+          "id": "proc-sys-l2-m5",
+          "type": "mcq",
+          "prompt": "In /proc/meminfo, what does MemTotal represent?",
+          "choices": [
+            "The total amount of RAM the system has",
+            "The amount of free disk space",
+            "The number of CPUs",
+            "The number of running programs"
+          ],
+          "answerIndex": 0,
+          "explanation": "MemTotal is the total RAM available to the system. MemFree and MemAvailable describe how much of it is unused; disk space and CPU counts come from other places."
+        },
+        {
+          "id": "proc-sys-l2-m6",
+          "type": "mcq",
+          "prompt": "What is RAM, in plain terms?",
+          "choices": [
+            "The permanent storage where files are saved",
+            "The fast working memory that running programs use",
+            "The processor that runs instructions",
+            "The network connection to the internet"
+          ],
+          "answerIndex": 1,
+          "explanation": "RAM (random-access memory) is the fast, temporary working memory programs run in. Permanent file storage is the disk; the processor is the CPU."
+        },
+        {
+          "id": "proc-sys-l2-m7",
+          "type": "mcq",
+          "prompt": "Which command reads the processor description file?",
+          "choices": [
+            "cat /proc/cpuinfo",
+            "cat /proc/diskstats",
+            "cat /proc/loadavg",
+            "cat /proc/uptime"
+          ],
+          "answerIndex": 0,
+          "explanation": "cat /proc/cpuinfo prints the processor information, one block per logical CPU. The other files describe disks, load, and uptime respectively."
+        },
+        {
+          "id": "proc-sys-l2-m8",
+          "type": "mcq",
+          "prompt": "The `uptime` command shows the load average. How does it relate to /proc/loadavg?",
+          "choices": [
+            "It measures load with a separate sensor",
+            "It reads the same /proc/loadavg file you could read yourself",
+            "It only works if /proc is unmounted",
+            "It calculates load from /proc/cpuinfo"
+          ],
+          "answerIndex": 1,
+          "explanation": "uptime reprints the numbers from /proc/loadavg — the same file you can cat directly. The tool just reads the file and formats it nicely.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/proc-sys-3.svg"
+        },
+        {
+          "id": "proc-sys-l2-m9",
+          "type": "mcq",
+          "prompt": "Why is reading these /proc files a good first step before installing monitoring tools?",
+          "choices": [
+            "Because the files are encrypted and tools can't read them",
+            "Because the same information is right there as text, readable with cat, with nothing to install",
+            "Because /proc files are faster than RAM",
+            "Because the tools would corrupt /proc"
+          ],
+          "answerIndex": 1,
+          "explanation": "The kernel already exposes this information as plain text, so cat answers the question immediately. The fancy tools just read the same files."
         }
       ]
     },
     {
       "id": "proc-sys-l3",
-      "title": "sysctl Tuning, Persistence, and the Observability Layer",
+      "title": "Per-Process Info: /proc/<pid>/",
       "order": 3,
-      "difficulty": 3,
-      "content": "`/proc/sys/` is special: unlike the read-only views, many of its files are **writable**, and writing one changes a live kernel parameter. The `sysctl` command is just a friendly front-end — the dotted name maps directly to a path: `net.ipv4.ip_forward` ↔ `/proc/sys/net/ipv4/ip_forward`.\n\n```bash\n# Turn this box into a router (live, lost on reboot):\nsysctl net.ipv4.ip_forward        # read current value\nsysctl -w net.ipv4.ip_forward=1   # set it\necho 1 > /proc/sys/net/ipv4/ip_forward   # identical effect\n\n# Reduce swap aggressiveness:\nsysctl -w vm.swappiness=10\n```\n\nThose writes vanish on reboot. For **persistence**, drop a file in `/etc/sysctl.d/` (the modern, package-friendly location) rather than editing the monolithic `/etc/sysctl.conf`:\n\n```bash\ncat >/etc/sysctl.d/99-router.conf <<'EOF'\nnet.ipv4.ip_forward = 1\nvm.swappiness = 10\nEOF\nsysctl --system     # reload all *.conf from the sysctl.d dirs now\n```\n\nThe classic **observability tools are all procfs readers**: `vmstat` (memory/swap/IO/CPU from `/proc/stat` + `/proc/meminfo`), `iostat`/`mpstat` (sysstat package), `free` (`/proc/meminfo`), `uptime` (`/proc/loadavg`). They sample these files and compute deltas — nothing magic.\n\nThe **MODERN successors** are eBPF-based: `bpftrace`, the bcc tools (`execsnoop`, `opensnoop`, `biolatency`), and `bpftop`. Instead of polling text files, they attach safe, verified programs to kernel hooks (tracepoints, kprobes) for low-overhead, event-driven tracing — the natural evolution of `/proc` sampling, covered fully in the eBPF module. Rule of thumb: reach for `/proc`+`free`/`vmstat` for a quick snapshot; reach for bpftrace/bcc when you need *why* and *which*, per-event, in production.",
+      "difficulty": 2,
+      "content": "So far we've read system-wide files. Now we zoom in on a single running program.\n\n**Hook.** Every running program is called a *process*, and the kernel gives each one an ID number called a PID (process ID). Want to ask one specific process \"what are you doing right now?\" There's a folder for that.\n\n**Build.** Under `/proc` there is one folder per process, named by its PID — for example `/proc/1492/`. Inside are virtual files that answer questions about just that process:\n\n- `cmdline` — the exact command (with its arguments) that started the process. Its parts are separated by invisible NUL characters, so reading it raw looks run-together; piping through `tr '\\0' ' '` adds spaces.\n- `status` — a readable summary: the process state, who owns it, and memory use. The field `VmRSS` is the real RAM the process is using right now.\n- `fd/` — a folder with one entry per open file the process has. \"fd\" means file descriptor (the number the kernel uses for each open file or connection). Listing it answers \"what files and network connections does this process have open?\"\n- `maps` — the regions of memory the process is using.\n\n```bash\npid=1492\ncat /proc/$pid/cmdline | tr '\\0' ' '; echo   # the command that started it\ngrep VmRSS /proc/$pid/status                  # real RAM in use\nls -l /proc/$pid/fd                           # open files and sockets\n```\n\nThe everyday tools `ps` and `top` (which list processes) read these very files for you. So when `top` shows a process's memory, it's reporting the same `VmRSS` you can read by hand.\n\n**Recap.** `/proc/<pid>/` is the per-process window: `cmdline` (what started it), `status` (state and memory), and `fd/` (open files). To check a process's open files, list `/proc/<pid>/fd`.",
       "items": [
-        {
-          "id": "proc-sys-l3-f1",
-          "type": "flashcard",
-          "front": "How does the sysctl name net.ipv4.ip_forward map to the filesystem?",
-          "back": "Dots become slashes under /proc/sys: net.ipv4.ip_forward = /proc/sys/net/ipv4/ip_forward. `sysctl -w name=val` and `echo val > /proc/sys/.../name` are equivalent.",
-          "hint": "Dotted path under /proc/sys."
-        },
-        {
-          "id": "proc-sys-l3-f2",
-          "type": "flashcard",
-          "front": "You ran `sysctl -w net.ipv4.ip_forward=1`. Why is the box no longer forwarding after a reboot, and how do you fix it?",
-          "back": "Writes to /proc/sys are runtime-only and reset at boot. Persist by adding `net.ipv4.ip_forward = 1` to a file in /etc/sysctl.d/ (e.g. 99-router.conf); it is applied at boot and via `sysctl --system`.",
-          "hint": "Runtime vs on-disk config."
-        },
-        {
-          "id": "proc-sys-l3-f3",
-          "type": "flashcard",
-          "front": "What does vm.swappiness control, and what does a lower value do?",
-          "back": "It biases the kernel between reclaiming page cache and swapping out anonymous pages. Lower values (e.g. 10) make the kernel avoid swapping process memory, preferring to drop cache; higher values swap more readily.",
-          "hint": "0–100 knob; lower = swap less."
-        },
-        {
-          "id": "proc-sys-l3-f4",
-          "type": "flashcard",
-          "front": "What do free, uptime, and vmstat have in common with respect to /proc?",
-          "back": "They are all procfs readers: free and vmstat parse /proc/meminfo and /proc/stat, uptime reads /proc/loadavg. They sample these files (and compute deltas) rather than measuring the kernel directly.",
-          "hint": "Pretty-printers over text files."
-        },
-        {
-          "id": "proc-sys-l3-f5",
-          "type": "flashcard",
-          "front": "What is the core advantage of eBPF tools (bpftrace, bcc) over /proc-polling tools like vmstat?",
-          "back": "They attach safe, verified programs to kernel hooks (tracepoints/kprobes) and report per-event data with low overhead — answering 'why' and 'which process/file/syscall' — instead of periodically sampling aggregate counters from text files.",
-          "hint": "Event-driven in-kernel vs polling text."
-        },
         {
           "id": "proc-sys-l3-m1",
           "type": "mcq",
-          "prompt": "Which command set turns on IP forwarding immediately AND survives a reboot?",
+          "prompt": "What is a PID?",
           "choices": [
-            "echo 1 > /proc/sys/net/ipv4/ip_forward   (only that)",
-            "sysctl -w net.ipv4.ip_forward=1   (only that)",
-            "sysctl -w net.ipv4.ip_forward=1  plus a line in /etc/sysctl.d/*.conf",
-            "Adding it to /etc/fstab"
+            "A password for the process",
+            "The ID number the kernel assigns to each running process",
+            "The amount of memory a process uses",
+            "A type of file on disk"
           ],
-          "answerIndex": 2,
-          "explanation": "The -w write applies it live; persistence requires an entry in /etc/sysctl.d/ (or sysctl.conf) so it is reapplied at boot. fstab is unrelated to kernel parameters."
+          "answerIndex": 1,
+          "explanation": "A PID (process ID) is the unique number identifying a running process. /proc has one folder per process, named by its PID."
         },
         {
           "id": "proc-sys-l3-m2",
           "type": "mcq",
-          "prompt": "Why are most files under /proc/sys/ different from the rest of /proc?",
+          "prompt": "How would you check which files a process (say PID 1492) currently has open, using only /proc?",
           "choices": [
-            "They are stored on disk rather than generated",
-            "Many are writable, and writing them changes a live kernel parameter",
-            "They require a kernel module to appear",
-            "They are owned by the user, not root"
+            "cat /proc/1492/cmdline",
+            "ls -l /proc/1492/fd",
+            "cat /proc/meminfo",
+            "grep VmRSS /proc/1492/status"
           ],
           "answerIndex": 1,
-          "explanation": "/proc/sys is the sysctl tree: many entries are writable tunables. Writing one (via echo or sysctl -w) immediately changes kernel behavior at runtime."
+          "explanation": "Each open file or connection shows up as an entry in /proc/<pid>/fd, so listing that folder answers the question. cmdline shows the start command, and VmRSS shows memory — not open files."
         },
         {
           "id": "proc-sys-l3-m3",
           "type": "mcq",
-          "prompt": "What is the recommended modern way to make a sysctl setting persistent on a package-managed system?",
+          "prompt": "Which /proc/<pid>/ file tells you the exact command that started a process?",
           "choices": [
-            "Edit the kernel source and recompile",
-            "Append it to /etc/rc.local",
-            "Drop a *.conf file into /etc/sysctl.d/ and run `sysctl --system`",
-            "Add it to the GRUB command line every boot"
+            "status",
+            "cmdline",
+            "maps",
+            "fd"
           ],
-          "answerIndex": 2,
-          "explanation": "/etc/sysctl.d/*.conf is the drop-in, package-friendly location; `sysctl --system` reloads all such files. It is preferred over editing the monolithic /etc/sysctl.conf."
+          "answerIndex": 1,
+          "explanation": "cmdline holds the full command line and its arguments. status summarizes state and memory; maps shows memory regions; fd lists open files."
         },
         {
           "id": "proc-sys-l3-m4",
           "type": "mcq",
-          "prompt": "A daemon is mysteriously opening many files under load and you need to see exactly which paths, per event, in production. Best tool?",
+          "prompt": "You want the real RAM a process is using right now. Which field do you read?",
           "choices": [
-            "free -h in a loop",
-            "vmstat 1",
-            "opensnoop (bcc/eBPF)",
-            "cat /proc/meminfo"
+            "VmRSS in /proc/<pid>/status",
+            "MemTotal in /proc/meminfo",
+            "the load average in /proc/loadavg",
+            "the number of entries in /proc/<pid>/fd"
           ],
-          "answerIndex": 2,
-          "explanation": "opensnoop attaches to the open-family syscalls via eBPF and prints each open with the process and path — event-level 'which file' detail that aggregate /proc samplers like free/vmstat cannot provide."
+          "answerIndex": 0,
+          "explanation": "VmRSS (resident set size) in the per-process status file is the real RAM that process occupies. MemTotal is the whole system's RAM, and load average and fd counts are unrelated to one process's memory."
+        },
+        {
+          "id": "proc-sys-l3-m5",
+          "type": "mcq",
+          "prompt": "When you `cat /proc/<pid>/cmdline` the parts look stuck together. Why, and how do you fix it?",
+          "choices": [
+            "The file is corrupted; reboot to fix it",
+            "The arguments are separated by invisible NUL characters; pipe through tr '\\0' ' ' to add spaces",
+            "You lack permission; use sudo",
+            "It needs to be opened in a text editor"
+          ],
+          "answerIndex": 1,
+          "explanation": "cmdline separates arguments with NUL bytes rather than spaces, so they run together on screen. Translating those NULs to spaces with tr makes it readable. It is not corruption or a permission issue."
+        },
+        {
+          "id": "proc-sys-l3-m6",
+          "type": "mcq",
+          "prompt": "What does 'fd' stand for in /proc/<pid>/fd?",
+          "choices": [
+            "Folder data",
+            "File descriptor — the number the kernel uses for each open file or connection",
+            "Free disk",
+            "Fast download"
+          ],
+          "answerIndex": 1,
+          "explanation": "fd means file descriptor. Each open file, socket, or pipe gets a numbered descriptor, and they appear as entries in the fd/ folder."
+        },
+        {
+          "id": "proc-sys-l3-m7",
+          "type": "mcq",
+          "prompt": "When the `top` command shows a process's memory usage, where does that number ultimately come from?",
+          "choices": [
+            "From the process folder under /proc that top reads",
+            "From a hidden cloud database",
+            "From the BIOS",
+            "From /etc/fstab"
+          ],
+          "answerIndex": 0,
+          "explanation": "top (like ps) reads the per-process /proc files — such as status/VmRSS — to display memory. The tools surface the same data you can read by hand."
+        },
+        {
+          "id": "proc-sys-l3-m8",
+          "type": "mcq",
+          "prompt": "What does /proc/<pid>/status contain?",
+          "choices": [
+            "The full source code of the program",
+            "A readable summary including the process state, its owner, and memory use such as VmRSS",
+            "A list of every other process on the system",
+            "The disk partitions"
+          ],
+          "answerIndex": 1,
+          "explanation": "status is a human-readable summary of one process: its state, owner, and memory fields like VmRSS. It does not contain source code or system-wide lists."
+        },
+        {
+          "id": "proc-sys-l3-m9",
+          "type": "mcq",
+          "prompt": "If you read /proc/meminfo and then add up the memory of every process via their /proc/<pid>/status, why might the numbers not line up neatly?",
+          "choices": [
+            "Because /proc files are random",
+            "Because system memory accounting (shared memory, caches) is more than the sum of per-process resident sets",
+            "Because /proc/meminfo is always wrong",
+            "Because processes hide their real memory"
+          ],
+          "answerIndex": 1,
+          "explanation": "System-wide memory includes shared pages and caches that aren't simply the sum of each process's VmRSS, so reconciling free/meminfo with per-process numbers takes care. The data isn't random or fake.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/proc-sys-4.svg"
+        }
+      ]
+    },
+    {
+      "id": "proc-sys-l4",
+      "title": "/sys: The Map of Your Hardware",
+      "order": 4,
+      "difficulty": 2,
+      "content": "`/proc` is mostly about processes and overall system info. Its sibling `/sys` is about *hardware*.\n\n**Hook.** How does the system know what devices you have — network cards, disks, USB gadgets — and their current state, like whether the network cable is plugged in? It keeps a tidy map of them under `/sys`, and you read it with `cat`.\n\n**Build.** `/sys` (the sysfs filesystem) is the kernel's *device model*: a set of folders describing every device the kernel knows about, laid out as files. Like `/proc`, these are virtual files — reading one asks the kernel for that device's live state.\n\nA few useful places:\n\n- `/sys/devices/` — the real, full tree of devices. It's detailed and not the friendliest to browse.\n- `/sys/class/<type>/` — devices grouped by what they do. For example `/sys/class/net/` lists network interfaces; `/sys/block/` lists whole disks.\n- `/sys/module/` — information about loaded kernel modules (add-on pieces of the kernel, such as a driver for a specific device).\n\nThe friendly views like `/sys/class` are mostly *shortcuts* (symbolic links) pointing into the real `/sys/devices/` tree. So one device shows up in several places — a detailed home and easier-to-find groupings.\n\n```bash\nls /sys/class/net                     # lo  eth0  wlan0 ...\ncat /sys/class/net/eth0/operstate     # up  or  down\ncat /sys/class/net/eth0/address       # the MAC (hardware address)\n```\n\nThe tool `ip link` shows this same interface state — it READS these files for you.\n\n**Recap.** `/sys` is the live map of your hardware. To check a network interface's state without any special tool, read `/sys/class/net/<name>/operstate`.",
+      "items": [
+        {
+          "id": "proc-sys-l4-m1",
+          "type": "mcq",
+          "prompt": "What is /sys mainly about?",
+          "choices": [
+            "Running processes and their memory",
+            "The kernel's model of hardware devices, exposed as files",
+            "The list of user accounts",
+            "Saved log files from past boots"
+          ],
+          "answerIndex": 1,
+          "explanation": "/sys (sysfs) is the device model: folders and files describing the hardware the kernel knows about. Processes live under /proc instead."
+        },
+        {
+          "id": "proc-sys-l4-m2",
+          "type": "mcq",
+          "prompt": "Where would you look to see the list of network interfaces?",
+          "choices": [
+            "/sys/class/net/",
+            "/proc/meminfo",
+            "/sys/module/",
+            "/proc/loadavg"
+          ],
+          "answerIndex": 0,
+          "explanation": "/sys/class/net/ groups the network interfaces. /sys/module is about kernel modules, and the /proc files listed are about memory and load."
+        },
+        {
+          "id": "proc-sys-l4-m3",
+          "type": "mcq",
+          "prompt": "How do you check whether the interface eth0 is currently up or down, with no special tool?",
+          "choices": [
+            "cat /sys/class/net/eth0/operstate",
+            "cat /proc/cpuinfo",
+            "ls /sys/module",
+            "cat /sys/class/net/eth0/address"
+          ],
+          "answerIndex": 0,
+          "explanation": "operstate reports up or down for that interface. The address file gives the MAC instead, and the other paths are unrelated to link state."
+        },
+        {
+          "id": "proc-sys-l4-m4",
+          "type": "mcq",
+          "prompt": "The /sys/class views are described as shortcuts. What does that mean?",
+          "choices": [
+            "They are copies that can become out of date",
+            "They are symbolic links pointing into the real /sys/devices tree",
+            "They only appear after you run a command",
+            "They are compressed archives"
+          ],
+          "answerIndex": 1,
+          "explanation": "/sys/class entries are symbolic links into the canonical /sys/devices tree, so one device appears in several convenient groupings. They are not separate copies that drift out of date."
+        },
+        {
+          "id": "proc-sys-l4-m5",
+          "type": "mcq",
+          "prompt": "Which directory holds the real, full tree of devices?",
+          "choices": [
+            "/sys/devices/",
+            "/sys/class/",
+            "/proc/mounts",
+            "/sys/block/"
+          ],
+          "answerIndex": 0,
+          "explanation": "/sys/devices/ is the canonical device tree. /sys/class and /sys/block are friendlier grouped views (mostly symlinks) into it."
+        },
+        {
+          "id": "proc-sys-l4-m6",
+          "type": "mcq",
+          "prompt": "A kernel module is best described as:",
+          "choices": [
+            "A user account with extra privileges",
+            "An add-on piece of the kernel, such as a driver for a specific device, that can be loaded in",
+            "A folder under /home",
+            "A type of network cable"
+          ],
+          "answerIndex": 1,
+          "explanation": "A kernel module is an add-on component (often a device driver) that extends the kernel. Information about loaded modules appears under /sys/module/."
+        },
+        {
+          "id": "proc-sys-l4-m7",
+          "type": "mcq",
+          "prompt": "The `ip link` command shows network interface state. How does it relate to /sys/class/net?",
+          "choices": [
+            "It ignores /sys and queries a remote server",
+            "It reads the same per-interface files under /sys (and related kernel sources) and formats them",
+            "It only works if /sys is deleted first",
+            "It writes new interfaces into /sys"
+          ],
+          "answerIndex": 1,
+          "explanation": "ip link surfaces the same live interface information that lives under /sys/class/net (operstate, address, etc.). The tool reads it for you."
+        },
+        {
+          "id": "proc-sys-l4-m8",
+          "type": "mcq",
+          "prompt": "Are files under /sys real files stored on disk?",
+          "choices": [
+            "Yes, they take up disk space like any document",
+            "No — like /proc, sysfs is virtual; reading a file asks the kernel for the device's live state",
+            "Only the ones under /sys/devices are real",
+            "Yes, but only after the first reboot"
+          ],
+          "answerIndex": 1,
+          "explanation": "/sys is a virtual filesystem just like /proc. Reading a file returns the device's current state from the kernel, not data stored on disk.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/proc-sys-6.svg"
+        },
+        {
+          "id": "proc-sys-l4-m9",
+          "type": "mcq",
+          "prompt": "Which /sys file would show a network card's hardware (MAC) address?",
+          "choices": [
+            "/sys/class/net/eth0/address",
+            "/sys/class/net/eth0/operstate",
+            "/proc/version",
+            "/sys/module/eth0"
+          ],
+          "answerIndex": 0,
+          "explanation": "The address file holds the interface's MAC address. operstate reports up/down, and the other paths don't carry a MAC address."
+        }
+      ]
+    },
+    {
+      "id": "proc-sys-l5",
+      "title": "Writable Settings: /proc/sys, sysctl & Tools",
+      "order": 5,
+      "difficulty": 3,
+      "content": "Until now we've only *read* virtual files. A special corner of `/proc` lets you *write* them — and writing changes a live kernel setting.\n\n**Hook.** Some of these virtual files aren't just gauges; they're switches. Flip one, and the system's behavior changes immediately.\n\n**Build.** The folder `/proc/sys/` holds *tunable* kernel settings. Many of its files are writable, and writing a value changes a setting on the spot. A classic example is turning the machine into a router (passing network traffic between interfaces):\n\n```bash\ncat /proc/sys/net/ipv4/ip_forward     # shows 0 (off)\necho 1 > /proc/sys/net/ipv4/ip_forward  # now 1 (on), live\n```\n\nTyping those long paths is awkward, so there's a friendlier command: `sysctl`. It uses dotted names that map directly to the paths (dots become slashes): `net.ipv4.ip_forward` is the same setting as `/proc/sys/net/ipv4/ip_forward`. Another common knob is `vm.swappiness`, which nudges how eagerly the system uses swap.\n\n```bash\nsysctl net.ipv4.ip_forward            # read it\nsysctl -w net.ipv4.ip_forward=1       # set it (same as the echo above)\n```\n\nOne catch: these changes are live but **lost on reboot**. To make a setting permanent, put the line in a file under `/etc/sysctl.d/` (an ordinary on-disk config folder), e.g. `net.ipv4.ip_forward = 1` in `/etc/sysctl.d/99-router.conf`. It's reapplied at every boot.\n\nFinally, the familiar monitoring tools — `free`, `vmstat`, `top` — are all just `/proc` readers underneath. They sample the same files you now know and present the numbers nicely.\n\n**Recap.** `/proc/sys` (via the `sysctl` command) holds writable kernel settings; writing changes them live, and `/etc/sysctl.d/` makes them survive a reboot. Everyday tools like `free` and `vmstat` simply read `/proc`.",
+      "items": [
+        {
+          "id": "proc-sys-l5-m1",
+          "type": "mcq",
+          "prompt": "What is special about files under /proc/sys/ compared to most of /proc?",
+          "choices": [
+            "They are stored on disk instead of being virtual",
+            "Many are writable, and writing one changes a live kernel setting",
+            "They can only be read by the root user",
+            "They contain the system's log files"
+          ],
+          "answerIndex": 1,
+          "explanation": "/proc/sys holds tunable settings: many files are writable, and a write immediately changes kernel behavior. Most other /proc files are read-only views."
+        },
+        {
+          "id": "proc-sys-l5-m2",
+          "type": "mcq",
+          "prompt": "How does the sysctl name net.ipv4.ip_forward map to a file path?",
+          "choices": [
+            "/etc/net/ipv4/ip_forward",
+            "/proc/sys/net/ipv4/ip_forward (dots become slashes under /proc/sys)",
+            "/sys/class/net/ip_forward",
+            "/proc/ip_forward"
+          ],
+          "answerIndex": 1,
+          "explanation": "sysctl dotted names map directly under /proc/sys with dots turned into slashes. So net.ipv4.ip_forward is /proc/sys/net/ipv4/ip_forward."
+        },
+        {
+          "id": "proc-sys-l5-m3",
+          "type": "mcq",
+          "prompt": "You ran `echo 1 > /proc/sys/net/ipv4/ip_forward` and forwarding turned on. After a reboot it's off again. Why?",
+          "choices": [
+            "The command was typed wrong",
+            "Writes to /proc/sys are live only and reset at boot; you must persist them in config",
+            "Rebooting deletes /proc/sys permanently",
+            "ip_forward can never be turned on"
+          ],
+          "answerIndex": 1,
+          "explanation": "Runtime writes to /proc/sys don't survive a reboot. To keep the setting, you add it to persistent config; the kernel reapplies it at boot."
+        },
+        {
+          "id": "proc-sys-l5-m4",
+          "type": "mcq",
+          "prompt": "How do you make a sysctl setting survive reboots on a typical modern system?",
+          "choices": [
+            "Recompile the kernel each time",
+            "Add the line to a .conf file under /etc/sysctl.d/",
+            "Write it to /proc/sys twice",
+            "Store it in /proc/cmdline"
+          ],
+          "answerIndex": 1,
+          "explanation": "A line such as net.ipv4.ip_forward = 1 in a file under /etc/sysctl.d/ is reapplied at every boot. Writing to /proc/sys alone is temporary."
+        },
+        {
+          "id": "proc-sys-l5-m5",
+          "type": "mcq",
+          "prompt": "What does the `sysctl` command give you over editing /proc/sys files directly?",
+          "choices": [
+            "It is the only way to read settings",
+            "A friendlier dotted-name interface to the same settings, e.g. sysctl -w net.ipv4.ip_forward=1",
+            "It changes settings permanently by itself",
+            "It works only on /sys, not /proc"
+          ],
+          "answerIndex": 1,
+          "explanation": "sysctl is a convenient front-end using dotted names that map to /proc/sys paths. By itself sysctl -w is still a runtime change, not a permanent one."
+        },
+        {
+          "id": "proc-sys-l5-m6",
+          "type": "mcq",
+          "prompt": "Turning on ip_forward does what?",
+          "choices": [
+            "Speeds up the CPU",
+            "Lets the machine pass network traffic between interfaces, acting like a router",
+            "Frees up disk space",
+            "Disables the network entirely"
+          ],
+          "answerIndex": 1,
+          "explanation": "IP forwarding lets the system route packets between its network interfaces, so it can act as a router. It has nothing to do with CPU speed or disk space."
+        },
+        {
+          "id": "proc-sys-l5-m7",
+          "type": "mcq",
+          "prompt": "Tools like free and vmstat report memory and system activity. What are they doing underneath?",
+          "choices": [
+            "Measuring the hardware with sensors",
+            "Reading the same /proc files (like /proc/meminfo) and presenting the numbers",
+            "Querying a remote monitoring server",
+            "Writing new values into /proc/sys"
+          ],
+          "answerIndex": 1,
+          "explanation": "free, vmstat, and top are /proc readers: they sample the same files you can read by hand and format the results. They don't measure hardware directly or write settings."
+        },
+        {
+          "id": "proc-sys-l5-m8",
+          "type": "mcq",
+          "prompt": "Which two commands have the SAME effect of turning IP forwarding on right now?",
+          "choices": [
+            "echo 1 > /proc/sys/net/ipv4/ip_forward  and  sysctl -w net.ipv4.ip_forward=1",
+            "cat /proc/sys/net/ipv4/ip_forward  and  ls /sys/class/net",
+            "reboot  and  free -h",
+            "rm /proc/sys/net/ipv4/ip_forward  and  vmstat 1"
+          ],
+          "answerIndex": 0,
+          "explanation": "Writing 1 to the file with echo and using sysctl -w on the matching dotted name do the same live change. The other pairs only read, list, reboot, or are invalid."
+        },
+        {
+          "id": "proc-sys-l5-m9",
+          "type": "mcq",
+          "prompt": "What does the vm.swappiness setting roughly control?",
+          "choices": [
+            "How many CPUs are enabled",
+            "How eagerly the system uses swap",
+            "The network card's speed",
+            "The number of open files allowed"
+          ],
+          "answerIndex": 1,
+          "explanation": "vm.swappiness is a tunable that nudges how readily the kernel moves memory to swap. It is set the same way as other sysctl values, and persisted via /etc/sysctl.d/.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/proc-sys-5.svg"
         }
       ]
     }
