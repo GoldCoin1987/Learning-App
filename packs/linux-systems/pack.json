@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "id": "linux-systems",
   "title": "Linux Systems",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "Linux from scratch (beginner rework in progress): 19 sub-topics from the shell through systemd, the kernel, containers, storage, networking, and embedded Linux. Beginner-first readings, code, and diagrams; tiered easy to hard.",
   "requires": [],
   "tags": [
@@ -4075,282 +4075,408 @@
       "lessons": [
         {
           "id": "kernel-userspace-syscalls-kernel-userspace-syscalls-l1",
-          "title": "The Ring Model and the Syscall Gateway",
+          "title": "The Two Worlds: Kernel and Userspace",
           "order": 1,
           "difficulty": 1,
-          "content": "Your CPU runs in one of two relevant privilege levels. On x86-64 these are **ring 0** (kernel mode) and **ring 3** (user mode); other ISAs have analogous EL1/EL0 or supervisor/user modes. In ring 3 your code cannot touch hardware directly, cannot reprogram the MMU, and cannot execute privileged instructions — the same protection scheme you knew on radar hardware where only privileged firmware could poke certain registers. Everything else (browsers, compilers, your daemon) lives in ring 3.\n\nWhen user code needs something only the kernel may do — read a file, allocate memory, send a packet — it cannot just jump into kernel code. That would defeat isolation. Instead it executes a **trap**: a single controlled instruction (`syscall` on x86-64, `svc` on ARM) that switches the CPU to ring 0 at *one fixed kernel entry point*. The kernel decides what to do based on a number you placed in a register.\n\n```c\n/* No stdio. A raw syscall: number in rax, args in rdi/rsi/rdx. */\n#include <unistd.h>\nint main(void) {\n    write(1, \"hi\\n\", 3);   /* __NR_write = 1 on x86-64 */\n    return 0;\n}\n```\n\nThe argument count and order is the **syscall calling convention**, distinct from the C calling convention. The gateway is narrow on purpose: a fixed entry, a validated syscall number, and arguments the kernel must treat as untrusted. This single boundary — cross it deliberately or not at all — is the conceptual core of how Linux stays safe from the millions of lines of code running above it.\n\n```bash\nstrace -e trace=write ./a.out   # see the one write() crossing the line\n```",
+          "content": "Have you ever wondered why one buggy app can crash without taking your whole computer down with it? The answer is that an operating system is split into **two worlds**, and they are kept carefully apart.\n\nThink of a bank. Customers stand in the lobby. Behind a counter is the vault, where the money and the controls live. Customers are *not allowed* to walk into the vault and help themselves. That would be chaos, and one careless person could ruin things for everyone.\n\nAn operating system works the same way:\n\n- The **kernel** is the trusted core. It is the staff-only area behind the counter. The kernel runs with **full privileges**, meaning it is allowed to directly control the hardware (the disk, the network card, the memory). There is only one kernel, and it is in charge.\n- **Userspace** is the lobby. Your normal programs — your browser, your text editor, your games — all run here with **limited privileges**. \"Limited\" means they are *not* allowed to touch the hardware directly.\n\nWhy build it this way? Two reasons, both about safety:\n\n1. **Stability.** If a program in userspace crashes or misbehaves, it stays in its own little box. The kernel keeps running, and your other programs keep running. One bad app cannot take down the machine.\n2. **Security.** A program cannot secretly read another program's memory or scribble directly onto your disk, because it has no direct access to the hardware. The kernel stands guard.\n\nThe diagram shows the two worlds: your everyday programs up top in userspace, the kernel below controlling the real hardware, and a single doorway between them (we will meet that doorway in the next lesson).\n\n**Recap:** The kernel is the privileged core that controls hardware; userspace is where your ordinary, limited-privilege programs run. The split exists to keep the system safe and stable.",
           "items": [
-            {
-              "id": "kernel-userspace-syscalls-l1-fc1",
-              "type": "flashcard",
-              "front": "On x86-64, which ring is kernel mode and which is user mode?",
-              "back": "Ring 0 is kernel mode (full privilege: hardware, MMU, privileged instructions). Ring 3 is user mode where ordinary applications run with no direct hardware access.",
-              "hint": "Lower number = more privilege."
-            },
-            {
-              "id": "kernel-userspace-syscalls-l1-fc2",
-              "type": "flashcard",
-              "front": "What instruction does user code execute to enter the kernel, and why can't it just call kernel functions directly?",
-              "back": "A trap instruction (`syscall` on x86-64, `svc` on ARM). A direct call would bypass the privilege boundary; the trap switches to ring 0 at one fixed, controlled entry point chosen by the kernel.",
-              "hint": "One controlled door, not arbitrary jumps."
-            },
-            {
-              "id": "kernel-userspace-syscalls-l1-fc3",
-              "type": "flashcard",
-              "front": "How does the kernel know which operation a syscall is requesting?",
-              "back": "By the syscall number placed in a designated register (rax on x86-64). The kernel uses it to index the syscall table and dispatch to the right handler (e.g. number 1 = write).",
-              "hint": "A number in a register, then a table lookup."
-            },
-            {
-              "id": "kernel-userspace-syscalls-l1-fc4",
-              "type": "flashcard",
-              "front": "Why is the user/kernel boundary called a 'narrow' or 'controlled' gateway?",
-              "back": "There is a single fixed entry point, a validated syscall number, and arguments the kernel treats as untrusted. Code cannot jump into arbitrary kernel addresses, which is what preserves isolation.",
-              "hint": "One door, validated inputs."
-            },
             {
               "id": "kernel-userspace-syscalls-l1-mcq1",
               "type": "mcq",
-              "prompt": "A normal C program in ring 3 tries to execute a privileged instruction that reprograms the MMU. What happens?",
+              "prompt": "In an operating system, what is the kernel?",
               "choices": [
-                "The CPU silently allows it because the process owns its own memory",
-                "The CPU raises a fault/exception; the kernel typically kills the process",
-                "It is automatically converted into the equivalent system call",
-                "It succeeds only if the program was compiled with -O2"
+                "A single program you download to speed up your computer",
+                "The trusted core that runs with full privileges and directly controls the hardware",
+                "The folder where all your files are stored",
+                "Another name for the desktop and its windows"
               ],
               "answerIndex": 1,
-              "explanation": "Privileged instructions executed in ring 3 trigger a CPU fault. The kernel handles the exception, usually delivering SIGILL/SIGSEGV and terminating the offender. That hardware enforcement is what makes user mode a sandbox."
+              "explanation": "The kernel is the privileged core of the operating system. It is the only part allowed to talk to the hardware directly, and there is just one of it in charge. It is not a download, a folder, or the visual desktop.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/kernel-userspace-syscalls-2.svg"
             },
             {
               "id": "kernel-userspace-syscalls-l1-mcq2",
               "type": "mcq",
-              "prompt": "On x86-64, where does the kernel expect the syscall NUMBER to be when the `syscall` instruction executes?",
+              "prompt": "Where do your normal programs (browser, text editor, games) run?",
               "choices": [
-                "On the top of the user stack",
-                "In the rax register",
-                "In an environment variable",
-                "In the first argument register, rdi"
+                "Inside the kernel, with full privileges",
+                "In userspace, with limited privileges",
+                "Directly on the hardware, bypassing the operating system",
+                "In a separate computer entirely"
               ],
               "answerIndex": 1,
-              "explanation": "The syscall number goes in rax; arguments go in rdi, rsi, rdx, r10, r8, r9. rdi holds the first argument, not the number. This is the syscall convention, which differs from the C function calling convention."
+              "explanation": "Ordinary programs run in userspace, where they have limited privileges. They cannot touch the hardware directly. The kernel, not your apps, runs with full privileges."
             },
             {
               "id": "kernel-userspace-syscalls-l1-mcq3",
               "type": "mcq",
-              "prompt": "Which statement best describes what 'trapping into the kernel' does to CPU privilege level?",
+              "prompt": "Using the bank analogy, which part of the operating system is like the staff-only vault area?",
               "choices": [
-                "It permanently elevates the process to ring 0",
-                "It switches from ring 3 to ring 0 for the duration of the syscall, then returns to ring 3",
-                "It has no effect on privilege; only the scheduler changes rings",
-                "It drops the process from ring 3 to ring 4 for safety"
+                "Userspace",
+                "The kernel",
+                "The customer lobby",
+                "The request slip you fill out"
               ],
               "answerIndex": 1,
-              "explanation": "A trap raises privilege to ring 0 at the kernel entry point, the kernel does the work, then execution returns to ring 3 where the application resumes. The elevation is temporary and scoped to the call."
+              "explanation": "The kernel is the staff-only vault: trusted, privileged, and the only place allowed to handle the valuable controls (the hardware). Userspace is the public lobby where customers (your programs) wait."
             },
             {
               "id": "kernel-userspace-syscalls-l1-mcq4",
               "type": "mcq",
-              "prompt": "Why must the kernel treat syscall arguments (like a pointer passed to write()) as untrusted?",
+              "prompt": "Why can't a normal program touch the hardware (like the disk or network card) directly?",
               "choices": [
-                "Because user pointers are always encrypted",
-                "Because a malicious or buggy ring-3 program could pass garbage, kernel, or out-of-range addresses",
-                "Because the C standard requires it",
-                "Because pointers change value when crossing the trap"
+                "Hardware is too slow for normal programs to use",
+                "For safety: limiting direct access stops one buggy or malicious program from crashing the machine or harming others",
+                "Normal programs are written in the wrong language to reach hardware",
+                "The hardware is physically disconnected from running programs"
               ],
               "answerIndex": 1,
-              "explanation": "Anything from ring 3 could be hostile or buggy: a bad pointer, an address that overlaps kernel memory, or an invalid length. The kernel must validate and copy carefully (copy_from_user), never blindly dereference, or it would expose a privilege-escalation hole."
+              "explanation": "The split exists for safety and stability. If any program could poke the hardware directly, one bug or attack could corrupt the disk, read another program's data, or crash the whole system. Keeping hardware access inside the privileged kernel contains the damage. It is a permission rule, not a language or wiring limitation."
+            },
+            {
+              "id": "kernel-userspace-syscalls-l1-mcq5",
+              "type": "mcq",
+              "prompt": "A program in userspace has a serious bug and crashes. What usually happens to the rest of the system?",
+              "choices": [
+                "The whole computer instantly shuts down",
+                "The crash is contained to that program; the kernel and other programs keep running",
+                "Every other program is automatically deleted",
+                "The kernel is replaced with a backup copy"
+              ],
+              "answerIndex": 1,
+              "explanation": "Because userspace programs are isolated and have limited privileges, a crash stays inside that program's own box. The kernel keeps running and so do your other programs. Containing crashes this way is exactly why the two-world split exists."
+            },
+            {
+              "id": "kernel-userspace-syscalls-l1-mcq6",
+              "type": "mcq",
+              "prompt": "What does it mean that the kernel has 'full privileges' while userspace has 'limited privileges'?",
+              "choices": [
+                "The kernel costs more money to run than userspace",
+                "The kernel is allowed to do anything, including controlling hardware and memory, while userspace programs are restricted to a safe set of actions",
+                "The kernel can only run at night, userspace only during the day",
+                "Privileges just refer to how fast each part runs"
+              ],
+              "answerIndex": 1,
+              "explanation": "Privilege here means permission. Full privilege (the kernel) means it is allowed to control hardware and memory directly. Limited privilege (userspace) means a program is fenced into safe actions and must ask the kernel for anything more. It has nothing to do with cost, time of day, or speed."
+            },
+            {
+              "id": "kernel-userspace-syscalls-l1-mcq7",
+              "type": "mcq",
+              "prompt": "Which of these would run in userspace rather than in the kernel?",
+              "choices": [
+                "The code that decides which program gets the CPU next",
+                "The code that directly drives the network card",
+                "A web browser you open to read the news",
+                "The part that translates a program's memory addresses to real memory"
+              ],
+              "answerIndex": 2,
+              "explanation": "A web browser is an ordinary application, so it lives in userspace with limited privileges. Deciding who gets the CPU, driving hardware, and managing real memory are all privileged jobs the kernel performs."
+            },
+            {
+              "id": "kernel-userspace-syscalls-l1-mcq8",
+              "type": "mcq",
+              "prompt": "Besides stability, what is the other main safety reason for splitting the system into kernel and userspace?",
+              "choices": [
+                "Security: a program cannot secretly read another program's memory or write directly to disk because it has no direct hardware access",
+                "It makes programs load faster",
+                "It saves electricity",
+                "It lets you install more programs at once"
+              ],
+              "answerIndex": 0,
+              "explanation": "The two big reasons are stability (a crash stays contained) and security (a program can't directly snoop on others' memory or tamper with the disk). Speed, power use, and install limits are not the reason for the split."
+            },
+            {
+              "id": "kernel-userspace-syscalls-l1-mcq9",
+              "type": "mcq",
+              "prompt": "How many kernels are 'in charge' of a single running computer at a time?",
+              "choices": [
+                "One per running program",
+                "One — a single kernel manages the whole machine",
+                "One per user logged in",
+                "None; programs manage themselves"
+              ],
+              "answerIndex": 1,
+              "explanation": "There is a single kernel running the machine. All programs, all users, and all hardware go through that one trusted core. Programs do not manage themselves and there is not a separate kernel per program or user."
             }
           ]
         },
         {
           "id": "kernel-userspace-syscalls-kernel-userspace-syscalls-l2",
-          "title": "What the Kernel Provides, libc, and Syscall Families",
+          "title": "System Calls: the Controlled Doorway",
           "order": 2,
           "difficulty": 2,
-          "content": "Behind the gateway the kernel is a multiplexer for shared resources. The big services it provides: **process scheduling** (deciding which thread runs on which CPU), **memory management** (virtual memory, paging, and the MMU translating per-process virtual addresses to physical frames — the same address-translation idea as a hardware page table), the **VFS** (one `open/read/write` interface over ext4, XFS, procfs, NFS, …), the **network stack** (TCP/IP, sockets), and **device drivers** that own the actual hardware.\n\nYou rarely issue raw `syscall` instructions. The **C library** (glibc on most distros, musl on Alpine/embedded) is a thin wrapper: `read()` in your code is a tiny libc stub that marshals arguments into registers, executes the trap, and converts the kernel's return into a C-friendly value plus `errno`. libc also adds buffering (stdio's `fread`), which is why one `printf` may not equal one `write`.\n\n```c\n#include <fcntl.h>\n#include <unistd.h>\nint fd = open(\"data.bin\", O_RDONLY);   /* open + read + close: 3 syscalls */\nchar buf[4096];\nssize_t n = read(fd, buf, sizeof buf);\nclose(fd);\n```\n\nDistinguish **API** from **ABI**. The API is the source-level contract (function names, header types) you compile against. The **ABI** is the binary contract: which register holds which argument, struct layouts, the syscall numbers themselves. Linux famously keeps a stable syscall ABI — an old binary keeps working — even as APIs evolve.\n\nKey syscall families to recognize: **process** (`fork`, `execve`, `wait4`, `exit`, `clone` — `clone` underlies both threads and container namespaces); **file** (`open`, `read`, `write`, `close`, `lseek`, `stat`, `mmap`); **IPC/sync** (`pipe`, `socket`, `shmget`, `futex` — the primitive under mutexes); **signals** (`kill`, `sigaction`, `rt_sigprocmask`).\n\n```bash\nstrace -e trace=%process ./launcher   # watch fork/execve/wait4/clone\n```",
+          "content": "So your program lives in userspace and cannot touch the hardware. But programs obviously *do* open files and send data over the internet. How? They **ask the kernel to do it for them**. That request is called a **system call** (often shortened to **syscall**).\n\nBack to the bank. You (a userspace program) want money from the vault. You cannot walk in. Instead you fill out a **request slip** and slide it under the window. The teller (the kernel) checks that the request is allowed, does the dangerous part safely, and hands back the result. A system call is that request slip: a controlled, official way to ask the trusted core to do something on your behalf.\n\nWhy is the doorway so important? Because it is the *only* way in. A program cannot just jump into the kernel wherever it likes — that would defeat the whole point of keeping the worlds apart. There is one official entrance, the kernel checks every request, and only then does it act.\n\nWhen you make a system call, the CPU briefly switches gears:\n\n1. Your program is running in **user mode** (limited privileges).\n2. It makes a system call. The CPU switches into **kernel mode** (full privileges) and hands control to the kernel.\n3. The kernel does the work safely.\n4. The CPU switches **back to user mode** and your program continues where it left off.\n\nThis switch is temporary — the kernel takes the wheel only for the length of the call. (The privilege levels are sometimes called \"rings\": the kernel runs in the most-privileged ring, your programs in a less-privileged one. The names matter less than the idea: two levels, one doorway between them.)\n\nSome of the most common system calls have short names worth recognizing:\n\n- `open` — open a file so you can use it\n- `read` — read data from an open file\n- `write` — write data out (to a file, or to the screen)\n- `close` — finish with a file\n- `fork` — start a new copy of the current process\n- `exec` (technically `execve`) — replace the current program with a different one\n\nA real example you can run yourself:\n\n```bash\necho \"hello\" > note.txt   # opening and writing this file used system calls\ncat note.txt             # opening and reading it used more system calls\n```\n\nEvery time `cat` opened and read that file, it made `open` and `read` system calls behind the scenes.\n\n**Recap:** A system call is the one controlled doorway a userspace program uses to ask the kernel for something. Making the call switches the CPU from user mode into kernel mode for the duration of the request, then back again.",
           "items": [
-            {
-              "id": "kernel-userspace-syscalls-l2-fc1",
-              "type": "flashcard",
-              "front": "Name the five core services the Linux kernel provides behind the syscall gateway.",
-              "back": "Process scheduling, memory management (virtual memory / paging / MMU), the VFS (unified file interface), the network stack (TCP/IP, sockets), and device drivers.",
-              "hint": "CPU, memory, files, network, hardware."
-            },
-            {
-              "id": "kernel-userspace-syscalls-l2-fc2",
-              "type": "flashcard",
-              "front": "What role does glibc/musl play relative to system calls?",
-              "back": "It is a thin wrapper library: it marshals arguments into registers, executes the trap instruction, and converts the kernel's return into a C return value plus errno. It also adds conveniences like stdio buffering.",
-              "hint": "The shim between your C call and the raw trap."
-            },
-            {
-              "id": "kernel-userspace-syscalls-l2-fc3",
-              "type": "flashcard",
-              "front": "API vs ABI — what is the difference, and which does Linux keep stable across kernel versions?",
-              "back": "API = source-level contract (function/type names you compile against). ABI = binary contract (argument registers, struct layouts, syscall numbers). Linux keeps the syscall ABI stable so old binaries keep running.",
-              "hint": "Source contract vs binary contract."
-            },
-            {
-              "id": "kernel-userspace-syscalls-l2-fc4",
-              "type": "flashcard",
-              "front": "What does the MMU do, and how does it tie into kernel memory management?",
-              "back": "The MMU translates a process's virtual addresses into physical frame addresses using page tables the kernel sets up, faulting into the kernel on a miss (demand paging). It gives each process its own isolated address space.",
-              "hint": "Virtual-to-physical address translation."
-            },
-            {
-              "id": "kernel-userspace-syscalls-l2-fc5",
-              "type": "flashcard",
-              "front": "Which syscall underlies both creating threads and creating container namespaces?",
-              "back": "clone(). With different flags it shares more or less of the parent (address space, file descriptors, namespaces). fork() is essentially clone() with a conservative flag set; threads share the address space; CLONE_NEW* flags create new namespaces.",
-              "hint": "One flexible primitive, many flag combinations."
-            },
             {
               "id": "kernel-userspace-syscalls-l2-mcq1",
               "type": "mcq",
-              "prompt": "Why might a single printf() in your program NOT correspond to a single write() syscall seen under strace?",
+              "prompt": "What is a system call?",
               "choices": [
-                "strace cannot see write() at all",
-                "stdio in libc buffers output, so multiple printf calls may coalesce into one write, or none until flush",
-                "printf is a kernel function, not a libc function",
-                "write() is deprecated and never actually runs"
+                "A phone call you make to technical support",
+                "The controlled way a userspace program asks the kernel to do something on its behalf",
+                "A function that only ever runs inside another userspace program",
+                "A way for the kernel to ask a program for permission"
               ],
               "answerIndex": 1,
-              "explanation": "libc's stdio layer buffers. Several printf calls can accumulate in a userspace buffer and be flushed with one write() (or at exit). This is exactly why strace output sometimes 'lags' your printfs — the syscall happens at flush time."
+              "explanation": "A system call is how a limited-privilege userspace program requests a privileged action (like opening a file) from the kernel. It is the doorway between the two worlds, not a support phone call, and it goes from program TO kernel, not the other way around.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/kernel-userspace-syscalls-3.svg"
             },
             {
               "id": "kernel-userspace-syscalls-l2-mcq2",
               "type": "mcq",
-              "prompt": "Reading one file with the classic open/read/close pattern issues roughly how many system calls (ignoring buffering details)?",
+              "prompt": "Name one common system call and what it does.",
               "choices": [
-                "Zero — file access does not use syscalls",
-                "Exactly one combined 'fileio' syscall",
-                "At least three: open, read, close (more read()s for larger files)",
-                "Exactly two: fopen and fclose"
+                "render — it draws the desktop wallpaper",
+                "read — it reads data from an open file",
+                "browse — it opens a web page",
+                "compile — it turns source code into a program"
               ],
-              "answerIndex": 2,
-              "explanation": "open(), read(), and close() are three distinct syscalls; large files need multiple read() calls. fopen/fclose are libc wrappers that themselves call open/close. Each is a separate trap into the kernel."
+              "answerIndex": 1,
+              "explanation": "read is a core system call: it asks the kernel to read data from an already-open file. Other common ones are open, write, close, fork, and exec. Drawing wallpaper, browsing the web, and compiling are higher-level tasks, not individual system calls."
             },
             {
               "id": "kernel-userspace-syscalls-l2-mcq3",
               "type": "mcq",
-              "prompt": "Which group correctly lists FILE-related system calls?",
+              "prompt": "In the bank analogy, the request slip you slide under the teller's window represents what?",
               "choices": [
-                "fork, execve, wait4, clone",
-                "open, read, write, lseek, mmap",
-                "kill, sigaction, rt_sigprocmask",
-                "pipe, socket, futex, shmget"
+                "The kernel",
+                "A system call",
+                "The hardware",
+                "A crashed program"
               ],
               "answerIndex": 1,
-              "explanation": "open/read/write/lseek/mmap are file-oriented. The first option is the process family, the third is the signal family, and the fourth is IPC/synchronization. Recognizing families lets you skim strace output fast."
+              "explanation": "The request slip is the system call: a controlled, official request handed to the trusted core (the teller/kernel), which checks it and does the work safely. You never enter the vault yourself."
             },
             {
               "id": "kernel-userspace-syscalls-l2-mcq4",
               "type": "mcq",
-              "prompt": "Linux maintains a stable syscall ABI. What practical guarantee does this give?",
+              "prompt": "When a program makes a system call, what happens to the CPU's mode?",
               "choices": [
-                "Source code never needs recompiling between distros",
-                "A binary compiled years ago can still issue the same syscalls and run on a newer kernel",
-                "All kernel internal functions keep the same names",
-                "Drivers never need updating"
+                "It stays in user mode the whole time",
+                "It switches from user mode into kernel mode for the call, then back to user mode afterward",
+                "It permanently stays in kernel mode from then on",
+                "It shuts the CPU down and restarts it"
               ],
               "answerIndex": 1,
-              "explanation": "The stable syscall ABI means syscall numbers and their argument conventions do not change incompatibly, so an old userspace binary keeps working on a new kernel. Internal kernel symbols and driver APIs, by contrast, are explicitly NOT stable."
+              "explanation": "A system call temporarily switches the CPU from user mode (limited) into kernel mode (full privileges) so the kernel can do the work, then switches back to user mode so your program continues. The switch is temporary, not permanent."
+            },
+            {
+              "id": "kernel-userspace-syscalls-l2-mcq5",
+              "type": "mcq",
+              "prompt": "Why is the system-call doorway described as the ONLY way into the kernel?",
+              "choices": [
+                "Because the kernel is too small to have more than one entrance",
+                "Because allowing programs to jump into the kernel anywhere they liked would defeat the safety of keeping the two worlds apart",
+                "Because there is a hardware limit of exactly one entrance per computer",
+                "Because older computers had more doorways but modern ones removed them"
+              ],
+              "answerIndex": 1,
+              "explanation": "A single controlled entrance is what makes the separation safe. If programs could leap into kernel code wherever they wanted, the kernel could not check or trust requests, and the protection would collapse. It is a deliberate design choice, not a size or hardware accident."
+            },
+            {
+              "id": "kernel-userspace-syscalls-l2-mcq6",
+              "type": "mcq",
+              "prompt": "Which system call would a program use to start a brand-new copy of the current process?",
+              "choices": [
+                "fork",
+                "write",
+                "close",
+                "open"
+              ],
+              "answerIndex": 0,
+              "explanation": "fork creates a new process that is a copy of the current one. write sends out data, close finishes with a file, and open opens a file. (A related call, exec, then replaces a process's program with a different one.)"
+            },
+            {
+              "id": "kernel-userspace-syscalls-l2-mcq7",
+              "type": "mcq",
+              "prompt": "You run 'cat note.txt' and it prints the file's contents. Which system calls did cat most likely use to get the file's data?",
+              "choices": [
+                "fork and exec",
+                "open and read",
+                "close and close again",
+                "No system calls at all — cat reads the disk directly"
+              ],
+              "answerIndex": 1,
+              "explanation": "To show a file, cat opens it (open) and reads its contents (read), both system calls, then closes it. cat is a userspace program, so it cannot read the disk directly; it must ask the kernel through system calls."
+            },
+            {
+              "id": "kernel-userspace-syscalls-l2-mcq8",
+              "type": "mcq",
+              "prompt": "What does the 'exec' family of system calls do?",
+              "choices": [
+                "It deletes a file from the disk",
+                "It replaces the current program with a different program in the same process",
+                "It shuts down the computer",
+                "It increases a program's privileges to kernel level permanently"
+              ],
+              "answerIndex": 1,
+              "explanation": "exec (execve) replaces what a process is running with a different program, keeping the same process. It does not delete files, shut down the machine, or grant kernel privileges. fork plus exec is the classic way Linux starts a new program."
+            },
+            {
+              "id": "kernel-userspace-syscalls-l2-mcq9",
+              "type": "mcq",
+              "prompt": "The terms 'user mode' and 'kernel mode' (sometimes called rings) refer to what?",
+              "choices": [
+                "Two different brands of operating system",
+                "Two CPU privilege levels: a limited one for normal programs and a full one for the kernel",
+                "Two physical processors inside the computer",
+                "Two separate hard drives"
+              ],
+              "answerIndex": 1,
+              "explanation": "User mode and kernel mode are two privilege levels the CPU can run in: limited for userspace programs, full for the kernel. A system call switches between them. They are not separate brands, processors, or drives."
+            },
+            {
+              "id": "kernel-userspace-syscalls-l2-mcq10",
+              "type": "mcq",
+              "prompt": "After the kernel finishes handling a system call, what happens next?",
+              "choices": [
+                "The program is shut down because its job is done",
+                "The CPU switches back to user mode and the program continues from where it asked",
+                "The kernel keeps control forever to be safe",
+                "The computer reboots to clear kernel mode"
+              ],
+              "answerIndex": 1,
+              "explanation": "Once the kernel has done the requested work, the CPU returns to user mode and the program resumes right where it made the call, usually with a result in hand. The program is not shut down and the kernel does not keep control."
             }
           ]
         },
         {
           "id": "kernel-userspace-syscalls-kernel-userspace-syscalls-l3",
-          "title": "Tracing, errno, and What Physically Happens on read()",
+          "title": "What the Kernel Provides, and Watching It with strace",
           "order": 3,
           "difficulty": 3,
-          "content": "When a program 'just fails,' reach for **strace** before guessing. It intercepts every syscall (via ptrace), printing the name, decoded arguments, return value, and on failure the symbolic errno. `ltrace` does the same for library calls. `/proc/<pid>/syscall` shows the syscall a process is blocked in right now.\n\n```bash\nstrace -f -e trace=openat,read,write cat /etc/hostname\nstrace -c ls            # histogram: counts + time per syscall\ncat /proc/$(pgrep -n sshd)/syscall   # which syscall is it stuck in?\n```\n\nA failing line looks like `openat(AT_FDCWD, \"/nope\", O_RDONLY) = -1 ENOENT (No such file or directory)`. At the ABI level the kernel returned a small negative number; libc saw it, set the thread-local `errno` to `ENOENT`, and returned `-1`. Always check the return value, then read `errno` — strace just shows you both at once.\n\nDistinguish a **syscall** from an **interrupt**. A syscall is *synchronous and voluntary*: your code executes the trap and expects to resume. An **interrupt** is *asynchronous*: a hardware device (NIC, timer, the radar ADC you once serviced) or a software event yanks the CPU into a handler regardless of what was running. Both transfer control to the kernel, but one is requested and one is imposed. Each transfer is a **context switch** of privilege; switching to a *different process* is a heavier context switch (save/restore registers, swap page tables).\n\nWhat physically happens on `read(fd, buf, 4096)`? (1) libc traps in with `__NR_read` and the three args. (2) Ring 0; VFS routes by fd to the backing filesystem/driver. (3) The kernel checks its **page cache**; on a miss it issues block I/O and the calling process is put to **sleep (S/D state)** while DMA fills a kernel buffer. (4) An **interrupt** from the disk signals completion. (5) The kernel uses **`copy_to_user`** to move bytes from kernel space into your `buf`, validating the address first (never a raw memcpy — a bad pointer must fail safely, not crash the kernel). (6) It returns the byte count; you wake back in ring 3. The mirror, `copy_from_user`, guards writes inbound — the trust boundary enforced in code.",
+          "content": "Now that you know the kernel is the trusted core behind the doorway, what is it actually *doing* in there? It is the manager of all the shared resources of the computer. A handful of big jobs:\n\n- **Scheduling.** Many programs want to run, but there are only so many CPUs. The kernel decides who runs, for how long, and switches between them so quickly it feels simultaneous.\n- **Memory management.** The kernel hands out memory to programs and keeps each program's memory separate. It uses **virtual memory**, a clever trick where each program *thinks* it has its own clean block of memory, while the kernel quietly maps those to the real physical chips. This is part of why one program can't read another's memory.\n- **Filesystems.** The kernel turns raw disks into the neat tree of folders and files you actually use, so `open`, `read`, and `write` work the same whether the file is on your hard drive, a USB stick, or the network.\n- **Networking.** Sending and receiving data over the internet goes through the kernel's networking machinery.\n- **Drivers.** A **driver** is the piece of kernel code that knows how to talk to a specific device (a particular network card, disk, or keyboard). Drivers are how the kernel actually controls the hardware.\n\nYou might wonder: when I write a program, do I type out raw system calls? Usually not. Programs lean on the **C library** (a standard helper library), which provides friendly functions like `read()` and `write()`. The C library is a **thin wrapper**: when you call its `read()`, it does the small, fiddly work of actually making the `read` system call for you and handing back the result. Think of it as a helpful clerk who fills out the request slip in the proper format on your behalf.\n\nHere is the genuinely useful part. There is a famous tool called **`strace`** that lets you *watch* every system call a program makes, live. When a program mysteriously \"just fails,\" `strace` is one of the first tools an experienced user reaches for, because it shows you exactly what the program asked the kernel to do and what answer it got.\n\n```bash\nstrace cat hello.txt\n```\n\nYou will see lines like these (look at the diagram for an annotated version):\n\n```\nopenat(AT_FDCWD, \"hello.txt\", O_RDONLY) = 3\nread(3, \"Hello!\\n\", 131072)            = 7\nwrite(1, \"Hello!\\n\", 7)                = 7\nclose(3)                              = 0\n```\n\nEach line is one system call: its name, the arguments it was given, and the result after the `=`. If a call **fails**, the result is `-1` and an error name explains why. For example, asking to open a file that doesn't exist gives:\n\n```\nopenat(AT_FDCWD, \"missing.txt\", O_RDONLY) = -1 ENOENT (No such file or directory)\n```\n\nThat one line tells you the program failed because the file wasn't there. No guessing.\n\nOne last distinction. A **system call** is something your program *chooses* to do — it asks, on purpose, and waits for the answer. An **interrupt** is different: it is the hardware *interrupting* the CPU on its own schedule (\"a network packet just arrived!\", \"the timer ticked!\"). Both hand control to the kernel, but a system call is requested by your program, while an interrupt is sprung on the CPU by the hardware. One is asked for; the other is imposed.\n\n**Recap:** The kernel manages scheduling, memory, filesystems, networking, and hardware via drivers; the C library wraps system calls in friendly functions; and `strace` lets you watch those calls to debug what a program is really doing.",
           "items": [
-            {
-              "id": "kernel-userspace-syscalls-l3-fc1",
-              "type": "flashcard",
-              "front": "What does strace show you for each system call, and what underlying mechanism does it use?",
-              "back": "It shows the syscall name, decoded arguments, the return value, and on failure the symbolic errno. It works via the ptrace() mechanism, which lets one process intercept another's syscalls.",
-              "hint": "Name, args, return, errno — powered by ptrace."
-            },
-            {
-              "id": "kernel-userspace-syscalls-l3-fc2",
-              "type": "flashcard",
-              "front": "When a syscall fails, what does the kernel return at the ABI level, and what does libc do with it?",
-              "back": "The kernel returns a small negative value (e.g. -ENOENT). libc detects this, stores the positive code in the thread-local errno, and returns -1 (or NULL) to your program.",
-              "hint": "Negative from kernel; -1 plus errno from libc."
-            },
-            {
-              "id": "kernel-userspace-syscalls-l3-fc3",
-              "type": "flashcard",
-              "front": "Syscall vs interrupt: what is the key difference?",
-              "back": "A syscall is synchronous and voluntary — user code executes a trap and expects to resume. An interrupt is asynchronous and imposed — a hardware device or event diverts the CPU regardless of what was running. Both enter the kernel.",
-              "hint": "Requested by you vs forced by hardware."
-            },
-            {
-              "id": "kernel-userspace-syscalls-l3-fc4",
-              "type": "flashcard",
-              "front": "What do copy_to_user() and copy_from_user() do, and why not a plain memcpy?",
-              "back": "They move data across the user/kernel boundary while validating the userspace address can be safely accessed. A bad user pointer makes them fail cleanly (returning an error) instead of faulting in ring 0 and crashing or corrupting the kernel.",
-              "hint": "Safe, validated copies across the trust boundary."
-            },
-            {
-              "id": "kernel-userspace-syscalls-l3-fc5",
-              "type": "flashcard",
-              "front": "Which file reveals the syscall a running process is currently blocked in, and how is that useful?",
-              "back": "/proc/<pid>/syscall. It tells you what a hung or slow process is waiting on (e.g. a read on a network fd) without attaching strace, which is handy for a quick, low-impact diagnosis.",
-              "hint": "Under /proc, per-PID, single line."
-            },
             {
               "id": "kernel-userspace-syscalls-l3-mcq1",
               "type": "mcq",
-              "prompt": "During a read() that misses the page cache and goes to disk, what is the calling process typically doing?",
+              "prompt": "Which of these is a core job the kernel performs?",
               "choices": [
-                "Busy-spinning in ring 3 polling the disk register directly",
-                "Sleeping (S or D state) while the kernel issues block I/O and DMA fills a buffer",
-                "Running in ring 0 the entire time at 100% CPU",
-                "Killed and restarted by the scheduler"
+                "Deciding which program runs on the CPU next (scheduling)",
+                "Choosing the color scheme of your desktop",
+                "Writing the source code for your applications",
+                "Designing the physical shape of the hard drive"
               ],
-              "answerIndex": 1,
-              "explanation": "On a cache miss the process is put to sleep (interruptible S, or uninterruptible D during the actual transfer) so the CPU can run other work. A completion interrupt from the device later wakes it. User code never polls the disk register directly — that is ring-0 driver territory."
+              "answerIndex": 0,
+              "explanation": "Scheduling, deciding which program gets the CPU and for how long, is a central kernel job, along with memory management, filesystems, networking, and drivers. Desktop colors are a userspace concern, and the kernel neither writes your apps nor designs hardware.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/kernel-userspace-syscalls-4.svg"
             },
             {
               "id": "kernel-userspace-syscalls-l3-mcq2",
               "type": "mcq",
-              "prompt": "strace prints: openat(AT_FDCWD, \"/etc/secret\", O_RDONLY) = -1 EACCES (Permission denied). What do you conclude?",
+              "prompt": "What is virtual memory, in plain terms?",
               "choices": [
-                "The file does not exist",
-                "The syscall succeeded but returned no data",
-                "The open failed due to permissions; errno was set to EACCES and the call returned -1",
-                "strace itself crashed"
+                "Extra memory you buy and plug in later",
+                "A trick where each program thinks it has its own clean block of memory, which the kernel maps to the real physical memory",
+                "Memory that only exists while the screen is on",
+                "A backup copy of the kernel kept on disk"
               ],
-              "answerIndex": 2,
-              "explanation": "The return value -1 with EACCES means the openat syscall failed specifically on permissions (not a missing file, which would be ENOENT). This is the canonical strace workflow: find the first failing syscall and read its errno to pinpoint the real problem."
+              "answerIndex": 1,
+              "explanation": "Virtual memory lets each program act as if it has its own private memory space; the kernel maps those virtual addresses to real physical memory and keeps programs separated. It is not extra hardware you buy, not tied to the screen, and not a kernel backup."
             },
             {
               "id": "kernel-userspace-syscalls-l3-mcq3",
               "type": "mcq",
-              "prompt": "Which command gives you a histogram of how many times each syscall was made and the time spent in each?",
+              "prompt": "What is a device driver?",
               "choices": [
-                "strace -f program",
-                "strace -c program",
-                "ltrace -S program",
-                "cat /proc/self/syscall"
+                "The person who installed your operating system",
+                "Kernel code that knows how to talk to a specific piece of hardware",
+                "A userspace app for managing files",
+                "The cable that connects a device to the computer"
               ],
               "answerIndex": 1,
-              "explanation": "strace -c produces a summary table: calls, errors, and time per syscall. -f follows child processes (forks) but still shows the per-call trace; ltrace traces library calls; /proc/self/syscall shows only the current single syscall."
+              "explanation": "A driver is the part of the kernel that knows how to control a particular device, such as a specific network card or disk. Drivers are how the kernel actually operates the hardware. It is not a person, a file-manager app, or a cable."
             },
             {
               "id": "kernel-userspace-syscalls-l3-mcq4",
               "type": "mcq",
-              "prompt": "Why does the kernel use copy_to_user() to deliver read() data into your buffer instead of memcpy()?",
+              "prompt": "What role does the C library play when your program calls read()?",
               "choices": [
-                "memcpy is slower than copy_to_user",
-                "copy_to_user encrypts the data in transit",
-                "The user pointer is untrusted; copy_to_user validates it and fails safely instead of faulting in ring 0",
-                "memcpy cannot copy more than 4096 bytes"
+                "It replaces the kernel entirely",
+                "It is a thin wrapper that makes the actual read system call for you and hands back the result",
+                "It stores all of your files",
+                "It speeds up the hardware directly"
               ],
-              "answerIndex": 2,
-              "explanation": "The destination pointer came from ring 3 and could be invalid or hostile. copy_to_user checks the address and handles a fault gracefully (returning bytes-not-copied) rather than letting a bad dereference crash or compromise the kernel. It is the trust boundary expressed in code."
+              "answerIndex": 1,
+              "explanation": "The C library is a thin wrapper around system calls. Its read() function does the fiddly work of making the real read system call and returning the result in a friendly form. It does not replace the kernel, store files, or touch hardware directly."
+            },
+            {
+              "id": "kernel-userspace-syscalls-l3-mcq5",
+              "type": "mcq",
+              "prompt": "What does the tool strace let you do?",
+              "choices": [
+                "Speed up a slow program automatically",
+                "Watch every system call a program makes, with its arguments and result",
+                "Edit the kernel's source code",
+                "Encrypt a program's files"
+              ],
+              "answerIndex": 1,
+              "explanation": "strace shows you, live, each system call a program makes: the call name, its arguments, and the result. That makes it a go-to debugging tool when a program 'just fails.' It does not speed up, edit the kernel, or encrypt anything."
+            },
+            {
+              "id": "kernel-userspace-syscalls-l3-mcq6",
+              "type": "mcq",
+              "prompt": "In this strace line, what does the result mean?\n\nopenat(AT_FDCWD, \"missing.txt\", O_RDONLY) = -1 ENOENT (No such file or directory)",
+              "choices": [
+                "The file was opened successfully and is empty",
+                "The open failed: -1 means failure, and ENOENT says the file does not exist",
+                "The program read 1 byte from the file",
+                "strace itself crashed"
+              ],
+              "answerIndex": 1,
+              "explanation": "A result of -1 means the system call failed, and the error name ENOENT (Error NO ENTry) tells you why: there is no such file. This is the everyday strace workflow, find the failing call and read its error to learn the real problem."
+            },
+            {
+              "id": "kernel-userspace-syscalls-l3-mcq7",
+              "type": "mcq",
+              "prompt": "What is the key difference between a system call and an interrupt?",
+              "choices": [
+                "There is no difference; the words mean the same thing",
+                "A system call is requested on purpose by your program; an interrupt is sprung on the CPU by the hardware on its own schedule",
+                "A system call comes from hardware; an interrupt comes from your program",
+                "Interrupts only happen on broken computers"
+              ],
+              "answerIndex": 1,
+              "explanation": "A system call is voluntary: your program chooses to ask the kernel for something. An interrupt is imposed: the hardware diverts the CPU when an event occurs (a packet arrives, a timer ticks). Both enter the kernel, but one is asked for and the other is forced. Interrupts are normal, not a sign of breakage."
+            },
+            {
+              "id": "kernel-userspace-syscalls-l3-mcq8",
+              "type": "mcq",
+              "prompt": "Why do open, read, and write work the same whether a file is on your hard drive, a USB stick, or the network?",
+              "choices": [
+                "Because all storage devices are physically identical",
+                "Because the kernel's filesystem layer presents one consistent file interface over all of them",
+                "Because the C library copies every file to the hard drive first",
+                "Because there is a separate set of system calls for each device"
+              ],
+              "answerIndex": 1,
+              "explanation": "The kernel provides a unified filesystem interface, so the same open/read/write calls behave consistently no matter what is actually storing the data. The devices are not identical, files are not secretly copied to disk, and you do not need different calls per device."
+            },
+            {
+              "id": "kernel-userspace-syscalls-l3-mcq9",
+              "type": "mcq",
+              "prompt": "In the strace line  read(3, \"Hello!\\n\", 131072) = 7,  what does the 7 after the = tell you?",
+              "choices": [
+                "The read failed",
+                "The read succeeded and returned 7 bytes of data",
+                "The program waited 7 seconds",
+                "There were 7 errors"
+              ],
+              "answerIndex": 1,
+              "explanation": "For a successful read, the number after = is how many bytes were actually read, here 7 (the six letters of 'Hello!' plus a newline). A failure would show -1 and an error name instead. It is a byte count, not seconds or an error tally."
+            },
+            {
+              "id": "kernel-userspace-syscalls-l3-mcq10",
+              "type": "mcq",
+              "prompt": "A coworker's program mysteriously 'just fails' with no clear message. Why is strace a smart first tool to reach for?",
+              "choices": [
+                "It automatically rewrites the program to fix the bug",
+                "It shows exactly which system calls the program made and which one failed and why, removing the guesswork",
+                "It makes the program run faster so the bug goes away",
+                "It deletes the broken program and reinstalls it"
+              ],
+              "answerIndex": 1,
+              "explanation": "strace reveals the real conversation between the program and the kernel: every call, its arguments, and its result. The first failing call (and its error name) usually points straight at the problem, such as a missing file or a permission denial. It does not rewrite, speed up, or reinstall anything."
             }
           ]
         }
