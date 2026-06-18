@@ -1,384 +1,588 @@
 {
   "id": "toolchain",
-  "title": "Toolchain: Cross-Compiler, Linker, Startup & Debug",
+  "title": "Toolchain: Cross-Compiler, Linker, Startup, Debug",
   "order": 4,
   "lessons": [
     {
-      "id": "toolchain-lesson-cross-compile",
-      "title": "Cross-Compilation & the Freestanding Pipeline",
+      "id": "toolchain-lesson-big-picture",
+      "title": "The Big Picture: From Your Code to Code on the Chip",
       "order": 1,
       "difficulty": 1,
-      "content": "You already build native software, where `gcc` targets the same machine it runs on. Embedded work is **cross-compilation**: the *host* (your x86-64 laptop) builds code for a different *target* (an ARM Cortex-M). The compiler is named for the **target triple** it emits: `arm-none-eabi-gcc` means architecture `arm`, vendor `none`, and ABI `eabi` (the ARM Embedded ABI). The empty middle field is the giveaway that there is **no operating system**.\n\nThat \"no OS\" fact is what *freestanding* means. A **hosted** environment assumes a full libc and an OS underneath (`fopen`, `malloc` backed by `brk`, a `main` that `_start` calls for you). A **freestanding** environment provides only the language plus headers like `<stdint.h>`, `<stddef.h>`, and `<stdbool.h>` — no guaranteed `printf`, no filesystem, no process. You supply the path to `main` yourself (the startup code, lesson 3).\n\nThe classic flags reflect this:\n\n```\narm-none-eabi-gcc -mcpu=cortex-m4 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 \\\n    -ffreestanding -nostartfiles -Os -g3 -c main.c -o main.o\n```\n\n`-mthumb` selects the Thumb-2 instruction set (all Cortex-M is Thumb-only). `-ffreestanding` tells the compiler not to assume hosted-library semantics, and `-nostartfiles` says \"do not link the default `crt0`/`_start` — I provide my own.\" The toolchain ships matching multilib copies of `libc`/`libgcc` built for each `-mcpu`/`-mfloat-abi` combination, so the linker picks the variant that matches your flags. Mismatch them and you get cryptic link errors or a hard fault on the first float.",
+      "content": "**Hook.** You type C code as plain text. A chip cannot read text — it only runs *machine code*, the simple numbered instructions a processor understands. So how does your text become something the chip can run? A small team of tools does the work, one after another. This chain of tools is called the **toolchain**.\n\n**Build.** Think of writing a book in your own language and shipping it to a reader who speaks another language. First a **translator** turns your words into theirs. Then an editor takes the translated chapters from different writers, stitches them into one book, and numbers all the pages so everything can be found. In the toolchain:\n\n- The **compiler** is the translator. It turns your C code into machine code.\n- The **linker** is the editor. It stitches the separate pieces together into one program and decides *where* each part will live in the chip's memory.\n\nThe result is one **program file** (often called an `.elf`). To actually run it, you **flash** it — load it onto the chip's memory — and then the chip can execute it. Later, a **debugger** lets you pause the running program and look inside.\n\n**Recap.** Source code → compiler (translate) → linker (stitch + place) → a program file → flash it onto the chip. That whole pipeline is the toolchain, and the rest of this sub-topic walks through each step.",
       "items": [
         {
-          "id": "toolchain-fc-triple",
-          "type": "flashcard",
-          "front": "Decode the target triple in `arm-none-eabi-gcc`.",
-          "back": "arm = architecture (ARM, Thumb on Cortex-M); none = vendor/OS (no operating system); eabi = the ARM Embedded ABI for calling conventions and object layout. The empty 'none' field signals a bare-metal/freestanding target.",
-          "hint": "Three fields: arch, vendor/OS, ABI."
-        },
-        {
-          "id": "toolchain-fc-freestanding",
-          "type": "flashcard",
-          "front": "What does a *freestanding* C environment provide vs a *hosted* one?",
-          "back": "Freestanding guarantees only the language and a few headers (stdint.h, stddef.h, stdbool.h, limits.h, float.h) and no OS/process startup. Hosted assumes a full libc, an OS, and that _start runs init then calls main for you. On bare metal you write the startup path to main yourself.",
-          "hint": "Think about what runs before main()."
-        },
-        {
-          "id": "toolchain-fc-thumb",
-          "type": "flashcard",
-          "front": "Why does every Cortex-M build pass `-mthumb`?",
-          "back": "Cortex-M cores execute ONLY the Thumb-2 instruction set; they have no ARM (A32) state. Omitting -mthumb (or linking A32 code) produces instructions the core cannot run, faulting immediately.",
-          "hint": "Cortex-M has no A32 state."
-        },
-        {
-          "id": "toolchain-fc-nostartfiles",
-          "type": "flashcard",
-          "front": "What does `-nostartfiles` do, and why use it on an MCU?",
-          "back": "It tells the linker not to pull in the default crt0/_start objects. On bare metal you supply your own Reset_Handler/startup that sets the stack pointer, initializes .data/.bss, and calls main, so the hosted _start would be wrong or absent.",
-          "hint": "You provide the entry path yourself."
-        },
-        {
-          "id": "toolchain-mcq-float-abi",
+          "id": "toolchain-mcq-bigpic-why-tools",
           "type": "mcq",
-          "prompt": "You compile some objects with `-mfloat-abi=hard` and others (a prebuilt lib) with `-mfloat-abi=soft`. What happens?",
+          "prompt": "Why can't a chip run your C code directly as you typed it?",
           "choices": [
-            "Nothing; the float ABI is purely cosmetic",
-            "Link or runtime failure because the two halves pass float arguments differently (FPU registers vs core registers)",
-            "The linker silently recompiles the soft objects to hard",
-            "The code runs but floats are always rounded to integers"
+            "C code is too long for the chip's memory",
+            "A chip runs machine code (numbered instructions), not text, so the code must be translated first",
+            "C code is encrypted and must be decrypted by the chip",
+            "The chip only runs code written in its own brand of C"
           ],
           "answerIndex": 1,
-          "explanation": "The float ABI is a calling convention. 'hard' passes floats in FPU (s0/d0) registers; 'soft' passes them in core registers via library calls. Mixing them means a callee reads arguments from the wrong place, so the linker rejects the mismatch (it tags objects) or you get garbage/faults. All objects and libs must share the same -mfloat-abi/-mfpu."
+          "explanation": "A processor only understands machine code — simple numbered instructions. Your C is human-readable text. The compiler translates that text into machine code the chip can actually execute. It is not about length, encryption, or a special dialect.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/toolchain-3.svg"
         },
         {
-          "id": "toolchain-mcq-triple-purpose",
+          "id": "toolchain-mcq-bigpic-compiler-job",
           "type": "mcq",
-          "prompt": "Why is the compiler named `arm-none-eabi-gcc` rather than just `gcc`?",
+          "prompt": "In the book analogy, the compiler plays the role of the...",
           "choices": [
-            "It is a marketing alias for the same native compiler",
-            "It is a cross-compiler whose name encodes the target triple it generates code for, distinct from the host it runs on",
-            "It only works on ARM host machines",
-            "The prefix selects the editor integration"
-          ],
-          "answerIndex": 1,
-          "explanation": "It is a cross-compiler: it runs on your host (often x86-64) but emits code for the ARM/none/eabi target. The triple prefix lets multiple cross toolchains coexist and makes the target unambiguous to build systems."
-        },
-        {
-          "id": "toolchain-mcq-headers",
-          "type": "mcq",
-          "prompt": "Which header is guaranteed available in a freestanding C environment?",
-          "choices": [
-            "<stdio.h>",
-            "<stdlib.h>",
-            "<stdint.h>",
-            "<unistd.h>"
-          ],
-          "answerIndex": 2,
-          "explanation": "The C standard guarantees a small set of headers in freestanding mode (stddef.h, stdint.h, stdbool.h, limits.h, float.h, iso646.h, stdalign.h, stdnoreturn.h, etc.). stdio/stdlib/unistd assume a hosted library and OS and may be absent or non-functional without supplying syscall stubs."
-        },
-        {
-          "id": "toolchain-fc-cpp-stages",
-          "type": "flashcard",
-          "front": "Name the four classic stages of the build pipeline and their outputs.",
-          "back": "Preprocess (cpp): expand #includes/macros -> translation unit. Compile (cc1): C -> assembly (.s). Assemble (as): assembly -> object (.o). Link (ld): combine .o + libraries, resolve symbols, place sections -> .elf.",
-          "hint": "cpp, cc1, as, ld."
-        },
-        {
-          "id": "toolchain-mcq-os-flag-meaning",
-          "type": "mcq",
-          "prompt": "What practical consequence follows from the 'none' (no-OS) field for `malloc`?",
-          "choices": [
-            "malloc is impossible on bare metal",
-            "malloc works but ultimately calls a `_sbrk`/`_brk` stub you must provide to grow the heap, since there is no OS to do it",
-            "malloc is always lock-free and reentrant",
-            "malloc allocates from flash"
-          ],
-          "answerIndex": 1,
-          "explanation": "With no OS, the libc heap allocator has nothing to ask for more memory. newlib calls _sbrk to extend the program break; you must supply that stub (typically carving from a RAM region between the heap start and the stack). Many bare-metal designs avoid malloc entirely for determinism."
-        }
-      ]
-    },
-    {
-      "id": "toolchain-lesson-sections-linker",
-      "title": "Sections & the Linker Script: MEMORY, SECTIONS, LMA vs VMA",
-      "order": 2,
-      "difficulty": 2,
-      "content": "Every object file is divided into **sections** by purpose. `.text` is executable code (and usually the vector table); `.rodata` is read-only constants (string literals, `const` tables); `.data` is initialized read/write globals; `.bss` is zero-initialized read/write globals (it occupies no space in the image — just a size). `.stack` and `.heap` are reserved RAM regions. The linker's job is to gather like-named input sections from all `.o` files and place each output section at a real address.\n\nThat placement is what the **linker script** (`.ld`) describes. It has two key blocks. `MEMORY` names the physical regions:\n\n```\nMEMORY {\n  FLASH (rx)  : ORIGIN = 0x08000000, LENGTH = 512K\n  RAM   (rwx) : ORIGIN = 0x20000000, LENGTH = 128K\n}\n```\n\n`SECTIONS` maps output sections into those regions and is where the crucial **LMA vs VMA** distinction lives. The **VMA** (virtual/run address) is where a section *executes or is read* from at run time; the **LMA** (load address) is where it *physically lives in the image*. For code and constants the two are equal — they run from FLASH. But `.data` is special: it must *run* from RAM (VMA in RAM) yet its initial values must be *stored* in FLASH (LMA in FLASH), because RAM is volatile. The `AT>` operator sets the LMA:\n\n```\n.text : { KEEP(*(.isr_vector)) *(.text*) *(.rodata*) } > FLASH\n.data : {\n  _sdata = .;\n  *(.data*)\n  _edata = .;\n} > RAM AT> FLASH\n_sidata = LOADADDR(.data);  /* LMA of .data, used by startup */\n.bss : { _sbss = .; *(.bss*) *(COMMON); _ebss = .; } > RAM\n```\n\n`KEEP(*(.isr_vector))` forces the **vector table** to the very start of FLASH (`0x08000000` on STM32), because the CPU fetches the initial SP and reset PC from there on reset. The exported symbols (`_sdata`, `_edata`, `_sidata`, `_sbss`, `_ebss`, `_estack`) are the handles the startup code uses next.",
-      "items": [
-        {
-          "id": "toolchain-fc-sections",
-          "type": "flashcard",
-          "front": "What goes in .text, .rodata, .data, and .bss?",
-          "back": ".text = executable code (+ vector table). .rodata = read-only constants (string literals, const tables). .data = initialized read/write globals (nonzero init values). .bss = zero-initialized read/write globals (no bytes in the image, only a size).",
-          "hint": "Code, constants, init'd RW, zeroed RW."
-        },
-        {
-          "id": "toolchain-fc-lma-vma",
-          "type": "flashcard",
-          "front": "Define LMA vs VMA and give the section where they differ.",
-          "back": "VMA (virtual/run address) is where a section is accessed at run time; LMA (load address) is where its bytes are stored in the image. They differ for .data: VMA is in RAM (it must be writable) but LMA is in FLASH (init values must survive power-off). Startup copies LMA->VMA.",
-          "hint": "Where it runs vs where it is stored."
-        },
-        {
-          "id": "toolchain-fc-bss-noimage",
-          "type": "flashcard",
-          "front": "Why does .bss occupy no space in the .bin image but does occupy RAM?",
-          "back": "All .bss bytes are zero, so storing them in flash would be wasteful and redundant. The linker records only the .bss size and its RAM addresses (_sbss.._ebss); the startup code zeroes that RAM range at boot. So it costs RAM at run time but zero flash.",
-          "hint": "Zeros need no storage, only a size."
-        },
-        {
-          "id": "toolchain-mcq-at-operator",
-          "type": "mcq",
-          "prompt": "In `.data : { ... } > RAM AT> FLASH`, what does `AT> FLASH` accomplish?",
-          "choices": [
-            "Runs .data code directly from flash to save RAM",
-            "Sets the section's LMA to FLASH while its VMA stays in RAM, so init values are stored in flash but accessed in RAM",
-            "Copies .bss into flash",
-            "Disables the .data section entirely"
-          ],
-          "answerIndex": 1,
-          "explanation": "AT> sets the load region (LMA) independently of the run region (VMA, set by the '> RAM' placement). The result: .data's initial bytes are programmed into flash, but all symbol addresses resolve to RAM. Startup then copies the bytes from LOADADDR(.data) to _sdata."
-        },
-        {
-          "id": "toolchain-mcq-vector-placement",
-          "type": "mcq",
-          "prompt": "Why is `KEEP(*(.isr_vector))` placed first in the FLASH output section?",
-          "choices": [
-            "It makes the binary smaller",
-            "On reset the Cortex-M core reads the initial stack pointer and reset vector from the base of the boot memory, so the vector table must sit at that fixed address",
-            "Interrupts are faster if the table is first",
-            "KEEP enables compression of the table"
-          ],
-          "answerIndex": 1,
-          "explanation": "At reset the core loads MSP from address 0x0 of the boot region and PC from the next word (the Reset vector). On STM32 flash that maps to 0x08000000. The table must be at the region base, and KEEP prevents the linker from garbage-collecting it since nothing 'calls' it directly."
-        },
-        {
-          "id": "toolchain-mcq-keep-gc",
-          "type": "mcq",
-          "prompt": "With `--gc-sections` enabled, why might the vector table vanish without `KEEP(...)`?",
-          "choices": [
-            "KEEP marks the section as referenced so the garbage collector will not discard it, even though no code explicitly calls it",
-            "KEEP compresses the section",
-            "Without KEEP the table moves to RAM",
-            "KEEP is only a comment"
+            "translator who turns your words into the reader's language",
+            "editor who numbers the pages",
+            "printer who binds the final book",
+            "reader who follows the instructions"
           ],
           "answerIndex": 0,
-          "explanation": "Section garbage collection removes input sections with no references. The vector table is reached only by hardware (the core reads it at reset), not by a call/jump the linker can see, so it looks unused. KEEP() forces the linker to retain it."
+          "explanation": "The compiler is the translator: it turns your C (your language) into machine code (the chip's language). Numbering pages and stitching chapters is the linker's job; flashing is the 'printing'; the chip is the reader."
         },
         {
-          "id": "toolchain-fc-memory-block",
-          "type": "flashcard",
-          "front": "What does the MEMORY block in a linker script declare?",
-          "back": "Named physical address regions with their ORIGIN, LENGTH, and access attributes (e.g. FLASH (rx) at 0x08000000, RAM (rwx) at 0x20000000). SECTIONS then assigns output sections into these regions; the linker errors if a region overflows.",
-          "hint": "ORIGIN + LENGTH + attributes per region."
+          "id": "toolchain-mcq-bigpic-linker-job",
+          "type": "mcq",
+          "prompt": "What is the linker's role in the toolchain?",
+          "choices": [
+            "It translates C into machine code one file at a time",
+            "It stitches the separate compiled pieces into one program and decides where each part lives in memory",
+            "It loads the program onto the chip",
+            "It pauses the program so you can inspect it"
+          ],
+          "answerIndex": 1,
+          "explanation": "The linker is the editor of the toolchain: it combines the compiled pieces into a single program and assigns each part an address in the chip's memory. Translating is the compiler's job; loading is flashing; pausing is the debugger."
         },
         {
-          "id": "toolchain-fc-linker-symbols",
-          "type": "flashcard",
-          "front": "What are `_sdata`, `_edata`, `_sidata`, `_sbss`, `_ebss` used for?",
-          "back": "They are linker-defined address symbols the startup code reads: _sidata = LMA of .data in flash; _sdata/_edata = start/end of .data in RAM (copy target); _sbss/_ebss = start/end of .bss in RAM (zero range). Startup uses them to copy .data and clear .bss before main.",
-          "hint": "Handles startup uses to init RAM.",
-          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/toolchain-1.svg"
+          "id": "toolchain-mcq-bigpic-order",
+          "type": "mcq",
+          "prompt": "What is the correct order of the main steps?",
+          "choices": [
+            "Link, then compile, then flash",
+            "Flash, then compile, then link",
+            "Compile, then link, then flash onto the chip",
+            "Debug, then compile, then link"
+          ],
+          "answerIndex": 2,
+          "explanation": "You compile first (translate the code), then link (stitch the pieces and place them in memory), then flash the finished program onto the chip. Debugging comes after the program is on the chip and running."
+        },
+        {
+          "id": "toolchain-mcq-bigpic-flash-meaning",
+          "type": "mcq",
+          "prompt": "What does it mean to 'flash' a program?",
+          "choices": [
+            "To make an LED blink quickly during the build",
+            "To load (write) the finished program onto the chip's memory so it can run",
+            "To translate the C code faster than normal",
+            "To delete the old program without adding a new one"
+          ],
+          "answerIndex": 1,
+          "explanation": "Flashing means loading the finished program onto the chip (into its flash memory) so the chip can run it. It is the step between having a program file on your PC and having a running program on the chip."
+        },
+        {
+          "id": "toolchain-mcq-bigpic-debugger",
+          "type": "mcq",
+          "prompt": "After the program is on the chip, what does a debugger let you do?",
+          "choices": [
+            "Translate the program into a different language",
+            "Pause the running program and look inside it (for example, check a variable's value)",
+            "Make the chip run twice as fast",
+            "Remove the linker from the toolchain"
+          ],
+          "answerIndex": 1,
+          "explanation": "A debugger lets you pause the running program, step through it, and inspect what is happening inside (like variable values). It is an inspection tool, not a translator or a speed booster."
+        },
+        {
+          "id": "toolchain-mcq-bigpic-elf",
+          "type": "mcq",
+          "prompt": "What is the program file (often an `.elf`) that the linker produces?",
+          "choices": [
+            "A copy of your C source code with comments removed",
+            "The single combined program, with each part already assigned to a place in memory",
+            "A list of errors found while compiling",
+            "A picture of the chip's circuit board"
+          ],
+          "answerIndex": 1,
+          "explanation": "The linker's output is one combined program file with everything stitched together and each part placed at an address. It is what you flash onto the chip (or hand to a debugger). It is not your source, an error list, or a diagram."
+        },
+        {
+          "id": "toolchain-mcq-bigpic-toolchain-term",
+          "type": "mcq",
+          "prompt": "Why is the whole set of tools called a 'toolchain'?",
+          "choices": [
+            "Because the tools are chained to the chip with a cable",
+            "Because the tools run one after another, each handing its result to the next, like links in a chain",
+            "Because there are always exactly three tools",
+            "Because it can only be used once before breaking"
+          ],
+          "answerIndex": 1,
+          "explanation": "The tools run in sequence — compiler, then linker, then flashing — each passing its output to the next step. That hand-off-down-the-line arrangement is why it is called a chain."
         }
       ]
     },
     {
-      "id": "toolchain-lesson-startup-crt0",
-      "title": "Startup / crt0: Making main() Reachable",
-      "order": 3,
-      "difficulty": 2,
-      "content": "The linker placed everything; now something must run between reset and your first C statement. That is the **startup code** (the bare-metal analogue of `crt0`). Its centerpiece is the **Reset_Handler**, and it does exactly four jobs, using the symbols the linker exported:\n\n1. **Set the stack pointer.** On Cortex-M the hardware actually does this for you: the first word of the vector table is the initial MSP (`_estack`), loaded automatically at reset. Other architectures set SP explicitly first thing.\n2. **Copy `.data` from FLASH (LMA) to RAM (VMA).** Initialized globals have values stored in flash but live in RAM; without this copy they would read garbage.\n3. **Zero `.bss`.** All zero-initialized globals must be cleared, or `static int count;` is not actually zero.\n4. **Run C-runtime init, then call `main`.** `__libc_init_array()` runs C++ static constructors and `__attribute__((constructor))` functions; then it branches to `main`.\n\n```c\nvoid Reset_Handler(void) {\n  extern uint32_t _sidata, _sdata, _edata, _sbss, _ebss;\n  uint32_t *src = &_sidata, *dst = &_sdata;\n  while (dst < &_edata) *dst++ = *src++;   /* copy .data: FLASH -> RAM */\n  for (dst = &_sbss; dst < &_ebss; ) *dst++ = 0;  /* zero .bss */\n  __libc_init_array();                     /* C++ ctors / init */\n  main();                                  /* finally! */\n  while (1) {}                             /* main must not return */\n}\n```\n\nThe **vector table** sits above it as an array whose `[0]` is `_estack` and `[1]` is `Reset_Handler`:\n\n```c\n__attribute__((section(\".isr_vector\")))\nvoid (* const vectors[])(void) = { (void*)&_estack, Reset_Handler, NMI_Handler, HardFault_Handler, /* ... */ };\n```\n\nThis is the whole demystification: there is no magic that calls `main`. The **linker script** says *where* `.data`'s init image and the `.bss` range are; the **startup code** uses those symbols to make RAM consistent, then jumps in. Library glue (**newlib-nano**, a size-optimized newlib) and **semihosting** stubs (`_write`, `_sbrk`) get linked here too — semihosting routes `printf` over the debug probe to your host console, convenient for bring-up but slow and blocking.",
+      "id": "toolchain-lesson-cross-compile",
+      "title": "Cross-Compiling: Building on Your PC for a Different Chip",
+      "order": 2,
+      "difficulty": 1,
+      "content": "**Hook.** You write and build your program on your PC. But the program is not meant to run on your PC — it is meant to run on the tiny chip (the MCU, the small computer-on-a-chip). Your PC and the chip are *different kinds of processors*, so they speak different machine codes. How do you build code on one and run it on the other? This is **cross-compiling**.\n\n**Build.** Imagine you live in one country and want to mail instructions to a friend in another country who speaks a different language. You sit at *your* desk (comfortable, lots of space) but you write the instructions in *your friend's* language so they can follow them. You do the writing here; the doing happens there.\n\nTwo words name these two sides:\n\n- The **host** is the machine that does the building — your PC. It is big and fast and has a screen and keyboard.\n- The **target** is the machine that will run the result — the MCU. It is small and has different innards.\n\nA normal compiler builds code for the same machine it runs on. A **cross-compiler** runs on the host but produces machine code for a *different* target. A common one for small ARM chips is named `arm-none-eabi-gcc`; the name simply spells out the kind of target it builds for. You do not run that program file on your PC — you flash it onto the chip.\n\n**Recap.** Host = where you build (your PC). Target = where it runs (the MCU). Cross-compiling means building on the host to produce code for a different target.",
       "items": [
         {
-          "id": "toolchain-fc-four-jobs",
-          "type": "flashcard",
-          "front": "List the four jobs the Reset_Handler performs before main().",
-          "back": "1) Ensure the stack pointer is set (Cortex-M hardware loads MSP from vector[0]). 2) Copy .data from its flash LMA to its RAM VMA. 3) Zero the .bss range. 4) Run __libc_init_array (C++ ctors/init), then call main().",
-          "hint": "SP, copy .data, zero .bss, init+main."
-        },
-        {
-          "id": "toolchain-mcq-sp-set",
+          "id": "toolchain-mcq-cross-define",
           "type": "mcq",
-          "prompt": "On Cortex-M, how is the initial stack pointer established at reset?",
+          "prompt": "What does 'cross-compiling' mean?",
           "choices": [
-            "The Reset_Handler must load SP from a constant before anything else",
-            "Hardware loads MSP from the first word of the vector table automatically, before the Reset_Handler runs",
-            "The linker writes SP into a CPU fuse",
-            "SP is left undefined until main sets it"
+            "Compiling the same code twice to catch errors",
+            "Building code on one kind of machine (your PC) to run on a different kind of machine (the chip)",
+            "Combining two programs into one",
+            "Compiling code that is angry or broken"
           ],
           "answerIndex": 1,
-          "explanation": "Cortex-M is unusual: at reset the core reads vector[0] as the initial MSP and vector[1] as the reset address, loading both in hardware. That is why vectors[0] is set to &_estack. On many other cores the startup code must set SP manually as its first instruction."
+          "explanation": "Cross-compiling means the machine that builds the code and the machine that runs it are different kinds of processors. You build on your PC but the output runs on the MCU. It is not about compiling twice or merging programs.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/toolchain-4.svg"
         },
         {
-          "id": "toolchain-mcq-skip-data-copy",
+          "id": "toolchain-mcq-cross-host",
           "type": "mcq",
-          "prompt": "If the startup code skips the `.data` copy step, what symptom appears?",
+          "prompt": "In cross-compiling, what is the 'host'?",
           "choices": [
-            "Compilation fails",
-            "Zero-initialized globals become nonzero",
-            "Initialized globals (e.g. `int baud = 115200;`) read uninitialized/garbage values at run time",
-            "The vector table moves to RAM"
-          ],
-          "answerIndex": 2,
-          "explanation": "Initialized globals have their values stored at the flash LMA and addresses in RAM (VMA). Without the copy, the RAM holds whatever was there at power-on, so 'baud' is garbage. This is a classic 'works in debugger that auto-loads, fails standalone' bug."
-        },
-        {
-          "id": "toolchain-mcq-skip-bss",
-          "type": "mcq",
-          "prompt": "What breaks if `.bss` is never zeroed at startup?",
-          "choices": [
-            "Nothing; the C runtime always zeroes RAM",
-            "All `static`/global zero-initialized variables start with random RAM contents instead of 0",
-            "The stack pointer is wrong",
-            "Constants in .rodata get corrupted"
+            "The chip that runs the finished program",
+            "The machine that does the building — usually your PC",
+            "The person writing the code",
+            "The cable that connects the PC to the chip"
           ],
           "answerIndex": 1,
-          "explanation": "The C standard requires objects with static storage duration and no explicit initializer to be zero. Those live in .bss, which has no stored bytes; only the startup loop makes them zero. Skip it and 'static int count;' holds garbage, breaking counters, flags, and pointers assumed NULL."
+          "explanation": "The host is the machine where the building happens — your PC, with its screen, keyboard, and plenty of power. The chip that runs the result is the target, not the host."
         },
         {
-          "id": "toolchain-fc-vector0-1",
-          "type": "flashcard",
-          "front": "What are entries [0] and [1] of the Cortex-M vector table?",
-          "back": "[0] = initial Main Stack Pointer value (typically &_estack, top of RAM). [1] = address of the Reset_Handler (initial PC). The core loads these at reset. Subsequent entries are NMI, HardFault, and the rest of the exception/IRQ handlers.",
-          "hint": "Initial SP, then reset PC."
-        },
-        {
-          "id": "toolchain-fc-libc-init-array",
-          "type": "flashcard",
-          "front": "What does `__libc_init_array()` do, and why call it before main?",
-          "back": "It walks the .init_array/.preinit_array tables and runs each registered initializer: C++ global/static constructors and functions marked __attribute__((constructor)). Calling it before main ensures global objects are constructed before any code uses them.",
-          "hint": "Runs C++ ctors / constructor attributes."
-        },
-        {
-          "id": "toolchain-fc-newlib-nano",
-          "type": "flashcard",
-          "front": "What is newlib-nano and when do you choose it?",
-          "back": "A size-optimized build of newlib (the common bare-metal libc) with a smaller printf/scanf, reduced reentrancy structures, and a lighter malloc. You select it with --specs=nano.specs to shrink flash/RAM on memory-constrained MCUs, accepting reduced features (e.g. no %f in printf unless you re-enable it).",
-          "hint": "Smaller libc via nano.specs."
-        },
-        {
-          "id": "toolchain-mcq-semihosting",
+          "id": "toolchain-mcq-cross-target",
           "type": "mcq",
-          "prompt": "What is semihosting and its main drawback?",
+          "prompt": "In cross-compiling, what is the 'target'?",
           "choices": [
-            "A way to run two OSes; it doubles RAM use",
-            "A mechanism where the target traps to the attached debug host to perform I/O (e.g. printf to the host console); it is slow and blocking, and halts if no debugger is attached",
-            "A flash compression scheme; it corrupts .data",
-            "A JTAG-only feature that disables SWD"
+            "Your PC, where you type the code",
+            "The chip (MCU) that will actually run the finished program",
+            "The compiler program itself",
+            "The folder where the output is saved"
           ],
           "answerIndex": 1,
-          "explanation": "Semihosting uses a special instruction (BKPT 0xAB) to ask the debugger to service syscalls like _write, so printf appears on the host. It is great for bring-up but each call stalls the core waiting on the host, badly distorts timing, and hangs if no debugger services the trap. RTT/defmt are the low-overhead alternatives."
+          "explanation": "The target is the machine the code is built *for* — the MCU that will run it. Your PC (where you type and build) is the host. Keeping host vs target straight is the whole point of the term."
         },
         {
-          "id": "toolchain-fc-why-no-magic",
-          "type": "flashcard",
-          "front": "Explain how the linker script and startup together make main() reachable.",
-          "back": "The linker script defines memory regions, places code/constants in flash, assigns .data a RAM VMA with a flash LMA, sizes .bss, and exports symbols (_sidata,_sdata,_edata,_sbss,_ebss,_estack). The startup/Reset_Handler reads those symbols to copy .data flash->RAM, zero .bss, run init, and branch to main. No hidden runtime does it for you.",
-          "hint": "Linker places + exports symbols; startup uses them.",
-          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/toolchain-2.svg"
+          "id": "toolchain-mcq-cross-why-needed",
+          "type": "mcq",
+          "prompt": "Why do you need a cross-compiler instead of a normal one?",
+          "choices": [
+            "Because the PC and the chip are different processors that use different machine code",
+            "Because cross-compilers are always faster",
+            "Because the chip cannot store any program",
+            "Because normal compilers cannot read C code"
+          ],
+          "answerIndex": 0,
+          "explanation": "Your PC and the MCU are different kinds of processors, so machine code built for the PC would be meaningless to the chip. A cross-compiler runs on the PC but produces code aimed at the chip's processor. Speed is not the reason."
+        },
+        {
+          "id": "toolchain-mcq-cross-run-output",
+          "type": "mcq",
+          "prompt": "After cross-compiling, what do you do with the program file?",
+          "choices": [
+            "Double-click it to run it on your PC",
+            "Flash it onto the chip, because that is where it is meant to run",
+            "Email it to the compiler",
+            "Compile it again on the chip"
+          ],
+          "answerIndex": 1,
+          "explanation": "The output is machine code for the chip, not the PC, so it will not run on your PC. You flash it onto the target chip, which is where it is designed to run."
+        },
+        {
+          "id": "toolchain-mcq-cross-analogy",
+          "type": "mcq",
+          "prompt": "Which everyday situation best matches cross-compiling?",
+          "choices": [
+            "Reading a book you already own",
+            "Writing instructions at your own desk but in a friend's language so they can follow them elsewhere",
+            "Photocopying a page twice",
+            "Throwing away a draft and starting over"
+          ],
+          "answerIndex": 1,
+          "explanation": "You do the work in a comfortable place (your desk = host) but produce something for someone elsewhere who needs it in their own form (friend's language = target's machine code). That separation of 'where built' from 'where used' is exactly cross-compiling."
+        },
+        {
+          "id": "toolchain-mcq-cross-name",
+          "type": "mcq",
+          "prompt": "A common cross-compiler for small ARM chips is named `arm-none-eabi-gcc`. What does that long name tell you?",
+          "choices": [
+            "That it only runs on ARM-brand PCs",
+            "That it builds code for a particular kind of target chip (the name spells out the target)",
+            "That it is a broken version of gcc",
+            "That it compiles four programs at once"
+          ],
+          "answerIndex": 1,
+          "explanation": "The prefix in the name describes the kind of target the compiler builds for. As a beginner you do not need every piece; the key idea is that the name labels the target, which is how cross-compilers are kept distinct from the plain PC compiler."
+        },
+        {
+          "id": "toolchain-mcq-cross-same-machine",
+          "type": "mcq",
+          "prompt": "How does an ordinary (non-cross) compiler differ from a cross-compiler?",
+          "choices": [
+            "An ordinary compiler builds code for the same machine it runs on; a cross-compiler builds for a different one",
+            "An ordinary compiler cannot produce machine code at all",
+            "A cross-compiler does not need any source code",
+            "There is no difference; the names are interchangeable"
+          ],
+          "answerIndex": 0,
+          "explanation": "An ordinary compiler's host and target are the same machine (build on your PC, run on your PC). A cross-compiler's host and target differ (build on your PC, run on the chip). That mismatch is the defining feature."
+        }
+      ]
+    },
+    {
+      "id": "toolchain-lesson-linker-memory",
+      "title": "The Linker: Deciding Where Things Go in Memory",
+      "order": 3,
+      "difficulty": 2,
+      "content": "**Hook.** The compiler made machine code, but it did not decide *where* in the chip that code and its data will live. The chip has two main kinds of memory: **flash** (keeps its contents even when power is off — a good home for code) and **RAM** (fast and writable, but forgets everything when power is off — a good home for data that changes). Someone must place each part in the right one. That someone is the **linker**.\n\n**Build.** Picture an editor laying out a book: chapters go in a fixed order and every page gets a number so anything can be found. The linker does the same with memory addresses. It sorts the program into named **sections** by purpose, then assigns each an address.\n\nYou tell the linker the layout with a small text file called a **linker script**. It does two things:\n\n- Names the **memory regions**: where flash is, where RAM is, and how big each is.\n- Says which sections go into which region.\n\nThe natural placement is: **code goes in flash** (it never changes and must survive power-off), and **data that changes goes in RAM**. There is one twist. A global variable that starts at a set value (say `int speed = 60;`) needs its starting value stored *somewhere permanent* (flash, so it survives power-off) but the variable itself must live in *RAM* (so the program can change it). So its starting value is kept in flash and copied into RAM at boot — which is the startup code's job in the next lesson.\n\n**Recap.** The linker places code in flash and changeable data in RAM, guided by a linker script that names the memory regions. Deciding where every part lives is exactly what the linker decides.",
+      "items": [
+        {
+          "id": "toolchain-mcq-linker-decides",
+          "type": "mcq",
+          "prompt": "What does the linker decide that the compiler does not?",
+          "choices": [
+            "How to translate C into machine code",
+            "Where each part of the program lives in the chip's memory (its address)",
+            "How fast the chip's clock runs",
+            "Which programming language you write in"
+          ],
+          "answerIndex": 1,
+          "explanation": "The compiler translates code; the linker decides placement — the address in memory where each part lives, and which memory (flash or RAM) it goes in. Clock speed and language choice are unrelated to the linker.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/toolchain-5.svg"
+        },
+        {
+          "id": "toolchain-mcq-linker-flash-vs-ram",
+          "type": "mcq",
+          "prompt": "Why is flash a good home for your program's code, while RAM is a good home for data that changes?",
+          "choices": [
+            "Flash is faster than RAM for everything",
+            "Flash keeps its contents with the power off (good for code), and RAM is writable but forgets when power is off (good for changing data)",
+            "RAM cannot be written to at all",
+            "Code must always live in RAM to run"
+          ],
+          "answerIndex": 1,
+          "explanation": "Code does not change and must survive a power cycle, so flash (non-volatile) suits it. Data that the program updates needs fast, writable storage, so RAM suits it — even though RAM loses its contents at power-off. RAM is definitely writable."
+        },
+        {
+          "id": "toolchain-mcq-linker-script",
+          "type": "mcq",
+          "prompt": "What is a linker script?",
+          "choices": [
+            "A list of bugs to fix in your code",
+            "A small file that names the memory regions (flash, RAM) and says which sections go where",
+            "The machine code output of the compiler",
+            "A script that runs on the chip every second"
+          ],
+          "answerIndex": 1,
+          "explanation": "A linker script is the layout instructions for the linker: it defines the memory regions and their sizes and assigns sections to them. It is not an error list, not the compiled output, and not something that runs on the chip."
+        },
+        {
+          "id": "toolchain-mcq-linker-regions",
+          "type": "mcq",
+          "prompt": "What does the 'memory regions' part of a linker script describe?",
+          "choices": [
+            "The names, locations, and sizes of memories like FLASH and RAM",
+            "The list of variables in your program",
+            "The speed of each instruction",
+            "The colors used in the debugger"
+          ],
+          "answerIndex": 0,
+          "explanation": "Memory regions describe the chip's memories — where flash starts and how big it is, where RAM starts and how big it is. This lets the linker place sections without running off the end of a memory."
+        },
+        {
+          "id": "toolchain-mcq-linker-text-section",
+          "type": "mcq",
+          "prompt": "The `.text` section holds your program's instructions. Where does the linker normally put it?",
+          "choices": [
+            "In RAM, so it can change while running",
+            "In flash, because code must survive power-off and does not change",
+            "On your PC's hard drive",
+            "In the debugger"
+          ],
+          "answerIndex": 1,
+          "explanation": "Code (`.text`) is fixed and must remain after power-off, so it belongs in flash. Putting it in RAM would lose it at power-off and waste precious RAM. It does not live on your PC or in the debugger once flashed."
+        },
+        {
+          "id": "toolchain-mcq-linker-data-twist",
+          "type": "mcq",
+          "prompt": "A global variable `int speed = 60;` can be changed while the program runs but must start at 60 after every power-on. How does the linker handle this?",
+          "choices": [
+            "It stores the variable only in flash and never lets it change",
+            "It keeps the starting value (60) in flash and places the changeable variable in RAM, to be copied over at boot",
+            "It puts the variable only in RAM, so it starts at a random value",
+            "It refuses to allow variables with starting values"
+          ],
+          "answerIndex": 1,
+          "explanation": "The starting value must survive power-off, so it is stored in flash; the variable must be writable, so it lives in RAM. At boot the startup code copies the flash copy into RAM so `speed` reliably begins at 60 and can then change."
+        },
+        {
+          "id": "toolchain-mcq-linker-bss",
+          "type": "mcq",
+          "prompt": "The `.bss` section is for global variables that should start at zero. Why does it take up RAM but almost no flash?",
+          "choices": [
+            "Because zeros do not need to be stored — the linker only records how much RAM to clear, and the startup code zeroes it",
+            "Because flash cannot hold zeros",
+            "Because .bss variables never actually exist",
+            "Because RAM is cheaper than flash"
+          ],
+          "answerIndex": 0,
+          "explanation": "There is no point storing a long run of zeros in flash. The linker just notes the size and RAM location of the zeroed variables; startup fills that RAM with zeros at boot. So .bss costs RAM at run time but almost no flash."
+        },
+        {
+          "id": "toolchain-mcq-linker-sections-purpose",
+          "type": "mcq",
+          "prompt": "Why does the linker sort the program into named sections like `.text` and `.data`?",
+          "choices": [
+            "To make the code run more slowly on purpose",
+            "So it can group parts by purpose and place each group in the right memory",
+            "Because C requires exactly two sections",
+            "To hide the code from the debugger"
+          ],
+          "answerIndex": 1,
+          "explanation": "Sections group parts by their role — code, constants, changeable data, zeroed data — so the linker can send each group to the memory that fits it (code to flash, changeable data to RAM). It is about organized placement, not slowing things down."
+        }
+      ]
+    },
+    {
+      "id": "toolchain-lesson-startup",
+      "title": "Startup Code: Getting Ready Before main()",
+      "order": 4,
+      "difficulty": 2,
+      "content": "**Hook.** It is tempting to think `main()` is the first thing that runs when you power on the chip. It is not. A tiny piece of **startup code** runs first to get the chip's memory into a known, correct state. Only then does it call `main()`.\n\n**Build.** Think of a pilot's pre-flight checklist. Before the plane takes off, the pilot checks fuel, flaps, and instruments — small but essential steps that make the flight safe. Startup code is that checklist for your program. When the chip powers on (a moment called **reset**), the startup code does three jobs in order:\n\n1. **Copy the starting values of changeable globals from flash into RAM.** These are the `.data` variables (like `int speed = 60;`). The linker kept their start values in flash; now they must be placed in RAM so the program reads the right values. Skip this and those variables would hold leftover garbage.\n2. **Set the zero-start globals to zero.** These are the `.bss` variables. They were never stored (zeros need no storage), so the startup code clears that area of RAM. Skip this and a variable you expect to be 0 could start as any random value.\n3. **Call `main()`.** Now that memory is correct, your program can begin.\n\nThis is why startup runs before `main()`: `main()` assumes its variables already hold their correct starting values, and *something* has to make that true first. The startup code, using the addresses the linker recorded, is that something. There is no magic that does it for you.\n\n**Recap.** On reset, startup code copies `.data` start values into RAM, zeroes `.bss`, then calls `main()` — a pre-flight checklist that makes memory correct before your program runs.",
+      "items": [
+        {
+          "id": "toolchain-mcq-startup-first",
+          "type": "mcq",
+          "prompt": "What runs first when the chip powers on?",
+          "choices": [
+            "main(), always",
+            "Small startup code that prepares memory, which then calls main()",
+            "The debugger",
+            "The linker script"
+          ],
+          "answerIndex": 1,
+          "explanation": "main() is not first. A bit of startup code runs at power-on (reset), gets memory into a correct state, and only then calls main(). The linker script is used at build time, not at run time, and the debugger is optional.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/toolchain-6.svg"
+        },
+        {
+          "id": "toolchain-mcq-startup-why-before-main",
+          "type": "mcq",
+          "prompt": "Why must the startup code run *before* main()?",
+          "choices": [
+            "Because main() is too large to run first",
+            "Because main() assumes its variables already hold correct starting values, and the startup code is what makes that true",
+            "Because the chip cannot find main() without help from the debugger",
+            "Because startup code runs faster than main()"
+          ],
+          "answerIndex": 1,
+          "explanation": "main() relies on globals already being set up — changeable ones copied into RAM and zero-start ones cleared. Nothing does that automatically on a bare chip, so the startup code must do it first. It is about correctness of memory, not size or speed."
+        },
+        {
+          "id": "toolchain-mcq-startup-data-copy",
+          "type": "mcq",
+          "prompt": "One startup job is copying `.data` values from flash into RAM. Why?",
+          "choices": [
+            "To delete the program from flash",
+            "Because changeable globals live in RAM but their starting values were stored in flash, so they must be copied over before use",
+            "To make the chip run faster",
+            "Because flash is the only writable memory"
+          ],
+          "answerIndex": 1,
+          "explanation": "Initialized globals run from RAM (so they can change) but their start values were kept in flash (so they survive power-off). Startup copies flash to RAM so the variables begin at the right values. Flash is not the writable one — RAM is."
+        },
+        {
+          "id": "toolchain-mcq-startup-skip-data",
+          "type": "mcq",
+          "prompt": "If the startup code skipped copying `.data`, what would happen to a variable like `int speed = 60;`?",
+          "choices": [
+            "It would correctly be 60 anyway",
+            "It would hold leftover/garbage values instead of 60",
+            "The program would refuse to compile",
+            "It would be stored permanently in flash and never change"
+          ],
+          "answerIndex": 1,
+          "explanation": "Without the copy, the RAM where speed lives still holds whatever was there before, so speed would not reliably be 60. This is a classic bug. It compiles fine — the problem only shows up at run time."
+        },
+        {
+          "id": "toolchain-mcq-startup-bss-zero",
+          "type": "mcq",
+          "prompt": "Why does the startup code zero the `.bss` area?",
+          "choices": [
+            "To erase the program",
+            "Because those globals are supposed to start at zero, but their zeros were never stored — so startup clears that RAM",
+            "To speed up the clock",
+            "Because RAM is always full of zeros at power-on"
+          ],
+          "answerIndex": 1,
+          "explanation": ".bss holds globals that should begin at 0. Since storing many zeros in flash is wasteful, they are not stored; startup writes zeros into that RAM at boot. RAM is not guaranteed to be zero at power-on, which is exactly why this step is needed."
+        },
+        {
+          "id": "toolchain-mcq-startup-order",
+          "type": "mcq",
+          "prompt": "What is the order of the startup code's main jobs?",
+          "choices": [
+            "Call main(), then copy .data, then zero .bss",
+            "Copy .data into RAM, zero .bss, then call main()",
+            "Zero .bss, then call main(), then copy .data",
+            "Copy .data, call main(), then zero .bss"
+          ],
+          "answerIndex": 1,
+          "explanation": "Memory must be correct before main() runs, so startup first copies .data into RAM and zeroes .bss, and only then calls main(). Calling main() before preparing memory would let it read wrong values."
+        },
+        {
+          "id": "toolchain-mcq-startup-analogy",
+          "type": "mcq",
+          "prompt": "Startup code is compared to which everyday thing?",
+          "choices": [
+            "A pilot's pre-flight checklist done before takeoff",
+            "A translator turning one language into another",
+            "An editor numbering the pages of a book",
+            "A mailbox for sending letters"
+          ],
+          "answerIndex": 0,
+          "explanation": "Startup is the pre-flight checklist: small, essential preparation done before the 'flight' (main). The translator is the compiler and the page-numbering editor is the linker — different roles in the toolchain."
+        },
+        {
+          "id": "toolchain-mcq-startup-addresses",
+          "type": "mcq",
+          "prompt": "How does the startup code know where in RAM to copy values and which area to zero?",
+          "choices": [
+            "It guesses randomly each time",
+            "It uses the addresses the linker recorded for the .data and .bss areas",
+            "It asks the user to type the addresses",
+            "The chip tells it over the internet"
+          ],
+          "answerIndex": 1,
+          "explanation": "The linker decided where everything lives and recorded the start/end addresses of .data and .bss. The startup code reads those to know what to copy and what to clear. This is how the linker and startup code work together — no guessing, no magic."
         }
       ]
     },
     {
       "id": "toolchain-lesson-flash-debug",
-      "title": "Flashing, Debug Probes & the Modern Rust Toolchain",
-      "order": 4,
+      "title": "Outputs, Flashing, Debugging, and Modern Toolchains",
+      "order": 5,
       "difficulty": 3,
-      "content": "With an `.elf` built, you need it on-chip and a way to inspect a running core. The build emits three artifacts: the **`.elf`** carries sections, symbols, and debug info (what GDB loads); **`objcopy -O binary`** strips it to a raw **`.bin`** (just the bytes, you supply the base address); **`-O ihex`** makes an **`.hex`** (Intel HEX, addresses embedded as ASCII records). Flashers consume `.bin`/`.hex`; debuggers want the `.elf`.\n\nOn-chip debug uses one of two transports. **JTAG** is the classic 4-5 pin boundary-scan chain (TCK/TMS/TDI/TDO/TRST), able to daisy-chain many devices. **SWD** (Serial Wire Debug) is the ARM 2-pin replacement (SWCLK + SWDIO) carrying the same Debug Access Port over fewer pins — the default on Cortex-M and what frees up the JTAG pins for I/O. Both are driven by a **probe**: ST-Link (on Nucleo/Discovery), SEGGER J-Link, or open CMSIS-DAP designs like the RP2040 **Picoprobe**.\n\nTwo software stacks bridge probe to GDB. **OpenOCD** speaks to the probe and exposes a GDB server; **probe-rs** is the modern Rust-native replacement that also serves GDB and powers `cargo-embed`/`cargo flash`. A GDB session connects, loads, sets **breakpoints/watchpoints**, and examines memory. Crucially, a **CMSIS-SVD** file describes every peripheral register by name, so register-aware debuggers (`svd` in probe-rs, GDB plugins) show `GPIOA->ODR` symbolically instead of as a raw address.\n\nThe **modern Rust** path collapses much of this:\n\n```\nrustup target add thumbv7em-none-eabihf   # Cortex-M4F\ncargo embed --release                      # build + flash + RTT console\n```\n\nThe `thumbv7em-none-eabihf` triple mirrors `arm-none-eabi`: `thumb` ISA, `v7em` = Cortex-M4/M7, `none` = no OS, `eabihf` = hard-float ABI. `cortex-m-rt` provides the linker script glue and `#[entry]` (the Rust startup). For logging, **defmt** + **RTT** beat semihosting decisively: the device writes compact deferred-format tokens into a RAM ring buffer that the probe drains over the existing debug link — microsecond-scale, non-blocking, and the formatting strings stay on the host, so almost nothing lands in flash.",
+      "content": "**Hook.** You have a finished program. Now two questions: how do you get it onto the chip, and how do you watch it run so you can fix problems? This lesson covers the output files, **flashing**, and **on-chip debugging**.\n\n**Build.** The build can produce a few file forms. The **`.elf`** is the rich version — it contains the program *plus* extra notes (names of variables, where things are) that a debugger uses. Simpler forms, **`.bin`** and **`.hex`**, are just the raw bytes to write into the chip. Rough rule: a flasher takes `.bin`/`.hex`; a debugger likes the `.elf`.\n\nTo get the program onto the chip you use a small hardware adapter called a **debug probe** that sits between your PC (over USB) and the chip. The probe talks to the chip over a few special wires. There are two common wire standards: **JTAG** (older, more pins) and **SWD** (a 2-wire ARM standard, common on small chips). The same probe can also **debug**: on your PC, a tool called **GDB** lets you set a **breakpoint** (pause when the program reaches a chosen line) or a **watchpoint** (pause when a chosen variable changes), then step through and inspect memory.\n\nYou do not have to wire all this by hand. **Vendor IDEs** (all-in-one apps from chip makers) bundle the compiler, flasher, and debugger behind buttons. A **hand-rolled build** (writing your own linker script and startup, calling the tools yourself) is more work but shows you exactly what is happening. Finally, **modern toolchains** exist beyond C: `arm-none-eabi-gcc` is the classic C cross-compiler, while **Rust** offers its own embedded toolchain (with helpers that provide the startup and linker glue for you).\n\n**Recap.** `.elf` carries debug info; `.bin`/`.hex` are raw images. A debug probe flashes the chip and, with GDB over SWD or JTAG, lets you pause and inspect. IDEs hide the steps; hand-rolled builds reveal them; Rust is a modern alternative to C.",
       "items": [
         {
-          "id": "toolchain-fc-elf-bin-hex",
-          "type": "flashcard",
-          "front": "Contrast .elf, .bin, and .hex.",
-          "back": ".elf: full object with sections, symbols, debug info — loaded by GDB. .bin: raw contiguous bytes with no address metadata — you must tell the flasher the base address. .hex (Intel HEX): ASCII records that embed addresses, so it is self-locating for flashers. Make .bin/.hex with objcopy -O binary / -O ihex.",
-          "hint": "Symbols vs raw bytes vs addressed-ASCII."
-        },
-        {
-          "id": "toolchain-mcq-jtag-swd",
+          "id": "toolchain-mcq-fd-elf",
           "type": "mcq",
-          "prompt": "What is the primary practical advantage of SWD over JTAG on a Cortex-M?",
+          "prompt": "What makes the `.elf` file different from a `.bin` or `.hex`?",
           "choices": [
-            "SWD is faster in every case and supports more devices in a chain",
-            "SWD uses only two pins (SWCLK + SWDIO) to reach the same Debug Access Port, freeing the other JTAG pins for application I/O",
-            "SWD does not need a probe",
-            "SWD can flash without a debugger"
+            "The .elf is smaller because it removes the program",
+            "The .elf carries the program plus extra debug notes (variable names, locations) that a debugger uses",
+            "The .elf can only be opened on the chip",
+            "There is no difference; the names are the same file"
           ],
           "answerIndex": 1,
-          "explanation": "SWD is ARM's 2-wire alternative to JTAG's 4-5 wires, accessing the same Debug Access Port. The win is pin count: it frees TDI/TDO/etc. for GPIO/alternate functions. JTAG keeps the edge of multi-device boundary-scan chains, but for a single Cortex-M, SWD is the usual choice."
+          "explanation": "The .elf includes the program and extra information useful for debugging, which is why debuggers prefer it. The .bin/.hex are stripped down to just the raw bytes to flash. The .elf is typically larger, not smaller.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/toolchain-7.svg"
         },
         {
-          "id": "toolchain-fc-probes",
-          "type": "flashcard",
-          "front": "Name three common debug probes and what category each is.",
-          "back": "ST-Link: ST's probe, built onto Nucleo/Discovery boards. SEGGER J-Link: commercial, fast, broad target support (RTT/Ozone). CMSIS-DAP: ARM's open standard, e.g. the RP2040 Picoprobe or DAPLink boards. All present a SWD/JTAG interface that OpenOCD or probe-rs can drive.",
-          "hint": "Vendor, commercial, open-standard."
-        },
-        {
-          "id": "toolchain-mcq-openocd-probers",
+          "id": "toolchain-mcq-fd-bin-hex",
           "type": "mcq",
-          "prompt": "What role do OpenOCD and probe-rs play in a debug session?",
+          "prompt": "What are `.bin` and `.hex` files used for?",
           "choices": [
-            "They are compilers that replace arm-none-eabi-gcc",
-            "They talk to the debug probe and expose a GDB server (probe-rs also powers cargo-embed/cargo-flash), bridging GDB to the target",
-            "They are oscilloscope front-ends",
-            "They convert .elf to .hex"
-          ],
-          "answerIndex": 1,
-          "explanation": "OpenOCD and probe-rs are the host-side daemons that drive the probe's SWD/JTAG and present a GDB remote server, plus flashing. probe-rs is the Rust-native modern option underpinning cargo-embed/cargo-flash and supporting RTT and SVD. Neither compiles code or rewrites artifacts."
-        },
-        {
-          "id": "toolchain-fc-svd",
-          "type": "flashcard",
-          "front": "What is an SVD file and what does it enable during debug?",
-          "back": "CMSIS-SVD (System View Description) is a vendor XML describing every peripheral, register, bitfield, and address for a device. Register-aware debuggers load it so you can read/write peripherals by name (e.g. GPIOA.ODR, USART1.SR.TXE) instead of decoding raw addresses and bit positions.",
-          "hint": "Vendor XML mapping registers by name."
-        },
-        {
-          "id": "toolchain-mcq-thumbv7em",
-          "type": "mcq",
-          "prompt": "Decode the Rust target `thumbv7em-none-eabihf`.",
-          "choices": [
-            "Thumb ISA, ARMv7E-M (Cortex-M4/M7), no OS, hard-float ABI",
-            "Thumb ISA, ARMv6-M (Cortex-M0), Linux, soft-float",
-            "ARM (A32) ISA, ARMv7-A, no OS, hard-float",
-            "RISC-V ISA, no OS, soft-float"
+            "They are the raw bytes of the program, used by a flasher to write onto the chip",
+            "They are the C source code in two formats",
+            "They are error logs from the compiler",
+            "They are debugger settings files"
           ],
           "answerIndex": 0,
-          "explanation": "thumb = Thumb instruction set; v7em = ARMv7E-M (the M4/M7 DSP-capable profile); none = bare metal/no OS; eabihf = EABI with hardware float (FPU registers for floats). It is the Rust mirror of arm-none-eabihf for Cortex-M4F. Cortex-M0 would be thumbv6m-none-eabi."
+          "explanation": ".bin and .hex are the plain program bytes meant for flashing onto the chip. They lack the extra debug notes that the .elf has. They are not source code or logs."
         },
         {
-          "id": "toolchain-mcq-defmt-rtt",
+          "id": "toolchain-mcq-fd-probe",
           "type": "mcq",
-          "prompt": "Why are defmt + RTT preferred over semihosting for logging?",
+          "prompt": "What is a debug probe?",
           "choices": [
-            "They print in color",
-            "RTT writes compact tokens into a RAM ring buffer drained by the probe over the existing debug link — non-blocking and microsecond-scale — while defmt keeps format strings on the host so little lands in flash",
-            "They require no probe at all",
-            "They disable interrupts to guarantee ordering"
+            "A part of the chip that runs your code",
+            "A small hardware adapter between your PC (USB) and the chip that flashes and debugs it",
+            "A type of C compiler",
+            "A section in the linker script"
           ],
           "answerIndex": 1,
-          "explanation": "Semihosting stalls the core on each call waiting for the host and hangs with no debugger attached. RTT (Real-Time Transfer) just appends to a RAM ring buffer the probe reads asynchronously, so it barely perturbs timing. defmt sends interned indices + raw args, deferring formatting to the host, minimizing both CPU and flash cost."
+          "explanation": "A debug probe is a little adapter that connects your PC to the chip. It loads (flashes) the program and gives the debugger a way to pause and inspect the running chip. It is hardware, not a compiler or a section."
         },
         {
-          "id": "toolchain-fc-cortex-m-rt",
-          "type": "flashcard",
-          "front": "In the Rust embedded toolchain, what does `cortex-m-rt` provide?",
-          "back": "The runtime/startup crate: it supplies the linker-script glue (link.x via memory.x), the reset entry that initializes .data/.bss, the vector table, and the #[entry] attribute that marks your main. It is the Rust equivalent of the hand-written startup + crt0 you would otherwise author.",
-          "hint": "Rust's startup + #[entry] + linker glue."
-        },
-        {
-          "id": "toolchain-mcq-watchpoint",
+          "id": "toolchain-mcq-fd-swd-jtag",
           "type": "mcq",
-          "prompt": "You want GDB to stop the instant a variable's memory is modified, without single-stepping. What do you use?",
+          "prompt": "What are SWD and JTAG?",
           "choices": [
-            "A software breakpoint on main",
-            "A hardware watchpoint (data watchpoint) on the variable's address",
-            "Semihosting",
-            "An SVD file"
+            "Two programming languages for chips",
+            "Two wire standards a debug probe uses to talk to the chip (SWD uses fewer pins; JTAG is older)",
+            "Two brands of flash memory",
+            "Two parts of the C startup code"
           ],
           "answerIndex": 1,
-          "explanation": "A hardware watchpoint (Cortex-M DWT comparators) traps on read/write to a target address with zero runtime overhead until it triggers. It is the right tool to catch unexpected writes (e.g. memory corruption) without slow single-stepping. Cortex-M has a limited number, so use them sparingly."
+          "explanation": "SWD and JTAG are the wiring standards the probe uses to reach the chip's debug port. SWD is a 2-wire ARM standard common on small chips; JTAG is older and uses more pins. They are not languages or memory types."
+        },
+        {
+          "id": "toolchain-mcq-fd-breakpoint",
+          "type": "mcq",
+          "prompt": "In GDB, what does a breakpoint do?",
+          "choices": [
+            "It permanently deletes a line of code",
+            "It pauses the program when it reaches a chosen line so you can look at what is happening",
+            "It makes the program run faster",
+            "It flashes the chip"
+          ],
+          "answerIndex": 1,
+          "explanation": "A breakpoint pauses execution at a chosen spot so you can inspect variables and memory. It does not delete code, speed things up, or flash the chip — those are different actions."
+        },
+        {
+          "id": "toolchain-mcq-fd-watchpoint",
+          "type": "mcq",
+          "prompt": "How is a watchpoint different from a breakpoint?",
+          "choices": [
+            "A watchpoint pauses the program when a chosen variable changes, rather than at a chosen line",
+            "A watchpoint runs the program twice",
+            "A watchpoint is only for flashing",
+            "There is no difference"
+          ],
+          "answerIndex": 0,
+          "explanation": "A breakpoint stops at a *place* (a line); a watchpoint stops when a *value* changes (a variable is written). Watchpoints are handy for catching unexpected changes to a variable."
+        },
+        {
+          "id": "toolchain-mcq-fd-ide-vs-handrolled",
+          "type": "mcq",
+          "prompt": "What is the trade-off between a vendor IDE and a hand-rolled build?",
+          "choices": [
+            "The IDE is always slower at running code",
+            "The IDE bundles the tools behind buttons (easy), while a hand-rolled build is more work but shows you exactly what each step does",
+            "A hand-rolled build cannot flash a chip",
+            "There is no difference in what you learn"
+          ],
+          "answerIndex": 1,
+          "explanation": "A vendor IDE hides the compiler, flasher, and debugger behind convenient buttons. Building by hand (your own linker script and startup, calling tools yourself) is more effort but makes every step visible, which is great for understanding the toolchain."
+        },
+        {
+          "id": "toolchain-mcq-fd-rust",
+          "type": "mcq",
+          "prompt": "What is true about using Rust for embedded work?",
+          "choices": [
+            "Rust cannot run on microcontrollers at all",
+            "Rust is a modern alternative to C, with its own embedded toolchain and helpers that provide the startup and linker glue",
+            "Rust replaces the need for a chip",
+            "Rust is just another name for arm-none-eabi-gcc"
+          ],
+          "answerIndex": 1,
+          "explanation": "Rust is a modern language option for embedded development. It has its own toolchain, and crates (libraries) supply the startup code and linker glue similar to what you would hand-write in C. It is distinct from the C compiler arm-none-eabi-gcc."
+        },
+        {
+          "id": "toolchain-mcq-fd-flasher-vs-debugger",
+          "type": "mcq",
+          "prompt": "Which file would a debugger most want to load, and why?",
+          "choices": [
+            "The .bin, because it is smallest",
+            "The .elf, because it includes the extra notes (names and locations) the debugger needs",
+            "The linker script, because it has the addresses",
+            "The C source file, because it is human-readable"
+          ],
+          "answerIndex": 1,
+          "explanation": "The debugger wants the .elf because it carries the symbol and location information that lets it show variables by name and map addresses back to your code. A flasher, by contrast, is happy with the raw .bin/.hex."
         }
       ]
     }
