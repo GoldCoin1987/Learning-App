@@ -4,288 +4,637 @@
   "order": 5,
   "lessons": [
     {
-      "id": "gpio-l1-modes-clock",
-      "title": "Pin Modes and the Clock-First Rule",
+      "id": "gpio-l1-what-is-gpio",
+      "title": "What GPIO Is and Blinking an LED",
       "order": 1,
       "difficulty": 1,
-      "content": "GPIO is the \"hello world\" of peripherals, and it teaches the **universal peripheral pattern**: *enable clock → configure → use*, all through register writes. Skip the first step and nothing works — the registers read back as zero or garbage because an unclocked peripheral block is electrically dead on the bus.\n\nA modern MCU pin is a configurable mux, not a fixed wire. Each pin can be one of:\n\n- **Input** — a digital reader, usually behind a Schmitt trigger.\n- **Output** — push-pull (drives both high and low) or open-drain (drives low only).\n- **Analog** — the digital buffer is disconnected so an ADC/DAC sees the raw voltage.\n- **Alternate function (AF)** — the pin is handed to a peripheral: UART TX, SPI SCK, a timer channel, etc.\n\nOn an STM32, every port (GPIOA, GPIOB, ...) hangs off an AHB bus and has its own clock-enable bit in an RCC register. Configuring a pin before that bit is set is the single most common bare-metal mistake.\n\n```c\n#include <stdint.h>\n#define RCC_AHB1ENR (*(volatile uint32_t *)0x40023830u)\n#define GPIOA_MODER (*(volatile uint32_t *)0x40020000u)\n\nvoid pa5_output(void) {\n    RCC_AHB1ENR |= (1u << 0);        /* 1. ENABLE PORT A CLOCK FIRST */\n    GPIOA_MODER &= ~(3u << (5 * 2)); /* 2. clear the 2 mode bits     */\n    GPIOA_MODER |=  (1u << (5 * 2)); /* 3. 01 = general-purpose output */\n}\n```\n\nNote the `volatile`: these addresses *are* hardware, and the compiler must not cache or reorder accesses to them.",
+      "content": "Imagine a light switch you can flip from inside your program. That is the simplest way to picture **GPIO**, which stands for **General-Purpose Input/Output**. GPIO is just the chip's **pins** (the metal legs) that your software can control directly.\n\nA pin can do one of two jobs:\n\n- As an **output**, the pin drives a **voltage** (electrical 'pressure') to turn something on or off — light up an LED, click a relay, buzz a buzzer.\n- As an **input**, the pin **reads** whether the voltage on it is **high** or **low** — for example, is a button pressed?\n\nGPIO is the famous 'hello world' of embedded programming: **blink an LED**. To make a pin turn an LED on, you wire the pin through a resistor to the LED and then to **ground** (the 0-volt reference). When your program tells the pin to go **HIGH** (drive 3.3 V), current flows and the LED lights. Tell it to go **LOW** (0 V) and the LED turns off.\n\nIn code it looks like flipping a switch:\n\n```c\npin_write(LED, HIGH);  // LED on\npin_write(LED, LOW);   // LED off\n```\n\n**Recap:** GPIO = pins your software controls. Output drives a voltage (turn things on); input reads a voltage (sense a button). Blinking an LED is the classic first project.",
       "items": [
         {
-          "id": "gpio-fc-universal-pattern",
-          "type": "flashcard",
-          "front": "What is the universal peripheral bring-up pattern that GPIO teaches?",
-          "back": "Enable the peripheral's clock → configure its registers → use it. Every peripheral on the chip follows this same three-step sequence.",
-          "hint": "Three steps, and the first one is the one everybody forgets."
-        },
-        {
-          "id": "gpio-fc-pin-modes",
-          "type": "flashcard",
-          "front": "Name the four fundamental GPIO pin modes.",
-          "back": "Input (digital read), Output (push-pull or open-drain), Analog (digital buffer disconnected), and Alternate Function (pin muxed to a peripheral like UART/SPI/timer)."
-        },
-        {
-          "id": "gpio-fc-forgot-clock",
-          "type": "flashcard",
-          "front": "What symptom tells you that you forgot to enable a peripheral's clock?",
-          "back": "Register writes have no effect and the registers read back as zero (or garbage). An unclocked peripheral block does not respond on the bus, so configuration silently fails.",
-          "hint": "The classic 'nothing works and reads back zero' gotcha."
-        },
-        {
-          "id": "gpio-fc-af-mode",
-          "type": "flashcard",
-          "front": "What does Alternate Function (AF) mode do to a pin?",
-          "back": "It disconnects the pin from the basic GPIO output/input logic and routes it to an on-chip peripheral (e.g. USART TX, SPI SCK, a timer compare/capture channel). The AF mux selects which peripheral."
-        },
-        {
-          "id": "gpio-fc-analog-mode",
-          "type": "flashcard",
-          "front": "Why is there a distinct 'analog' pin mode rather than just using input mode for the ADC?",
-          "back": "Analog mode disconnects the digital input buffer (Schmitt trigger). This avoids drawing current through the buffer near the threshold and lets the ADC/DAC see the true analog voltage on the pad."
-        },
-        {
-          "id": "gpio-mcq-config-order",
+          "id": "gpio-mcq-define",
           "type": "mcq",
-          "prompt": "On an STM32, what must you do BEFORE writing to GPIOB's MODER register?",
+          "prompt": "What does GPIO stand for, and what is it?",
           "choices": [
-            "Enable the GPIOB port clock in the RCC register",
-            "Set the BSRR register to a known state",
-            "Disable all interrupts globally",
-            "Read the IDR register once to 'wake' the port"
+            "General-Purpose Input/Output: the chip's pins that software can control",
+            "Graphics Processing Input Option: a video output port",
+            "Global Program Internal Operation: a CPU instruction",
+            "General Power Input/Output: the chip's power supply pins"
           ],
           "answerIndex": 0,
-          "explanation": "The port clock must be enabled in RCC first. Without it the GPIOB register block is not clocked, so writes are ignored and reads return zero. This is the #1 bare-metal gotcha."
+          "explanation": "GPIO means General-Purpose Input/Output. These are the chip's pins, and software decides whether each one drives a voltage out (output) or reads a voltage in (input). The other expansions are made up."
         },
         {
-          "id": "gpio-mcq-volatile",
+          "id": "gpio-mcq-output-job",
           "type": "mcq",
-          "prompt": "Why must a GPIO register pointer be declared 'volatile uint32_t *'?",
+          "prompt": "When a GPIO pin is used as an OUTPUT, what does it do?",
           "choices": [
-            "It makes the access atomic across interrupts",
-            "It forces every source-level access to become a real memory access, with no caching in a CPU register and no reordering relative to other volatile accesses",
-            "It guarantees a memory barrier before each access",
-            "It makes the write faster on the AHB bus"
+            "It measures the temperature of the chip",
+            "It drives a voltage on the pin to turn things on or off, like an LED",
+            "It reads whether a button is pressed",
+            "It stores a number for the CPU to use later"
           ],
           "answerIndex": 1,
-          "explanation": "volatile only guarantees the access actually happens and is not optimized away or hoisted. It does NOT give atomicity or general memory ordering — those need atomics or barriers."
+          "explanation": "An output pin drives a voltage out so it can turn something on or off (an LED, a relay). Reading whether a button is pressed is the job of an input pin, not an output."
         },
         {
-          "id": "gpio-mcq-pushpull-define",
+          "id": "gpio-mcq-input-job",
           "type": "mcq",
-          "prompt": "A push-pull output differs from an open-drain output in that it:",
+          "prompt": "When a GPIO pin is used as an INPUT, what does it do?",
           "choices": [
-            "Can only sink current, never source it",
-            "Requires an external pull-up resistor to ever go high",
-            "Actively drives both the high and the low logic levels",
-            "Is only usable in alternate-function mode"
+            "It supplies power to other chips",
+            "It drives an LED on and off",
+            "It reads whether the voltage on the pin is high or low",
+            "It generates a clock signal for the CPU"
           ],
           "answerIndex": 2,
-          "explanation": "Push-pull uses both a high-side and a low-side transistor, so it actively sources current for HIGH and sinks current for LOW. Open-drain only sinks (drives LOW) and relies on a pull-up for HIGH."
+          "explanation": "An input pin senses the voltage on the pin and tells your program whether it is high or low (for example, is a button pressed?). Driving an LED is an output task."
         },
         {
-          "id": "gpio-mcq-moder-bits",
+          "id": "gpio-mcq-hello-world",
           "type": "mcq",
-          "prompt": "STM32 MODER uses 2 bits per pin. To put pin 5 into output mode (01) cleanly, you should:",
+          "prompt": "Which project is known as the 'hello world' of embedded systems?",
           "choices": [
-            "Write GPIOA_MODER = (1u << 5)",
-            "Set bit 5 only with |=",
-            "Clear both bits at position 5*2 first, then OR in 01 shifted by 5*2",
-            "Toggle the whole MODER register with ^="
+            "Printing text to a screen",
+            "Blinking an LED with a GPIO pin",
+            "Sorting a list of numbers",
+            "Connecting to a website"
+          ],
+          "answerIndex": 1,
+          "explanation": "Blinking an LED is the classic first embedded project because it exercises the whole basic flow: configure a pin and drive it high and low. It is the embedded equivalent of a 'hello world' program."
+        },
+        {
+          "id": "gpio-mcq-led-high",
+          "type": "mcq",
+          "prompt": "In a typical LED-on-a-pin circuit, what makes the LED light up?",
+          "choices": [
+            "Driving the pin HIGH so current flows through the LED to ground",
+            "Reading the pin as an input",
+            "Setting the pin to analog mode",
+            "Disconnecting the pin from the chip"
+          ],
+          "answerIndex": 0,
+          "explanation": "Driving the pin HIGH puts a voltage on it, so current flows through the resistor and LED down to ground, lighting the LED. Reading or disconnecting the pin does not drive any current."
+        },
+        {
+          "id": "gpio-mcq-led-off",
+          "type": "mcq",
+          "prompt": "After the LED is lit, how does your program turn it off in this circuit?",
+          "choices": [
+            "By unplugging the chip",
+            "By driving the pin LOW (0 V) so no current flows",
+            "By reading the pin",
+            "By raising the supply voltage"
+          ],
+          "answerIndex": 1,
+          "explanation": "Driving the pin LOW puts 0 V on it, so there is no voltage difference to push current through the LED, and it turns off. You control the LED purely in software by writing HIGH or LOW."
+        },
+        {
+          "id": "gpio-mcq-light-switch",
+          "type": "mcq",
+          "prompt": "Which everyday analogy best matches a GPIO OUTPUT pin?",
+          "choices": [
+            "A thermometer that reports a reading",
+            "A microphone that listens",
+            "A light switch that your program flips on and off",
+            "A ruler that measures length"
           ],
           "answerIndex": 2,
-          "explanation": "Each pin owns 2 bits at position pin*2. You must clear that 2-bit field (mask 0b11) before ORing the desired value, or leftover bits could leave the pin in analog/AF mode."
+          "explanation": "An output pin is like a light switch the program can flip: high turns things on, low turns them off. A thermometer or microphone that reports a value is more like an input."
+        },
+        {
+          "id": "gpio-mcq-resistor-purpose",
+          "type": "mcq",
+          "prompt": "Why is a resistor placed in series with an LED on a GPIO pin?",
+          "choices": [
+            "To make the LED brighter than the supply allows",
+            "To turn the pin into an input",
+            "To limit the current so the LED and pin are not damaged",
+            "To store charge for later"
+          ],
+          "answerIndex": 2,
+          "explanation": "The resistor limits the current flowing through the LED to a safe value. Without it, too much current could damage the LED or the pin. It does not change the pin's direction or boost brightness beyond the supply."
+        },
+        {
+          "id": "gpio-img-blink",
+          "type": "mcq",
+          "prompt": "Looking at the LED output circuit, what path does the current take when the pin is driven HIGH?",
+          "choices": [
+            "From ground, backward through the LED, into the pin",
+            "From the pin, through the resistor and LED, to ground",
+            "It stays inside the chip and never reaches the LED",
+            "From the LED into the power supply rail"
+          ],
+          "answerIndex": 1,
+          "explanation": "With the pin HIGH, current flows out of the pin, through the current-limiting resistor, through the LED, and down to ground. That flow is what lights the LED.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/gpio-2.svg"
         }
       ]
     },
     {
-      "id": "gpio-l2-output-pulls",
-      "title": "Output Type, Pulls, and Atomic BSRR",
+      "id": "gpio-l2-clock-first-pattern",
+      "title": "Enable Clock, Configure, Use",
       "order": 2,
-      "difficulty": 2,
-      "content": "Once a pin is an output you must choose its **output type** and **drive characteristics**, and once it is an input you must decide on **internal pulls**.\n\n**Push-pull vs open-drain.** Push-pull actively drives high and low — the default for LEDs and most logic. Open-drain can only pull low and floats otherwise, so it needs a pull-up to reach the high level. Open-drain is mandatory on **wired-AND** buses where multiple devices share a line: any device can pull low, none fight over high. **I2C (SDA/SCL) is exactly this**, which is why I2C *requires external* pull-ups — the chip's weak internal pulls (tens of kΩ) are too weak for I2C edge rates; you size external resistors (typ. 2.2k–4.7k) to the bus capacitance.\n\n**Drive strength and slew rate** trade EMI against speed: fast slew gives clean fast edges but radiates and can ring; slower slew is quieter. **Drive strength** sets how much current the pin can source/sink — don't drive a relay or motor directly; use a transistor.\n\n**The full config sequence:** enable port clock → MODER (mode) → OTYPER (push-pull/open-drain) → OSPEEDR (slew) → PUPDR (pull) → then use.\n\n**Atomic set/reset.** Writing the output data register (ODR) with `|=` is a read-modify-write: read ODR, OR a bit, write back. If an interrupt touches another pin in the same port between the read and the write, that change is lost. The **BSRR** register fixes this — a single write atomically sets and/or clears bits with no read:\n\n```c\n#define GPIOA_BSRR (*(volatile uint32_t *)0x40020018u)\n\nGPIOA_BSRR = (1u << 5);        /* atomically SET pin 5 (no RMW)  */\nGPIOA_BSRR = (1u << (5 + 16)); /* atomically RESET pin 5         */\n```\n\nLow 16 bits set, high 16 bits reset — no race, no lost neighbor.",
+      "difficulty": 1,
+      "content": "Before you can blink that LED, the chip needs to be told how to use the pin. Every peripheral on a microcontroller follows the **same three-step recipe**, and GPIO is the gentlest place to learn it:\n\n1. **Enable the clock** for the peripheral. A peripheral is a built-in helper block (like the GPIO port). Most blocks are powered down to save energy until you switch on their **clock** — think of it as flipping on the power for that part of the chip.\n2. **Configure** the pin: tell the chip this pin is an output (or an input).\n3. **Use** it: write HIGH/LOW to drive it, or read its level.\n\nMicrocontrollers are controlled through **registers** — special memory addresses that *are* hardware. Writing a value into a register has a real-world side effect, like making a pin go high. You already met registers and memory-mapped I/O earlier; GPIO is where they pay off.\n\nThe single most common beginner bug is **forgetting step 1**. If the port's clock is off, the block is electrically asleep: your configuration writes are ignored, and when you read the registers back they come out as zero. Everything looks fine in your code, yet the LED never blinks.\n\n```c\nenable_clock(PORT_A);   // 1. wake the port FIRST\nset_output(PORT_A, 5);  // 2. configure pin 5 as output\npin_write(PORT_A, 5, HIGH); // 3. use it\n```\n\n**Recap:** enable clock -> configure -> use. Skip the clock and nothing works — that is the famous 'I forgot to enable the port clock' gotcha.",
       "items": [
         {
-          "id": "gpio-fc-i2c-pullups",
-          "type": "flashcard",
-          "front": "Why does I2C require EXTERNAL pull-up resistors rather than the MCU's internal pulls?",
-          "back": "I2C is an open-drain wired-AND bus, so HIGH is produced only by a pull-up. The internal pulls are weak (tens of kΩ) and too slow for the bus capacitance/edge rates. External resistors (typ. 2.2k–4.7k) are sized to the bus capacitance.",
-          "hint": "Open-drain bus + weak internal pulls."
+          "id": "gpio-mcq-three-steps",
+          "type": "mcq",
+          "prompt": "What is the universal three-step pattern for bringing up a peripheral like GPIO?",
+          "choices": [
+            "Read, write, erase",
+            "Enable the clock, configure the pin, then use it",
+            "Compile, link, flash",
+            "Input, process, output"
+          ],
+          "answerIndex": 1,
+          "explanation": "Every peripheral follows enable-clock -> configure -> use. GPIO teaches this pattern, and the same recipe applies to timers, UART, ADC, and the rest."
         },
         {
-          "id": "gpio-fc-bsrr",
-          "type": "flashcard",
-          "front": "What problem does the BSRR register solve, and how?",
-          "back": "It avoids the read-modify-write race on the output register. A single write to BSRR atomically sets (low 16 bits) and/or resets (high 16 bits) pins with no read step, so an ISR can't clobber a neighboring pin between read and write."
+          "id": "gpio-mcq-forgot-clock",
+          "type": "mcq",
+          "prompt": "You wrote correct-looking GPIO code but the LED never blinks, and reading the config registers shows all zeros. What did you most likely forget?",
+          "choices": [
+            "To enable the port's clock first",
+            "To add more comments",
+            "To make the pin analog",
+            "To increase the supply voltage"
+          ],
+          "answerIndex": 0,
+          "explanation": "This is the classic gotcha. With the clock off, the GPIO block is asleep: writes are ignored and reads return zero. Enabling the port clock before configuring fixes it."
         },
         {
-          "id": "gpio-fc-open-drain-use",
-          "type": "flashcard",
-          "front": "When is open-drain output the correct choice over push-pull?",
-          "back": "On wired-AND / multi-drop buses where several devices share a line and any one may pull it low (I2C, some interrupt/alert lines, level-shifting to a different voltage rail). It also allows safe bus sharing without driver contention."
+          "id": "gpio-mcq-blink-order",
+          "type": "mcq",
+          "prompt": "To blink an LED, in what order should you do these steps?",
+          "choices": [
+            "Write HIGH to the pin, then enable the clock, then set it as output",
+            "Set the pin as output, then enable the clock, then write HIGH",
+            "Enable the port clock, then set the pin as output, then write HIGH/LOW",
+            "Read the pin, then enable the clock, then configure it"
+          ],
+          "answerIndex": 2,
+          "explanation": "Clock first, then configure the pin as an output, then drive it. If you configure or write before enabling the clock, the block is asleep and ignores you."
         },
         {
-          "id": "gpio-fc-config-sequence",
-          "type": "flashcard",
-          "front": "Give the full ordered GPIO configuration sequence on an STM32.",
-          "back": "1) Enable the port clock (RCC). 2) MODER — set mode. 3) OTYPER — push-pull vs open-drain. 4) OSPEEDR — slew/speed. 5) PUPDR — internal pull up/down/none. Then use the pin (IDR/ODR/BSRR).",
-          "hint": "Clock first, then mode, type, speed, pull."
+          "id": "gpio-mcq-clock-meaning",
+          "type": "mcq",
+          "prompt": "In this context, what does 'enabling the clock' for a peripheral mean?",
+          "choices": [
+            "Setting the time of day on a calendar",
+            "Switching on the power/clock signal so that block of the chip becomes active",
+            "Speeding up the CPU permanently",
+            "Adding a delay before the program runs"
+          ],
+          "answerIndex": 1,
+          "explanation": "Enabling the clock wakes up that part of the chip so it can respond. Many blocks stay powered down to save energy until you enable them; it is not about wall-clock time or CPU speed."
         },
         {
-          "id": "gpio-fc-slew",
-          "type": "flashcard",
-          "front": "What does reducing a pin's slew rate (output speed) buy you, and what does it cost?",
-          "back": "Slower edges reduce EMI, overshoot/ringing, and crosstalk. The cost is reduced maximum toggle/signal frequency. Use the slowest speed that meets the timing requirement."
+          "id": "gpio-mcq-register-side-effect",
+          "type": "mcq",
+          "prompt": "Why is writing to a GPIO register different from writing to a normal variable?",
+          "choices": [
+            "Register writes are always slower and that is the only difference",
+            "A register write has a real-world side effect, like driving a pin high",
+            "Registers cannot be read, only written",
+            "Registers automatically reset every millisecond"
+          ],
+          "answerIndex": 1,
+          "explanation": "A register address IS hardware. Writing to it has a physical side effect, such as making a pin go high. A normal variable just stores a value in memory with no external effect."
+        },
+        {
+          "id": "gpio-mcq-symptom",
+          "type": "mcq",
+          "prompt": "Which symptom is most typical of an unclocked peripheral?",
+          "choices": [
+            "The chip overheats immediately",
+            "Configuration writes seem to have no effect and registers read back as zero",
+            "The program refuses to compile",
+            "Other unrelated pins start toggling randomly"
+          ],
+          "answerIndex": 1,
+          "explanation": "An unclocked block does not respond on the bus, so your writes do nothing and reads return zero. It does not cause compile errors or overheating; the code just silently fails to work."
+        },
+        {
+          "id": "gpio-mcq-same-pattern",
+          "type": "mcq",
+          "prompt": "Why is GPIO called a good place to learn the peripheral pattern?",
+          "choices": [
+            "Because GPIO is the only peripheral that needs a clock",
+            "Because the enable-clock -> configure -> use pattern is the same for every peripheral",
+            "Because GPIO never uses registers",
+            "Because GPIO cannot fail"
+          ],
+          "answerIndex": 1,
+          "explanation": "GPIO is simple, but the bring-up recipe (enable clock, configure, use) is identical for timers, UART, SPI, ADC, and more. Learn it here and you can apply it everywhere."
+        },
+        {
+          "id": "gpio-mcq-step3",
+          "type": "mcq",
+          "prompt": "Once the clock is on and the pin is configured as an output, what does the 'use' step look like?",
+          "choices": [
+            "Re-enabling the clock repeatedly",
+            "Writing HIGH or LOW to the pin to drive its voltage",
+            "Reading the input data register for a button",
+            "Disabling the peripheral again"
+          ],
+          "answerIndex": 1,
+          "explanation": "For an output pin, 'use' means writing HIGH or LOW to drive its voltage (blink the LED). Reading is what you do for an input pin; you do not keep re-enabling the clock."
+        },
+        {
+          "id": "gpio-img-pattern",
+          "type": "mcq",
+          "prompt": "In the three-step diagram, which step is the one beginners most often skip, causing everything else to silently fail?",
+          "choices": [
+            "Step 3: use the pin",
+            "Step 2: configure the pin",
+            "Step 1: enable the clock",
+            "None of them can be skipped accidentally"
+          ],
+          "answerIndex": 2,
+          "explanation": "Step 1 (enable the clock) is the one beginners forget. Without it the port is asleep, so steps 2 and 3 quietly do nothing even though the code looks correct.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/gpio-3.svg"
+        }
+      ]
+    },
+    {
+      "id": "gpio-l3-inputs-pulls",
+      "title": "Reading Inputs, Pulls, and Floating Pins",
+      "order": 3,
+      "difficulty": 2,
+      "content": "Now flip the pin around and use it as an **input** to read a button. You read its level from an **input register** that simply tells you HIGH (1) or LOW (0).\n\nHere is a trap. Suppose a button connects the pin to **ground** when pressed. Pressed -> the pin reads LOW. But when the button is *released*, the pin is connected to... nothing. A pin connected to nothing is **floating**: it has no defined voltage and picks up electrical noise, so it reads HIGH and LOW at random. A floating input is a bug.\n\nThe fix is a **pull resistor**, a weak resistor inside the chip you can switch on:\n\n- A **pull-up** gently ties the pin to the supply voltage, so when nothing else drives it, it reads HIGH. With a button to ground: released = HIGH, pressed = LOW. This is the most common button wiring.\n- A **pull-down** gently ties the pin to ground, so the resting state is LOW.\n\n'Gently' means the resistor is weak: if the button actively pulls the line the other way, the button wins, but when nothing drives the line the pull sets a known default. That is exactly why you put a pull-up on a button: to give the released state a definite value instead of noise.\n\nOutputs have a related choice. A **push-pull** output actively drives both HIGH and LOW (the normal choice for an LED). An **open-drain** output can only pull LOW; to read HIGH it needs a pull-up resistor to do the lifting. Open-drain is used on shared bus lines where many devices take turns.\n\n**Recap:** read inputs from the input register; never leave an input floating; use a pull-up (or pull-down) to give a released button a defined level. Push-pull drives both ways; open-drain only pulls low.",
+      "items": [
+        {
+          "id": "gpio-mcq-read-input",
+          "type": "mcq",
+          "prompt": "How does your program find out the current level of an input pin?",
+          "choices": [
+            "By writing HIGH to the pin and seeing if it sticks",
+            "By reading the pin's input register, which reports HIGH or LOW",
+            "By measuring how long the program takes to run",
+            "By disabling the clock and checking for errors"
+          ],
+          "answerIndex": 1,
+          "explanation": "You read the input register, which reflects the actual voltage on the pin as a 1 (HIGH) or 0 (LOW). Writing is for outputs; reading is how you sense an input."
+        },
+        {
+          "id": "gpio-mcq-floating",
+          "type": "mcq",
+          "prompt": "What does it mean for an input pin to be 'floating', and why is it bad?",
+          "choices": [
+            "It is connected to nothing, so it picks up noise and reads HIGH/LOW randomly",
+            "It is driven too hard and overheats",
+            "It is stuck permanently HIGH and can never change",
+            "It is in output mode by mistake"
+          ],
+          "answerIndex": 0,
+          "explanation": "A floating pin is connected to nothing definite, so stray electrical noise sets its value unpredictably. Your program then reads random results. A pull resistor fixes this by giving a default level."
+        },
+        {
+          "id": "gpio-mcq-why-pullup",
+          "type": "mcq",
+          "prompt": "A button connects a pin to ground when pressed. Why add a pull-up resistor to that pin?",
+          "choices": [
+            "To make the button press register as HIGH instead of LOW",
+            "To give the released (open) state a definite HIGH instead of a floating, noisy value",
+            "To supply power to the LED",
+            "To speed up the CPU clock"
+          ],
+          "answerIndex": 1,
+          "explanation": "When the button is released the pin would otherwise float. The pull-up ties it to a definite HIGH; pressing the button overrides that and pulls it LOW. So released = HIGH, pressed = LOW, both well defined."
+        },
+        {
+          "id": "gpio-mcq-pullup-vs-pulldown",
+          "type": "mcq",
+          "prompt": "What is the difference between a pull-up and a pull-down resistor?",
+          "choices": [
+            "A pull-up makes the pin an output; a pull-down makes it an input",
+            "A pull-up ties the resting pin to the supply (default HIGH); a pull-down ties it to ground (default LOW)",
+            "A pull-up is external only; a pull-down is internal only",
+            "There is no real difference"
+          ],
+          "answerIndex": 1,
+          "explanation": "A pull-up gently holds the pin HIGH when nothing else drives it; a pull-down holds it LOW. Either one removes the floating problem; which you choose depends on how the button is wired."
+        },
+        {
+          "id": "gpio-mcq-gently",
+          "type": "mcq",
+          "prompt": "Why does a pull resistor only weakly (gently) set the pin's level?",
+          "choices": [
+            "So it sets a default when nothing drives the pin, but a real driver like a button can override it",
+            "Because strong resistors are illegal",
+            "So the pin can never change at all",
+            "To make the pin draw as much current as possible"
+          ],
+          "answerIndex": 0,
+          "explanation": "The pull is intentionally weak: it provides a default level when the line is otherwise idle, yet a button pulling the line the other way easily wins. A strong pull would fight the button."
+        },
+        {
+          "id": "gpio-mcq-pushpull",
+          "type": "mcq",
+          "prompt": "What does a push-pull output do?",
+          "choices": [
+            "It only pulls the pin LOW and needs a pull-up for HIGH",
+            "It actively drives the pin both HIGH and LOW",
+            "It reads the pin instead of driving it",
+            "It connects the pin to an analog sensor"
+          ],
+          "answerIndex": 1,
+          "explanation": "Push-pull actively drives both levels, which is why it is the normal choice for an LED. Open-drain is the one that only pulls LOW and needs a pull-up for HIGH."
+        },
+        {
+          "id": "gpio-mcq-opendrain",
+          "type": "mcq",
+          "prompt": "An open-drain output can only pull the line LOW. How does it ever reach a HIGH level?",
+          "choices": [
+            "It cannot ever be HIGH",
+            "A pull-up resistor raises the line to HIGH when the output is not pulling low",
+            "By switching to analog mode",
+            "By increasing the CPU speed"
+          ],
+          "answerIndex": 1,
+          "explanation": "Open-drain only sinks current (pulls LOW). A pull-up resistor does the work of bringing the line HIGH when no device is pulling it low. This is what lets several devices safely share one line."
+        },
+        {
+          "id": "gpio-mcq-default-output",
+          "type": "mcq",
+          "prompt": "For simply turning an LED on and off, which output type is the natural choice?",
+          "choices": [
+            "Open-drain, because it saves power",
+            "Push-pull, because it actively drives both HIGH and LOW",
+            "Analog mode",
+            "Input mode with a pull-up"
+          ],
+          "answerIndex": 1,
+          "explanation": "Push-pull cleanly drives the pin HIGH to light the LED and LOW to turn it off, with no extra resistor needed. Open-drain would need a pull-up just to reach HIGH and is meant for shared buses."
+        },
+        {
+          "id": "gpio-img-button",
+          "type": "mcq",
+          "prompt": "In the button-with-pull-up diagram, what does the pin read in each state?",
+          "choices": [
+            "Released = LOW, pressed = HIGH",
+            "Released = HIGH, pressed = LOW",
+            "Both states read HIGH",
+            "Both states float randomly"
+          ],
+          "answerIndex": 1,
+          "explanation": "The pull-up holds the released pin HIGH. Pressing the button connects the pin to ground, overriding the weak pull-up and pulling it LOW. So released = HIGH, pressed = LOW, both definite.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/gpio-4.svg"
+        }
+      ]
+    },
+    {
+      "id": "gpio-l4-debounce-drive",
+      "title": "Debouncing and Drive Strength",
+      "order": 4,
+      "difficulty": 3,
+      "content": "When you actually read a real button, you hit a surprise: one press can look like several presses. The reason is **mechanical bounce**. The metal contacts inside a switch physically bounce when they touch, making and breaking the connection many times over a few milliseconds (roughly 1-20 ms) before settling. On an oscilloscope you would see a ragged burst of edges, not one clean step.\n\nIf your program counts every edge, a single press might register as five. The cure is **debouncing**: don't trust a change until the signal has held steady.\n\n- **Software debouncing**: after you see a change, wait a short time (or take several samples) and only accept the new state once it stays stable. Simple and common.\n- **Hardware debouncing**: a small resistor-capacitor (RC) filter smooths the bounce before it ever reaches the pin.\n\nA related point: some inputs include a **Schmitt trigger**, which cleans up *slow, noisy* voltage changes by ignoring tiny wiggles. That helps with electrical noise, but it does **not** fix mechanical bounce, because bounce is a real series of separate connect/disconnect events. You still need debouncing.\n\nFinally, **drive strength** is how much current an output pin can safely supply. A pin can light an LED (a few milliamps), but it cannot directly run a motor or a relay coil, which need far more current. For those you use the GPIO pin to switch a **transistor**, and the transistor handles the big current. Higher drive strength also tends to make faster, sharper edges, which can be noisier.\n\n**Recap:** mechanical bounce turns one press into many edges; debounce in software or hardware. A Schmitt trigger handles noise, not bounce. Drive strength is limited, so use a transistor for big loads.",
+      "items": [
+        {
+          "id": "gpio-mcq-bounce",
+          "type": "mcq",
+          "prompt": "What is switch bounce?",
+          "choices": [
+            "The pin physically moving up and down",
+            "A software loop running too fast",
+            "The metal contacts of a switch making and breaking connection rapidly for a few milliseconds",
+            "The LED flickering because of low battery"
+          ],
+          "answerIndex": 2,
+          "explanation": "Bounce is mechanical: the contacts chatter (connect/disconnect repeatedly) for about 1-20 ms before settling. This produces many edges from a single press."
+        },
+        {
+          "id": "gpio-mcq-bounce-symptom",
+          "type": "mcq",
+          "prompt": "If you do NOT debounce a button, what is the likely symptom?",
+          "choices": [
+            "One press is counted several times",
+            "The button never responds at all",
+            "The chip resets",
+            "The LED gets brighter"
+          ],
+          "answerIndex": 0,
+          "explanation": "Each bounce looks like a separate edge, so the program may count one physical press as multiple presses. Debouncing makes one press count once."
+        },
+        {
+          "id": "gpio-mcq-sw-debounce",
+          "type": "mcq",
+          "prompt": "What is a common SOFTWARE debouncing technique?",
+          "choices": [
+            "Increase the supply voltage",
+            "After a change, wait a short time or take several samples and accept the new state only once it stays stable",
+            "Switch the pin to output mode",
+            "Read the pin exactly once, very fast"
+          ],
+          "answerIndex": 1,
+          "explanation": "Software debouncing waits for the signal to settle: only accept the new state after it holds steady for several samples or a short delay. Reading once or changing voltage does not address bounce."
+        },
+        {
+          "id": "gpio-mcq-hw-debounce",
+          "type": "mcq",
+          "prompt": "Which is a HARDWARE debouncing approach?",
+          "choices": [
+            "A loop that counts to a million",
+            "An RC (resistor-capacitor) filter that smooths the signal before it reaches the pin",
+            "Adding more pull-up resistors in parallel",
+            "Reading the input register twice in a row"
+          ],
+          "answerIndex": 1,
+          "explanation": "An RC filter physically smooths the bouncy edges before they reach the pin. The other options either do nothing useful for bounce or are software tricks."
+        },
+        {
+          "id": "gpio-mcq-schmitt",
+          "type": "mcq",
+          "prompt": "Does a Schmitt-trigger input fix mechanical switch bounce?",
+          "choices": [
+            "Yes, it removes bounce completely",
+            "No; it cleans up slow/noisy voltage wiggles but not real make/break bounce events",
+            "Yes, but only on output pins",
+            "No, it makes bounce worse"
+          ],
+          "answerIndex": 1,
+          "explanation": "A Schmitt trigger adds hysteresis to ignore small noisy wiggles near the threshold. But mechanical bounce is a real series of separate connect/disconnect events, so you still need debouncing."
+        },
+        {
+          "id": "gpio-mcq-drive-strength",
+          "type": "mcq",
+          "prompt": "What does a pin's 'drive strength' refer to?",
+          "choices": [
+            "How fast the CPU runs",
+            "How much current the output pin can safely supply or sink",
+            "How many pins the chip has",
+            "The voltage of the power supply"
+          ],
+          "answerIndex": 1,
+          "explanation": "Drive strength is the amount of current an output can safely handle. It is limited (a few to tens of milliamps), which is why heavy loads need help."
+        },
+        {
+          "id": "gpio-mcq-relay",
+          "type": "mcq",
+          "prompt": "You want a GPIO pin to switch a motor that needs far more current than the pin can supply. What is the right approach?",
+          "choices": [
+            "Connect the motor directly to the pin and hope for the best",
+            "Use the pin to switch a transistor, and let the transistor carry the motor's current",
+            "Set the pin to input mode",
+            "Lower the supply voltage"
+          ],
+          "answerIndex": 1,
+          "explanation": "A pin cannot directly drive a motor or relay; the current would damage it. Use the GPIO to control a transistor, which switches the large current safely. Connecting directly risks frying the pin."
+        },
+        {
+          "id": "gpio-mcq-fast-edges",
+          "type": "mcq",
+          "prompt": "Higher drive strength (faster, sharper edges) comes with what trade-off?",
+          "choices": [
+            "It makes the pin an input",
+            "It tends to create more electrical noise",
+            "It disables the clock",
+            "It always saves power"
+          ],
+          "answerIndex": 1,
+          "explanation": "Faster, sharper edges can radiate more electrical noise and cause ringing. So you pick the slowest drive that still meets your timing needs, balancing speed against noise."
+        },
+        {
+          "id": "gpio-img-bounce",
+          "type": "mcq",
+          "prompt": "In the bounce-vs-debounced diagram, what is the key difference between the two traces?",
+          "choices": [
+            "The raw trace shows one clean edge; the debounced trace bounces",
+            "The raw trace shows a burst of rapid edges; the debounced trace shows one clean transition",
+            "Both traces are identical",
+            "The debounced trace is at a higher voltage"
+          ],
+          "answerIndex": 1,
+          "explanation": "The raw signal chatters with many edges during the bounce window, while the debounced signal settles into a single clean transition, which is what the program should react to.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/gpio-5.svg"
+        }
+      ]
+    },
+    {
+      "id": "gpio-l5-altfn-atomic-edges",
+      "title": "Shared Pins, Atomic Writes, and Edges",
+      "order": 5,
+      "difficulty": 3,
+      "content": "GPIO has a few more ideas worth knowing, even if you meet them in depth later.\n\n**Alternate function (pin muxing).** A single pin can do more than plain on/off. Inside the chip a **mux** (a selector switch) can connect the pin to a built-in peripheral instead: it might become a UART transmit line, an SPI clock, or a timer output. This sharing is called the pin's **alternate function**. A pin can only do one job at a time, so you choose: plain GPIO, or hand it over to UART/SPI/a timer.\n\n**Atomic set/reset.** Imagine you want to change just one pin of a port. The obvious way is read the whole output register, flip your bit, and write it back. But if an interrupt fires in the middle and changes a *different* pin, your write-back can overwrite that change and lose it. This read-modify-write race is a real bug. Many chips solve it with a special **set/reset register** (on STM32 it is called **BSRR**): a single write sets or clears exactly the bits you name, with no read step, so it cannot clobber neighboring pins. The idea to remember: prefer an atomic set/reset register over read-modify-write when other code may touch the same port.\n\n**Edge vs level (for interrupts later).** Instead of constantly polling a pin, you can ask the chip to interrupt you when the pin changes. You specify the trigger: an **edge** (the moment it goes low-to-high or high-to-low, fires once per change, ideal for a button) or a **level** (fires while the pin stays at a given level). You will use this when you study interrupts; for now, just know GPIO can signal an event by edge or by level.\n\n**Recap:** alternate function muxes a pin to a peripheral (one job at a time); an atomic set/reset register avoids read-modify-write races; edge vs level is how a pin will later trigger interrupts.",
+      "items": [
+        {
+          "id": "gpio-mcq-altfn",
+          "type": "mcq",
+          "prompt": "What is a pin's 'alternate function'?",
+          "choices": [
+            "A backup pin used only if the first one breaks",
+            "Connecting the pin to a built-in peripheral like UART, SPI, or a timer instead of plain GPIO",
+            "Using the pin as both input and output at the same instant",
+            "A second power supply for the pin"
+          ],
+          "answerIndex": 1,
+          "explanation": "Alternate function means the pin is muxed (switched) to serve a peripheral such as UART TX or SPI clock, rather than acting as plain on/off GPIO. It is the same physical pin doing a different job."
+        },
+        {
+          "id": "gpio-mcq-mux",
+          "type": "mcq",
+          "prompt": "What does the internal mux on a pin do?",
+          "choices": [
+            "It amplifies the pin's voltage",
+            "It selects which signal source (plain GPIO, UART, SPI, timer) the pin is connected to",
+            "It debounces the pin automatically",
+            "It supplies the pull-up resistor"
+          ],
+          "answerIndex": 1,
+          "explanation": "The mux is a selector that routes one of several possible signals to the pin. Software picks which one, so the pin can be GPIO or an alternate function, but only one at a time."
+        },
+        {
+          "id": "gpio-mcq-one-job",
+          "type": "mcq",
+          "prompt": "Can a single pin act as plain GPIO and as a UART line at the same time?",
+          "choices": [
+            "Yes, pins do all functions simultaneously",
+            "No, a pin can only have one function active at a time",
+            "Yes, but only if the clock is off",
+            "No, because UART does not use pins"
+          ],
+          "answerIndex": 1,
+          "explanation": "The mux connects the pin to exactly one source at a time. You choose plain GPIO or one alternate function; it cannot be two things at once."
         },
         {
           "id": "gpio-mcq-rmw-race",
           "type": "mcq",
-          "prompt": "Two contexts both do GPIOA_ODR |= bit on different pins of port A. What can go wrong?",
+          "prompt": "Why can read-modify-write on a port's output register be risky?",
           "choices": [
-            "Nothing — ODR writes are always atomic",
-            "An interrupt between the read and write-back can cause one context's pin change to be lost",
-            "The port clock gets disabled",
-            "The pins switch to analog mode"
+            "It is always too slow to use",
+            "An interrupt that changes another pin between the read and the write-back can have its change overwritten and lost",
+            "It permanently disables the pin",
+            "It switches the pin to analog mode"
           ],
           "answerIndex": 1,
-          "explanation": "|= is read-modify-write. If an ISR modifies another bit of ODR between main's read and write-back, main writes a stale value and loses the ISR's change. Use BSRR for atomic, race-free single-pin updates."
+          "explanation": "Read-modify-write is three steps. If an interrupt modifies a different bit between your read and your write-back, you write a stale value and lose the interrupt's change. An atomic set/reset register avoids this."
         },
         {
-          "id": "gpio-mcq-bsrr-reset",
+          "id": "gpio-mcq-bsrr",
           "type": "mcq",
-          "prompt": "On STM32 BSRR, to atomically RESET (drive low) pin 3 you write:",
+          "prompt": "What problem does an atomic set/reset register (like STM32's BSRR) solve?",
           "choices": [
-            "(1u << 3)",
-            "(1u << 3) with a prior read of BSRR",
-            "(1u << (3 + 16))",
-            "~(1u << 3) into ODR"
-          ],
-          "answerIndex": 2,
-          "explanation": "BSRR's low 16 bits SET pins; its high 16 bits RESET them. So resetting pin 3 means writing bit 3+16 = bit 19. Setting uses bit 3. The write is atomic with no read step."
-        },
-        {
-          "id": "gpio-mcq-pullup-need",
-          "type": "mcq",
-          "prompt": "A button connects a pin to GND when pressed and the pin is configured as plain input with no pull. What is read when the button is released?",
-          "choices": [
-            "A solid logic 0",
-            "A solid logic 1",
-            "A floating, indeterminate value subject to noise",
-            "Whatever was last written to ODR"
-          ],
-          "answerIndex": 2,
-          "explanation": "With no pull and the button open, the pin floats and reads noise. Enable an internal pull-up (PUPDR) so the released state is a defined logic 1, with the press pulling it to 0."
-        },
-        {
-          "id": "gpio-mcq-relay-drive",
-          "type": "mcq",
-          "prompt": "You need a GPIO to switch a 200 mA relay coil. The right approach is to:",
-          "choices": [
-            "Set maximum drive strength and connect the relay directly",
-            "Use open-drain mode so the relay pulls itself",
-            "Drive a transistor/MOSFET (with flyback diode) from the GPIO, not the coil directly",
-            "Parallel several GPIO pins to share the current"
-          ],
-          "answerIndex": 2,
-          "explanation": "GPIO drive strength is milliamps, far below a relay coil, and the inductive kickback would destroy the pin. Use the GPIO to switch a transistor/MOSFET with a flyback diode across the coil."
-        }
-      ]
-    },
-    {
-      "id": "gpio-l3-input-debounce-exti",
-      "title": "Inputs, Debouncing, and EXTI Edge/Level",
-      "order": 3,
-      "difficulty": 3,
-      "content": "Reading inputs looks trivial — read the **input data register (IDR)** — but real mechanical contacts and edge-triggered interrupts add rigor.\n\n**Debouncing.** A mechanical switch does not make one clean transition; the contacts bounce for ~1–20 ms, producing a burst of edges. On a scope you'll see a ragged transition; an edge interrupt will fire many times. Schmitt-trigger inputs (built into most GPIO) clean *slow analog* noise via hysteresis but do **not** fix contact bounce. Two cures: **hardware** (RC filter + Schmitt, or an RS-latch) and **software** (sample periodically and accept a change only after N consecutive stable reads, or ignore further edges for a guard time).\n\n```c\n/* Integrator debounce: call every ~1 ms from a timer ISR. */\nstatic uint8_t hist = 0xFF;\nstatic uint8_t stable = 1;\n\nuint8_t debounce(uint8_t raw_high) {\n    hist = (uint8_t)((hist << 1) | (raw_high & 1u));\n    if (hist == 0x00) stable = 0;       /* 8 stable lows  */\n    else if (hist == 0xFF) stable = 1;  /* 8 stable highs */\n    return stable;                       /* else: still bouncing */\n}\n```\n\n**EXTI — external interrupts.** Instead of polling, an EXTI line can fire on a pin event. You choose the sensitivity:\n\n- **Edge-triggered** — rising, falling, or both. Fires once per transition; the canonical choice for a button or a sensor data-ready pulse.\n- **Level-triggered** — active as long as the line is at a level. Re-asserts immediately if you return while the level persists, so it suits a held condition but risks an interrupt storm if not cleared/handled.\n\nFor EXTI you still configure the pin (clock + input + pull), then route the line to the EXTI controller, select edge sensitivity, unmask it, and enable the IRQ in the NVIC. In the ISR, **clear the pending flag** — forget it and you re-enter forever. Keep the ISR short: set a `volatile` flag, defer the work.",
-      "items": [
-        {
-          "id": "gpio-fc-bounce",
-          "type": "flashcard",
-          "front": "What is switch bounce and roughly how long does it last?",
-          "back": "When a mechanical contact opens or closes, the metal physically bounces, producing a burst of make/break transitions for about 1–20 ms before settling. It generates spurious edges that fool edge interrupts and counters."
-        },
-        {
-          "id": "gpio-fc-schmitt",
-          "type": "flashcard",
-          "front": "Does a Schmitt-trigger input fix switch bounce?",
-          "back": "No. Hysteresis cleans up slow or noisy analog transitions (prevents multiple toggles near the threshold), but it does NOT remove genuine mechanical contact bounce, which is a real series of separate make/break events. You still need RC/software debouncing.",
-          "hint": "Hysteresis vs mechanical contacts."
-        },
-        {
-          "id": "gpio-fc-debounce-methods",
-          "type": "flashcard",
-          "front": "Name a hardware and a software debouncing technique.",
-          "back": "Hardware: RC low-pass filter feeding a Schmitt-trigger input, or an RS-latch on a SPDT switch. Software: periodic sampling that accepts a state change only after N consecutive stable reads, or an edge plus a guard-time lockout."
-        },
-        {
-          "id": "gpio-fc-edge-vs-level",
-          "type": "flashcard",
-          "front": "Edge-triggered vs level-triggered interrupt: what's the difference?",
-          "back": "Edge fires once on a transition (rising/falling/both). Level stays asserted while the line holds a given level — it re-fires immediately on ISR exit if the level persists, which suits a held condition but can cause an interrupt storm if not handled."
-        },
-        {
-          "id": "gpio-fc-clear-pending",
-          "type": "flashcard",
-          "front": "Why must an EXTI ISR clear its pending flag, and what happens if it doesn't?",
-          "back": "The pending flag is what signals the NVIC the interrupt is outstanding. If you don't clear it (write 1 to the pending bit on STM32), the handler is re-entered immediately and forever — the CPU never returns to main.",
-          "hint": "The 're-enter forever' ISR gotcha."
-        },
-        {
-          "id": "gpio-mcq-idr-read",
-          "type": "mcq",
-          "prompt": "To read the current logic level of an input pin on STM32 you read:",
-          "choices": [
-            "The ODR (output data register)",
-            "The IDR (input data register)",
-            "The BSRR register",
-            "The MODER register"
+            "It makes the LED brighter",
+            "It sets or clears chosen pins in a single write with no read step, avoiding the read-modify-write race",
+            "It enables the peripheral clock automatically",
+            "It debounces buttons in hardware"
           ],
           "answerIndex": 1,
-          "explanation": "IDR reflects the actual pin level. ODR holds the value you intend to drive when the pin is an output; reading ODR tells you the last written output, not the sensed input."
+          "explanation": "A set/reset register changes exactly the bits you specify in one atomic write, with no read first. That means an interrupt cannot clobber a neighboring pin, which is the race you get with read-modify-write."
         },
         {
-          "id": "gpio-mcq-exti-bringup",
+          "id": "gpio-mcq-atomic-when",
           "type": "mcq",
-          "prompt": "Which sequence correctly brings up a button EXTI on STM32?",
+          "prompt": "When is using an atomic set/reset register most important?",
           "choices": [
-            "Enable NVIC IRQ, then enable the port clock, then never configure the pin",
-            "Enable port clock + configure pin as input with pull; route the line to EXTI; select edge; unmask EXTI; enable the NVIC IRQ",
-            "Set the pin to analog mode and poll IDR in the ISR",
-            "Write BSRR to arm the interrupt, then enable the clock"
+            "Never; read-modify-write is always fine",
+            "When other code (such as an interrupt) might modify other pins of the same port",
+            "Only when the pin is an input",
+            "Only when the LED is off"
           ],
           "answerIndex": 1,
-          "explanation": "Clock and pin config come first (clock-first rule still applies), then the EXTI line routing, edge selection, unmask, and finally the NVIC enable. The ISR then clears the pending flag."
+          "explanation": "If only one piece of code ever touches the port, read-modify-write is usually fine. The race appears when an interrupt or another context can change other pins of the same register, so atomic writes protect you."
         },
         {
-          "id": "gpio-mcq-isr-discipline",
+          "id": "gpio-mcq-edge-vs-level",
           "type": "mcq",
-          "prompt": "What is the correct discipline inside a button EXTI handler?",
+          "prompt": "What is the difference between an edge-triggered and a level-triggered pin event?",
           "choices": [
-            "Run the full UI update and call printf to log it",
-            "Clear the pending flag, set a volatile flag or post to a queue, and return quickly; defer real work to main/a task",
-            "Busy-wait for the debounce time inside the ISR",
-            "Disable the port clock to prevent re-entry"
+            "Edge fires once when the pin changes; level is active while the pin stays at a given level",
+            "Edge is for outputs; level is for inputs",
+            "Edge means the pin is broken; level means it is healthy",
+            "There is no difference"
+          ],
+          "answerIndex": 0,
+          "explanation": "An edge trigger reacts to the moment of a transition (once per change), great for a button. A level trigger stays active as long as the pin holds a level. You will use these when configuring interrupts."
+        },
+        {
+          "id": "gpio-mcq-edge-button",
+          "type": "mcq",
+          "prompt": "For detecting a single button press as an event, which trigger type is the natural fit?",
+          "choices": [
+            "Level-triggered, because it fires continuously",
+            "Edge-triggered, because it fires once on the transition",
+            "Neither; you must poll forever",
+            "Analog mode"
           ],
           "answerIndex": 1,
-          "explanation": "Keep ISRs short: clear the source flag, hand off via a volatile flag/queue, and defer heavy or non-reentrant work (like printf) to thread context. Busy-waiting or printf in an ISR wrecks latency."
+          "explanation": "An edge trigger fires once when the button goes from released to pressed, which matches one press to one event. A level trigger would keep firing while the button is held."
         },
         {
-          "id": "gpio-mcq-level-storm",
+          "id": "gpio-img-altfn",
           "type": "mcq",
-          "prompt": "A sensor holds an alert line LOW until its register is read. Configuring the EXTI as level-triggered (active low) without reading the sensor in the ISR will:",
+          "prompt": "In the alternate-function diagram, what is the role of the mux between the signals and the pin?",
           "choices": [
-            "Fire exactly once and then stop",
-            "Never fire at all",
-            "Re-fire continuously (interrupt storm) because the level stays asserted",
-            "Automatically switch the pin to output mode"
+            "It combines all signals onto the pin at once",
+            "It selects exactly one signal (GPIO, UART, SPI, or timer) to route to the pin",
+            "It removes the need for a clock",
+            "It debounces the pin"
           ],
-          "answerIndex": 2,
-          "explanation": "Level sensitivity re-asserts as long as the condition holds. If the ISR doesn't clear the source (read the sensor to release the alert line), the interrupt fires endlessly. Either clear the source or use edge sensitivity."
-        },
-        {
-          "id": "gpio-img-pushpull-opendrain",
-          "type": "flashcard",
-          "front": "Push-pull vs open-drain output stage",
-          "back": "Side-by-side schematic: push-pull stage with high-side P-FET and low-side N-FET driving both levels, versus open-drain stage with only a low-side N-FET and an external pull-up resistor to VDD producing the high level.",
-          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/gpio-1.svg"
+          "answerIndex": 1,
+          "explanation": "The mux picks one source for the pin. Software selects whether the pin carries plain GPIO or an alternate function, and only that one signal reaches the pin at a time.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/gpio-6.svg"
         }
       ]
     }
