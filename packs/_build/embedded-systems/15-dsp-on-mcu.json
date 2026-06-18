@@ -1,294 +1,386 @@
 {
   "id": "dsp-on-mcu",
-  "title": "DSP on Microcontrollers: the Bridge to Radar",
+  "title": "DSP on Microcontrollers - Bridge to Radar",
   "order": 15,
   "lessons": [
     {
       "id": "dsp-on-mcu-lesson-1",
-      "title": "Why DSP Runs on an MCU Now",
+      "title": "What DSP Is and Why a Small Chip Can Do It",
       "order": 1,
       "difficulty": 1,
-      "content": "There was a time when any real signal processing needed a dedicated DSP chip. That changed when ARM put a single-precision **FPU** and a set of **DSP/SIMD instructions** into the Cortex-M4 (the **M4F**) and a faster pipeline plus optional double-precision FPU into the **Cortex-M7**. These cores can run a multiply-accumulate (MAC) — the heart of every filter and transform — in roughly one cycle, and the SIMD instructions pack two 16-bit operations into one 32-bit datapath.\n\nYou do not write those instructions by hand. ARM ships **CMSIS-DSP**, a free, optimized C library of the standard kernels: FIR/IIR filters, FFTs, windowing, vector math, magnitude, correlation, and statistics. It auto-selects SIMD/FPU paths for your core, so the same call runs well on an M0+ (software) or an M4F (hardware FPU + DSP extensions).\n\nThe MAC that dominates a length-$M$ FIR filter is\n\n$$ y[n] = \\\\sum_{k=0}^{M-1} h[k]\\\\, x[n-k]. $$\n\nA float FIR on an M4F is just a call:\n\n```c\narm_fir_instance_f32 S;\narm_fir_init_f32(&S, M, coeffs, state, BLOCK);\narm_fir_f32(&S, in, out, BLOCK);  /* one MAC per tap, FPU-accelerated */\n```\n\nFor you this is a homecoming: a radar receiver is timed sampling followed by filtering and an FFT. The MCU is now fast enough to *be* that receiver for low-to-moderate bandwidths. The rest of this subtopic is about doing it without dropping a sample and knowing exactly when the MCU runs out of room.",
+      "content": "## Hook\n\nWhen you put on noise-cancelling headphones, a tiny chip listens to the noise around you and quietly cancels it out. When a music app shows bars dancing to the beat, a chip is measuring the sound. When a phone waits for \"OK Google,\" it is constantly checking a stream of sound for one pattern. All of these are **DSP** at work.\n\n## Build\n\n**DSP** stands for **Digital Signal Processing**. A **signal** is just something that changes over time, like sound, light, or a voltage. \"Digital\" means we have already turned that signal into a stream of numbers called **samples** (snapshots of the signal taken many times per second). DSP is simply **using math on that stream of numbers to clean up or analyze the signal**: removing noise, or finding which tones (frequencies) are inside it.\n\nThe simplest, most useful piece of math is a **filter**. Imagine each new sample is a little bumpy because of random noise. If you replace each sample with the **average** of itself and its neighbors, the sharp random bumps get smoothed away while the real shape stays. That averaging is a filter, and it is the heart of DSP.\n\nFor a long time you needed a special **DSP chip** to do this fast enough. That changed when ordinary microcontrollers (small computer chips, **MCUs**) got two helpers. First, a built-in **FPU** (Floating-Point Unit), hardware that does decimal math quickly. Second, special **DSP instructions** that crunch the multiply-and-add step that filters live on. On top of that, ARM gives away **CMSIS-DSP**, a free library (a ready-made toolbox) of functions like filters and the FFT, so you call `arm_fir_f32(...)` instead of writing the math yourself.\n\n## Recap\n\nDSP is doing math on a stream of digital samples to clean up or analyze a signal, and a filter (like smoothing by averaging) is the first tool. Modern MCUs can do this in real time thanks to a built-in FPU, DSP instructions, and the ready-made CMSIS-DSP library.",
       "items": [
-        {
-          "id": "dsp-on-mcu-1-fc-1",
-          "type": "flashcard",
-          "front": "What two hardware additions to the Cortex-M4F/M7 made real DSP on a general MCU practical?",
-          "back": "A single-precision (M4F) or double-precision (M7) floating-point unit (FPU), plus DSP/SIMD instructions including single-cycle multiply-accumulate (MAC). These accelerate the MACs at the core of every filter and transform.",
-          "hint": "One does floats fast, one packs parallel integer ops."
-        },
-        {
-          "id": "dsp-on-mcu-1-fc-2",
-          "type": "flashcard",
-          "front": "What is CMSIS-DSP and why use it instead of hand-writing kernels?",
-          "back": "ARM's free, optimized C library of standard DSP kernels (FIR/IIR, FFT, windowing, magnitude, correlation, statistics). It auto-selects FPU/SIMD code paths per core, so you get vendor-tuned performance from a portable API instead of writing assembly.",
-          "hint": "Standard library shipped by the core vendor."
-        },
-        {
-          "id": "dsp-on-mcu-1-fc-3",
-          "type": "flashcard",
-          "front": "What single operation dominates the cost of an FIR filter, and why does the FPU/SIMD matter for it?",
-          "back": "The multiply-accumulate (MAC): one multiply plus one add per filter tap. With a single-cycle MAC and SIMD packing, an M-tap filter approaches M cycles per output sample instead of many.",
-          "hint": "y[n] = sum of h[k] * x[n-k]."
-        },
-        {
-          "id": "dsp-on-mcu-1-fc-4",
-          "type": "flashcard",
-          "front": "Why is the MCU DSP pipeline framed as 'the bridge to radar'?",
-          "back": "A radar receiver is fundamentally timed acquisition followed by filtering and FFT/detection. That is exactly the timer->ADC->DMA->window->FFT->magnitude pipeline you build on an MCU, so the same code and the same budgeting reasoning carry straight over.",
-          "hint": "Acquire, filter, transform, detect."
-        },
-        {
-          "id": "dsp-on-mcu-1-fc-5",
-          "type": "flashcard",
-          "front": "Does the same CMSIS-DSP call run on a Cortex-M0+ that has no FPU?",
-          "back": "Yes -- the API is the same, but the library compiles to a software (or fixed-point) implementation on cores without an FPU/DSP extension, which is far slower. The portability is in the API, not the performance.",
-          "hint": "Same function name, different code path selected at build."
-        },
         {
           "id": "dsp-on-mcu-1-mcq-1",
           "type": "mcq",
-          "prompt": "On a Cortex-M4F, what does the 'F' specifically denote?",
+          "prompt": "What does DSP (Digital Signal Processing) actually mean?",
           "choices": [
-            "A faster flash memory controller",
-            "An integrated single-precision floating-point unit (FPU)",
-            "A FreeRTOS-certified core variant",
-            "A built-in FFT hardware accelerator"
+            "Using math on a stream of digital samples to clean up or analyze a signal",
+            "A type of memory chip used to store programs",
+            "A wireless protocol for connecting sensors",
+            "A way to draw graphics on a screen"
           ],
-          "answerIndex": 1,
-          "explanation": "The 'F' is the FPU: the M4F adds a single-precision hardware FPU to the Cortex-M4. The M4 also carries DSP/SIMD instructions, but the suffix specifically marks the floating-point unit. There is no dedicated FFT accelerator on a stock M4F."
+          "answerIndex": 0,
+          "explanation": "DSP is processing (doing math on) a signal that has been turned into a stream of numbers called samples. The goal is usually to clean it up (remove noise) or analyze it (find what is in it). The other options are unrelated hardware or communication ideas."
         },
         {
           "id": "dsp-on-mcu-1-mcq-2",
           "type": "mcq",
-          "prompt": "Which of these is NOT a kernel that CMSIS-DSP provides out of the box?",
+          "prompt": "In DSP, what is a 'sample'?",
           "choices": [
-            "FIR and IIR (biquad) filtering",
-            "Real FFT via arm_rfft_fast",
-            "Windowing and complex magnitude/dB",
-            "A full TCP/IP networking stack"
+            "A free trial version of the software",
+            "A single numerical snapshot of the signal taken at one instant in time",
+            "The loudest part of a sound",
+            "A small piece of program code"
           ],
-          "answerIndex": 3,
-          "explanation": "CMSIS-DSP is a math/signal library: filters, transforms, windowing, magnitude, correlation, statistics. Networking is the domain of stacks like lwIP or a vendor TCP/IP library, not a DSP kernel library."
+          "answerIndex": 1,
+          "explanation": "A sample is one measurement of the signal at a moment in time. Taking many samples per second gives the stream of numbers that DSP works on. It has nothing to do with trial software or code."
         },
         {
           "id": "dsp-on-mcu-1-mcq-3",
           "type": "mcq",
-          "prompt": "Why does a single-cycle MAC matter so much for DSP throughput on an MCU?",
+          "prompt": "A simple smoothing filter often works by replacing each sample with what?",
           "choices": [
-            "It eliminates the need for any RAM buffers",
-            "Filters and transforms are dominated by multiply-then-accumulate operations, so a 1-cycle MAC roughly sets the per-sample cost",
-            "It allows the ADC to sample faster",
-            "It removes the need to enable peripheral clocks"
+            "The largest of all the samples seen so far",
+            "Zero, to erase the noise",
+            "The average of itself and its neighboring samples",
+            "A random number"
           ],
-          "answerIndex": 1,
-          "explanation": "FIR/IIR filters and the butterflies of an FFT are sums of products. When each multiply-accumulate retires in one cycle, the core's clock rate translates almost directly into MACs/second, which is the currency of DSP throughput."
+          "answerIndex": 2,
+          "explanation": "Averaging each sample with its neighbors smooths out the fast random bumps (noise) while keeping the slow real shape of the signal. Taking the largest value or zeroing samples would distort or destroy the signal, not clean it.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/dsp-on-mcu-2.svg"
         },
         {
           "id": "dsp-on-mcu-1-mcq-4",
           "type": "mcq",
-          "prompt": "A working software developer is told 'this MCU pipeline is just a radar receiver.' What is the most accurate reading of that claim?",
+          "prompt": "Why is smoothing (averaging) called 'filtering'?",
           "choices": [
-            "It means the MCU can transmit radar pulses at microwave frequencies",
-            "It means the acquire-then-filter-then-FFT-then-detect structure is identical, even if the bandwidth and front-end differ",
-            "It means radar systems no longer use FPGAs or dedicated DSPs",
-            "It means CMSIS-DSP includes radar target-tracking algorithms"
+            "Because it removes the unwanted fast wiggles (noise) and lets the wanted slow signal pass through",
+            "Because it deletes every other sample to save space",
+            "Because it changes the signal into text",
+            "Because it only works on water signals"
+          ],
+          "answerIndex": 0,
+          "explanation": "A filter lets some things through and blocks others. A smoothing filter blocks the fast random noise and lets the slower real signal pass, just like a coffee filter blocks grounds and lets liquid through."
+        },
+        {
+          "id": "dsp-on-mcu-1-mcq-5",
+          "type": "mcq",
+          "prompt": "What does the FPU (Floating-Point Unit) inside a modern microcontroller do?",
+          "choices": [
+            "It stores the program permanently",
+            "It connects the chip to the internet",
+            "It is hardware that does decimal (floating-point) math quickly",
+            "It controls the power supply voltage"
+          ],
+          "answerIndex": 2,
+          "explanation": "The FPU is dedicated hardware for fast decimal math. Because DSP does huge numbers of multiplications and additions on decimal values, having an FPU makes real-time DSP practical. It is not memory, networking, or power hardware."
+        },
+        {
+          "id": "dsp-on-mcu-1-mcq-6",
+          "type": "mcq",
+          "prompt": "What is CMSIS-DSP?",
+          "choices": [
+            "A brand of microcontroller",
+            "A free, ready-made library of DSP functions (filters, FFT, math) you can call from your program",
+            "A debugging cable",
+            "A type of sensor"
           ],
           "answerIndex": 1,
-          "explanation": "The structural pipeline is the same: evenly timed sampling, optional filtering, an FFT, then magnitude/detection. The MCU does not generate RF, and high-bandwidth radars still use FPGAs/DSPs; what transfers is the signal-chain reasoning."
+          "explanation": "CMSIS-DSP is a free software toolbox from ARM containing tested, fast DSP building blocks like filters and the FFT. You call its functions instead of writing the tricky math yourself. It is software, not a chip, cable, or sensor."
+        },
+        {
+          "id": "dsp-on-mcu-1-mcq-7",
+          "type": "mcq",
+          "prompt": "Which everyday device is a good example of DSP cleaning up a signal?",
+          "choices": [
+            "A mechanical wind-up clock",
+            "Noise-cancelling headphones",
+            "A paper notebook",
+            "A simple light switch"
+          ],
+          "answerIndex": 1,
+          "explanation": "Noise-cancelling headphones use DSP to measure surrounding noise and produce a sound that cancels it, leaving cleaner audio. A wind-up clock, notebook, and light switch involve no signal processing."
+        },
+        {
+          "id": "dsp-on-mcu-1-mcq-8",
+          "type": "mcq",
+          "prompt": "Before MCUs gained an FPU and DSP instructions, what was usually needed for real signal processing?",
+          "choices": [
+            "Nothing, any chip could always do it instantly",
+            "A separate, dedicated DSP chip built for the job",
+            "A faster internet connection",
+            "A larger battery"
+          ],
+          "answerIndex": 1,
+          "explanation": "Real-time DSP used to require a separate, specialized DSP chip because ordinary microcontrollers were too slow at the heavy math. Modern MCUs with an FPU and DSP instructions can now often do the job themselves."
+        },
+        {
+          "id": "dsp-on-mcu-1-mcq-9",
+          "type": "mcq",
+          "prompt": "Why is calling a CMSIS-DSP function like arm_fir_f32 usually better than writing the filter math yourself?",
+          "choices": [
+            "It is already written, tested, and tuned to run fast on the chip, so you avoid mistakes and get good speed",
+            "It makes the program run on any operating system without a chip",
+            "It removes the need for any samples",
+            "It automatically charges the battery"
+          ],
+          "answerIndex": 0,
+          "explanation": "The library functions are pre-written and optimized to use the chip's FPU and DSP instructions, so you get correct, fast results without reinventing tricky math. They still need samples and hardware to run."
         }
       ]
     },
     {
       "id": "dsp-on-mcu-lesson-2",
-      "title": "Fixed-Point vs Float, Saturation, and the Core Kernels",
+      "title": "The FFT and the Real-Time Sampling Pipeline",
       "order": 2,
       "difficulty": 2,
-      "content": "Before the FPU was standard, MCU DSP meant **fixed-point**. CMSIS-DSP still supports it because it is faster on FPU-less cores and cheaper in power. The two common formats are **Q15** (a 16-bit signed value scaled so the range is $[-1, 1)$ with $2^{-15}$ resolution) and **Q31** (the 32-bit version). A real number $x$ is stored as the integer $\\\\mathrm{round}(x \\\\cdot 2^{15})$ for Q15.\n\nThe trap is overflow. Multiplying two Q15 values gives a Q30 product needing 32 bits; adding many of them (as a filter does) can exceed the format. Plain two's-complement arithmetic **wraps**: $+0.99$ can suddenly become $-1.0$, a catastrophic spike. The DSP instructions instead **saturate** — clamp to the max/min — which is graceful degradation, exactly like an overdriven analog stage clipping rather than folding. CMSIS-DSP's `_q15`/`_q31` kernels use saturating MACs.\n\nFloat (`_f32`) sidesteps scaling entirely: huge dynamic range, no manual Q-format bookkeeping, at the cost of more cycles and energy than fixed-point on the same core. On an M4F float is usually the right default; reach for Q15/Q31 only when the budget is tight or the core lacks an FPU.\n\nThe core kernels you will compose:\n\n```c\narm_rfft_fast_instance_f32 fft;\narm_rfft_fast_init_f32(&fft, 1024);          /* real 1024-pt FFT */\narm_mult_f32(samples, hann, windowed, 1024); /* apply window      */\narm_rfft_fast_f32(&fft, windowed, freq, 0);  /* 0 = forward       */\narm_cmplx_mag_f32(freq, mag, 512);           /* |bin| magnitude   */\n```\n\nWindowing (Hann, Hamming, Blackman) reduces spectral leakage before the FFT; magnitude and a $20\\\\log_{10}$ step give a dB spectrum; correlation (`arm_correlate_f32`) is matched-filtering — the same operation a pulse-compression radar performs on its return.",
+      "content": "## Hook\n\nLook at the bouncing bars on a music app's equalizer. The tall bars on the left are the deep bass; the ones on the right are the high notes. Something is taking the music and asking: *which frequencies (pitches) are in this sound right now, and how strong is each one?* The tool that answers that is the **FFT**.\n\n## Build\n\nA recorded signal is a wave that wiggles up and down over time. That is the **time domain**: amplitude versus time. But often the useful information is *which tones are inside the wave*. The **FFT** (Fast Fourier Transform) takes a block of samples and reports the strength of each frequency. The result is the **frequency domain**: a row of bars, where a tall bar (a **peak**) means that frequency is strongly present, and a flat region means that frequency is absent. So in one sentence: **an FFT tells you what frequencies a signal is made of, and how much of each.**\n\nA microcontroller can run the FFT in real time, but first it has to collect samples cleanly and steadily. The classic **real-time pipeline** ties the whole topic together:\n\n1. A **timer** fires at a steady rate and tells the **ADC** (Analog-to-Digital Converter, the part that turns a voltage into a number) to grab one sample.\n2. **DMA** (Direct Memory Access, a helper that copies data without bothering the CPU) drops each new sample straight into a **buffer** (a block of memory).\n3. When the buffer is full, the **CPU** runs a filter or an FFT on it.\n4. The result is used: shown on a display, sent out, or used to make a decision.\n\nWhy bother with the timer and DMA? If you instead read the ADC in a simple loop, every sample is delayed by whatever else the CPU happens to be doing, so the spacing between samples is uneven and the FFT result is wrong. A hardware **timer** guarantees a perfectly even rate, and **DMA** moves the data while the CPU is busy elsewhere, so no sample is ever missed.\n\n## Recap\n\nThe FFT turns a wave in time into a picture of the frequencies inside it (peaks = present tones). To feed it good data, a timer triggers the ADC at a steady rate, DMA collects the samples into a buffer, and then the CPU processes the buffer.",
       "items": [
-        {
-          "id": "dsp-on-mcu-2-fc-1",
-          "type": "flashcard",
-          "front": "What range and resolution does Q15 represent, and how is a real value stored?",
-          "back": "Q15 is a 16-bit signed fixed-point value covering [-1, 1) with resolution 2^-15. A real number x is stored as the integer round(x * 2^15). Q31 is the same idea in 32 bits with resolution 2^-31.",
-          "hint": "16 bits, normalized to roughly +/-1."
-        },
-        {
-          "id": "dsp-on-mcu-2-fc-2",
-          "type": "flashcard",
-          "front": "What is the difference between wrapping and saturating arithmetic on overflow, and why does DSP prefer saturation?",
-          "back": "Wrapping rolls a near-max positive value over to a large negative one (a destructive spike). Saturation clamps to the format's max/min. DSP prefers saturation because clipping degrades gracefully -- like an overdriven analog stage -- instead of injecting a wild discontinuity.",
-          "hint": "Clip vs roll-over."
-        },
-        {
-          "id": "dsp-on-mcu-2-fc-3",
-          "type": "flashcard",
-          "front": "When should you pick float (_f32) over fixed-point (Q15/Q31) on an MCU, and vice versa?",
-          "back": "Use float on an FPU-equipped core (M4F/M7) as the default: huge dynamic range, no Q-format bookkeeping. Use Q15/Q31 when there is no FPU, when power/cycles are tight, or to fit narrow memory -- accepting manual scaling and overflow management.",
-          "hint": "Float = convenience + range; fixed = speed/power on weak cores."
-        },
-        {
-          "id": "dsp-on-mcu-2-fc-4",
-          "type": "flashcard",
-          "front": "Why apply a window (Hann/Hamming/Blackman) before an FFT?",
-          "back": "A finite, non-integer-period capture has discontinuities at its edges that smear energy across bins (spectral leakage). A tapered window forces the block to roll off smoothly at both ends, concentrating energy near the true frequency at the cost of slightly wider main lobes.",
-          "hint": "Reduces leakage from abrupt block edges."
-        },
-        {
-          "id": "dsp-on-mcu-2-fc-5",
-          "type": "flashcard",
-          "front": "What radar operation is CMSIS-DSP correlation (arm_correlate) equivalent to?",
-          "back": "Matched filtering / pulse compression: correlating the received signal against a known transmitted template maximizes SNR and locates the echo. The same correlation kernel that finds a code in comms finds a chirp return in radar.",
-          "hint": "Match the return against the transmitted pulse."
-        },
         {
           "id": "dsp-on-mcu-2-mcq-1",
           "type": "mcq",
-          "prompt": "You multiply two Q15 numbers near +0.9. Without saturation, what is the danger when accumulating many such products in a filter?",
+          "prompt": "What does an FFT tell you about a signal?",
           "choices": [
-            "The result silently wraps to a large negative value, producing a spurious spike",
-            "The FPU automatically rescales to float",
-            "The values are rounded to zero",
-            "Nothing -- Q15 cannot overflow"
+            "How long the signal will last",
+            "Which frequencies (tones) are present in the signal and how strong each one is",
+            "What color the signal is",
+            "Where the signal is stored in memory"
           ],
-          "answerIndex": 0,
-          "explanation": "Two's-complement accumulation wraps on overflow: a value past +full-scale reappears as a large negative number, injecting a discontinuity. Saturating MACs (the _q15 kernels) clamp instead, which is why they are used for filters."
+          "answerIndex": 1,
+          "explanation": "The FFT converts a block of samples into a list of frequency strengths, revealing which tones make up the signal and how much of each. It does not report duration, color, or memory location.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/dsp-on-mcu-3.svg"
         },
         {
           "id": "dsp-on-mcu-2-mcq-2",
           "type": "mcq",
-          "prompt": "On a Cortex-M4F running a 1024-point real FFT, which choice is usually the sensible default and why?",
+          "prompt": "On an FFT result, what does a tall bar (a peak) at some frequency mean?",
           "choices": [
-            "Q15, because fixed-point is always faster than float",
-            "f32, because the hardware FPU makes float fast and removes Q-format scaling bugs",
-            "Q31, because 32-bit integers are required for any FFT",
-            "Double precision, because the M4F FPU is double-precision"
+            "That frequency is strongly present in the signal",
+            "The signal is about to stop",
+            "There is an error in the program",
+            "That frequency has been removed"
           ],
-          "answerIndex": 1,
-          "explanation": "The M4F has a single-precision FPU, so f32 is fast and avoids the manual scaling/overflow management of fixed-point. (Q15/Q31 win only when cycles/power/memory are tight or there is no FPU; the M4F FPU is single-, not double-precision.)"
+          "answerIndex": 0,
+          "explanation": "A peak means that tone is strongly present. A flat region means that frequency is weak or absent. Peaks are not errors and do not indicate removal."
         },
         {
           "id": "dsp-on-mcu-2-mcq-3",
           "type": "mcq",
-          "prompt": "What is the purpose of arm_cmplx_mag_f32 in the spectrum pipeline?",
+          "prompt": "The 'time domain' view of a signal shows what?",
           "choices": [
-            "It applies the window function to the time-domain samples",
-            "It computes the magnitude sqrt(re^2 + im^2) of each complex FFT bin to give the spectrum amplitude",
-            "It triggers the next DMA transfer",
-            "It converts Q15 samples to float"
+            "A list of memory addresses",
+            "The signal's amplitude (its up-and-down value) as it changes over time",
+            "The temperature of the chip",
+            "The strength of each frequency"
           ],
           "answerIndex": 1,
-          "explanation": "The rFFT produces complex bins; arm_cmplx_mag_f32 collapses each to its magnitude sqrt(re^2+im^2), the per-bin amplitude. A following 20*log10 step turns that into a dB spectrum."
+          "explanation": "The time domain plots how the signal's value changes over time, the raw wave you record. Showing the strength of each frequency is the frequency domain, which the FFT produces."
         },
         {
           "id": "dsp-on-mcu-2-mcq-4",
           "type": "mcq",
-          "prompt": "arm_rfft_fast_f32 is preferred over a generic complex FFT for ADC data because:",
+          "prompt": "Why use a timer plus DMA to gather samples instead of just reading the ADC in a loop?",
           "choices": [
-            "ADC samples are real-valued, so a real FFT exploits Hermitian symmetry to roughly halve the work and memory",
-            "It is the only FFT that supports windowing",
-            "Complex FFTs cannot run on a Cortex-M",
-            "It outputs results in decibels directly"
+            "Because loops are not allowed in C",
+            "Because the timer guarantees perfectly even spacing between samples and DMA collects them without missing any while the CPU is busy",
+            "Because DMA makes the ADC use less electricity",
+            "Because a loop would store the samples in the wrong language"
+          ],
+          "answerIndex": 1,
+          "explanation": "A hardware timer fires at an exact steady rate, so samples are evenly spaced (which the FFT needs to be correct), and DMA moves each sample into memory on its own, so none are lost even if the CPU is doing other work. A read-in-a-loop approach gives uneven spacing and can miss samples."
+        },
+        {
+          "id": "dsp-on-mcu-2-mcq-5",
+          "type": "mcq",
+          "prompt": "What is the job of the ADC (Analog-to-Digital Converter) in the pipeline?",
+          "choices": [
+            "It turns a real-world voltage into a number (a sample)",
+            "It stores the finished results on disk",
+            "It draws the spectrum on the screen",
+            "It generates the timer signal"
           ],
           "answerIndex": 0,
-          "explanation": "Real input has a Hermitian-symmetric spectrum, so a real FFT computes only the unique half of the bins, using about half the operations and storage of a full complex FFT on the same N. It does not window or convert to dB for you."
+          "explanation": "The ADC measures an analog voltage and converts it into a digital number, producing the samples DSP works on. It does not store, draw, or generate timing."
+        },
+        {
+          "id": "dsp-on-mcu-2-mcq-6",
+          "type": "mcq",
+          "prompt": "What does DMA (Direct Memory Access) do in this pipeline?",
+          "choices": [
+            "It performs the FFT math",
+            "It copies each new sample into a memory buffer without using the CPU",
+            "It decides which frequencies matter",
+            "It supplies power to the ADC"
+          ],
+          "answerIndex": 1,
+          "explanation": "DMA is a helper that moves data (here, samples from the ADC into a buffer) without making the CPU do the copying. That frees the CPU and prevents missed samples. It does not do the FFT math or supply power."
+        },
+        {
+          "id": "dsp-on-mcu-2-mcq-7",
+          "type": "mcq",
+          "prompt": "What is the correct order of the classic real-time DSP pipeline?",
+          "choices": [
+            "CPU processes, then timer fires, then ADC samples, then DMA copies",
+            "Timer triggers ADC to sample, DMA copies samples into a buffer, then the CPU processes the buffer",
+            "DMA samples, ADC processes, timer displays the result",
+            "CPU samples in a loop, then the FFT triggers the timer"
+          ],
+          "answerIndex": 1,
+          "explanation": "The flow is: timer triggers the ADC at a steady rate, DMA collects the samples into a buffer, and once the buffer is full the CPU runs the filter or FFT. The other orders mix up the roles of each part."
+        },
+        {
+          "id": "dsp-on-mcu-2-mcq-8",
+          "type": "mcq",
+          "prompt": "What is a 'buffer' in this context?",
+          "choices": [
+            "A polishing cloth for the chip",
+            "A block of memory that holds a group of samples until they are ready to be processed",
+            "A type of frequency",
+            "The screen that shows the spectrum"
+          ],
+          "answerIndex": 1,
+          "explanation": "A buffer is a chunk of memory used to hold samples as they arrive, so the CPU can process them as a group (a block) rather than one at a time. It is not a physical cloth, a frequency, or a display."
+        },
+        {
+          "id": "dsp-on-mcu-2-mcq-9",
+          "type": "mcq",
+          "prompt": "If samples are collected at uneven time spacing, what happens to the FFT result?",
+          "choices": [
+            "It becomes faster but still correct",
+            "It can be wrong or misleading, because the FFT assumes evenly spaced samples",
+            "Nothing changes",
+            "The signal turns into text"
+          ],
+          "answerIndex": 1,
+          "explanation": "The FFT assumes samples are taken at a steady, even rate. Uneven spacing distorts the frequency picture, which is exactly why a hardware timer is used to keep the spacing exact."
         }
       ]
     },
     {
       "id": "dsp-on-mcu-lesson-3",
-      "title": "The Real-Time Pipeline and the Compute Budget",
+      "title": "Number Formats, the Compute Budget, and When the MCU Is Not Enough",
       "order": 3,
       "difficulty": 3,
-      "content": "Now assemble the whole chain and prove it runs in real time. A **timer** triggers the **ADC** at a precise rate $f_s$; the **DMA** streams conversions into a **double (ping-pong) buffer** of $N$ samples per half. When a half fills, a half-transfer/transfer-complete interrupt hands that buffer to the CPU, which applies a window, runs an $N$-point `arm_rfft_fast_f32`, and computes magnitude — *while DMA fills the other half*. No sample is dropped because acquisition and processing run on disjoint buffers in parallel.\n\nThe budget is a deadline race. A block of $N$ samples arrives every\n\n$$ T_{\\\\text{block}} = \\\\frac{N}{f_s}. $$\n\nProcessing that block costs some cycles $C$; you must satisfy\n\n$$ C < T_{\\\\text{block}} \\\\cdot f_{\\\\text{cpu}} \\\\quad\\\\Longleftrightarrow\\\\quad \\\\frac{C}{N} < \\\\frac{f_{\\\\text{cpu}}}{f_s}. $$\n\nAn $N$-point FFT costs on the order of $N\\\\log_2 N$ operations, so per-sample cost grows like $\\\\log_2 N$. The tension: a **larger $N$** gives finer frequency resolution (bin spacing $f_s/N$) and better processing gain, but costs more cycles per block and adds latency $T_{\\\\text{block}}$; a **higher $f_s$** captures more bandwidth (Nyquist $f_s/2$) but shrinks the deadline. You cannot independently maximize bandwidth, resolution, and CPU headroom — that triangle is the whole game, and it is *exactly* the radar designer's range-resolution / unambiguous-range / dwell-time tradeoff.\n\n```c\nvoid DMA1_Stream0_IRQHandler(void) {\n  if (half_transfer) { process_block(&buf[0]); }   /* CPU on half A */\n  else               { process_block(&buf[N]); }   /* CPU on half B */\n  /* must finish before this half refills: deadline = N / fs */\n}\n```\n\nWhen even the M7 cannot keep up — wider bandwidth, larger FFTs, multiple channels — you move processing to a dedicated **DSP**, an **FPGA** (streaming, deterministic, massively parallel), or an **application processor** running Linux (handoff to 05). Knowing *where that line is* for your $f_s$, $N$, and $f_{\\\\text{cpu}}$ is the engineering judgment this whole module builds toward.",
+      "content": "## Hook\n\nA chip doing real-time DSP is in a quiet race against the clock. Samples keep arriving whether or not the math from the last batch has finished. If the chip falls behind, samples pile up and get lost. Understanding that race, and the choices that affect it, is the difference between a system that works and one that drops data.\n\n## Build\n\n**How numbers are stored.** There are two ways to keep the sample values. **Floating-point** (often written `float` or `f32`) stores decimals directly and is easy to use, handling tiny and huge values without fuss; on a chip with an FPU it is fast and the natural default. **Fixed-point** (formats called **Q15** or **Q31**, just integers treated as fractions) was the old way before FPUs existed. Fixed-point can be faster and use less power on a chip without an FPU, but you have to manage the scaling carefully or numbers overflow. The simple rule: if the chip has an FPU, use float; only reach for fixed-point when you have no FPU or must save every bit of power.\n\n**The compute budget.** Samples arrive at a steady rate, $f_s$ samples per second. The CPU works on them in blocks of $N$ samples. A new block fills up every $T = N / f_s$ seconds. That is your deadline: all the math on one block (the filter, the FFT, the magnitude) must finish before the next block is ready. If it does not finish in time, you fall behind and lose data. So the budget is a simple question: *does the math for one block fit in the time it takes the next block to arrive?*\n\nThis creates a trade-off. A **bigger block** $N$ gives a finer, more detailed frequency picture, but it takes more math and adds delay. A **higher sample rate** $f_s$ captures faster signals, but shrinks the deadline. You cannot push all of them at once on one chip.\n\n**When the MCU is not enough.** If you need very high sample rates, very large FFTs, or many channels at once, even a fast MCU runs out of time. Then you move the work to a dedicated **DSP** chip, or an **FPGA** (Field-Programmable Gate Array, hardware you wire up to do many operations in parallel). This same reasoning is exactly what a **radar** receiver lives on: it samples a returning signal on a timer, filters it, runs an FFT, and decides what is out there. That is where this whole topic leads.\n\n## Recap\n\nUse floating-point when the chip has an FPU; use fixed-point only when you must. The core constraint is the compute budget: a block of $N$ samples arrives every $N/f_s$ seconds and the math must finish before the next block. When the budget runs out, move to a DSP or FPGA, which is the same path a radar receiver follows.",
       "items": [
-        {
-          "id": "dsp-on-mcu-3-fc-1",
-          "type": "flashcard",
-          "front": "In the real-time spectrum pipeline, why does a DMA double (ping-pong) buffer prevent dropped samples?",
-          "back": "The CPU processes the half that just filled while the DMA continues writing the other half. Acquisition and processing run in parallel on disjoint buffers, so no incoming sample has to wait for the CPU and none is overwritten before it is read.",
-          "hint": "Process one half while the other fills.",
-          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/dsp-on-mcu-1.svg"
-        },
-        {
-          "id": "dsp-on-mcu-3-fc-2",
-          "type": "flashcard",
-          "front": "Write the per-block deadline for processing N samples acquired at rate fs, and state the constraint that must hold.",
-          "back": "T_block = N / fs. Processing cost C (in cycles) must satisfy C < T_block * f_cpu, equivalently C/N < f_cpu/fs. If processing a block takes longer than a block takes to fill, you fall behind and drop data.",
-          "hint": "Time to fill a block vs cycles to process it."
-        },
-        {
-          "id": "dsp-on-mcu-3-fc-3",
-          "type": "flashcard",
-          "front": "State the three-way tradeoff between FFT size N, sample rate fs, and CPU budget.",
-          "back": "Larger N: finer bins (fs/N) and more processing gain, but more cycles/block and more latency. Higher fs: more bandwidth (Nyquist fs/2) but a shorter deadline N/fs. Finite f_cpu caps cycles/block. You cannot maximize bandwidth, resolution, and headroom at once.",
-          "hint": "Resolution vs bandwidth vs cycles -- a triangle."
-        },
-        {
-          "id": "dsp-on-mcu-3-fc-4",
-          "type": "flashcard",
-          "front": "What is the frequency resolution (bin spacing) of an N-point FFT taken at sample rate fs?",
-          "back": "fs / N hertz per bin. Doubling N halves the bin spacing (finer resolution) but doubles the block time N/fs (more latency) and increases cycles per block.",
-          "hint": "Span fs over N bins."
-        },
-        {
-          "id": "dsp-on-mcu-3-fc-5",
-          "type": "flashcard",
-          "front": "When do you move processing off the MCU to a DSP, FPGA, or application processor?",
-          "back": "When the per-block deadline can no longer be met -- wider bandwidth (higher fs), larger FFTs, or many channels push C/N above f_cpu/fs. FPGAs give deterministic streaming parallelism; app processors (Linux) give throughput and software ecosystem; both are the handoff beyond the MCU.",
-          "hint": "When C/N exceeds f_cpu/fs even on an M7."
-        },
         {
           "id": "dsp-on-mcu-3-mcq-1",
           "type": "mcq",
-          "prompt": "You sample at fs = 200 kHz with an FFT size N = 1024. What is the approximate per-block deadline the processing must beat?",
+          "prompt": "On a microcontroller that has an FPU, which number format is usually the sensible default for DSP?",
           "choices": [
-            "About 5.12 ms",
-            "About 5.12 us",
-            "About 51.2 ms",
-            "About 200 ms"
+            "Fixed-point, because it is always faster",
+            "Floating-point (float / f32), because the FPU makes it fast and it avoids tricky scaling",
+            "Text strings, because they are easy to read",
+            "Whole numbers only, because decimals are not allowed"
           ],
-          "answerIndex": 0,
-          "explanation": "T_block = N / fs = 1024 / 200000 s = 5.12 ms. The window + FFT + magnitude for that block must complete within 5.12 ms, or the next half-buffer overwrites unprocessed data."
+          "answerIndex": 1,
+          "explanation": "With an FPU present, floating-point is fast and avoids the manual scaling that fixed-point requires, so it is the natural default. Fixed-point only wins when there is no FPU or power is extremely tight."
         },
         {
           "id": "dsp-on-mcu-3-mcq-2",
           "type": "mcq",
-          "prompt": "Doubling N from 1024 to 2048 at a fixed fs has which combined effect?",
+          "prompt": "What is the main downside of fixed-point (Q15/Q31) compared to floating-point?",
           "choices": [
-            "Bin spacing halves (finer resolution), but block latency doubles and cycles/block more than double",
-            "Bin spacing doubles and latency halves",
-            "Nothing changes except memory usage",
-            "Nyquist frequency doubles"
+            "It cannot store any numbers",
+            "You must carefully manage scaling, or values can overflow and become wrong",
+            "It only works on the internet",
+            "It always uses more power"
           ],
-          "answerIndex": 0,
-          "explanation": "Bin spacing fs/N halves, improving resolution. Block time N/fs doubles, raising latency. FFT cost ~N*log2(N) more than doubles. Nyquist (fs/2) depends only on fs, so it is unchanged."
+          "answerIndex": 1,
+          "explanation": "Fixed-point packs values into integers treated as fractions, so the programmer must track scaling to avoid overflow. Its advantages are speed and low power on chips without an FPU; the cost is this extra bookkeeping."
         },
         {
           "id": "dsp-on-mcu-3-mcq-3",
           "type": "mcq",
-          "prompt": "Why does this exact MCU pipeline justify the label 'a radar receiver'?",
+          "prompt": "Samples arrive at rate fs and are processed in blocks of N samples. How long is the deadline to process one block?",
           "choices": [
-            "Because it generates the transmitted RF pulse",
-            "Because timed acquisition -> windowing -> FFT/correlation -> magnitude/detection is the core structure of a radar signal chain, and the N/fs/CPU tradeoff mirrors range-resolution/ambiguity/dwell tradeoffs",
-            "Because CMSIS-DSP includes a CFAR detector",
-            "Because DMA is a radar-specific peripheral"
+            "N times fs seconds",
+            "fs divided by N seconds",
+            "N divided by fs seconds",
+            "Exactly one second, always"
           ],
-          "answerIndex": 1,
-          "explanation": "The receiver structure and the budgeting math are the same: even sampling, optional matched filtering/windowing, an FFT, then magnitude/detection, governed by a resolution-vs-bandwidth-vs-compute tradeoff. The MCU does not produce RF, and DMA/CMSIS-DSP are general-purpose."
+          "answerIndex": 2,
+          "explanation": "A block of N samples fills in T = N / fs seconds, so that is how long you have to finish processing one block before the next is ready. For example, 1000 samples at 1000 samples/second fill in 1 second.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/embedded-systems/images/dsp-on-mcu-1.svg"
         },
         {
           "id": "dsp-on-mcu-3-mcq-4",
           "type": "mcq",
-          "prompt": "The processing of a block consistently takes 6 ms but a block fills every 5 ms. What is the correct response?",
+          "prompt": "What happens if the math for one block takes longer than the time it takes the next block to arrive?",
           "choices": [
-            "Increase fs so blocks fill faster",
-            "Reduce the workload per block (smaller N, lighter window, or fewer ops) or lower fs, or move processing to a DSP/FPGA/app processor",
-            "Disable the DMA double buffer",
-            "Add more flash memory"
+            "The chip speeds itself up automatically",
+            "Nothing, extra blocks wait politely forever",
+            "The system falls behind and starts losing samples (data)",
+            "The samples turn into floating-point automatically"
+          ],
+          "answerIndex": 2,
+          "explanation": "If processing is slower than the arrival rate, blocks pile up faster than they can be handled and data is lost. Meeting the deadline N/fs every time is what keeps the system real-time."
+        },
+        {
+          "id": "dsp-on-mcu-3-mcq-5",
+          "type": "mcq",
+          "prompt": "Choosing a bigger block size N has which combined effect?",
+          "choices": [
+            "A finer, more detailed frequency picture, but more math per block and more delay",
+            "Less detail and less math",
+            "A higher sample rate automatically",
+            "No effect at all"
+          ],
+          "answerIndex": 0,
+          "explanation": "A larger N gives finer frequency detail (more, narrower bins) but requires more computation and adds latency because you wait longer for the bigger block to fill and process. It does not change the sample rate."
+        },
+        {
+          "id": "dsp-on-mcu-3-mcq-6",
+          "type": "mcq",
+          "prompt": "Raising the sample rate fs lets you capture faster signals, but what is the cost?",
+          "choices": [
+            "It makes the FFT meaningless",
+            "Blocks fill faster, so the deadline to finish the math gets shorter",
+            "It uses no extra resources",
+            "It permanently disables the timer"
           ],
           "answerIndex": 1,
-          "explanation": "Processing time (6 ms) exceeds the deadline (5 ms), so you are losing the race. Fixes: shrink N, simplify the kernels, or lower fs to relax the deadline -- and if none suffice, offload to a DSP/FPGA/application processor. Raising fs makes the deadline worse, not better."
+          "explanation": "A higher fs means each block of N samples fills sooner (T = N/fs is smaller), shrinking the deadline. So you trade a tighter time budget for the ability to capture faster signals. The FFT still works."
+        },
+        {
+          "id": "dsp-on-mcu-3-mcq-7",
+          "type": "mcq",
+          "prompt": "When the demands (very high sample rates, huge FFTs, many channels) exceed what an MCU can finish in time, what is the usual next step?",
+          "choices": [
+            "Give up on the project",
+            "Move the heavy processing to a dedicated DSP chip or an FPGA",
+            "Add more buttons to the device",
+            "Lower the screen brightness"
+          ],
+          "answerIndex": 1,
+          "explanation": "When even a fast MCU cannot meet the deadline, you offload to hardware built for the job: a dedicated DSP, or an FPGA that does many operations in parallel. Adding buttons or dimming the screen does nothing for the compute budget."
+        },
+        {
+          "id": "dsp-on-mcu-3-mcq-8",
+          "type": "mcq",
+          "prompt": "What is an FPGA (Field-Programmable Gate Array), in beginner terms?",
+          "choices": [
+            "A kind of battery",
+            "Hardware you can wire up to do many operations in parallel, useful when one CPU cannot keep up",
+            "A software library like CMSIS-DSP",
+            "A type of display"
+          ],
+          "answerIndex": 1,
+          "explanation": "An FPGA is reconfigurable hardware: you configure its internal logic to perform many operations at the same time, which is helpful when a single CPU cannot meet a tight DSP deadline. It is not a battery, a library, or a display."
+        },
+        {
+          "id": "dsp-on-mcu-3-mcq-9",
+          "type": "mcq",
+          "prompt": "Why is DSP on an MCU described as the 'bridge to radar'?",
+          "choices": [
+            "Because radars are built only from microcontrollers",
+            "Because a radar receiver does the same thing: sample on a timer, filter, run an FFT, then decide what is present",
+            "Because radar uses no math at all",
+            "Because microcontrollers can transmit radar waves by themselves"
+          ],
+          "answerIndex": 1,
+          "explanation": "A radar receiver follows the same signal chain you learned here: timed sampling, filtering, an FFT, and a decision. That shared structure is why this topic leads naturally toward radar, even though full radar systems use much more powerful hardware."
         }
       ]
     }
