@@ -5,263 +5,661 @@
   "lessons": [
     {
       "id": "users-auth-l1",
-      "title": "Identity: UID/GID, passwd, shadow & group",
+      "title": "Who Are You? Users and the root Superuser",
       "order": 1,
       "difficulty": 1,
-      "content": "On Linux, an \"account\" is just rows in flat files keyed by numeric IDs. The kernel only ever deals in numbers: every process has a **UID** (user ID) and **GID** (primary group), plus a set of *supplementary* GIDs. Names are a human convenience resolved at lookup time.\n\nThree files define the model:\n\n- `/etc/passwd` — one line per user: `name:x:UID:GID:GECOS:home:shell`. The `x` is a placeholder; the real hash lives elsewhere. This file is world-readable.\n- `/etc/shadow` — `name:hash:lastchange:min:max:warn:...`. Root-only (mode 640, group `shadow`). The hash is `$id$salt$digest`: `$6$` = SHA-512, `$y$` = yescrypt (modern default on Debian/Ubuntu), `$2b$` = bcrypt. A `!` or `*` in the hash field means the password is locked — login by password is impossible.\n- `/etc/group` — `name:x:GID:member1,member2`. Lists *supplementary* members; your *primary* group comes from the passwd line.\n\nConvention: UID `0` is **root** (omnipotent, not because of the name but because the kernel special-cases UID 0). UIDs below ~1000 are **system/service accounts**; regular humans start at 1000 (the `UID_MIN` in `/etc/login.defs`).\n\n```bash\nid                       # uid, gid, and all groups for you\nid -u; id -gn            # numeric uid; primary group name\ngetent passwd 1000       # resolve via nsswitch, not just the file\nsudo grep '^root' /etc/shadow   # see root's hash field\n```\n\nThink of it like a hardware part number: the silicon (kernel) cares about the number; the label (name) is for the humans reading the schematic.",
+      "content": "Imagine a single computer shared by a whole family. Each person has their own login so their files, settings, and email stay separate. Linux works exactly like that, all the time. Linux is **multi-user**: more than one account can exist (and even be logged in) on the same machine.\n\nA **user** is simply an account. Behind the scenes every user has a number called a **UID** (user ID, a unique number the system uses to tell accounts apart). You see a friendly name like `alice`, but the computer really thinks in numbers. The name is just a label for humans.\n\nNot all users are people. Many users are **background services** — programs like a web server or a printer service that run quietly and need an account of their own. So \"user\" means \"any account,\" person or program.\n\nOne account is special: **root**, also called the **superuser**. Root can do *anything* — read any file, change any setting, delete anything. That is a lot of power, so on a healthy system you do **not** log in as root for daily work. You log in as a normal user and only borrow root's power for the rare moment you truly need it (you'll meet `sudo` for that later). Think \"Run as administrator\" on Windows: you click it only when needed.\n\nTo see who you currently are:\n\n```bash\nwhoami        # prints your user name, e.g. alice\nid            # shows your UID and the groups you belong to\nid -u         # just your numeric UID\n```\n\nLogging in (typing your password) is how you **prove who you are**. That proof is called **authentication** — the computer checking that you really are the person you claim to be, like showing a keycard at a door.\n\n**Recap:** Linux is multi-user; every account is a user with a numeric UID; root (the superuser) can do anything, so you stay a normal user and borrow root power only when needed; and logging in proves your identity (authentication).",
       "items": [
-        {
-          "id": "users-auth-l1-f1",
-          "type": "flashcard",
-          "front": "What does the kernel actually use to identify a user and their permissions?",
-          "back": "Numeric IDs: a UID, a primary GID, and a set of supplementary GIDs. Names are only resolved by userspace at lookup time; the kernel never sees them.",
-          "hint": "Names are a convenience layer."
-        },
-        {
-          "id": "users-auth-l1-f2",
-          "type": "flashcard",
-          "front": "What are the seven colon-separated fields of an /etc/passwd line?",
-          "back": "name : x (password placeholder) : UID : primary GID : GECOS (comment/full name) : home directory : login shell.",
-          "hint": "Starts with name, ends with shell."
-        },
-        {
-          "id": "users-auth-l1-f3",
-          "type": "flashcard",
-          "front": "Why does /etc/passwd contain an 'x' instead of the password, and where is the real secret?",
-          "back": "The 'x' is a placeholder because /etc/passwd is world-readable. The actual password hash lives in /etc/shadow, which is root-only (mode 640, group 'shadow').",
-          "hint": "Who can read each file?"
-        },
-        {
-          "id": "users-auth-l1-f4",
-          "type": "flashcard",
-          "front": "Decode the shadow hash prefixes $6$, $y$, and $2b$.",
-          "back": "$6$ = SHA-512 crypt; $y$ = yescrypt (modern default on Debian/Ubuntu); $2b$ = bcrypt. The format is $id$salt$digest.",
-          "hint": "One number, one letter, one b-variant."
-        },
-        {
-          "id": "users-auth-l1-f5",
-          "type": "flashcard",
-          "front": "What does a '!' or '*' in the shadow password field mean?",
-          "back": "The account's password is locked — no password can hash to '!' or '*', so password login is impossible. Key auth (e.g. SSH keys) may still work.",
-          "hint": "No valid hash starts with that character."
-        },
         {
           "id": "users-auth-l1-m1",
           "type": "mcq",
-          "prompt": "Which file stores the actual password hash on a modern Linux system?",
+          "prompt": "What does it mean that Linux is \"multi-user\"?",
           "choices": [
-            "/etc/passwd",
-            "/etc/shadow",
-            "/etc/group",
-            "/etc/login.defs"
+            "Only one person can ever use the computer",
+            "More than one account can exist on the same machine, each kept separate",
+            "It can only run on servers, not laptops",
+            "Every program must be written by multiple people"
           ],
           "answerIndex": 1,
-          "explanation": "/etc/passwd is world-readable and holds only an 'x' placeholder; the hash lives in root-only /etc/shadow. /etc/group lists group membership; /etc/login.defs holds policy like UID_MIN."
+          "explanation": "Multi-user means many accounts (people and background services) can exist and be kept separate on one machine, like separate logins on a shared family computer. It has nothing to do with how programs are written or what hardware it runs on.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-2.svg"
         },
         {
           "id": "users-auth-l1-m2",
           "type": "mcq",
-          "prompt": "A user's UID is 0. What does that mean?",
+          "prompt": "What is a UID?",
           "choices": [
-            "The account is disabled",
-            "It is the root/superuser account",
-            "It is a service account with no login",
-            "The UID failed to assign"
+            "A unique number the system uses to identify a user account",
+            "The user's password",
+            "The name of the user's home folder",
+            "A type of network cable"
           ],
-          "answerIndex": 1,
-          "explanation": "The kernel special-cases UID 0 as root with full privileges. The name 'root' is irrelevant; any account with UID 0 is superuser."
+          "answerIndex": 0,
+          "explanation": "A UID (user ID) is the unique number Linux really uses to tell accounts apart. The friendly name like 'alice' is just a label for humans; it is not the password or the home folder.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-2.svg"
         },
         {
           "id": "users-auth-l1-m3",
           "type": "mcq",
-          "prompt": "Where does a user's PRIMARY group come from?",
+          "prompt": "Who, or what, is the 'root' account?",
           "choices": [
-            "The member list in /etc/group",
-            "The GID field on their /etc/passwd line",
-            "The GECOS field",
-            "/etc/gshadow only"
+            "A locked account no one can ever use",
+            "The superuser account that can do anything on the system",
+            "The account for guests with the fewest powers",
+            "The folder at the top of the filesystem"
           ],
           "answerIndex": 1,
-          "explanation": "The primary GID is the 4th field of the passwd line. /etc/group's member list defines SUPPLEMENTARY group membership, not the primary group."
+          "explanation": "root is the superuser: it can read, change, or delete anything. (The very top folder '/' is also called root, but that is a directory, not the user account here.) Guests have the fewest powers, the opposite of root.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-2.svg"
+        },
+        {
+          "id": "users-auth-l1-m4",
+          "type": "mcq",
+          "prompt": "Why is it best to log in as a normal user instead of as root for everyday work?",
+          "choices": [
+            "Root accounts are slower",
+            "Root cannot open a web browser",
+            "Root can do anything, so one mistake could damage the whole system",
+            "Normal users get more storage space"
+          ],
+          "answerIndex": 2,
+          "explanation": "Because root has unlimited power, a single typo or bad command could wipe out the system. Staying a normal user limits the damage from mistakes. Speed, browsers, and storage are not the reason.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-2.svg"
+        },
+        {
+          "id": "users-auth-l1-m5",
+          "type": "mcq",
+          "prompt": "Are all users on a Linux system people?",
+          "choices": [
+            "Yes, every user is always a human being",
+            "No, many users are background services (programs) with their own accounts",
+            "No, users are only ever programs, never people",
+            "Yes, but only one person is allowed per computer"
+          ],
+          "answerIndex": 1,
+          "explanation": "A 'user' is any account. Besides people, background programs like a web server get their own user accounts. So users can be people or services.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-2.svg"
+        },
+        {
+          "id": "users-auth-l1-m6",
+          "type": "mcq",
+          "prompt": "Which command prints just the name of the user you are currently logged in as?",
+          "choices": [
+            "whoami",
+            "passwd",
+            "reboot",
+            "mkdir"
+          ],
+          "answerIndex": 0,
+          "explanation": "whoami prints your current user name. passwd changes a password, reboot restarts the machine, and mkdir makes a folder — none of those tell you who you are.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-2.svg"
+        },
+        {
+          "id": "users-auth-l1-m7",
+          "type": "mcq",
+          "prompt": "When you type your password to log in, the system checks that you are who you claim to be. What is this checking called?",
+          "choices": [
+            "Compilation",
+            "Authentication",
+            "Compression",
+            "Encryption"
+          ],
+          "answerIndex": 1,
+          "explanation": "Authentication is proving your identity — like showing a keycard at a door. Compilation turns source code into a program, compression shrinks data, and encryption scrambles data; none of those mean 'prove who you are'.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-2.svg"
+        },
+        {
+          "id": "users-auth-l1-m8",
+          "type": "mcq",
+          "prompt": "The command 'id' is run and shows 'uid=1000(alice)'. What does the number 1000 represent?",
+          "choices": [
+            "alice's password",
+            "How many times alice has logged in",
+            "alice's numeric user ID (UID)",
+            "The amount of memory alice is using"
+          ],
+          "answerIndex": 2,
+          "explanation": "1000 is alice's UID — the number the system uses internally for her account. The name 'alice' in parentheses is the human label for that same number. It is not a password, a login count, or memory usage.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-2.svg"
+        },
+        {
+          "id": "users-auth-l1-m9",
+          "type": "mcq",
+          "prompt": "A good everyday comparison for the root/superuser idea is:",
+          "choices": [
+            "A guest Wi-Fi password",
+            "The 'Run as administrator' option you use only when needed",
+            "Turning the screen brightness up",
+            "Renaming a file"
+          ],
+          "answerIndex": 1,
+          "explanation": "Like 'Run as administrator' on Windows, root power is used only when truly needed. Guest Wi-Fi, brightness, and renaming files are ordinary low-risk actions, not all-powerful administrator actions.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-2.svg"
         }
       ]
     },
     {
       "id": "users-auth-l2",
-      "title": "Managing accounts, service users & privilege escalation",
+      "title": "Groups: Sharing Access Between Users",
       "order": 2,
-      "difficulty": 2,
-      "content": "Now the operational side: creating accounts, locking down service accounts, and escalating privilege safely.\n\n**User management** edits the files for you (never hand-edit shadow):\n\n```bash\nsudo useradd -m -s /bin/bash -G sudo alice   # create, make home, set shell, add group\nsudo passwd alice                            # set/change password (writes shadow)\nsudo usermod -aG docker alice                # APPEND a supplementary group (-a is vital)\nsudo userdel -r bob                          # remove user + home\nid alice; groups alice                       # verify membership\n```\n\nForget `-a` in `usermod -aG` and you *replace* all supplementary groups — a classic foot-gun that silently drops people from `sudo`.\n\n**Service accounts** run daemons, not people. They get a **nologin shell** so a stolen credential can't open an interactive session:\n\n```bash\nsudo useradd -r -s /usr/sbin/nologin -M svc-app   # -r = system uid (<1000), -M = no home\n```\n\n`/usr/sbin/nologin` simply prints a message and exits non-zero — the login flow's final `exec shell` step dead-ends. This is least-privilege in practice.\n\n**Privilege escalation**: `su` *becomes* another user (default root) and needs the **target's** password; `su -` also loads a login environment. `sudo` runs one command as root (or another user) after checking *your* password against policy in `/etc/sudoers`. Prefer `sudo` — it's per-command, logged, and policy-driven. Crucially: a group you were just added to does **not** apply to your current shell, because credentials are fixed when the session is created. Log out and back in (or `newgrp`) to pick it up.",
+      "difficulty": 1,
+      "content": "Suppose alice and bob both work on the family photos and need to open and edit the same files. You could grant each person access one by one, but that gets messy fast. Linux has a tidier way: **groups**.\n\nA **group** is a named bucket of users. You put alice and bob into a group called `photos`, give the photo files to that group, and now both members can use them. Add a third person to the group later and they get access automatically — no need to touch each file.\n\nJust like users have a UID, every group has a number called a **GID** (group ID). And just like usernames, the group name is the friendly label while the GID is what the system tracks underneath.\n\nA user can belong to several groups at once. There are two kinds of membership, but the idea is simple: you have one **primary group** (your main group, used by default for new files you create) and you can be an extra member of many other **supplementary groups** (the additional buckets you've been added to). To see your groups:\n\n```bash\ngroups        # lists the groups you belong to\nid            # also shows your groups, with their GID numbers\n```\n\nGroups are also how Linux hands out special privileges. For example, members of a group often named `sudo` (or `wheel`) are allowed to borrow root powers. Being added to that group is how a normal user gets permission to run admin tasks.\n\nOne important gotcha: when someone adds you to a new group, your **current** login session does not see the change yet. Your group membership is locked in at the moment you log in. You must **log out and back in** (start a fresh session) for the new group to take effect. This surprises everyone the first time.\n\n**Recap:** A group is a named bucket of users (with a numeric GID) used to share access; you have one primary group plus any number of supplementary ones; some groups grant privileges like sudo; and a new group membership only applies after you start a new login session.",
       "items": [
-        {
-          "id": "users-auth-l2-f1",
-          "type": "flashcard",
-          "front": "Why must you use 'usermod -aG group user' and not 'usermod -G group user'?",
-          "back": "Without -a, -G REPLACES the user's entire supplementary group set with just the listed group(s), silently removing them from others (e.g. sudo). -a appends.",
-          "hint": "a = append."
-        },
-        {
-          "id": "users-auth-l2-f2",
-          "type": "flashcard",
-          "front": "What is a nologin shell and why give it to a service account?",
-          "back": "/usr/sbin/nologin prints a message and exits non-zero, so the login flow's final 'exec shell' dead-ends. A compromised service credential can't open an interactive shell — least privilege.",
-          "hint": "It dead-ends the last step of login."
-        },
-        {
-          "id": "users-auth-l2-f3",
-          "type": "flashcard",
-          "front": "What does 'useradd -r' do, and how does the resulting account differ from a normal one?",
-          "back": "-r creates a system account with a UID below UID_MIN (~1000). System accounts are for daemons/services; usually paired with -M (no home) and a nologin shell.",
-          "hint": "r = system/reserved range."
-        },
-        {
-          "id": "users-auth-l2-f4",
-          "type": "flashcard",
-          "front": "Whose password does 'su' ask for vs 'sudo'?",
-          "back": "su asks for the TARGET account's password (root by default). sudo asks for YOUR own password and checks it against the sudoers policy. sudo is per-command and logged.",
-          "hint": "su = target's secret; sudo = your secret + policy."
-        },
-        {
-          "id": "users-auth-l2-f5",
-          "type": "flashcard",
-          "front": "You ran 'usermod -aG docker me' but 'docker ps' still says permission denied in your shell. Why?",
-          "back": "Your current shell's credentials (UID/GID + supplementary groups) were fixed when the session was created. Group changes only take effect in a new session: log out/in, or run 'newgrp docker'.",
-          "hint": "Credentials are set once, at session start."
-        },
         {
           "id": "users-auth-l2-m1",
           "type": "mcq",
-          "prompt": "Which command creates a service account that cannot open an interactive shell?",
+          "prompt": "What is a group in Linux?",
           "choices": [
-            "useradd -m -s /bin/bash svc",
-            "useradd -r -s /usr/sbin/nologin svc",
-            "useradd -G sudo svc",
-            "useradd -s /bin/sh -m svc"
+            "A named collection of users that can share access",
+            "A backup copy of all your files",
+            "A type of password",
+            "A folder that cannot be deleted"
           ],
-          "answerIndex": 1,
-          "explanation": "-r gives a system UID and /usr/sbin/nologin makes the shell dead-end on login. The others grant a real shell (and one adds the sudo group)."
+          "answerIndex": 0,
+          "explanation": "A group is a named bucket of users, used so several people can share access to the same files or privileges. It is not a backup, a password, or a special folder.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-3.svg"
         },
         {
           "id": "users-auth-l2-m2",
           "type": "mcq",
-          "prompt": "After 'usermod -aG sudo carol', why can carol's currently-open terminal still not run sudo?",
+          "prompt": "alice and bob both need to edit the same photo files. What is the cleanest way to arrange that?",
           "choices": [
-            "The change requires a reboot",
-            "sudo caches denials for 5 minutes",
-            "Her open session's group set was fixed at login; she must start a new session",
-            "usermod -aG does not write /etc/group"
+            "Give them both the root password",
+            "Put them in a shared group and give the files to that group",
+            "Email the files back and forth",
+            "Make both of them UID 0"
           ],
-          "answerIndex": 2,
-          "explanation": "Supplementary groups are resolved into the process credentials when the session starts. Existing processes keep the old set; a fresh login (or newgrp) is needed."
+          "answerIndex": 1,
+          "explanation": "A shared group is exactly the tidy tool for this: both members get access, and adding a third person later is automatic. Sharing the root password or setting UID 0 hands out unlimited power, which is dangerous and overkill.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-3.svg"
         },
         {
           "id": "users-auth-l2-m3",
           "type": "mcq",
-          "prompt": "What is the safest, most auditable way to let a user run a single admin task?",
+          "prompt": "What is a GID?",
           "choices": [
-            "Give them the root password for su",
-            "Add them to a sudoers rule for that specific command",
-            "Set their UID to 0",
-            "chmod 4777 the tool"
+            "The name of a file",
+            "The numeric ID of a group",
+            "A graphics setting",
+            "A user's login password"
           ],
           "answerIndex": 1,
-          "explanation": "A targeted sudoers rule is per-command, logged, and uses the user's own password. Sharing the root password, UID 0, or world setuid binaries all violate least privilege."
+          "explanation": "A GID (group ID) is the number that identifies a group, just as a UID identifies a user. It is not a filename, a graphics setting, or a password.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-3.svg"
+        },
+        {
+          "id": "users-auth-l2-m4",
+          "type": "mcq",
+          "prompt": "Can one user belong to more than one group at the same time?",
+          "choices": [
+            "No, a user can only ever be in one group",
+            "Yes — one primary group plus any number of supplementary groups",
+            "Only root can be in more than one group",
+            "Only if the user has no password"
+          ],
+          "answerIndex": 1,
+          "explanation": "A user has one primary group (used by default for new files) and can be a supplementary member of many other groups. This is normal for every user, not just root, and has nothing to do with passwords.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-3.svg"
+        },
+        {
+          "id": "users-auth-l2-m5",
+          "type": "mcq",
+          "prompt": "Which command lists the groups you currently belong to?",
+          "choices": [
+            "groups",
+            "delete",
+            "format",
+            "shutdown"
+          ],
+          "answerIndex": 0,
+          "explanation": "The 'groups' command lists your group memberships (and 'id' shows them with GID numbers). 'delete', 'format', and 'shutdown' do not report your groups.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-3.svg"
+        },
+        {
+          "id": "users-auth-l2-m6",
+          "type": "mcq",
+          "prompt": "An administrator just added carol to the 'sudo' group, but in her already-open terminal she still cannot run admin tasks. Why?",
+          "choices": [
+            "The change needs a reboot of the whole building's power",
+            "Group changes only apply after she starts a new login session",
+            "Her keyboard is broken",
+            "Groups never affect what a user can do"
+          ],
+          "answerIndex": 1,
+          "explanation": "Group membership is locked in when a session starts. Carol must log out and back in (a fresh session) for the new group to take effect. A reboot is not required — just a new login — and groups absolutely do affect what a user can do.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-3.svg"
+        },
+        {
+          "id": "users-auth-l2-m7",
+          "type": "mcq",
+          "prompt": "What is the difference between a primary group and a supplementary group?",
+          "choices": [
+            "There is no difference; the words mean the same thing",
+            "The primary group is your main/default group; supplementary groups are extra ones you also belong to",
+            "Supplementary groups are only for root",
+            "The primary group is your password and the supplementary group is your username"
+          ],
+          "answerIndex": 1,
+          "explanation": "You have exactly one primary (default) group plus any number of supplementary (extra) groups. They are different roles, both available to ordinary users, and neither is a password or username.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-3.svg"
+        },
+        {
+          "id": "users-auth-l2-m8",
+          "type": "mcq",
+          "prompt": "Why are groups often used to hand out privileges like the ability to use sudo?",
+          "choices": [
+            "Because adding a user to the right group is a simple, central way to grant the same permission to many people",
+            "Because groups make the computer run faster",
+            "Because every user must be in the sudo group",
+            "Because groups delete files automatically"
+          ],
+          "answerIndex": 0,
+          "explanation": "Putting a user in a group like 'sudo' is a clean, central way to grant a permission, and it scales to many people. Groups do not speed up the machine, are not mandatory for every user, and do not delete files.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-3.svg"
         }
       ]
     },
     {
       "id": "users-auth-l3",
-      "title": "Sudoers, PAM, the login flow & directory-backed auth",
+      "title": "Creating Accounts and the Files Behind Them",
       "order": 3,
-      "difficulty": 3,
-      "content": "Tie it together: from a typed password to a running shell, and how policy is configured.\n\n**sudoers** is edited *only* with `visudo`, which locks the file and syntax-checks before saving — a broken `/etc/sudoers` can lock everyone out. Modern systems drop snippets in `/etc/sudoers.d/`.\n\n```bash\nsudo visudo                              # safely edit /etc/sudoers\n# alice ALL=(ALL:ALL) ALL               # full sudo\n# svc  ALL=(root) NOPASSWD: /usr/bin/systemctl restart app   # one command, no prompt\nsudo visudo -f /etc/sudoers.d/app        # edit a drop-in\n```\n\n`NOPASSWD:` skips the password for matched commands (used for automation). Mind the difference: `sudo cmd` runs one command keeping much of *your* environment, while `sudo -i` starts a full **root login shell** (loads root's profile, cwd, env) — like logging in as root.\n\n**PAM** (Pluggable Authentication Modules) is the framework that *applications* call so they don't implement auth themselves. Configs live in `/etc/pam.d/<service>`. Rules are grouped into four management groups stacked in order: **auth** (prove identity, e.g. `pam_unix` checks the shadow hash), **account** (is the account valid/unexpired?), **password** (changing the secret), **session** (set up/tear down — mount home, set limits, open a logind session). Control flags (`required`, `requisite`, `sufficient`, `optional`) decide how a module's result affects the stack.\n\n**The full login journey**: `login`/`sshd`/`gdm` collects the username and secret → PAM `auth` runs `pam_unix`, which uses **NSS** (`/etc/nsswitch.conf`) to find the account (`files`, then maybe `sss`/`ldap`) and verifies the hash → `account`/`session` phases run → the process does setuid/setgid to the resolved UID/GID and adds supplementary groups → finally it `exec`s the login shell. In enterprises, `nsswitch.conf` points at **SSSD/LDAP** so accounts live in a central directory, not local files — but the PAM+NSS pipeline is identical. Day to day you skip the password entirely with **SSH key auth**: the key proves identity, then PAM's `account`/`session` phases still run (covered in topic 06).",
+      "difficulty": 2,
+      "content": "Now that you know what users and groups are, how do you make and manage them? And where does Linux actually keep this information?\n\nLinux stores accounts in a couple of plain text files. You normally don't edit them by hand — commands do it for you — but it helps to know they exist.\n\n**`/etc/passwd`** lists the accounts. Despite the name, it holds **no passwords**. Each line describes one user, with fields separated by colons:\n\n```\nalice:x:1000:1000:Alice Smith:/home/alice:/bin/bash\n```\n\nThat reads as: user name `alice`; an `x` standing in for the password; UID `1000`; primary group GID `1000`; a comment (full name); the home folder; and the **login shell** (the program you get when you log in). This file is readable by everyone, which is why it must not contain the real password.\n\n**`/etc/shadow`** is where the real secret lives — but not the password itself. It stores a **password hash**: a scrambled, one-way version of your password. You can turn a password into its hash, but you cannot turn the hash back into the password. When you log in, Linux hashes what you typed and compares it to the stored hash. `/etc/shadow` is readable by **root only**, so other users cannot copy your hash and try to crack it. (Common misconception: the password is *not* kept in `/etc/passwd`.)\n\n**`/etc/group`** lists the groups and who belongs to them.\n\nUseful commands (admin actions need `sudo`, which you'll meet next):\n\n```bash\nsudo useradd -m alice     # create user alice, -m makes her home folder\nsudo passwd alice         # set or change alice's password\nsudo usermod -aG photos alice   # add alice to the 'photos' group (-aG = add to group)\ngroups alice              # show which groups alice is in\nid alice                  # show alice's UID, primary GID, and groups\nwho                       # show who is logged in right now\n```\n\nA tip you saw before: a group added with `usermod` only takes effect after a fresh login.\n\n**Recap:** `/etc/passwd` lists accounts (no passwords) in colon fields; `/etc/shadow` holds the one-way password hash and is root-only; `/etc/group` lists groups; and `useradd`, `passwd`, `usermod`, `id`, `groups`, and `who` create and inspect accounts.",
       "items": [
-        {
-          "id": "users-auth-l3-f1",
-          "type": "flashcard",
-          "front": "Why edit /etc/sudoers with visudo instead of a normal editor?",
-          "back": "visudo locks the file against concurrent edits and runs a syntax check before saving. A malformed sudoers file can lock everyone (including you) out of sudo.",
-          "hint": "It validates before it lets you save."
-        },
-        {
-          "id": "users-auth-l3-f2",
-          "type": "flashcard",
-          "front": "What is the difference between 'sudo cmd' and 'sudo -i'?",
-          "back": "'sudo cmd' runs one command as root while largely keeping your environment/cwd. 'sudo -i' starts a full root LOGIN shell — loads root's profile, env, and home, as if you logged in as root.",
-          "hint": "-i = interactive login shell."
-        },
-        {
-          "id": "users-auth-l3-f3",
-          "type": "flashcard",
-          "front": "Name PAM's four management groups and what each does.",
-          "back": "auth (verify identity, e.g. check the password), account (is the account valid/unexpired/allowed?), password (change the credential), session (set up/tear down the session — home, limits, logind).",
-          "hint": "Prove, permit, change, set-up."
-        },
-        {
-          "id": "users-auth-l3-f4",
-          "type": "flashcard",
-          "front": "What role does /etc/nsswitch.conf play during login?",
-          "back": "It tells the system WHERE to look up accounts/groups: e.g. 'passwd: files sss ldap'. PAM's pam_unix uses NSS to resolve the user from local files and/or a directory (SSSD/LDAP) before verifying the hash.",
-          "hint": "Name Service Switch — the lookup order."
-        },
-        {
-          "id": "users-auth-l3-f5",
-          "type": "flashcard",
-          "front": "In enterprise auth with SSSD/LDAP, what changes vs local /etc/passwd, and what stays the same?",
-          "back": "What changes: nsswitch.conf points lookups at a central directory (sss/ldap) instead of local files. What stays the same: the PAM stack + NSS pipeline and the overall login flow are identical.",
-          "hint": "Same plumbing, different account source."
-        },
-        {
-          "id": "users-auth-l3-f6",
-          "type": "flashcard",
-          "front": "What does 'NOPASSWD:' do in a sudoers rule, and why use it carefully?",
-          "back": "It lets the matched command(s) run via sudo without prompting for a password — useful for automation/scripts. Risky because it widens passwordless privilege, so scope it to specific commands only.",
-          "hint": "Mostly for non-interactive automation."
-        },
         {
           "id": "users-auth-l3-m1",
           "type": "mcq",
-          "prompt": "Which PAM management group actually verifies that the typed password matches the stored hash?",
+          "prompt": "Despite its name, what does the file /etc/passwd actually contain?",
           "choices": [
-            "session",
-            "account",
-            "auth",
-            "password"
+            "Everyone's actual passwords in plain text",
+            "A list of accounts and their details — but no passwords",
+            "Only the root password",
+            "A list of installed programs"
           ],
-          "answerIndex": 2,
-          "explanation": "The 'auth' group proves identity; pam_unix here checks the secret against /etc/shadow. 'account' checks validity, 'password' changes the secret, 'session' sets up/tears down the session."
+          "answerIndex": 1,
+          "explanation": "/etc/passwd lists accounts (name, UID, primary group, home, login shell) but holds no passwords — just an 'x' placeholder. It is readable by everyone, which is exactly why real passwords are kept out of it.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-4.svg"
         },
         {
           "id": "users-auth-l3-m2",
           "type": "mcq",
-          "prompt": "Put the login journey in the correct order.",
+          "prompt": "Where are password hashes stored, and why not in /etc/passwd?",
           "choices": [
-            "exec shell -> verify hash -> NSS lookup -> setuid",
-            "collect credentials -> PAM auth verifies hash (via NSS) -> account/session -> setuid/setgid -> exec login shell",
-            "NSS lookup -> exec shell -> PAM session -> setuid",
-            "setuid -> collect credentials -> exec shell -> PAM auth"
+            "In /etc/passwd, because it is convenient",
+            "In /etc/shadow, which only root can read, so others cannot copy the hashes",
+            "In the user's home folder, in a file called password.txt",
+            "Nowhere — Linux does not store anything about passwords"
           ],
           "answerIndex": 1,
-          "explanation": "Credentials are collected, PAM auth verifies the hash (resolving the account through NSS), account/session phases run, the process drops to the resolved UID/GID with supplementary groups, then execs the login shell."
+          "explanation": "Hashes live in /etc/shadow, which is readable by root only — so ordinary users cannot grab everyone's hashes and try to crack them. /etc/passwd is world-readable, so putting secrets there would be unsafe. Linux definitely does store a hash; it just keeps it protected.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-4.svg"
         },
         {
           "id": "users-auth-l3-m3",
           "type": "mcq",
-          "prompt": "A sudoers line reads: 'deploy ALL=(root) NOPASSWD: /usr/bin/systemctl restart web'. What can user 'deploy' do?",
+          "prompt": "What is a password 'hash'?",
           "choices": [
-            "Run any command as root without a password",
-            "Restart the web service as root without being prompted for a password",
-            "Only edit /etc/sudoers",
-            "Log in as root interactively"
+            "The password typed backwards",
+            "A scrambled, one-way version of the password that cannot be turned back",
+            "A nickname for the password",
+            "The number of characters in the password"
           ],
           "answerIndex": 1,
-          "explanation": "The rule grants exactly that one command, as root, with no password prompt. It does not grant other commands, root login, or sudoers editing."
+          "explanation": "A hash is a one-way scramble: you can turn a password into its hash but not the hash back into the password. At login, Linux hashes what you typed and compares. It is not the password reversed, a nickname, or a length count.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-4.svg"
         },
         {
-          "id": "users-auth-l3-img1",
-          "type": "flashcard",
-          "front": "The password-to-shell journey: login/sshd collects credentials, PAM auth verifies the shadow hash, NSS resolves the account, the process drops to the right UID/GID with supplementary groups, then execs the login shell.",
-          "back": "Review the diagram above.",
+          "id": "users-auth-l3-m4",
+          "type": "mcq",
+          "prompt": "In the line 'alice:x:1000:1000:Alice Smith:/home/alice:/bin/bash', what does the last field '/bin/bash' represent?",
+          "choices": [
+            "Alice's password",
+            "Alice's login shell — the program she gets when she logs in",
+            "Alice's email address",
+            "The amount of disk space alice may use"
+          ],
+          "answerIndex": 1,
+          "explanation": "The final field is the login shell, the program started when the user logs in (here, the bash shell). It is not a password, email, or disk quota.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-4.svg"
+        },
+        {
+          "id": "users-auth-l3-m5",
+          "type": "mcq",
+          "prompt": "Which command creates a new user named alice along with her home folder?",
+          "choices": [
+            "sudo useradd -m alice",
+            "sudo rm alice",
+            "sudo passwd -d alice",
+            "sudo reboot alice"
+          ],
+          "answerIndex": 0,
+          "explanation": "useradd creates the account and the -m flag makes her home folder. 'rm' deletes, 'passwd -d' removes a password, and 'reboot' restarts the machine — none create a user.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-4.svg"
+        },
+        {
+          "id": "users-auth-l3-m6",
+          "type": "mcq",
+          "prompt": "Which command sets or changes alice's password?",
+          "choices": [
+            "sudo passwd alice",
+            "sudo useradd alice",
+            "groups alice",
+            "who alice"
+          ],
+          "answerIndex": 0,
+          "explanation": "passwd sets or changes a password (writing the hash into /etc/shadow). useradd creates an account, 'groups' lists group membership, and 'who' shows who is logged in.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-4.svg"
+        },
+        {
+          "id": "users-auth-l3-m7",
+          "type": "mcq",
+          "prompt": "What does 'sudo usermod -aG photos alice' do?",
+          "choices": [
+            "Deletes the photos group",
+            "Adds alice to the 'photos' group",
+            "Changes alice's password to 'photos'",
+            "Renames alice to photos"
+          ],
+          "answerIndex": 1,
+          "explanation": "usermod -aG adds the user to a group (the -aG means 'add to this group'). It does not delete the group, change a password, or rename the user. Remember alice must start a new login session for it to take effect.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-4.svg"
+        },
+        {
+          "id": "users-auth-l3-m8",
+          "type": "mcq",
+          "prompt": "Which file lists the groups on the system and who belongs to them?",
+          "choices": [
+            "/etc/group",
+            "/etc/shadow",
+            "/etc/hostname",
+            "/etc/photos"
+          ],
+          "answerIndex": 0,
+          "explanation": "/etc/group lists groups and their members. /etc/shadow holds password hashes, /etc/hostname holds the computer's name, and /etc/photos is not a standard file.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-4.svg"
+        },
+        {
+          "id": "users-auth-l3-m9",
+          "type": "mcq",
+          "prompt": "Why do you normally use commands like useradd instead of opening /etc/passwd and /etc/shadow in a text editor?",
+          "choices": [
+            "The files are encrypted and cannot be opened",
+            "The commands fill in the fields correctly and keep the files consistent, avoiding mistakes",
+            "Editing the files is illegal",
+            "The files do not really exist"
+          ],
+          "answerIndex": 1,
+          "explanation": "The commands fill in fields in the right format and keep related files in sync, which avoids easy hand-editing mistakes that could lock you out. The files are plain text (not encrypted), they do exist, and editing them is allowed — just risky.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-4.svg"
+        }
+      ]
+    },
+    {
+      "id": "users-auth-l4",
+      "title": "Borrowing Root Power: sudo vs su",
+      "order": 4,
+      "difficulty": 2,
+      "content": "You know root can do anything, and that you should stay a normal user. So how do you do the occasional task that *needs* root power — like installing software? You **borrow** root's power briefly. There are two classic tools: `sudo` and `su`.\n\n**`sudo`** means \"do this one command as the superuser.\" You type `sudo` in front of a command, enter **your own** password, and just that command runs with root power:\n\n```bash\nsudo apt update        # update the software list, as root, just this once\n```\n\nWhen the command finishes, you are an ordinary user again. Two nice things: you use **your** password (no need to know root's), and the system can **record** who ran what, so there's a trail.\n\nYou earn the right to use `sudo` by being in a group such as `sudo` or `wheel`, or by a rule in a settings file called `/etc/sudoers` (you'll meet it later). The key idea now: `sudo` borrows power for **one command at a time**.\n\n**`su`** means \"switch user.\" By itself, `su` tries to *become* root, asking for **root's** password, and then leaves you sitting in a root shell where everything you type runs as root until you exit. `su alice` switches to alice instead.\n\nWhy prefer `sudo`?\n- `sudo` needs *your* password; `su` (to root) needs the *root* password, which ideally no human knows or shares.\n- `sudo` runs **one** command then drops back; `su` leaves you in an all-powerful shell where it's easy to forget you're root and make a costly mistake.\n- `sudo` actions are logged per command.\n\nThis is also why logging in directly as root is discouraged: it's like staying in \"administrator mode\" all day. Borrowing power for a single command is far safer.\n\n**Recap:** `sudo` runs one command as root using your own password and is logged; `su` switches into another user's shell (root by default) using *that* user's password and keeps that power until you exit; prefer `sudo` because it's per-command, safer, and uses your own credentials.",
+      "items": [
+        {
+          "id": "users-auth-l4-m1",
+          "type": "mcq",
+          "prompt": "What does 'sudo apt update' do?",
+          "choices": [
+            "Logs you in permanently as root",
+            "Runs just that one command (apt update) with root power, then returns you to normal",
+            "Deletes the root account",
+            "Changes your password to 'apt'"
+          ],
+          "answerIndex": 1,
+          "explanation": "sudo runs a single command with root power and then you are an ordinary user again. It does not log you in as root permanently, delete root, or change your password.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-5.svg"
+        },
+        {
+          "id": "users-auth-l4-m2",
+          "type": "mcq",
+          "prompt": "When you run a command with sudo, whose password do you normally type?",
+          "choices": [
+            "Root's password",
+            "Your own password",
+            "No password is ever needed",
+            "Another random user's password"
+          ],
+          "answerIndex": 1,
+          "explanation": "sudo asks for YOUR own password and checks that you are allowed to use sudo. That means no one needs to know or share root's password. (su, by contrast, asks for the target account's password.)",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-5.svg"
+        },
+        {
+          "id": "users-auth-l4-m3",
+          "type": "mcq",
+          "prompt": "Why is using sudo generally preferred over logging in as root and working there all day?",
+          "choices": [
+            "sudo makes commands run faster",
+            "sudo borrows root power for just one command and records who ran it, limiting risk",
+            "Logging in as root is impossible",
+            "sudo gives you more disk space"
+          ],
+          "answerIndex": 1,
+          "explanation": "sudo grants root power per command and keeps a log, so a mistake affects only that one command and there's a trail of who did what. Staying logged in as root is like leaving administrator mode on all day — one slip can be disastrous. Speed and disk space are not the reason.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-5.svg"
+        },
+        {
+          "id": "users-auth-l4-m4",
+          "type": "mcq",
+          "prompt": "What does the 'su' command (with no name after it) try to do?",
+          "choices": [
+            "Shut the computer down",
+            "Switch you into a root shell, asking for root's password",
+            "Show the system uptime",
+            "Update all software"
+          ],
+          "answerIndex": 1,
+          "explanation": "'su' means 'switch user', and by itself it switches to root, prompting for ROOT's password, leaving you in a root shell. It does not shut down, show uptime, or update software.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-5.svg"
+        },
+        {
+          "id": "users-auth-l4-m5",
+          "type": "mcq",
+          "prompt": "A key difference: after 'su' to root succeeds, what is your situation compared with running a single 'sudo' command?",
+          "choices": [
+            "You are dropped back to a normal user immediately, same as sudo",
+            "You stay in a root shell, where everything you type runs as root until you exit",
+            "Nothing changes; su has no effect",
+            "Your files are deleted"
+          ],
+          "answerIndex": 1,
+          "explanation": "su leaves you in an ongoing root shell — every command runs as root until you type 'exit'. sudo, by contrast, runs just one command then returns you to normal. su does have an effect and does not delete files.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-5.svg"
+        },
+        {
+          "id": "users-auth-l4-m6",
+          "type": "mcq",
+          "prompt": "How does a normal user typically earn the right to use sudo?",
+          "choices": [
+            "By being added to a group such as 'sudo' or 'wheel', or by a rule in /etc/sudoers",
+            "By guessing the root password",
+            "Everyone can use sudo automatically",
+            "By renaming their home folder"
+          ],
+          "answerIndex": 0,
+          "explanation": "Permission to use sudo comes from membership in a group like 'sudo'/'wheel' or a rule in /etc/sudoers. It does not require the root password, is not granted to everyone by default, and has nothing to do with folder names.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-5.svg"
+        },
+        {
+          "id": "users-auth-l4-m7",
+          "type": "mcq",
+          "prompt": "One safety advantage of sudo is that the system can keep a record of sudo commands. Why does that matter?",
+          "choices": [
+            "It makes the disk fill up faster",
+            "It provides a trail of who ran which admin command, useful for accountability",
+            "It speeds up the network",
+            "It hides what administrators do"
+          ],
+          "answerIndex": 1,
+          "explanation": "Logging sudo commands creates an audit trail showing who did what — helpful for security and troubleshooting. It is about accountability, not disk usage or speed, and the point is to reveal admin actions, not hide them.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-5.svg"
+        },
+        {
+          "id": "users-auth-l4-m8",
+          "type": "mcq",
+          "prompt": "Which statement about the root password is the safest practice on a well-run system?",
+          "choices": [
+            "Everyone should memorize the root password",
+            "No human needs to know root's password; people use sudo with their own passwords instead",
+            "The root password should be the same as every user's password",
+            "Print the root password and tape it to the monitor"
+          ],
+          "answerIndex": 1,
+          "explanation": "Best practice is that no one needs the root password day to day — authorized users borrow root power via sudo with their own passwords. Sharing, reusing, or posting the root password are all serious security risks.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-5.svg"
+        }
+      ]
+    },
+    {
+      "id": "users-auth-l5",
+      "title": "Behind the Scenes: Service Accounts, sudoers, Keys and Login",
+      "order": 5,
+      "difficulty": 3,
+      "content": "This lesson zooms out to a few ideas you'll bump into later. The goal is recognition, not mastery — a one-line mental model for each.\n\n**Service accounts and nologin shells.** Remember that many users are background programs, not people. A program like a web server gets its own **service account** so it runs with only the access it needs (this is called *least privilege* — give each account the minimum power required). Such accounts usually get a special login shell called **nologin**: instead of giving a usable shell, it just prints a short message and exits. So even if someone got hold of that account, they couldn't open a working session with it.\n\n**`/etc/sudoers` and `visudo`.** Earlier you used `sudo`. The rules for *who* may run *which* commands as root live in a file called `/etc/sudoers`. A rule can be broad (\"alice may run anything\") or precise (\"the deploy account may run *only* the restart-web command\"). It can also say **NOPASSWD** — meaning that specific command runs via sudo without asking for a password, handy for automated scripts. Because a typo here could lock everyone out of sudo, you edit it with a special tool, `visudo`, which checks the file for mistakes before saving.\n\n**SSH key-based login.** When connecting to another computer over the network, you often skip typing a password entirely. Instead you use a **key pair**: a private key you keep secret and a matching public key placed on the server. The key proves who you are — more convenient and stronger than a password. (You'll cover SSH in depth in the networking topic.)\n\n**PAM and nsswitch (one line each).** **PAM** (Pluggable Authentication Modules) is the framework programs use to check logins, so each program doesn't reinvent password checking. **nsswitch** (the Name Service Switch, configured in `/etc/nsswitch.conf`) tells the system *where* to look up accounts — local files, or a central company directory. In big organizations, accounts live in such a directory so one login works on every machine, but the overall login journey is the same.\n\nThe diagram shows that journey: a login program collects your username and secret, the system verifies it, looks up your account, sets your UID/GID and groups, and finally starts your shell.\n\n**Recap:** Service accounts run programs with least privilege and often use a nologin shell; `/etc/sudoers` (edited safely with `visudo`) defines who may run which commands as root, optionally NOPASSWD; SSH key login uses a key pair instead of a password; and PAM checks logins while nsswitch decides where accounts are looked up.",
+      "items": [
+        {
+          "id": "users-auth-l5-m1",
+          "type": "mcq",
+          "prompt": "What is a 'service account'?",
+          "choices": [
+            "An account a background program runs under, with only the access it needs",
+            "A paid subscription to Linux",
+            "The account used by the customer-service department",
+            "Another name for the root account"
+          ],
+          "answerIndex": 0,
+          "explanation": "A service account belongs to a background program (like a web server) and is given only the access it needs — least privilege. It is not a subscription, a department's login, or root.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-1.svg"
+        },
+        {
+          "id": "users-auth-l5-m2",
+          "type": "mcq",
+          "prompt": "What does giving a service account a 'nologin' shell accomplish?",
+          "choices": [
+            "It makes the account log in faster",
+            "It means the account cannot open a usable interactive session — the shell just prints a message and exits",
+            "It gives the account root power",
+            "It deletes the account"
+          ],
+          "answerIndex": 1,
+          "explanation": "A nologin shell prints a short message and exits instead of opening a working shell, so even a stolen service credential can't be used for an interactive session. It does not speed up login, grant root, or delete the account.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-1.svg"
+        },
+        {
+          "id": "users-auth-l5-m3",
+          "type": "mcq",
+          "prompt": "The idea of giving each account only the power it actually needs is called:",
+          "choices": [
+            "Maximum privilege",
+            "Least privilege",
+            "Open access",
+            "Root by default"
+          ],
+          "answerIndex": 1,
+          "explanation": "Least privilege means granting only the minimum access required, which limits damage if an account is misused. The other options describe handing out too much power, the opposite of the goal.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-1.svg"
+        },
+        {
+          "id": "users-auth-l5-m4",
+          "type": "mcq",
+          "prompt": "What does the file /etc/sudoers control?",
+          "choices": [
+            "The desktop wallpaper",
+            "Who may run which commands as root via sudo, and whether a password is required",
+            "Which websites can be visited",
+            "How much memory each program uses"
+          ],
+          "answerIndex": 1,
+          "explanation": "/etc/sudoers defines the sudo rules: which users may run which commands as root, and options like NOPASSWD. It has nothing to do with wallpaper, web filtering, or memory limits.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-1.svg"
+        },
+        {
+          "id": "users-auth-l5-m5",
+          "type": "mcq",
+          "prompt": "Why edit /etc/sudoers with the special tool 'visudo' rather than any text editor?",
+          "choices": [
+            "visudo is prettier",
+            "visudo checks the file for mistakes before saving, so a typo can't lock everyone out of sudo",
+            "Only visudo can open the file at all",
+            "visudo automatically gives everyone root"
+          ],
+          "answerIndex": 1,
+          "explanation": "visudo validates the syntax before saving; a broken sudoers file could otherwise lock everyone (including you) out of sudo. It is about safety, not looks, and it does not grant everyone root.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-1.svg"
+        },
+        {
+          "id": "users-auth-l5-m6",
+          "type": "mcq",
+          "prompt": "A sudoers rule says the 'deploy' account may run ONLY the command that restarts the web service, with NOPASSWD. What can 'deploy' do?",
+          "choices": [
+            "Run any command as root without a password",
+            "Restart the web service as root without being asked for a password — and nothing else via sudo",
+            "Log in as root interactively",
+            "Edit any file on the system"
+          ],
+          "answerIndex": 1,
+          "explanation": "The rule grants exactly one command, as root, with no password prompt (handy for automation). It does not grant other commands, root login, or general file editing. Scoping NOPASSWD to one specific command keeps it relatively safe.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-1.svg"
+        },
+        {
+          "id": "users-auth-l5-m7",
+          "type": "mcq",
+          "prompt": "In SSH key-based login, what proves your identity instead of a typed password?",
+          "choices": [
+            "A key pair — a secret private key you hold plus a matching public key on the server",
+            "Your phone number",
+            "The computer's serial number",
+            "A typed password, always"
+          ],
+          "answerIndex": 0,
+          "explanation": "SSH key login uses a key pair: you keep the private key secret, the server holds the matching public key, and the key proves who you are — more convenient and stronger than a password. It does not rely on a phone or serial number, and the whole point is to avoid typing a password.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-1.svg"
+        },
+        {
+          "id": "users-auth-l5-m8",
+          "type": "mcq",
+          "prompt": "In one line, what is PAM (Pluggable Authentication Modules)?",
+          "choices": [
+            "A program that draws the login screen",
+            "The framework programs use to check logins, so each program doesn't reinvent authentication",
+            "A type of computer memory",
+            "A backup tool"
+          ],
+          "answerIndex": 1,
+          "explanation": "PAM is the shared authentication framework that applications call to verify logins, so they don't each implement password checking. It is not the login screen's graphics, RAM, or a backup tool.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-1.svg"
+        },
+        {
+          "id": "users-auth-l5-m9",
+          "type": "mcq",
+          "prompt": "In one line, what does nsswitch (the Name Service Switch, /etc/nsswitch.conf) decide?",
+          "choices": [
+            "Which network cable to use",
+            "WHERE the system looks up accounts and groups — e.g. local files or a central company directory",
+            "The speed of the login screen",
+            "How passwords are scrambled"
+          ],
+          "answerIndex": 1,
+          "explanation": "nsswitch tells the system where to find account and group information — local files and/or a central directory. It does not pick cables, set screen speed, or define password hashing.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-1.svg"
+        },
+        {
+          "id": "users-auth-l5-m10",
+          "type": "mcq",
+          "prompt": "Put the login journey in the right order.",
+          "choices": [
+            "Start the shell first, then ask for the username last",
+            "Collect username and secret, verify the secret, look up the account, set UID/GID and groups, then start the login shell",
+            "Delete the account, then log in",
+            "Set the wallpaper, then verify the password"
+          ],
+          "answerIndex": 1,
+          "explanation": "The login program collects your username and secret, the system verifies it, looks up your account, sets your UID/GID and group memberships, and finally starts your login shell. The other orderings are nonsensical — you can't run the shell before knowing who you are.",
           "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/users-auth-1.svg"
         }
       ]
