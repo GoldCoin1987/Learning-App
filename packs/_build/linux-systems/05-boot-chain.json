@@ -4,304 +4,853 @@
   "order": 5,
   "lessons": [
     {
-      "id": "boot-chain-l1-firmware",
-      "title": "Firmware: BIOS/MBR vs UEFI/GPT",
+      "id": "boot-chain-l1-big-picture",
+      "title": "The Big Picture: From Power Button to Login",
       "order": 1,
       "difficulty": 1,
-      "content": "When you press the power button, no kernel exists in RAM yet — firmware baked into the motherboard runs first. Its job is to initialize hardware (POST: power-on self-test), then find and run the first stage of software that will eventually load Linux.\n\n**Legacy BIOS** is the old way. After POST, BIOS reads the very first 512-byte sector of the boot disk — the **Master Boot Record (MBR)**. The MBR holds a tiny boot-strap code stub plus a 4-entry partition table. Because 512 bytes is almost nothing, that stub just chain-loads a real bootloader. MBR also caps disks at ~2 TiB and 4 primary partitions.\n\n**UEFI** is the modern replacement (treat it as the default today). Instead of executing raw sectors, UEFI understands a filesystem. It reads a **GPT** (GUID Partition Table) disk, finds the **EFI System Partition (ESP)** — a small FAT32 partition mounted at `/boot/efi` — and executes a `.efi` application directly (e.g. `grubx64.efi`, `systemd-bootx64.efi`). UEFI keeps a list of boot entries in NVRAM, which you inspect and edit with `efibootmgr`.\n\n**Secure Boot** is a UEFI feature: firmware verifies each `.efi` binary's cryptographic signature against keys in NVRAM before running it, blocking unsigned/tampered bootloaders.\n\n```bash\n# Is this machine booted via UEFI? If this dir exists, yes.\nls /sys/firmware/efi\n\n# List UEFI boot entries and their order\nefibootmgr -v\n```\n\nKnow the pairing: BIOS goes with MBR; UEFI goes with GPT + ESP + Secure Boot.",
+      "content": "Have you ever wondered what happens in the few seconds between pressing the power button and seeing a login screen? The computer doesn't wake up all at once. It comes alive in **stages**, and each stage's only job is to start the next one. This sequence is called the **boot chain** (\"to boot\" comes from \"bootstrap\" — the machine pulling itself up by its own bootstraps).\n\nThink of a relay race. Each runner carries the baton a short distance, then hands it to the next runner. No single runner does the whole race. The boot chain works the same way:\n\n1. **Firmware** — a small program built into the computer's motherboard. It checks the hardware is working, then finds a disk to start from.\n2. **Bootloader** — a program on that disk (the common one is called GRUB). Its job is to load the operating system's core, the kernel.\n3. **Kernel** — the heart of Linux. It takes control of the hardware and gets the system ready.\n4. **init** — the very first regular program. Today this is almost always a program called **systemd**. It starts all the other services (networking, sound, the desktop) until you reach a login prompt.\n\nWhy learn this? Because when a computer won't boot, the screen usually freezes at *one* of these stages. Knowing the chain tells you which runner dropped the baton — and that is the first step to fixing it.\n\n**Recap:** power on → firmware → bootloader → kernel → init → login. Five handoffs, in that order. Everything else in this sub-topic just zooms in on one stage at a time.",
       "items": [
-        {
-          "id": "boot-chain-l1-fc1",
-          "type": "flashcard",
-          "front": "What does firmware (BIOS/UEFI) do before any bootloader runs?",
-          "back": "Runs POST (power-on self-test) to initialize and check hardware, then locates and executes the first-stage boot software — either MBR boot code (BIOS) or a .efi application on the ESP (UEFI).",
-          "hint": "Power-on self-test, then hand off."
-        },
-        {
-          "id": "boot-chain-l1-fc2",
-          "type": "flashcard",
-          "front": "How big is the MBR and what does it contain?",
-          "back": "512 bytes: the first disk sector. It holds a tiny bootstrap code stub plus a 4-entry primary partition table. Too small to hold a real bootloader, so it chain-loads one.",
-          "hint": "One sector."
-        },
-        {
-          "id": "boot-chain-l1-fc3",
-          "type": "flashcard",
-          "front": "What is the EFI System Partition (ESP) and how is it formatted?",
-          "back": "A small FAT32 partition (commonly mounted at /boot/efi) on a GPT disk where UEFI firmware finds and executes .efi bootloader applications like grubx64.efi or systemd-bootx64.efi.",
-          "hint": "FAT32, holds .efi files."
-        },
-        {
-          "id": "boot-chain-l1-fc4",
-          "type": "flashcard",
-          "front": "What does `efibootmgr` do?",
-          "back": "Reads and modifies the UEFI boot entries stored in firmware NVRAM — listing entries, their .efi targets, and the boot order; you can add, delete, and reorder entries.",
-          "hint": "Manages NVRAM boot entries."
-        },
-        {
-          "id": "boot-chain-l1-fc5",
-          "type": "flashcard",
-          "front": "What does Secure Boot enforce?",
-          "back": "Before executing each .efi binary, UEFI verifies its cryptographic signature against keys held in NVRAM, refusing to run unsigned or tampered bootloaders/kernels.",
-          "hint": "Signature check in firmware."
-        },
         {
           "id": "boot-chain-l1-mc1",
           "type": "mcq",
-          "prompt": "Which set of technologies forms the modern UEFI pairing (as opposed to legacy BIOS)?",
+          "prompt": "Put the boot stages in the correct order, from pressing the power button to reaching a login prompt.",
           "choices": [
-            "MBR + 512-byte boot sector + chain-loading",
-            "GPT + EFI System Partition + Secure Boot",
-            "initramfs + pivot_root + runlevels",
-            "U-Boot + device tree + TFTP"
+            "Power on → kernel → firmware → bootloader → init → login",
+            "Power on → firmware → bootloader → kernel → init → login",
+            "Power on → bootloader → firmware → init → kernel → login",
+            "Power on → init → kernel → bootloader → firmware → login"
           ],
           "answerIndex": 1,
-          "explanation": "UEFI reads a GPT disk, finds the FAT32 EFI System Partition, executes a .efi application, and can verify it with Secure Boot. MBR + 512-byte sector is the legacy BIOS pairing."
+          "explanation": "The order is firmware first (it is built into the hardware and runs before anything on disk), then the bootloader it finds on disk, which loads the kernel, which finally starts init. Remembering this order is the single most useful thing in this sub-topic."
         },
         {
           "id": "boot-chain-l1-mc2",
           "type": "mcq",
-          "prompt": "On a running Linux box, how can you quickly tell it was booted in UEFI mode rather than legacy BIOS?",
+          "prompt": "What is the main idea behind the term \"boot chain\"?",
           "choices": [
-            "Check whether /proc/cmdline is non-empty",
-            "Check whether the directory /sys/firmware/efi exists",
-            "Run `lsmod | grep bios`",
-            "Look for a 512-byte file at /boot/mbr"
+            "The computer does everything at once the moment you press power",
+            "The computer wakes up in stages, and each stage's job is to start the next one",
+            "The chain refers to physically chaining several disks together",
+            "It is the cable that connects the power button to the motherboard"
           ],
           "answerIndex": 1,
-          "explanation": "The kernel only populates /sys/firmware/efi when it was booted via UEFI. /proc/cmdline always has content, and there is no /boot/mbr file."
+          "explanation": "Booting happens in stages that hand off one to the next, like a relay race passing a baton. Nothing happens \"all at once,\" and the word has nothing to do with cables or chaining disks."
         },
         {
           "id": "boot-chain-l1-mc3",
           "type": "mcq",
-          "prompt": "Why does the MBR boot code almost always 'chain-load' a separate bootloader instead of booting the kernel directly?",
+          "prompt": "Which stage runs first, before anything stored on the hard disk gets a chance to run?",
           "choices": [
-            "Because the kernel refuses to be loaded by firmware",
-            "Because 512 bytes is far too small to hold logic that can read a filesystem and load a kernel",
-            "Because Secure Boot requires a second stage",
-            "Because GPT disks cannot store a kernel"
+            "The kernel",
+            "The bootloader",
+            "The firmware",
+            "init (systemd)"
           ],
-          "answerIndex": 1,
-          "explanation": "The MBR is a single 512-byte sector shared with the partition table, leaving only a tiny stub — nowhere near enough to parse filesystems and load a multi-megabyte kernel, so it hands off to a real bootloader."
+          "answerIndex": 2,
+          "explanation": "Firmware is built into the motherboard itself, so it is the only thing available the instant power arrives. The bootloader, kernel, and init all live on a disk and cannot run until the firmware finds that disk."
         },
         {
-          "id": "boot-chain-l1-fc6",
-          "type": "flashcard",
-          "front": "What practical limits does the MBR partition scheme impose that GPT removes?",
-          "back": "MBR caps usable disk size at ~2 TiB and allows only 4 primary partitions. GPT supports far larger disks and many partitions (typically 128).",
-          "hint": "~2 TiB, 4 primary partitions."
+          "id": "boot-chain-l1-mc4",
+          "type": "mcq",
+          "prompt": "What is the bootloader's main job in the chain?",
+          "choices": [
+            "To test that the memory and hardware are working",
+            "To load the operating system's kernel into memory and start it",
+            "To show you the login prompt",
+            "To start the networking and sound services"
+          ],
+          "answerIndex": 1,
+          "explanation": "The bootloader (commonly GRUB) sits between the firmware and the kernel. Hardware testing is the firmware's job; the login prompt and starting services come later, after init takes over."
+        },
+        {
+          "id": "boot-chain-l1-mc5",
+          "type": "mcq",
+          "prompt": "On a typical modern Linux system, which program is started as the very first regular program (init)?",
+          "choices": [
+            "GRUB",
+            "systemd",
+            "The firmware",
+            "The login screen"
+          ],
+          "answerIndex": 1,
+          "explanation": "Today init is almost always systemd. GRUB is the bootloader (an earlier stage), the firmware runs even earlier, and the login screen only appears after init has started the needed services."
+        },
+        {
+          "id": "boot-chain-l1-mc6",
+          "type": "mcq",
+          "prompt": "Why is understanding the boot chain useful when a computer refuses to start?",
+          "choices": [
+            "It lets you skip the boot process entirely",
+            "The screen usually freezes at one particular stage, and knowing the stages tells you where the failure is",
+            "It makes the computer boot faster automatically",
+            "It is only useful for designing new computers, not fixing them"
+          ],
+          "answerIndex": 1,
+          "explanation": "A boot failure happens at a specific stage. If you know the chain, the point where it freezes tells you which \"runner dropped the baton,\" which is the first step toward a fix. It does not speed anything up by itself."
+        },
+        {
+          "id": "boot-chain-l1-mc7",
+          "type": "mcq",
+          "prompt": "After the kernel finishes its early setup, what does init (systemd) do?",
+          "choices": [
+            "It tests the computer's hardware",
+            "It loads the kernel from disk",
+            "It starts the other services until you reach a login prompt",
+            "It shuts the computer back down"
+          ],
+          "answerIndex": 2,
+          "explanation": "init is the parent of all other programs; it starts services such as networking and the desktop, ending at a login prompt. Testing hardware is the firmware's job, and loading the kernel is the bootloader's."
+        },
+        {
+          "id": "boot-chain-l1-mc8",
+          "type": "mcq",
+          "prompt": "The relay-race analogy describes the boot chain as a series of handoffs. What is being \"handed off\" at each step?",
+          "choices": [
+            "A physical baton inside the computer",
+            "Control of the machine, passed from one stage to the next",
+            "Electrical power, which each stage uses up",
+            "The user's password"
+          ],
+          "answerIndex": 1,
+          "explanation": "Each stage does a small job and then hands control to the next stage. There is no real baton; it is a way to picture how responsibility passes along the chain. Power and passwords are not what gets passed."
+        },
+        {
+          "id": "boot-chain-l1-mc9",
+          "type": "mcq",
+          "prompt": "Which statement about the kernel is correct, based on the big picture?",
+          "choices": [
+            "The kernel runs before the firmware",
+            "The kernel is loaded by the bootloader and takes control of the hardware",
+            "The kernel is the same thing as the login screen",
+            "The kernel is built into the motherboard"
+          ],
+          "answerIndex": 1,
+          "explanation": "The bootloader loads the kernel, which then runs the hardware as the heart of Linux. The firmware runs earlier, the kernel is not the login screen, and only the firmware is built into the motherboard."
+        },
+        {
+          "id": "boot-chain-l1-img",
+          "type": "mcq",
+          "prompt": "Look at the diagram of the boot chain. Reading it left to right, which sequence does it show?",
+          "choices": [
+            "Login → init → kernel → bootloader → firmware → power",
+            "Power button → firmware → bootloader → kernel+initramfs → init (systemd) → login",
+            "Firmware → power button → kernel → login → init",
+            "Power button → kernel → firmware → init → bootloader → login"
+          ],
+          "answerIndex": 1,
+          "explanation": "The diagram reads left to right as a relay of handoffs: power, then firmware, then the bootloader, then the kernel (with its initramfs), then init/systemd, ending at the login prompt — the same order to memorize.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/boot-chain-2.svg"
         }
       ]
     },
     {
-      "id": "boot-chain-l2-bootloader-kernel",
-      "title": "Bootloader to Kernel: GRUB2, initramfs, and the cmdline",
+      "id": "boot-chain-l2-firmware",
+      "title": "Firmware: UEFI and Old BIOS",
       "order": 2,
       "difficulty": 2,
-      "content": "Firmware hands off to a **bootloader**, whose job is to load the kernel image and an initial RAM filesystem into memory, pass the kernel its command line, and jump into it.\n\n**GRUB2** is the dominant desktop/server bootloader. Its menu and behavior come from `grub.cfg`, which you don't hand-edit — you set values in `/etc/default/grub` and `/etc/grub.d/`, then regenerate with `grub-mkconfig -o /boot/grub/grub.cfg` (Debian: `update-grub`). Embedded systems use **U-Boot** (the ARM SoC workhorse, scriptable via its `bootcmd` environment); minimal UEFI setups often use **systemd-boot**, which is just a thin menu over `.efi` stubs on the ESP.\n\nThe bootloader loads two things from `/boot`:\n\n- **`vmlinuz`** — the compressed kernel image (a `bzImage` on x86).\n- **`initramfs`** (a.k.a. initrd) — a compressed cpio archive containing a minimal root filesystem with `/init` and just enough kernel modules.\n\n**Why initramfs exists:** the real root filesystem might live on LVM, LUKS-encrypted volumes, RAID, or an NVMe/USB device whose driver isn't built into the kernel. The kernel can't mount a disk it can't talk to. So the bootloader loads a small RAM-based root that contains those drivers; that early userspace probes hardware, loads modules, assembles/unlocks the real root, then pivots to it.\n\n```bash\n# The exact command line the running kernel was given\ncat /proc/cmdline\n# e.g. BOOT_IMAGE=/vmlinuz root=UUID=... ro quiet console=ttyS0\n\n# Peek inside the initramfs to see its bundled tools/modules\nlsinitramfs /boot/initrd.img-$(uname -r) | head\n```\n\nKey **kernel command-line** tokens: `root=` (which device/UUID is the real root), `ro` (mount it read-only first, fsck-safe), `console=` (where early kernel output goes — e.g. `ttyS0` serial for embedded), and `init=` (override which program becomes PID 1).",
+      "content": "When you press power, the computer needs *some* program to run — but nothing useful is in memory yet, because the operating system lives on a disk that hasn't been read. The fix: a small program is permanently stored in a chip on the motherboard. That program is the **firmware**. \"Firmware\" just means software baked into hardware so it's always there.\n\nThe firmware has two jobs. First, a quick hardware check often called **POST** (Power-On Self-Test): is there memory, a keyboard, a disk? Second, **find a boot device** — a disk that contains something to start — and launch the bootloader on it.\n\nThere are two kinds of firmware:\n\n**UEFI** (Unified Extensible Firmware Interface) is the modern standard, on essentially every computer made in the last decade. UEFI understands files and folders. It looks on the disk for a special area called the **EFI System Partition** (ESP) — a small storage area formatted in the simple FAT32 format — and runs a bootloader file stored there, such as `grubx64.efi`.\n\n**BIOS** (Basic Input/Output System) is the old way, from before UEFI. Instead of reading a file, the BIOS read the raw first chunk of the disk (the very first 512 bytes) and ran whatever code was there. It works, but it's clumsy and limited. You'll meet it mostly on older machines.\n\nThe key difference: UEFI reads a real *file* from a known partition; old BIOS read raw *bytes* from the start of the disk. Either way, the result is the same — the bootloader now runs.\n\n**Recap:** firmware is built into the motherboard, checks the hardware, finds a boot disk, and launches the bootloader. UEFI (modern) does this by reading a file from the EFI System Partition; BIOS (old) did it by reading the first raw sector.",
       "items": [
-        {
-          "id": "boot-chain-l2-fc1",
-          "type": "flashcard",
-          "front": "What two files does the bootloader load from /boot, and what is each?",
-          "back": "vmlinuz — the compressed kernel image (bzImage on x86). initramfs/initrd — a compressed cpio archive holding a minimal root FS with /init and early kernel modules.",
-          "hint": "Kernel + temporary RAM root."
-        },
-        {
-          "id": "boot-chain-l2-fc2",
-          "type": "flashcard",
-          "front": "Why does an initramfs exist at all? (the key 'aha')",
-          "back": "The real root may sit on LVM/LUKS/RAID/NVMe/USB whose drivers aren't built into the kernel. The kernel can't mount a device it can't drive, so initramfs supplies those modules in a RAM root, sets the real root up, then pivots to it.",
-          "hint": "Drivers needed to mount the real root."
-        },
-        {
-          "id": "boot-chain-l2-fc3",
-          "type": "flashcard",
-          "front": "How do you correctly change GRUB2's configuration?",
-          "back": "Don't hand-edit grub.cfg. Edit /etc/default/grub and scripts in /etc/grub.d/, then regenerate: grub-mkconfig -o /boot/grub/grub.cfg (or update-grub on Debian).",
-          "hint": "Edit defaults, then regenerate."
-        },
-        {
-          "id": "boot-chain-l2-fc4",
-          "type": "flashcard",
-          "front": "Name three bootloaders and where each is typically used.",
-          "back": "GRUB2 — mainstream desktop/server. U-Boot — embedded ARM SoCs (scriptable bootcmd). systemd-boot — minimal UEFI-only setups, a thin menu over .efi stubs on the ESP.",
-          "hint": "Desktop, embedded, minimal-UEFI."
-        },
-        {
-          "id": "boot-chain-l2-fc5",
-          "type": "flashcard",
-          "front": "What is the format of an initramfs archive and how do you inspect it?",
-          "back": "It's a compressed cpio archive of a minimal root filesystem. Inspect with lsinitramfs (or unmkinitramfs to extract) on Debian-family systems.",
-          "hint": "Compressed cpio; lsinitramfs."
-        },
         {
           "id": "boot-chain-l2-mc1",
           "type": "mcq",
-          "prompt": "What does the `root=` kernel command-line parameter specify?",
+          "prompt": "What does the word \"firmware\" mean in this context?",
           "choices": [
-            "The user account that becomes PID 1",
-            "The device or UUID holding the real root filesystem to pivot to",
-            "The path to the GRUB configuration file",
-            "Which TTY shows the login prompt"
+            "A program you download and install after buying the computer",
+            "Software permanently stored in a chip on the motherboard, so it is always available",
+            "A type of hard disk",
+            "The login screen of the operating system"
           ],
           "answerIndex": 1,
-          "explanation": "root= tells the kernel/initramfs which block device (often by UUID) contains the real root filesystem that will replace the initramfs."
+          "explanation": "Firmware is software \"baked into\" hardware — it lives in a motherboard chip and is there the instant power arrives. That is exactly why it can run before any disk is read."
         },
         {
           "id": "boot-chain-l2-mc2",
           "type": "mcq",
-          "prompt": "Why is `ro` commonly passed on the kernel command line for the initial root mount?",
+          "prompt": "What are the two main jobs of the firmware when you power on?",
           "choices": [
-            "It disables Secure Boot for faster booting",
-            "It mounts root read-only first so fsck can safely check the filesystem before it is remounted read-write",
-            "It forces the kernel to use the initramfs permanently",
-            "It tells GRUB to skip the menu"
+            "Show the desktop and load your documents",
+            "Check the hardware (POST), then find a boot device and launch its bootloader",
+            "Encrypt the disk and connect to Wi-Fi",
+            "Start systemd and reach the login prompt"
           ],
           "answerIndex": 1,
-          "explanation": "Mounting read-only first lets a filesystem check run safely; init later remounts the root read-write once it's clean."
+          "explanation": "Firmware does a Power-On Self-Test to verify the hardware, then locates a disk to boot from and hands off to its bootloader. Desktops, logins, and systemd all come much later in the chain."
         },
         {
           "id": "boot-chain-l2-mc3",
           "type": "mcq",
-          "prompt": "On an embedded board with no display, which cmdline token routes early kernel messages to the serial port?",
+          "prompt": "What does POST (Power-On Self-Test) do?",
           "choices": [
-            "init=/bin/sh",
-            "quiet",
-            "console=ttyS0",
-            "root=UUID=..."
+            "It posts a message to a remote server",
+            "It quickly checks that basic hardware like memory and disks are present and working",
+            "It loads the kernel into memory",
+            "It logs the user in automatically"
           ],
-          "answerIndex": 2,
-          "explanation": "console=ttyS0 (often with a baud rate, e.g. ttyS0,115200) directs kernel console output to the first serial UART — standard practice on headless embedded targets."
+          "answerIndex": 1,
+          "explanation": "POST is the firmware's quick hardware self-check at power-on. It is unrelated to networking, and loading the kernel or logging in happens in later stages."
         },
         {
           "id": "boot-chain-l2-mc4",
           "type": "mcq",
-          "prompt": "Where does the kernel record the exact command line it was booted with?",
+          "prompt": "Which firmware type is the modern standard found on essentially all recent computers?",
           "choices": [
-            "/etc/default/grub",
-            "/proc/cmdline",
-            "/boot/grub/grub.cfg",
-            "/sys/firmware/efi/cmdline"
+            "BIOS",
+            "UEFI",
+            "GRUB",
+            "POST"
           ],
           "answerIndex": 1,
-          "explanation": "/proc/cmdline is the read-only view of the actual command line the running kernel received — useful for confirming what root=, ro, console=, etc. were really passed."
+          "explanation": "UEFI is today's standard. BIOS is the older approach it replaced, GRUB is a bootloader (a later stage), and POST is the hardware self-test, not a firmware type."
         },
         {
-          "id": "boot-chain-l2-img1",
-          "type": "flashcard",
-          "front": "Study this diagram.",
-          "back": "Review the diagram above.",
-          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/boot-chain-1.svg"
+          "id": "boot-chain-l2-mc5",
+          "type": "mcq",
+          "prompt": "What is the EFI System Partition (ESP)?",
+          "choices": [
+            "The partition that holds all your personal documents",
+            "A small FAT32-formatted area on the disk where UEFI finds and runs bootloader files",
+            "A chip on the motherboard that stores the firmware",
+            "The part of memory the kernel runs in"
+          ],
+          "answerIndex": 1,
+          "explanation": "The ESP is a small, simply-formatted (FAT32) partition that UEFI reads to find a bootloader file like grubx64.efi. It is on the disk, not a motherboard chip, and it does not store your documents."
+        },
+        {
+          "id": "boot-chain-l2-mc6",
+          "type": "mcq",
+          "prompt": "What is the key difference in HOW UEFI versus old BIOS launches the bootloader?",
+          "choices": [
+            "UEFI reads a real file from the EFI System Partition; BIOS read raw bytes from the disk's first 512-byte sector",
+            "UEFI uses the keyboard; BIOS uses the mouse",
+            "UEFI runs after the kernel; BIOS runs before the firmware",
+            "There is no difference; the names are interchangeable"
+          ],
+          "answerIndex": 0,
+          "explanation": "UEFI understands files and reads a bootloader file from the ESP. Old BIOS instead executed the raw code in the disk's very first sector. The end result is the same — the bootloader starts — but the method differs."
+        },
+        {
+          "id": "boot-chain-l2-mc7",
+          "type": "mcq",
+          "prompt": "Why does the firmware need to run before the bootloader, kernel, or init?",
+          "choices": [
+            "Because the bootloader refuses to start without the firmware's permission code",
+            "Because at power-on nothing useful is in memory yet, and only the firmware (in a motherboard chip) is already there to run",
+            "Because the firmware is faster than the other stages",
+            "Because the kernel is too large to load first"
+          ],
+          "answerIndex": 1,
+          "explanation": "Right at power-on the disk has not been read, so memory holds nothing useful. The firmware is the one program physically present in a chip, so it must run first and find the disk for everything else."
+        },
+        {
+          "id": "boot-chain-l2-mc8",
+          "type": "mcq",
+          "prompt": "What format is the EFI System Partition typically stored in, and why does that matter?",
+          "choices": [
+            "FAT32, a simple format the firmware can read without needing complex drivers",
+            "An encrypted format, so no one can read the bootloader",
+            "The same format as the rest of Linux, so the firmware needs no special handling",
+            "A raw, unformatted area with no filesystem at all"
+          ],
+          "answerIndex": 0,
+          "explanation": "The ESP uses FAT32, a deliberately simple and universal format that UEFI firmware can read easily. A more complex or encrypted filesystem would be harder for the lightweight firmware to handle this early."
+        },
+        {
+          "id": "boot-chain-l2-mc9",
+          "type": "mcq",
+          "prompt": "After the firmware finishes its work, what happens next in the boot chain?",
+          "choices": [
+            "The login prompt appears immediately",
+            "The bootloader it found and launched begins running",
+            "The computer powers off",
+            "The kernel starts init directly, skipping the bootloader"
+          ],
+          "answerIndex": 1,
+          "explanation": "The firmware's last act is to launch the bootloader, so the bootloader runs next. The kernel, init, and login all come afterward, in that order."
+        },
+        {
+          "id": "boot-chain-l2-img",
+          "type": "mcq",
+          "prompt": "In the diagram, the UEFI firmware looks at the disk and reads one partition first before anything else. Which one?",
+          "choices": [
+            "The main partition holding the root filesystem",
+            "The EFI System Partition (ESP), which holds the bootloader file",
+            "A hidden recovery partition",
+            "It reads the whole disk at once"
+          ],
+          "answerIndex": 1,
+          "explanation": "UEFI reads the small FAT32 EFI System Partition first to find the bootloader (for example grubx64.efi). The larger main/root partition is used later, after the kernel has started.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/boot-chain-3.svg"
         }
       ]
     },
     {
-      "id": "boot-chain-l3-init-handoff",
-      "title": "Kernel Handoff to PID 1: init, targets, and diagnostics",
+      "id": "boot-chain-l3-bootloader",
+      "title": "The Bootloader: GRUB Loads the Kernel",
       "order": 3,
-      "difficulty": 3,
-      "content": "Once the kernel has decompressed, probed hardware, and — via the initramfs — assembled and mounted the **real root filesystem**, it performs the userspace handoff: it `execve()`s the program at `/sbin/init` (overridable with `init=`), which becomes **PID 1**. This is the boundary where kernel-space booting ends and userspace begins. PID 1 is special: it never exits, it adopts and reaps orphaned processes, and it owns service startup.\n\nThe pivot itself is precise: early userspace in the initramfs runs `switch_root` (modern) to swap the RAM root for the real root and re-exec the real `init`, freeing the initramfs memory.\n\n**Historically**, PID 1 was **SysV init**, which drove **runlevels** (0=halt, 1=single-user, 3=multi-user text, 5=graphical, 6=reboot) via numbered `/etc/rc?.d/` scripts run serially. **Modern systems** use **systemd**, which replaces runlevels with **targets** — dependency-graphed unit groups started in parallel. The rough mapping: `multi-user.target` ≈ runlevel 3, `graphical.target` ≈ runlevel 5, plus `rescue.target` and `emergency.target` for recovery. systemd brings up the target's dependencies, ending at a login prompt.\n\n```bash\n# What target is the system in / set the default\nsystemctl get-default\n\n# Boot diagnostics: kernel ring buffer, this-boot's journal, timing\ndmesg | less                 # kernel messages since power-on\njournalctl -b                # all logs from the current boot\njournalctl -k -b             # kernel messages only, current boot\nsystemd-analyze              # total firmware/loader/kernel/userspace time\nsystemd-analyze blame        # slowest units\nsystemd-analyze critical-chain  # the dependency path that gated boot\n```\n\n**Full narration, power button to login:** firmware POSTs and finds the ESP/MBR → bootloader (GRUB2/U-Boot) loads `vmlinuz` + `initramfs` and passes the cmdline → kernel decompresses, probes hardware, mounts the initramfs → initramfs loads drivers, assembles/unlocks the real root, `switch_root`s into it → kernel `execve`s `/sbin/init` as PID 1 → systemd reaches the default target → getty/display-manager shows the login prompt.",
+      "difficulty": 2,
+      "content": "The firmware found a disk and launched a program on it. That program is the **bootloader**, and on most Linux desktops and servers it is **GRUB** (GRand Unified Bootloader). The bootloader is the bridge between firmware and the operating system.\n\nWhy do we even need a separate bootloader? The firmware is simple and limited — it just knows how to find and start one file. The bootloader is smarter: it knows where the operating system's **kernel** is stored, how to load it into memory, and how to start it. Think of GRUB as a receptionist who greets you at the door and walks you to the right room.\n\nGRUB does three things:\n\n1. **Shows a menu** (sometimes only briefly). If a computer has more than one operating system, or several kernel versions, GRUB lets you pick. Often it just auto-selects the default after a moment.\n2. **Loads the kernel** — it reads the kernel file from the disk into memory.\n3. **Passes along instructions** — GRUB hands the kernel a short line of text called the **kernel command line**: settings the kernel reads as it starts, such as which disk holds the main system. (More on that next lesson.)\n\nYou usually don't write GRUB's menu by hand. It's generated from configuration files, and a command regenerates the menu when you change something — but as a beginner you mostly just need to recognize GRUB's menu when you see it at boot.\n\nA quick contrast: small embedded gadgets (think a router or a single-board computer with an ARM chip) often use a different bootloader called **U-Boot** instead of GRUB. Same idea — load the kernel — just a different tool for tiny hardware.\n\n**Recap:** the bootloader (GRUB on most PCs) loads the kernel into memory, optionally lets you choose which one, and passes it a kernel command line. It exists because the firmware is too simple to do this itself.",
       "items": [
-        {
-          "id": "boot-chain-l3-fc1",
-          "type": "flashcard",
-          "front": "What exact action marks the kernel-to-userspace handoff at the end of boot?",
-          "back": "The kernel execve()s /sbin/init (overridable via init=), and that program becomes PID 1. Everything before is kernel-space booting; everything after is userspace.",
-          "hint": "execve of PID 1."
-        },
-        {
-          "id": "boot-chain-l3-fc2",
-          "type": "flashcard",
-          "front": "What makes PID 1 special compared to ordinary processes?",
-          "back": "It is started directly by the kernel, must never exit while the system runs, adopts and reaps orphaned/zombie processes, and is responsible for bringing up all other services.",
-          "hint": "Never exits; reaps orphans."
-        },
-        {
-          "id": "boot-chain-l3-fc3",
-          "type": "flashcard",
-          "front": "How does early userspace swap the initramfs for the real root before running the real init?",
-          "back": "It calls switch_root (the modern replacement for pivot_root + chroot), which makes the mounted real root the new / , re-execs the real /sbin/init, and frees the initramfs RAM.",
-          "hint": "switch_root."
-        },
-        {
-          "id": "boot-chain-l3-fc4",
-          "type": "flashcard",
-          "front": "Map the common SysV runlevels to systemd targets.",
-          "back": "runlevel 3 (multi-user text) ≈ multi-user.target; runlevel 5 (graphical) ≈ graphical.target; runlevel 1 (single-user) ≈ rescue.target; plus emergency.target for the most minimal recovery shell.",
-          "hint": "3=multi-user, 5=graphical."
-        },
-        {
-          "id": "boot-chain-l3-fc5",
-          "type": "flashcard",
-          "front": "What is the core architectural difference between SysV runlevels and systemd targets?",
-          "back": "SysV ran numbered rc scripts serially per runlevel. systemd targets are dependency-graphed groups of units started in parallel, tracking ordering (After/Requires) explicitly — faster and more predictable.",
-          "hint": "Serial scripts vs parallel dependency graph."
-        },
         {
           "id": "boot-chain-l3-mc1",
           "type": "mcq",
-          "prompt": "Which command shows only kernel messages from the current boot via the journal?",
+          "prompt": "What is the bootloader's central job?",
           "choices": [
-            "journalctl -u kernel",
-            "journalctl -k -b",
-            "systemd-analyze blame",
-            "dmesg --previous"
+            "To test the hardware at power-on",
+            "To load the operating system's kernel into memory and start it",
+            "To display the desktop wallpaper",
+            "To format the EFI System Partition"
           ],
           "answerIndex": 1,
-          "explanation": "journalctl -k limits output to kernel (ring-buffer) messages, and -b restricts it to the current boot. dmesg shows the same kernel buffer but isn't a journal query."
+          "explanation": "The bootloader loads and launches the kernel. Hardware testing is the firmware's job, and desktops appear far later, after init has done its work."
         },
         {
           "id": "boot-chain-l3-mc2",
           "type": "mcq",
-          "prompt": "You want to find which single chain of dependencies most delayed boot. Which command is designed for that?",
+          "prompt": "What does GRUB stand for, and what kind of program is it?",
           "choices": [
-            "systemd-analyze blame",
-            "systemd-analyze critical-chain",
-            "journalctl -b -p err",
-            "systemctl list-units"
+            "A firmware chip on the motherboard",
+            "The GRand Unified Bootloader, the common bootloader on Linux PCs and servers",
+            "A part of the Linux kernel",
+            "A type of disk partition"
           ],
           "answerIndex": 1,
-          "explanation": "blame lists units by individual init time, but critical-chain shows the time-ordered dependency path that actually gated reaching the target — the real critical path."
+          "explanation": "GRUB is the GRand Unified Bootloader — the bootloader stage that runs after the firmware. It is not firmware, not part of the kernel, and not a partition."
         },
         {
           "id": "boot-chain-l3-mc3",
           "type": "mcq",
-          "prompt": "A system boots but you only get a minimal recovery shell with most services down. Which target was most likely reached?",
+          "prompt": "Why is a separate bootloader needed instead of letting the firmware load the kernel directly?",
           "choices": [
-            "graphical.target",
-            "multi-user.target",
-            "emergency.target",
-            "reboot.target"
+            "The firmware is forbidden by law from loading a kernel",
+            "The firmware is simple and only knows how to start one file; the bootloader is smarter about finding and loading the kernel",
+            "The kernel can only be loaded by another kernel",
+            "The bootloader is faster than the firmware at testing memory"
           ],
-          "answerIndex": 2,
-          "explanation": "emergency.target gives the most minimal environment (root shell, root FS often read-only, almost nothing else started) — typically reached when boot fails badly, e.g. a bad /etc/fstab entry."
+          "answerIndex": 1,
+          "explanation": "Firmware is intentionally minimal — it just launches one file. The bootloader adds the smarts to locate the kernel, load it, and pass it settings. It is a division of labor, not a legal rule."
         },
         {
           "id": "boot-chain-l3-mc4",
           "type": "mcq",
-          "prompt": "In the full power-button-to-login narration, which ordering is correct?",
+          "prompt": "What is the \"kernel command line\" that GRUB passes to the kernel?",
           "choices": [
-            "Bootloader → firmware POST → kernel → initramfs → PID 1",
-            "Firmware POST → bootloader loads vmlinuz+initramfs → kernel mounts initramfs → switch_root to real root → execve PID 1 → target → login",
-            "Firmware POST → kernel → bootloader → real root → PID 1 → initramfs",
-            "Kernel → firmware → initramfs → bootloader → login"
+            "A line of text with startup settings the kernel reads, such as which disk holds the main system",
+            "The command you type to log in",
+            "A list of all the files on the disk",
+            "The serial number of the motherboard"
           ],
-          "answerIndex": 1,
-          "explanation": "Firmware runs first (POST, find boot device), the bootloader loads the kernel + initramfs and the cmdline, the kernel mounts the initramfs which sets up and switch_roots into the real root, the kernel execs PID 1 (systemd), which reaches the default target ending at the login prompt."
+          "answerIndex": 0,
+          "explanation": "The kernel command line is a short string of startup options the kernel reads as it boots. It is set by GRUB, not typed by the user at login, and it is not a file list or a serial number."
         },
         {
           "id": "boot-chain-l3-mc5",
           "type": "mcq",
-          "prompt": "What does `init=/bin/sh` on the kernel command line accomplish?",
+          "prompt": "Why does GRUB sometimes show a menu during boot?",
           "choices": [
-            "Disables systemd permanently on disk",
-            "Tells the kernel to execve /bin/sh as PID 1 instead of the normal init — useful for emergency recovery",
-            "Forces the system into graphical.target",
-            "Rebuilds the initramfs at boot"
+            "To let you type your password",
+            "To let you choose between multiple operating systems or kernel versions if more than one is installed",
+            "To run the Power-On Self-Test",
+            "To format the disk before booting"
           ],
           "answerIndex": 1,
-          "explanation": "init= overrides which program the kernel execs as PID 1. Pointing it at /bin/sh drops you to a raw shell as PID 1 (no service manager) — a classic password-reset/recovery trick."
+          "explanation": "The GRUB menu exists so you can pick which OS or kernel to start when several are available; otherwise it usually auto-selects a default. Passwords, POST, and formatting are not what the menu is for."
+        },
+        {
+          "id": "boot-chain-l3-mc6",
+          "type": "mcq",
+          "prompt": "Which bootloader is commonly used on small embedded devices with ARM chips, instead of GRUB?",
+          "choices": [
+            "systemd",
+            "U-Boot",
+            "POST",
+            "FAT32"
+          ],
+          "answerIndex": 1,
+          "explanation": "U-Boot is the bootloader often used on tiny ARM-based hardware like routers and single-board computers. systemd is init (a much later stage), POST is a hardware test, and FAT32 is a disk format."
+        },
+        {
+          "id": "boot-chain-l3-mc7",
+          "type": "mcq",
+          "prompt": "Where does the bootloader sit in the boot chain?",
+          "choices": [
+            "Before the firmware",
+            "Between the firmware and the kernel",
+            "After init (systemd)",
+            "At the very end, right before login"
+          ],
+          "answerIndex": 1,
+          "explanation": "The firmware launches the bootloader, and the bootloader loads the kernel — so it sits squarely between the two. It does not run before the firmware or after init."
+        },
+        {
+          "id": "boot-chain-l3-mc8",
+          "type": "mcq",
+          "prompt": "As a beginner, what is the most important thing to recognize about GRUB's menu?",
+          "choices": [
+            "You must hand-write the whole menu file before every boot",
+            "It is the screen where you can pick which operating system or kernel to start",
+            "It is the same as the login screen",
+            "It only appears after the kernel has fully loaded"
+          ],
+          "answerIndex": 1,
+          "explanation": "Recognizing GRUB's menu — the boot-time screen for choosing an OS or kernel — is the practical takeaway. The menu is generated from config (not hand-written each boot), it is not the login screen, and it appears before the kernel loads, not after."
+        },
+        {
+          "id": "boot-chain-l3-mc9",
+          "type": "mcq",
+          "prompt": "Using the receptionist analogy, GRUB \"walks you to the right room.\" What does the \"right room\" represent?",
+          "choices": [
+            "The login prompt",
+            "The correct kernel to load and start",
+            "The motherboard firmware",
+            "The Wi-Fi network"
+          ],
+          "answerIndex": 1,
+          "explanation": "The analogy means GRUB directs the boot to the correct kernel and loads it. The login prompt comes much later, the firmware ran earlier, and networking is unrelated to GRUB's core job."
+        }
+      ]
+    },
+    {
+      "id": "boot-chain-l4-kernel-initramfs",
+      "title": "The Kernel Starts — and Why initramfs Exists",
+      "order": 4,
+      "difficulty": 3,
+      "content": "GRUB has loaded the **kernel** — the core of Linux — into memory and started it. The kernel now takes charge of the hardware: it sets up memory, detects devices, and prepares to run programs. Its big goal at this point is to mount the **root filesystem**: the main disk where all the system's files live, the one that becomes \"`/`\".\n\nBut there's a chicken-and-egg problem. To read a disk, the kernel needs the right **driver** — a small piece of code that knows how to talk to that specific kind of hardware. Modern disks come in many flavors: fast NVMe drives, encrypted volumes, RAID setups. The kernel can't include every possible driver built-in (it would be huge), so the driver it needs to reach the real disk might not be loaded yet. The kernel can't mount a disk it can't talk to.\n\nThe clever solution is the **initramfs** (initial RAM filesystem). Along with the kernel, GRUB also loaded a second small file: a tiny, temporary filesystem that lives entirely in memory. The initramfs contains just enough drivers and tools to find and open the real disk.\n\nThink of it like a spare key kept under the doormat. You can't get into the house without the key, and the key isn't *inside* the house — so you keep a small one outside, just enough to open the front door. Once you're in, you don't need it anymore.\n\nThe sequence: the kernel mounts the initramfs first, runs the drivers inside it, uses them to find and mount the real root disk, then **switches over** to that real disk as \"`/`\". The initramfs is then thrown away, freeing the memory.\n\n**Recap:** the kernel needs to mount the real disk, but might lack the driver to reach it. The initramfs is a tiny temporary in-memory filesystem carrying those drivers — a stepping-stone that gets the kernel to the real root, then disappears.",
+      "items": [
+        {
+          "id": "boot-chain-l4-mc1",
+          "type": "mcq",
+          "prompt": "What is the kernel's main goal once GRUB has started it?",
+          "choices": [
+            "To show the GRUB menu",
+            "To take charge of the hardware and mount the real root filesystem (the main disk, \"/\")",
+            "To run the Power-On Self-Test",
+            "To pick which operating system to boot"
+          ],
+          "answerIndex": 1,
+          "explanation": "After starting, the kernel controls the hardware and works toward mounting the root filesystem so the system's files become available. The GRUB menu, POST, and OS selection all happened in earlier stages."
+        },
+        {
+          "id": "boot-chain-l4-mc2",
+          "type": "mcq",
+          "prompt": "What is the initramfs FOR? (the key idea of this lesson)",
+          "choices": [
+            "It is a permanent backup copy of all your files",
+            "It is a tiny temporary in-memory filesystem holding the drivers the kernel needs to find and mount the real disk",
+            "It is the firmware stored on the motherboard",
+            "It is the login screen shown before the desktop"
+          ],
+          "answerIndex": 1,
+          "explanation": "The initramfs is a small, temporary RAM-based filesystem that carries just enough drivers and tools to reach the real root disk. It is not a backup, not firmware, and not the login screen."
+        },
+        {
+          "id": "boot-chain-l4-mc3",
+          "type": "mcq",
+          "prompt": "What is a \"driver\" in this context?",
+          "choices": [
+            "A person who maintains the computer",
+            "A small piece of code that knows how to talk to a specific kind of hardware, like a particular disk",
+            "Another name for the kernel command line",
+            "The cable connecting the disk to the motherboard"
+          ],
+          "answerIndex": 1,
+          "explanation": "A driver is software that lets the kernel communicate with a specific device. Without the right driver, the kernel cannot read that disk — which is exactly the problem the initramfs solves."
+        },
+        {
+          "id": "boot-chain-l4-mc4",
+          "type": "mcq",
+          "prompt": "Why might the kernel be unable to mount the real disk on its own, right away?",
+          "choices": [
+            "Because the disk is always encrypted by law",
+            "Because the kernel can't build in every possible driver, so the driver for that exact disk type may not be loaded yet",
+            "Because GRUB deletes the disk during boot",
+            "Because the firmware locks the disk until login"
+          ],
+          "answerIndex": 1,
+          "explanation": "Including every driver would make the kernel enormous, so the needed driver for a particular NVMe, encrypted, or RAID disk may not be present initially. The kernel cannot mount hardware it cannot yet talk to."
+        },
+        {
+          "id": "boot-chain-l4-mc5",
+          "type": "mcq",
+          "prompt": "In the \"spare key under the doormat\" analogy, what does the spare key represent?",
+          "choices": [
+            "Your login password",
+            "The initramfs — just enough to open the door (mount the real disk), kept outside the house",
+            "The firmware in the motherboard chip",
+            "The GRUB menu"
+          ],
+          "answerIndex": 1,
+          "explanation": "The spare key is the initramfs: a small thing kept outside the \"house\" (the real disk) that holds just enough to open the front door. Once inside, it is no longer needed — just like the initramfs is discarded after the real root is mounted."
+        },
+        {
+          "id": "boot-chain-l4-mc6",
+          "type": "mcq",
+          "prompt": "Which describes the correct sequence the kernel follows with the initramfs?",
+          "choices": [
+            "Mount the real disk, then load the initramfs, then delete the kernel",
+            "Mount the initramfs first, use its drivers to find and mount the real root disk, then switch to the real disk and discard the initramfs",
+            "Run the initramfs as the permanent root forever",
+            "Skip the initramfs and ask the firmware to mount the disk"
+          ],
+          "answerIndex": 1,
+          "explanation": "The kernel mounts the temporary initramfs, runs its drivers to reach the real root, switches over to that real disk, and then frees the initramfs. It is a stepping-stone, never the permanent root."
+        },
+        {
+          "id": "boot-chain-l4-mc7",
+          "type": "mcq",
+          "prompt": "What happens to the initramfs after the real root filesystem is mounted?",
+          "choices": [
+            "It stays in memory permanently as the main filesystem",
+            "It is thrown away, freeing the memory it used",
+            "It is copied onto the disk for next time",
+            "It becomes the kernel"
+          ],
+          "answerIndex": 1,
+          "explanation": "Once the real root is mounted, the initramfs has done its job and is discarded so its memory can be reused. It is temporary by design and does not become the kernel or get saved to disk."
+        },
+        {
+          "id": "boot-chain-l4-mc8",
+          "type": "mcq",
+          "prompt": "Where does the initramfs live while it is in use?",
+          "choices": [
+            "On the EFI System Partition",
+            "Entirely in memory (RAM)",
+            "Inside the motherboard firmware chip",
+            "On the real root disk it is trying to mount"
+          ],
+          "answerIndex": 1,
+          "explanation": "The initramfs is an \"initial RAM filesystem\" — it lives in memory. It cannot live on the real root disk, since its whole purpose is to reach that disk in the first place."
+        },
+        {
+          "id": "boot-chain-l4-mc9",
+          "type": "mcq",
+          "prompt": "What does it mean that the kernel \"mounts\" the root filesystem?",
+          "choices": [
+            "It physically screws the disk into the case",
+            "It makes the disk's files available to the system, attached at the path \"/\"",
+            "It deletes everything on the disk",
+            "It copies the disk into the firmware"
+          ],
+          "answerIndex": 1,
+          "explanation": "Mounting means making a filesystem's contents accessible, attached at a location in the directory tree — here, at the root \"/\". It has nothing to do with physically installing the drive or erasing it."
+        },
+        {
+          "id": "boot-chain-l4-mc10",
+          "type": "mcq",
+          "prompt": "Two files are loaded together by GRUB at boot. What are they?",
+          "choices": [
+            "The firmware and the BIOS",
+            "The kernel and the initramfs",
+            "The login screen and the desktop",
+            "The EFI System Partition and the root disk"
+          ],
+          "answerIndex": 1,
+          "explanation": "GRUB loads both the kernel and its initramfs into memory. The firmware/BIOS run before GRUB, and the login screen and desktop come much later via init."
+        },
+        {
+          "id": "boot-chain-l4-img",
+          "type": "mcq",
+          "prompt": "The diagram shows three steps. Which step lets the kernel finally reach the real disk?",
+          "choices": [
+            "Step 1, where the kernel starts but cannot yet read the real disk",
+            "Step 2, where the initramfs supplies the drivers needed to reach the disk",
+            "There is no step that reaches the disk",
+            "Step 1, because the kernel never needs any drivers"
+          ],
+          "answerIndex": 1,
+          "explanation": "In step 1 the kernel lacks the driver; step 2 is the initramfs providing that driver so the kernel can mount the real root in step 3. The initramfs is the bridge between not-reachable and reachable.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/boot-chain-4.svg"
+        }
+      ]
+    },
+    {
+      "id": "boot-chain-l5-init-handoff",
+      "title": "The Handoff to init and systemd",
+      "order": 5,
+      "difficulty": 3,
+      "content": "The kernel has mounted the real disk. Now comes a special moment: the kernel starts the very first ordinary program. That program becomes **PID 1** — process number 1, the first process — and it is called **init**. On modern Linux, init is a program named **systemd**.\n\nThis is the boundary between two worlds. Before this moment, the kernel was running everything itself (\"kernel space\"). After it, normal programs run on top of the kernel (\"user space\"). The kernel doesn't stop — it keeps running underneath, managing hardware — but from now on it starts programs *as requested* rather than driving the boot itself.\n\nPID 1 is special in two ways. It is the **ancestor of every other program**: everything else is started by it, or by something it started. And it **never exits** while the computer is on — if PID 1 stopped, the system would have no one in charge.\n\nWhat does systemd actually do? It starts all the services that make a usable system: networking, logging, the sound system, the graphical desktop, and finally the **login prompt**. It starts many of them **in parallel** (at the same time) where it safely can, which is part of why modern systems boot quickly.\n\nA bit of history: before systemd, the classic init was **SysV init**, which started services strictly one after another using numbered scripts and \"runlevels\" (numbered system states). systemd replaced runlevels with **targets** — named goals like `multi-user.target` (a full text-mode system) or `graphical.target` (a full desktop). You don't need to memorize these as a beginner; just know that a \"target\" is systemd's word for \"the state we're booting toward.\"\n\n**Recap:** the kernel starts init (systemd) as PID 1 — the first process, ancestor of all others, which never exits. systemd then starts the system's services, often in parallel, ending at the login prompt. This is the final handoff in the boot chain.",
+      "items": [
+        {
+          "id": "boot-chain-l5-mc1",
+          "type": "mcq",
+          "prompt": "What is PID 1?",
+          "choices": [
+            "The first hard disk in the computer",
+            "Process number 1 — the very first ordinary program the kernel starts, called init",
+            "The first partition on the disk",
+            "The firmware's identification number"
+          ],
+          "answerIndex": 1,
+          "explanation": "PID 1 is the first process: the init program the kernel launches once the real disk is mounted. It is not a disk, partition, or firmware ID."
+        },
+        {
+          "id": "boot-chain-l5-mc2",
+          "type": "mcq",
+          "prompt": "On a modern Linux system, which program is init (PID 1)?",
+          "choices": [
+            "GRUB",
+            "systemd",
+            "The kernel",
+            "UEFI"
+          ],
+          "answerIndex": 1,
+          "explanation": "Today systemd is init. GRUB is the bootloader, the kernel is a separate (earlier) thing that starts init, and UEFI is firmware from the very start of the chain."
+        },
+        {
+          "id": "boot-chain-l5-mc3",
+          "type": "mcq",
+          "prompt": "Why is the start of PID 1 described as a \"boundary\"?",
+          "choices": [
+            "It is where the disk is physically partitioned",
+            "It marks the switch from the kernel driving the boot (kernel space) to normal programs running on top of it (user space)",
+            "It is the boundary between two different disks",
+            "It is where the firmware hands off to GRUB"
+          ],
+          "answerIndex": 1,
+          "explanation": "Starting PID 1 is the crossing point from kernel space (the kernel running the show) to user space (ordinary programs). The firmware-to-GRUB handoff happened much earlier in the chain."
+        },
+        {
+          "id": "boot-chain-l5-mc4",
+          "type": "mcq",
+          "prompt": "What makes PID 1 special compared to ordinary programs?",
+          "choices": [
+            "It runs only for one second and then quits",
+            "It is the ancestor of every other program and never exits while the computer is on",
+            "It runs inside the firmware chip",
+            "It is the only program that can read the disk"
+          ],
+          "answerIndex": 1,
+          "explanation": "PID 1 starts everything else (directly or indirectly) and must keep running the whole time the system is up. If it exited, nothing would be in charge. It runs in user space, not in the firmware."
+        },
+        {
+          "id": "boot-chain-l5-mc5",
+          "type": "mcq",
+          "prompt": "Does the kernel stop running once init (systemd) starts?",
+          "choices": [
+            "Yes, the kernel shuts down and systemd takes its place entirely",
+            "No, the kernel keeps running underneath, managing hardware, while programs run on top of it",
+            "Yes, but only until login",
+            "No, but the kernel is copied into the initramfs"
+          ],
+          "answerIndex": 1,
+          "explanation": "The kernel never stops while the system runs; it continues managing hardware beneath user-space programs. init does not replace the kernel — it runs on top of it."
+        },
+        {
+          "id": "boot-chain-l5-mc6",
+          "type": "mcq",
+          "prompt": "What does systemd do after it becomes PID 1?",
+          "choices": [
+            "It tests the memory and finds a boot disk",
+            "It starts the system's services (networking, logging, desktop) and finally the login prompt",
+            "It loads the kernel into memory",
+            "It runs the GRUB menu"
+          ],
+          "answerIndex": 1,
+          "explanation": "systemd's job as init is to bring up all the services that make a usable system, ending at the login prompt. Memory testing/boot-disk finding is the firmware's job, and loading the kernel is GRUB's."
+        },
+        {
+          "id": "boot-chain-l5-mc7",
+          "type": "mcq",
+          "prompt": "One reason modern systems boot quickly is that systemd does what?",
+          "choices": [
+            "Skips starting most services",
+            "Starts many services in parallel (at the same time) where it safely can",
+            "Runs entirely inside the firmware",
+            "Boots without a kernel"
+          ],
+          "answerIndex": 1,
+          "explanation": "systemd starts independent services in parallel rather than strictly one-by-one, which speeds up boot. It does not skip needed services, and it certainly still requires the kernel."
+        },
+        {
+          "id": "boot-chain-l5-mc8",
+          "type": "mcq",
+          "prompt": "How did the older SysV init differ from systemd?",
+          "choices": [
+            "SysV started services strictly one after another using numbered scripts and runlevels",
+            "SysV ran before the firmware",
+            "SysV was a type of disk",
+            "SysV did not need a kernel"
+          ],
+          "answerIndex": 0,
+          "explanation": "The classic SysV init started services serially (one at a time) via numbered scripts and runlevels. systemd replaced that with parallel startup and named targets. Both run as init, after the kernel."
+        },
+        {
+          "id": "boot-chain-l5-mc9",
+          "type": "mcq",
+          "prompt": "In systemd, what is a \"target\" (such as graphical.target)?",
+          "choices": [
+            "A named goal describing the state the system is booting toward, like a full desktop",
+            "A physical disk to boot from",
+            "A driver inside the initramfs",
+            "A setting in the motherboard firmware"
+          ],
+          "answerIndex": 0,
+          "explanation": "A target is systemd's word for a state to reach, such as graphical.target (full desktop) or multi-user.target (full text-mode). It replaced the older numbered runlevels and has nothing to do with disks or firmware."
+        },
+        {
+          "id": "boot-chain-l5-mc10",
+          "type": "mcq",
+          "prompt": "Putting it together: which is the correct final stretch of the boot chain?",
+          "choices": [
+            "Kernel mounts the real disk → starts init (systemd) as PID 1 → systemd starts services → login prompt",
+            "systemd starts the kernel → kernel finds the disk → login → PID 1",
+            "Login prompt → kernel → systemd → disk mounted",
+            "Kernel → firmware → systemd → GRUB → login"
+          ],
+          "answerIndex": 0,
+          "explanation": "After mounting the real root, the kernel starts systemd as PID 1, which brings up services and ends at the login prompt. The kernel starts systemd — not the other way around — and firmware/GRUB ran long before this stage."
+        },
+        {
+          "id": "boot-chain-l5-img",
+          "type": "mcq",
+          "prompt": "The diagram divides the picture into \"kernel space\" and \"user space.\" What is the single arrow between them?",
+          "choices": [
+            "The firmware testing the hardware",
+            "The handoff where the kernel starts init (PID 1, systemd) in user space",
+            "GRUB loading the kernel",
+            "The login prompt appearing"
+          ],
+          "answerIndex": 1,
+          "explanation": "The arrow is the handoff: the kernel (kernel space) starts init as PID 1 in user space. GRUB loading the kernel and the firmware's hardware test were earlier stages, and login comes after this handoff.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/boot-chain-5.svg"
+        }
+      ]
+    },
+    {
+      "id": "boot-chain-l6-diagnostics",
+      "title": "When Boot Goes Wrong: Diagnostics",
+      "order": 6,
+      "difficulty": 4,
+      "content": "Now the payoff. You understand the chain: firmware → bootloader → kernel → initramfs → init → login. When a machine misbehaves — boots slowly, or a service fails — Linux keeps detailed records of what happened, and a few commands let you read them. You don't need to memorize every option; just know which tool answers which question.\n\n**`dmesg`** shows the **kernel's messages** — the running log the kernel keeps from the moment it started: which devices it found, which drivers it loaded, any hardware complaints. If a disk or network card isn't working, `dmesg` often shows the kernel struggling with it. (\"dmesg\" stands for \"display message,\" referring to the kernel's message buffer.)\n\n**`journalctl -b`** shows the **logs from the current boot**. systemd keeps a unified journal of everything that happened since power-on — every service starting, succeeding, or failing. The `-b` part means \"this boot only.\" This is where you look when a *service* (not the hardware) failed to start. To see kernel-only messages from this boot, you can add `-k`.\n\n**`systemd-analyze`** answers \"**why was boot slow?**\" On its own it prints how long each phase took (firmware, loader, kernel, userspace). Adding `blame` lists the slowest services, so you can see what dragged boot down.\n\nThe mental model: a hardware/driver problem? Reach for `dmesg`. A service that won't start? Reach for `journalctl -b`. A slow boot? Reach for `systemd-analyze`. These three cover most boot troubleshooting, and they all build on the same chain you've learned — each tool reports on a different stage of it.\n\n**Recap:** `dmesg` for kernel/hardware messages, `journalctl -b` for this-boot service logs (`-k` for kernel-only), and `systemd-analyze` (with `blame`) for boot timing. Match the tool to the question, and the boot chain becomes something you can debug, not just describe.",
+      "items": [
+        {
+          "id": "boot-chain-l6-mc1",
+          "type": "mcq",
+          "prompt": "Which command shows the kernel's own messages, such as which devices and drivers it found?",
+          "choices": [
+            "dmesg",
+            "systemd-analyze blame",
+            "ls /boot",
+            "efibootmgr"
+          ],
+          "answerIndex": 0,
+          "explanation": "dmesg displays the kernel's message buffer — device detection, driver loading, and hardware warnings. systemd-analyze is about boot timing, and the others are unrelated to reading kernel messages."
+        },
+        {
+          "id": "boot-chain-l6-mc2",
+          "type": "mcq",
+          "prompt": "You suspect a hardware or driver problem during boot — a disk or network card that won't come up. Which tool should you reach for first?",
+          "choices": [
+            "systemd-analyze",
+            "dmesg",
+            "The GRUB menu",
+            "POST"
+          ],
+          "answerIndex": 1,
+          "explanation": "Hardware and driver issues show up in the kernel's messages, which dmesg displays. systemd-analyze is for timing, the GRUB menu is for choosing a kernel, and POST is the firmware's early self-test."
+        },
+        {
+          "id": "boot-chain-l6-mc3",
+          "type": "mcq",
+          "prompt": "What does `journalctl -b` show?",
+          "choices": [
+            "Only the firmware's settings",
+            "The logs from the current boot — systemd's unified record of what happened since power-on",
+            "A list of files in /boot",
+            "The contents of the EFI System Partition"
+          ],
+          "answerIndex": 1,
+          "explanation": "journalctl reads systemd's journal, and -b limits it to the current boot: every service starting, succeeding, or failing since power-on. It is not a firmware viewer or a file lister."
+        },
+        {
+          "id": "boot-chain-l6-mc4",
+          "type": "mcq",
+          "prompt": "A particular service failed to start during boot. Which command is best for investigating that?",
+          "choices": [
+            "dmesg",
+            "journalctl -b",
+            "systemd-analyze",
+            "efibootmgr"
+          ],
+          "answerIndex": 1,
+          "explanation": "Service start/fail records live in systemd's journal, so journalctl -b is the right tool. dmesg focuses on the kernel/hardware, and systemd-analyze is about how long boot took, not why a service failed."
+        },
+        {
+          "id": "boot-chain-l6-mc5",
+          "type": "mcq",
+          "prompt": "Your computer boots, but slowly. Which command answers \"why was boot slow?\"",
+          "choices": [
+            "dmesg",
+            "journalctl -k",
+            "systemd-analyze (especially with 'blame')",
+            "ls /"
+          ],
+          "answerIndex": 2,
+          "explanation": "systemd-analyze reports how long each boot phase took, and systemd-analyze blame lists the slowest services. dmesg and journalctl -k show kernel messages, which are about correctness, not timing."
+        },
+        {
+          "id": "boot-chain-l6-mc6",
+          "type": "mcq",
+          "prompt": "What does the `-b` in `journalctl -b` mean?",
+          "choices": [
+            "Show messages in the background",
+            "Limit the output to the current boot only",
+            "Show only the bootloader's messages",
+            "Sort the output alphabetically"
+          ],
+          "answerIndex": 1,
+          "explanation": "-b narrows the journal to the current boot, so you see only what happened since the last power-on. It is not about backgrounding, the bootloader specifically, or sorting."
+        },
+        {
+          "id": "boot-chain-l6-mc7",
+          "type": "mcq",
+          "prompt": "How would you see kernel-only messages from the current boot using journalctl?",
+          "choices": [
+            "journalctl -b -k",
+            "journalctl --firmware",
+            "journalctl --grub",
+            "journalctl -b --slow"
+          ],
+          "answerIndex": 0,
+          "explanation": "Adding -k to journalctl -b filters to kernel messages from this boot — similar to dmesg but as a journal query. The other options are not real options."
+        },
+        {
+          "id": "boot-chain-l6-mc8",
+          "type": "mcq",
+          "prompt": "Match the tool to the question: \"Which services took the longest to start?\"",
+          "choices": [
+            "dmesg",
+            "systemd-analyze blame",
+            "journalctl -k",
+            "efibootmgr"
+          ],
+          "answerIndex": 1,
+          "explanation": "systemd-analyze blame lists services ordered by how long they took to start, directly answering this question. dmesg and journalctl -k are about kernel messages, not service timing."
+        },
+        {
+          "id": "boot-chain-l6-mc9",
+          "type": "mcq",
+          "prompt": "Why is knowing the boot chain helpful for using these diagnostic tools?",
+          "choices": [
+            "It isn't — the tools work without any understanding",
+            "Each tool reports on a different stage of the chain, so knowing the stages tells you which tool to use",
+            "The tools only run if you can recite the chain out loud",
+            "The chain replaces the need for any diagnostic tools"
+          ],
+          "answerIndex": 1,
+          "explanation": "Because each tool covers a different part of the chain (kernel/hardware, services, timing), knowing the chain points you to the right tool for a given symptom. Understanding does not replace the tools, but it makes them far more useful."
+        },
+        {
+          "id": "boot-chain-l6-mc10",
+          "type": "mcq",
+          "prompt": "Pick the correct tool-to-question matching for all three tools.",
+          "choices": [
+            "dmesg = slow boot; journalctl -b = hardware; systemd-analyze = service failed",
+            "dmesg = kernel/hardware messages; journalctl -b = this-boot service logs; systemd-analyze = boot timing",
+            "dmesg = login problems; journalctl -b = firmware settings; systemd-analyze = disk formatting",
+            "All three do exactly the same thing"
+          ],
+          "answerIndex": 1,
+          "explanation": "dmesg reports kernel/hardware messages, journalctl -b shows this boot's service logs, and systemd-analyze reports boot timing. Matching the symptom to the right tool is the practical skill of this lesson."
         }
       ]
     }
