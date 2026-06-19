@@ -4,284 +4,510 @@
   "order": 11,
   "lessons": [
     {
-      "id": "text-processing-regex-foundations",
-      "title": "Regular Expressions: BRE, ERE, and PCRE",
+      "id": "text-processing-grep-basics",
+      "title": "grep: Finding Lines That Match",
       "order": 1,
       "difficulty": 1,
-      "content": "A regex is a tiny pattern language for matching text. Linux ships **three flavors**, and knowing which one a tool speaks saves hours of confusion.\n\n- **BRE** (Basic RE) is the default for `grep` and `sed`. Here `+`, `?`, `{`, `(`, `|` are *literal* unless backslash-escaped: you write `\\(group\\)`, `a\\{2,3\\}`, `foo\\|bar`.\n- **ERE** (Extended RE) is `grep -E` (aka `egrep`) and `sed -E`. Metacharacters work *unescaped*: `(group)`, `a{2,3}`, `foo|bar`. Almost always what you want.\n- **PCRE** (Perl-compatible) is `grep -P` and most languages. Adds lazy quantifiers, lookaround, `\\d`, `\\b`, named groups.\n\nThe building blocks:\n\n- **Anchors:** `^` start of line, `$` end of line.\n- **Character classes:** `[abc]`, ranges `[a-z]`, negation `[^0-9]`, and POSIX classes `[[:digit:]]`, `[[:alpha:]]`, `[[:space:]]`.\n- **The dot** `.` matches any single character (except newline).\n- **Quantifiers:** `*` (0+), `+` (1+), `?` (0 or 1), `{n}`, `{n,}`, `{n,m}`.\n\n```bash\n# ERE: match a US-style phone number\ngrep -E '\\(?[0-9]{3}\\)?[-. ]?[0-9]{3}[-. ]?[0-9]{4}' contacts.txt\n\n# BRE equivalent quantifier braces need escaping\ngrep '[0-9]\\{3\\}-[0-9]\\{4\\}' contacts.txt\n```\n\nRule of thumb: reach for `-E` so your patterns read like the textbook. Drop to `-P` only when you need lookaround or lazy matching.",
+      "content": "On Linux, almost everything is plain text: log files, settings, lists of names, the output of commands. So one of the most useful skills is being able to *search* that text quickly.\n\n`grep` does exactly that. Give it a word and a file, and it prints back only the lines that contain that word. Think of it like the **Find** box in a text editor or browser, but it works on any file or any stream of text.\n\n```bash\ngrep \"error\" server.log\n```\n\nThis reads `server.log` line by line and prints every line containing the text `error`. Lines without it are simply skipped.\n\nYou can change how grep behaves with **flags** (small options that start with a dash):\n\n```bash\ngrep -i \"error\" server.log    # -i = ignore case (Error, ERROR, error all match)\ngrep -n \"error\" server.log    # -n = show the line NUMBER of each match\ngrep -v \"error\" server.log    # -v = invert: show lines that do NOT match\ngrep -r \"error\" logs/         # -r = search every file in a folder, recursively\n```\n\nYou can also feed grep the output of another command using a **pipe** (`|`), which you met in the shell lesson. The pipe sends one command's output straight into grep:\n\n```bash\nps aux | grep firefox          # from the list of all processes, keep firefox lines\n```\n\nFor now, your search text can just be a plain word or phrase. (Later you'll learn *patterns* that can match shapes of text, not just exact words.)\n\n**Recap:** `grep PATTERN FILE` prints the lines that match. Remember four everyday flags: `-i` ignore case, `-n` line numbers, `-v` invert, `-r` search a folder.",
       "items": [
         {
-          "id": "text-processing-fc-bre-vs-ere",
-          "type": "flashcard",
-          "front": "What is the core syntactic difference between BRE and ERE?",
-          "back": "In BRE, the metacharacters +, ?, {, }, (, ), and | are literal and must be backslash-escaped to act as operators. In ERE they work unescaped. `grep` defaults to BRE; `grep -E` selects ERE.",
-          "hint": "Think about which characters need a backslash."
-        },
-        {
-          "id": "text-processing-fc-anchors",
-          "type": "flashcard",
-          "front": "What do the anchors ^ and $ match?",
-          "back": "^ matches the start of a line and $ matches the end of a line. They are zero-width: they match a position, not a character. So ^$ matches an empty line.",
-          "hint": "They match positions, not characters."
-        },
-        {
-          "id": "text-processing-fc-posix-classes",
-          "type": "flashcard",
-          "front": "What does the POSIX class [[:digit:]] mean, and why prefer it over [0-9]?",
-          "back": "[[:digit:]] matches any decimal digit. It is locale-aware and unambiguous inside a bracket expression. Note the double brackets: the inner [:digit:] is the class, the outer [ ] is the bracket expression.",
-          "hint": "Double brackets, locale-aware."
-        },
-        {
-          "id": "text-processing-fc-dot-quantifiers",
-          "type": "flashcard",
-          "front": "What do . , * , + , and ? mean in a regex?",
-          "back": ". matches any single character (except newline). * means 0 or more of the preceding atom, + means 1 or more, ? means 0 or 1 (optional). So .* matches any run of characters including nothing.",
-          "hint": "One of them matches 'any char', three are quantifiers."
-        },
-        {
-          "id": "text-processing-mcq-grep-p",
+          "id": "text-processing-mcq-grep-what",
           "type": "mcq",
-          "prompt": "Which grep flag enables Perl-compatible regex (PCRE), unlocking features like \\d, \\b, and lookaround?",
-          "choices": ["grep -E", "grep -P", "grep -F", "grep -G"],
+          "prompt": "In one sentence, what does grep do?",
+          "choices": ["It replaces text in a file", "It prints the lines that match your search text", "It counts the columns in a file", "It sorts lines into alphabetical order"],
           "answerIndex": 1,
-          "explanation": "-P selects PCRE. -E is ERE (no \\d or lookaround), -F is fixed-string literal matching, and -G is the default BRE."
+          "explanation": "grep searches text and prints back the lines that contain what you asked for, like a Find box. Replacing text is sed's job, and sorting is the sort command's job."
         },
         {
-          "id": "text-processing-mcq-negated-class",
+          "id": "text-processing-mcq-grep-basic-cmd",
           "type": "mcq",
-          "prompt": "Inside a bracket expression, what does [^0-9] match?",
-          "choices": ["The literal characters ^, 0, -, and 9", "Any single character that is NOT a digit 0-9", "The start of a line followed by digits", "Zero or more digits"],
+          "prompt": "You want every line in notes.txt that contains the word 'meeting'. Which command?",
+          "choices": ["grep notes.txt \"meeting\"", "grep \"meeting\" notes.txt", "find \"meeting\" notes.txt", "grep -v \"meeting\" notes.txt"],
           "answerIndex": 1,
-          "explanation": "A ^ as the first character inside [ ] negates the class, so [^0-9] matches any one character that is not a digit. Outside brackets ^ is an anchor."
+          "explanation": "The order is grep PATTERN FILE, so the search text comes first and the file second. grep -v would do the opposite (lines WITHOUT 'meeting'), and find searches for filenames, not text inside files."
         },
         {
-          "id": "text-processing-mcq-bre-braces",
+          "id": "text-processing-mcq-grep-i",
           "type": "mcq",
-          "prompt": "In a BRE pattern (plain grep), how do you match exactly three digits?",
-          "choices": ["[0-9]{3}", "[0-9]\\{3\\}", "\\d{3}", "[0-9]+3"],
-          "answerIndex": 1,
-          "explanation": "In BRE the interval braces are literal unless escaped, so you must write [0-9]\\{3\\}. Unescaped {3} only works in ERE (grep -E). \\d is a PCRE feature."
+          "prompt": "Which flag makes grep treat 'Error', 'ERROR', and 'error' as the same thing?",
+          "choices": ["-n", "-v", "-i", "-r"],
+          "answerIndex": 2,
+          "explanation": "-i means 'ignore case', so upper- and lower-case letters match each other. -n adds line numbers, -v inverts the match, and -r searches a whole folder."
         },
         {
-          "id": "text-processing-fc-egrep-fgrep",
-          "type": "flashcard",
-          "front": "What are egrep and fgrep equivalent to in modern grep?",
-          "back": "egrep == grep -E (extended regex). fgrep == grep -F (fixed strings, no regex interpretation, faster for plain substrings). Both standalone commands are deprecated in favor of the flags.",
-          "hint": "-E and -F."
+          "id": "text-processing-mcq-grep-v",
+          "type": "mcq",
+          "prompt": "A file has 100 lines, and 12 of them contain the word 'debug'. How many lines does `grep -v debug file` print?",
+          "choices": ["12", "88", "100", "0"],
+          "answerIndex": 1,
+          "explanation": "-v inverts the match: it prints the lines that do NOT contain the word. 100 total minus 12 matching leaves 88 non-matching lines."
+        },
+        {
+          "id": "text-processing-mcq-grep-n",
+          "type": "mcq",
+          "prompt": "You want to see WHERE in the file each match is (its line number). Which flag adds that?",
+          "choices": ["-n", "-c", "-i", "-l"],
+          "answerIndex": 0,
+          "explanation": "-n prefixes each matching line with its line number in the file. -c would instead print just a count of matches, and -l would print only the filename."
+        },
+        {
+          "id": "text-processing-mcq-grep-r",
+          "type": "mcq",
+          "prompt": "You don't know which file under the logs/ folder mentions 'timeout'. What is the simplest way to search them all?",
+          "choices": ["grep \"timeout\" logs/", "grep -r \"timeout\" logs/", "grep -v \"timeout\" logs/", "grep -i logs/ \"timeout\""],
+          "answerIndex": 1,
+          "explanation": "-r (recursive) tells grep to descend into the folder and search every file inside it. Plain `grep \"timeout\" logs/` does not search inside a directory on its own. -v would invert the match and the last option has the arguments in the wrong order."
+        },
+        {
+          "id": "text-processing-mcq-grep-pipe",
+          "type": "mcq",
+          "prompt": "What does the pipe do in `ps aux | grep ssh`?",
+          "choices": ["It saves the output of ps to a file called grep", "It sends the output of ps into grep, which keeps only lines containing 'ssh'", "It runs ps and grep as two unrelated commands", "It searches the file named ssh for the text ps aux"],
+          "answerIndex": 1,
+          "explanation": "A pipe (|) feeds the left command's output straight into the right command as its input. So grep filters the process list down to lines mentioning ssh. Nothing is saved to a file, and ssh is not a file here."
+        },
+        {
+          "id": "text-processing-mcq-grep-tool-choice",
+          "type": "mcq",
+          "prompt": "Which tool: you just want to FIND the lines in a log that mention 'failed' (not change them, not count columns). Best choice?",
+          "choices": ["grep (finds matching lines)", "sed (replaces text)", "awk (works with columns)", "sort (orders lines)"],
+          "answerIndex": 0,
+          "explanation": "Finding lines that match is exactly grep's job. sed is for find-and-replace, awk is for column work and math, and sort just reorders lines."
+        },
+        {
+          "id": "text-processing-mcq-grep-output",
+          "type": "mcq",
+          "prompt": "A file contains the lines: 'apple', 'green apple', 'banana', 'pineapple'. What does `grep apple` print?",
+          "choices": ["only 'apple'", "'apple', 'green apple', and 'pineapple'", "all four lines", "'banana' only"],
+          "answerIndex": 1,
+          "explanation": "grep matches the text anywhere in a line, not just whole words. 'apple', 'green apple', and 'pineapple' all contain the letters 'apple'. 'banana' does not, so it is left out.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/text-processing-1.svg"
         }
       ]
     },
     {
-      "id": "text-processing-grep-groups-rg",
-      "title": "Grouping, Backreferences, Greedy vs Lazy, and ripgrep",
+      "id": "text-processing-regex-basics",
+      "title": "Regular Expressions: Patterns That Match Shapes",
       "order": 2,
       "difficulty": 2,
-      "content": "Beyond single characters, regex lets you capture and reuse chunks of a match.\n\n- **Groups** `(...)` (ERE/PCRE) bundle atoms so a quantifier applies to the whole group: `(ab)+` matches `ababab`. Groups also *capture* the matched text.\n- **Alternation** `|` inside a group: `(cat|dog|fox)`.\n- **Backreferences** `\\1`, `\\2` reuse what a group captured. `\\b(\\w+) \\1\\b` finds doubled words like \"the the\". Backreferences need BRE-escaped groups in `sed`/grep (`\\(...\\)` with `\\1`) or PCRE.\n- **Greedy vs lazy:** quantifiers are greedy by default, matching as much as possible. In PCRE, appending `?` makes them lazy (minimal). On `<a><b>`, `<.*>` greedily grabs the whole thing; `<.*?>` stops at the first `>`.\n\n```bash\n# Find lines with a repeated word (PCRE)\ngrep -P '\\b(\\w+)\\s+\\1\\b' essay.txt\n\n# Lazy match: capture the first HTML tag only\ngrep -oP '<.*?>' page.html | head\n```\n\n**ripgrep (`rg`)** is the MODERN replacement for grep: recursive by default, respects `.gitignore`, fast, PCRE2 via `-P`, with great defaults.\n\n```bash\nrg -i 'timeout' --type py          # case-insensitive, only .py files\nrg -n -A2 -B2 'panic'              # line numbers + 2 lines of context\nrg -o '\\b\\d{1,3}(\\.\\d{1,3}){3}\\b' access.log   # pull out IPv4 addresses\nrg -l 'TODO'                       # just the filenames that match\n```\n\nKey flags shared with grep: `-i` ignore case, `-v` invert, `-o` only-matching, `-c` count, `-A/-B/-C` context. Use `rg` interactively; keep `grep` for portable scripts.",
+      "content": "So far you searched for exact words. But often you want to match a *shape* of text: 'any line that starts with a number', 'a date', 'an empty line'. For that, grep (and the other tools) understand a small pattern language called a **regular expression**, or **regex** for short.\n\nA regex is just a search string where a few characters have special meaning. Here are the beginner building blocks:\n\n- `^` means **start of the line**. `^Error` matches lines that *begin* with `Error`.\n- `$` means **end of the line**. `done$` matches lines that *end* with `done`. (`^` and `$` are called **anchors** because they pin the match to a position; `^$` together matches an empty line.)\n- `.` (a dot) matches **any one character**. `c.t` matches `cat`, `cot`, even `c7t`.\n- `*` means **zero or more** of the thing right before it. `ab*` matches `a`, `ab`, `abb`, `abbb`.\n- `[...]` is a **character class**: any one of the characters listed inside. `[aeiou]` matches a single vowel. A range like `[a-z]` matches any lowercase letter and `[0-9]` matches any digit. Put `^` first *inside* the brackets to mean 'NOT these': `[^0-9]` is any character that is not a digit.\n\n```bash\ngrep \"^Error\" app.log        # lines that start with Error\ngrep \"\\.txt$\" files.list      # lines that end with .txt (\\. = a literal dot)\ngrep \"^[0-9]\" data.txt        # lines that start with a digit\ngrep \"^$\" notes.txt           # empty lines\n```\n\nNotice `\\.` in the second example. Because `.` normally means 'any character', you put a backslash in front to say 'I mean an actual dot here'. Escaping a special character with `\\` turns off its magic.\n\nOne practical tip: to use the fuller modern set of features (like `\\d` for 'a digit'), add the `-E` flag (`grep -E`) for *extended* regex. Plain grep supports the basics above, which is plenty to start.\n\n**Recap:** a regex matches a *shape*, not just a literal word. Learn `^` (start), `$` (end), `.` (any char), `*` (zero or more), and `[...]` (one of a set). Use `\\` to match a special character literally.",
       "items": [
         {
-          "id": "text-processing-fc-greedy-lazy",
-          "type": "flashcard",
-          "front": "Greedy vs lazy: what does <.*> match versus <.*?> on the string <a><b>?",
-          "back": "<.*> is greedy and matches the entire <a><b> (as much as possible). <.*?> is lazy and matches just <a> (the smallest match), stopping at the first >. The trailing ? makes the quantifier minimal in PCRE.",
-          "hint": "The ? after the quantifier flips the behavior."
-        },
-        {
-          "id": "text-processing-fc-backreference",
-          "type": "flashcard",
-          "front": "What is a backreference and how do you find a doubled word with one?",
-          "back": "A backreference (\\1, \\2, ...) reuses text captured by an earlier group. To find a repeated word: grep -P '\\b(\\w+)\\s+\\1\\b' — group 1 captures a word, and \\1 requires the same word to appear again.",
-          "hint": "\\1 refers back to group 1."
-        },
-        {
-          "id": "text-processing-fc-groups-quantifier",
-          "type": "flashcard",
-          "front": "Why use a group like (ab)+ instead of ab+?",
-          "back": "A quantifier binds to the single preceding atom. ab+ matches a followed by one-or-more b (ab, abb, abbb). (ab)+ applies + to the whole group, matching repetitions of the pair: ab, abab, ababab.",
-          "hint": "What does + attach to?"
-        },
-        {
-          "id": "text-processing-fc-rg-defaults",
-          "type": "flashcard",
-          "front": "Name three things ripgrep (rg) does by default that plain grep does not.",
-          "back": "rg searches recursively by default (no -r needed), automatically skips files listed in .gitignore and hidden/binary files, and shows colored output with grouped per-file results. It is also substantially faster on large trees.",
-          "hint": "Recursion, ignore files, speed."
-        },
-        {
-          "id": "text-processing-mcq-rg-context",
+          "id": "text-processing-mcq-regex-what",
           "type": "mcq",
-          "prompt": "You want matches for 'error' plus the 3 lines before AND after each match. Which flag?",
-          "choices": ["-A3", "-B3", "-C3", "-n3"],
+          "prompt": "What is a regular expression (regex)?",
+          "choices": ["A program that deletes files", "A pattern language for matching shapes of text, not just exact words", "Another name for a pipe", "A type of log file"],
+          "answerIndex": 1,
+          "explanation": "A regex lets you describe a pattern, like 'starts with a digit' or 'ends with .txt', instead of matching one fixed word. The other options are unrelated to pattern matching."
+        },
+        {
+          "id": "text-processing-mcq-regex-caret",
+          "type": "mcq",
+          "prompt": "Outside of square brackets, what does ^ mean in a regex?",
+          "choices": ["The end of the line", "Any single character", "The start of the line", "Zero or more characters"],
           "answerIndex": 2,
-          "explanation": "-C3 gives 3 lines of context on both sides. -A3 is After only, -B3 is Before only. -n shows line numbers and takes no count argument."
+          "explanation": "^ is the start-of-line anchor, so ^Error matches lines beginning with Error. The end of the line is $, and 'any single character' is the dot."
         },
         {
-          "id": "text-processing-mcq-only-matching",
+          "id": "text-processing-mcq-regex-dollar",
           "type": "mcq",
-          "prompt": "Which flag prints only the matched portion of each line rather than the whole line?",
-          "choices": ["-v", "-o", "-l", "-c"],
+          "prompt": "Which pattern matches lines that END with the word 'done'?",
+          "choices": ["^done", "done$", "done*", "[done]"],
           "answerIndex": 1,
-          "explanation": "-o (only-matching) prints just the substring that matched, one per line. -v inverts the match, -l lists filenames, -c counts matching lines."
+          "explanation": "$ anchors the match to the end of the line, so done$ matches a line ending in done. ^done would match lines that START with done, and [done] matches any single one of the letters d, o, n, e."
         },
         {
-          "id": "text-processing-mcq-ipv4-regex",
+          "id": "text-processing-mcq-regex-dot",
           "type": "mcq",
-          "prompt": "Which ERE pattern most reasonably matches a dotted IPv4 address (ignoring strict 0-255 range checks)?",
-          "choices": ["[0-9]+.[0-9]+.[0-9]+.[0-9]+", "\\b[0-9]{1,3}(\\.[0-9]{1,3}){3}\\b", "\\d.\\d.\\d.\\d", "[0-9.]*"],
+          "prompt": "The pattern c.t is searched. Which of these does it match?",
+          "choices": ["only the exact text 'c.t'", "'cat', 'cot', and 'c7t'", "only words starting with c", "any line containing the letter c"],
           "answerIndex": 1,
-          "explanation": "\\b[0-9]{1,3}(\\.[0-9]{1,3}){3}\\b captures one to three digits, then a dot-plus-octet group repeated exactly three times, with word boundaries. Note the literal dot must be escaped as \\. — an unescaped . matches any character, so the first option is too loose."
+          "explanation": "The dot matches any single character, so c.t matches c, then anything, then t: cat, cot, c7t. To match a literal dot you would write c\\.t instead."
         },
         {
-          "id": "text-processing-mcq-fixed-string",
+          "id": "text-processing-mcq-regex-empty-line",
           "type": "mcq",
-          "prompt": "You need to search for the literal string 'a.b*c' without regex interpretation. Best approach?",
-          "choices": ["grep 'a.b*c'", "grep -F 'a.b*c'", "grep -E 'a.b*c'", "grep -P 'a.b*c'"],
+          "prompt": "What does the pattern ^$ match?",
+          "choices": ["A line containing the characters ^ and $", "An empty line (start immediately followed by end)", "Any line at all", "The first and last line of the file"],
           "answerIndex": 1,
-          "explanation": "-F (fixed-strings) treats the pattern as a literal, so . and * are not special. The other forms interpret . as any-char and * as a quantifier, matching far more than intended."
+          "explanation": "^ is the start of the line and $ is the end. With nothing between them, the only thing that matches is a line with no characters: an empty line."
+        },
+        {
+          "id": "text-processing-mcq-regex-class",
+          "type": "mcq",
+          "prompt": "What does the character class [aeiou] match?",
+          "choices": ["The exact five-letter text 'aeiou'", "Any one of the letters a, e, i, o, or u", "Any line containing all five vowels", "Five vowels in a row"],
+          "answerIndex": 1,
+          "explanation": "Square brackets mean 'any ONE of the characters inside', so [aeiou] matches a single vowel. To match the literal text 'aeiou' you would just write aeiou with no brackets."
+        },
+        {
+          "id": "text-processing-mcq-regex-negated",
+          "type": "mcq",
+          "prompt": "Inside square brackets, what does [^0-9] match?",
+          "choices": ["The start of a line, then digits", "Any single character that is NOT a digit", "The literal characters ^, 0, and 9", "Zero or more digits"],
+          "answerIndex": 1,
+          "explanation": "A ^ as the FIRST character inside the brackets flips the class to mean 'not these', so [^0-9] matches any one non-digit character. (Outside brackets, ^ is the start-of-line anchor instead.)"
+        },
+        {
+          "id": "text-processing-mcq-regex-escape-dot",
+          "type": "mcq",
+          "prompt": "You want to match a line ending in a literal '.txt'. Why write the dot as \\. in the pattern \\.txt$?",
+          "choices": ["The backslash makes the search case-insensitive", "An unescaped dot means 'any character', so \\. is needed to match an actual dot", "\\. is faster than .", "Without the backslash the pattern would match nothing"],
+          "answerIndex": 1,
+          "explanation": "A plain . matches any single character (so 'axt' or 'a3t' would match). Putting \\ in front escapes it, telling regex you mean a real period. The backslash has nothing to do with speed or case."
+        },
+        {
+          "id": "text-processing-mcq-regex-star",
+          "type": "mcq",
+          "prompt": "What does the pattern ab* match?",
+          "choices": ["'ab' repeated, like 'abab'", "'a' followed by zero or more 'b's: a, ab, abb, abbb", "any two characters", "'a' or 'b'"],
+          "answerIndex": 1,
+          "explanation": "* means 'zero or more of the thing immediately before it', and that thing is the single letter b. So ab* is an a followed by any number of b's (including none). To repeat the pair 'ab' you would need a group, which is a later topic.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/text-processing-2.svg"
         }
       ]
     },
     {
-      "id": "text-processing-sed-stream-editing",
-      "title": "sed: Stream Editing, Addresses, and In-Place Edits",
+      "id": "text-processing-sed-replace",
+      "title": "sed: Find and Replace in a Stream",
       "order": 3,
-      "difficulty": 3,
-      "content": "`sed` is a non-interactive stream editor: it reads input line by line, applies commands, and prints the result. Its workhorse is **substitution**.\n\n```bash\nsed 's/old/new/'      # replace FIRST 'old' on each line\nsed 's/old/new/g'     # replace ALL (global) on each line\nsed 's/old/new/gi'    # global + case-insensitive\nsed 's/\\(foo\\)bar/\\1baz/'   # backref: capture foo, keep it\n```\n\nThe `s` command is `s/PATTERN/REPLACEMENT/FLAGS`. In the replacement, `&` means \"the whole match\" and `\\1`..`\\9` are captured groups (sed uses BRE, so groups are `\\(...\\)` unless you pass `-E`). Pick any delimiter to avoid escaping slashes in paths:\n\n```bash\nsed 's#/usr/local#/opt#g' paths.conf   # # as delimiter\n```\n\n**Addresses** restrict which lines a command touches:\n\n```bash\nsed '3s/x/y/'        # only line 3\nsed '2,5d'           # delete lines 2 through 5\nsed '/^#/d'          # delete comment lines (regex address)\nsed -n '10,20p'      # -n suppresses auto-print; p prints range 10-20\nsed '/START/,/END/s/foo/bar/'   # only between START and END markers\n```\n\n**In-place editing** with `-i` rewrites the file. Always keep a backup until you trust it:\n\n```bash\nsed -i.bak 's/DEBUG/INFO/g' app.conf   # edits file, saves app.conf.bak\n```\n\nThe **hold space** is sed's second buffer (alongside the pattern space). Commands `h`/`H` copy to it, `g`/`G` copy from it, `x` swaps them — enabling multi-line tricks like reversing files (`tac`). It is sed's advanced gear; know it exists.",
+      "difficulty": 2,
+      "content": "Where grep *finds* lines, `sed` *changes* them. Its most common use is **find-and-replace**, exactly like the Find-and-Replace feature in a word processor, but for any text stream or file.\n\nThe replace command looks like this:\n\n```bash\nsed 's/old/new/' file.txt\n```\n\nRead it as: **s**ubstitute `old` with `new`. The slashes `/` just separate the three parts: the `s`, the text to find, and the text to put in its place. By default sed prints the changed text to the screen; the original file is not touched yet.\n\nBy default, sed only replaces the **first** match on each line. Add a `g` (for *global*) at the end to replace **every** match on the line:\n\n```bash\nsed 's/cat/dog/'  pets.txt    # only the first 'cat' on each line becomes 'dog'\nsed 's/cat/dog/g' pets.txt    # every 'cat' on each line becomes 'dog'\nsed 's/cat/dog/gi' pets.txt   # g = all matches, i = ignore case too\n```\n\n**Editing the file for real.** The commands above only print the result. To actually rewrite the file, add `-i` (in-place). It is wise to keep a backup the first few times by adding a suffix, which saves the original:\n\n```bash\nsed -i 's/DEBUG/INFO/g' app.conf       # rewrites app.conf in place\nsed -i.bak 's/DEBUG/INFO/g' app.conf   # also saves the original as app.conf.bak\n```\n\n**Choosing which lines to change.** You can put an *address* before the `s` to limit which lines are affected. An address can be a line number or a `/pattern/`:\n\n```bash\nsed '3s/x/y/' file        # only on line 3\nsed '/^#/d' file          # delete every line starting with # (d = delete)\n```\n\nThe text you search for can be a plain word or a full regex from the last lesson.\n\n**Recap:** `sed 's/old/new/'` replaces the first match per line; add `g` for all matches and `-i` to edit the file (use `-i.bak` to keep a backup). An address like a line number or `/pattern/` limits which lines change.",
       "items": [
         {
-          "id": "text-processing-fc-sed-g-flag",
-          "type": "flashcard",
-          "front": "What does the g flag do in sed 's/a/b/g' and what happens without it?",
-          "back": "Without g, sed replaces only the FIRST occurrence of the pattern on each line. With g (global), it replaces ALL occurrences on each line. The g is per-line, not per-file (every line is processed regardless).",
-          "hint": "First vs all, per line."
-        },
-        {
-          "id": "text-processing-fc-sed-ampersand",
-          "type": "flashcard",
-          "front": "In a sed replacement, what do & and \\1 refer to?",
-          "back": "& stands for the entire matched text. \\1 (through \\9) refer to text captured by the corresponding \\(...\\) group. Example: sed 's/[0-9]\\{3\\}/[&]/' wraps a 3-digit match in brackets using &.",
-          "hint": "One is the whole match, one is a captured group."
-        },
-        {
-          "id": "text-processing-fc-sed-hold-space",
-          "type": "flashcard",
-          "front": "What is sed's hold space?",
-          "back": "A second buffer separate from the pattern space (the current line). Commands h/H copy pattern->hold, g/G copy hold->pattern, and x swaps them. It lets sed remember data across lines for multi-line operations.",
-          "hint": "The 'other' buffer; h, g, x."
-        },
-        {
-          "id": "text-processing-fc-sed-i-backup",
-          "type": "flashcard",
-          "front": "What does sed -i.bak 's/x/y/' file do?",
-          "back": "It edits the file in place (overwriting it with the substitution applied) AND saves the original as file.bak first. Supplying a suffix to -i creates a backup; bare -i edits with no backup, which is risky.",
-          "hint": "In-place, plus a safety net."
-        },
-        {
-          "id": "text-processing-mcq-sed-delete-comments",
+          "id": "text-processing-mcq-sed-what",
           "type": "mcq",
-          "prompt": "Which sed command deletes every line that begins with a # (comment lines)?",
-          "choices": ["sed 's/^#//'", "sed '/^#/d'", "sed '/#/p'", "sed -n '/^#/'"],
+          "prompt": "What is sed mainly used for?",
+          "choices": ["Finding and printing matching lines", "Find-and-replace (editing text)", "Counting how many lines a file has", "Listing files in a folder"],
           "answerIndex": 1,
-          "explanation": "/^#/d uses a regex address (lines starting with #) plus the d (delete) command. The first option only strips the leading # but keeps the line; /#/p with default printing would duplicate matches."
+          "explanation": "sed is a stream editor; its everyday job is substituting text, like Find-and-Replace. Finding/printing matching lines is grep, and counting lines is wc -l."
         },
         {
-          "id": "text-processing-mcq-sed-print-range",
+          "id": "text-processing-mcq-sed-syntax",
           "type": "mcq",
-          "prompt": "How do you print only lines 10 through 20 of a file with sed?",
-          "choices": ["sed '10,20p'", "sed -n '10,20p'", "sed '10,20d'", "sed -n '10,20d'"],
+          "prompt": "In `sed 's/old/new/'`, what does the leading s mean and what do the slashes do?",
+          "choices": ["s = sort; the slashes are file paths", "s = substitute; the slashes separate the find text from the replace text", "s = save; the slashes mark a comment", "s = search only, no replacement happens"],
           "answerIndex": 1,
-          "explanation": "-n suppresses the automatic printing of every line, so only the explicit p on the 10,20 address range is output. Without -n, sed would print all lines AND print 10-20 a second time."
+          "explanation": "s stands for substitute. The slashes are just delimiters separating the three parts: s / find / replace /. It does replace, not merely search."
         },
         {
-          "id": "text-processing-mcq-sed-delimiter",
+          "id": "text-processing-mcq-sed-g",
           "type": "mcq",
-          "prompt": "Why might you write sed 's#/var/log#/srv/log#g' using # instead of /?",
-          "choices": ["# is faster than / in sed", "The pattern contains / characters, so a different delimiter avoids escaping them", "# enables case-insensitive matching", "Only # works with absolute paths"],
+          "prompt": "A line is 'a cat sat by a cat'. What does `sed 's/cat/dog/'` (no g) produce?",
+          "choices": ["'a dog sat by a dog'", "'a dog sat by a cat'", "'a cat sat by a dog'", "'a cat sat by a cat'"],
           "answerIndex": 1,
-          "explanation": "sed lets you choose any delimiter after s. When the pattern or replacement contains slashes (like file paths), picking # (or any other char) avoids a clutter of escaped \\/ sequences. It has no effect on speed or case."
+          "explanation": "Without g, sed replaces only the FIRST match on the line, so only the first 'cat' becomes 'dog'. Adding g would change both occurrences."
         },
         {
-          "id": "text-processing-mcq-sed-range-addr",
+          "id": "text-processing-mcq-sed-g-all",
           "type": "mcq",
-          "prompt": "What does sed '/START/,/END/d' do?",
-          "choices": ["Deletes only the lines containing START and END", "Deletes every line between the first START and the next END, inclusive", "Deletes lines NOT between START and END", "Prints the range and deletes the rest"],
+          "prompt": "Which command replaces EVERY occurrence of 'cat' with 'dog' on each line?",
+          "choices": ["sed 's/cat/dog/'", "sed 's/cat/dog/g'", "sed 'g/cat/dog/'", "sed -v 's/cat/dog/'"],
           "answerIndex": 1,
-          "explanation": "A regex range address /START/,/END/ selects from the first line matching START through the next line matching END (inclusive); d deletes that block. This pattern is common for removing config sections."
+          "explanation": "The g flag at the end means 'global': replace all matches on each line, not just the first. The g must come after the closing slash; sed has no -v flag for this."
+        },
+        {
+          "id": "text-processing-mcq-sed-i",
+          "type": "mcq",
+          "prompt": "By default, `sed 's/a/b/g' file.txt` does what to file.txt?",
+          "choices": ["Rewrites file.txt with the changes", "Deletes file.txt", "Leaves file.txt unchanged and just prints the result to the screen", "Creates file.txt.bak automatically"],
+          "answerIndex": 2,
+          "explanation": "Without -i, sed only prints the edited text; the original file is untouched. You must add -i to actually rewrite the file, and -i.bak to also save a backup."
+        },
+        {
+          "id": "text-processing-mcq-sed-backup",
+          "type": "mcq",
+          "prompt": "What does `sed -i.bak 's/x/y/' notes.txt` do?",
+          "choices": ["Prints the change but edits nothing", "Edits notes.txt in place AND saves the original as notes.txt.bak", "Creates a new file called y", "Deletes notes.txt and makes a file named bak"],
+          "answerIndex": 1,
+          "explanation": "-i edits the file in place, and the .bak suffix tells sed to first save the untouched original as notes.txt.bak. That backup is your safety net if the substitution was wrong."
+        },
+        {
+          "id": "text-processing-mcq-sed-address",
+          "type": "mcq",
+          "prompt": "What does the 3 do in `sed '3s/x/y/' file`?",
+          "choices": ["Replaces x with y three times", "Limits the replacement to line 3 only", "Replaces the third x on every line", "Keeps only the first 3 lines"],
+          "answerIndex": 1,
+          "explanation": "A number before the s command is an address that restricts the substitution to that line. So only line 3 is changed; all other lines pass through untouched."
+        },
+        {
+          "id": "text-processing-mcq-sed-delete",
+          "type": "mcq",
+          "prompt": "What does `sed '/^#/d' config.txt` do?",
+          "choices": ["Replaces # with d on each line", "Deletes every line that begins with #", "Prints only the lines beginning with #", "Adds a # to the start of each line"],
+          "answerIndex": 1,
+          "explanation": "/^#/ is a pattern address matching lines that start with #, and d is the delete command, so comment lines are removed from the output. It deletes whole lines rather than replacing characters."
+        },
+        {
+          "id": "text-processing-mcq-sed-tool-choice",
+          "type": "mcq",
+          "prompt": "Which tool: you need to change 'http://' to 'https://' everywhere in a config file. Best choice?",
+          "choices": ["grep (find lines)", "sed (replace text)", "wc (count lines)", "sort (order lines)"],
+          "answerIndex": 1,
+          "explanation": "Replacing one piece of text with another is sed's specialty (sed 's#http://#https://#g'). grep can only find the lines, not edit them.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/text-processing-3.svg"
         }
       ]
     },
     {
-      "id": "text-processing-awk-pipelines",
-      "title": "awk for Columnar Data, plus join/sort/uniq/jq Pipelines",
+      "id": "text-processing-awk-columns",
+      "title": "awk: Working With Columns",
       "order": 4,
-      "difficulty": 4,
-      "content": "`awk` is a column-oriented language built on a **pattern { action }** model: for each input record (line), if the pattern matches, run the action. Fields split on whitespace into `$1`, `$2`, ..., with `$NF` = last field and `$0` = whole line.\n\nKey built-in variables: `NR` (record/line number, running total), `NF` (number of fields on this line), `FNR` (per-file line number), `FS` (input field separator), `OFS` (output field separator). `BEGIN { }` runs before input; `END { }` runs after the last line.\n\n```bash\nawk '{print $1, $NF}' data.txt           # first and last column\nawk -F: '{print $1}' /etc/passwd          # FS = colon: usernames\nawk 'NR>1 && $3 > 100' table.tsv          # skip header, filter col 3\nawk 'BEGIN{OFS=\"\\t\"} {print $2,$1}' f      # swap cols, tab-separated\n```\n\n**Associative arrays** make awk the go-to for summaries. Count requests per IP and produce a top-10:\n\n```bash\nawk '{count[$1]++} END {for (ip in count) print count[ip], ip}' access.log \\\n  | sort -rn | head\n```\n\nMean and max of a numeric column:\n\n```bash\nawk '{sum+=$1; if($1>max) max=$1} END {print \"mean\",sum/NR,\"max\",max}' nums.txt\n```\n\nSupporting tools chain together: `cut -d, -f2` (extract field 2), `sort -k3 -rn` (sort by column 3, reverse numeric), `uniq -c` (count adjacent duplicates — sort first!), `comm` (compare two sorted files), `join` (relational join on a key), `paste` (merge files side by side), and `jq` (MODERN, query JSON):\n\n```bash\n# Classic top-talkers idiom\nawk '{print $1}' access.log | sort | uniq -c | sort -rn | head\n\n# Parse JSON: names of running pods\nkubectl get pods -o json | jq -r '.items[].metadata.name'\n```\n\nReach for awk whenever you think \"summarize this column.\"",
+      "difficulty": 3,
+      "content": "Lots of text is arranged in **columns**: a table of names and ages, a log line with a timestamp and a message, the output of many commands. `awk` is the tool that understands columns and can do math on them, a bit like a tiny spreadsheet for the command line.\n\nWhen awk reads a line, it automatically splits it on spaces into **fields**. You refer to them with a dollar sign:\n\n- `$1` is the first field, `$2` the second, and so on.\n- `$NF` is the **last** field (`NF` = 'number of fields', used as an index).\n- `$0` is the **whole line**.\n\n```bash\nawk '{print $1}' people.txt        # print just the first column\nawk '{print $1, $NF}' people.txt   # print the first and last columns\n```\n\nThe quoted part is `{ action }`: the action runs for every line. You can also put a **pattern** before the braces, and the action then runs only on lines that match the pattern, just like an if-test:\n\n```bash\nawk '$2 > 100' data.txt            # print lines whose 2nd column is over 100\nawk '/error/ {print $1}' app.log   # on lines containing 'error', print column 1\n```\n\n**Changing the separator.** If the columns are split by something other than spaces (say colons in `/etc/passwd`), tell awk with `-F`:\n\n```bash\nawk -F: '{print $1}' /etc/passwd   # fields are split on ':' -> print usernames\n```\n\nThe character awk splits on is called the **field separator** (`FS`); `-F:` sets it to a colon.\n\n**Doing math.** awk can keep a running total. Two special words help: `NR` is the current line number (a running count of records), and `BEGIN`/`END` are blocks that run once before and once after all the lines. A classic example, the average of column 1:\n\n```bash\nawk '{ sum += $1 } END { print sum / NR }' numbers.txt\n```\n\nFor each line it adds column 1 to `sum`; after the last line, `END` prints `sum` divided by `NR` (the count of lines), giving the mean.\n\n**Recap:** awk splits each line into fields `$1`, `$2`, ... `$NF`; `$0` is the whole line. Use `pattern { action }` to filter and act, `-F` to set the separator, and `NR` with `END` to count and average a column.",
       "items": [
         {
-          "id": "text-processing-fc-awk-model",
-          "type": "flashcard",
-          "front": "Describe awk's pattern-action execution model.",
-          "back": "awk reads input one record (line) at a time. For each record it evaluates each pattern { action } rule: if the pattern is true (or omitted, meaning always), it runs the action. BEGIN{} runs once before input, END{} once after the last record.",
-          "hint": "pattern { action }, per record."
+          "id": "text-processing-mcq-awk-what",
+          "type": "mcq",
+          "prompt": "What is awk especially good at?",
+          "choices": ["Replacing text in place", "Working with columns and doing math on them", "Listing open network ports", "Compressing files"],
+          "answerIndex": 1,
+          "explanation": "awk splits lines into columns (fields) and can filter and compute on them, like a mini spreadsheet. In-place replacement is sed's job."
         },
         {
-          "id": "text-processing-fc-awk-fields",
-          "type": "flashcard",
-          "front": "In awk, what are $1, $NF, $0, and NF?",
-          "back": "$1 is the first field, $NF is the LAST field (NF = number of fields, used as an index), and $0 is the entire current record/line. NF itself is the count of fields on the current line.",
-          "hint": "NF is a count; $NF uses it as an index."
+          "id": "text-processing-mcq-awk-fields",
+          "type": "mcq",
+          "prompt": "A line is 'alice 42 London'. In awk, what is $2?",
+          "choices": ["alice", "42", "London", "the whole line"],
+          "answerIndex": 1,
+          "explanation": "awk numbers the space-separated fields from 1, so $1 is alice, $2 is 42, and $3 is London. The whole line is $0."
         },
         {
-          "id": "text-processing-fc-awk-nr-fnr",
-          "type": "flashcard",
-          "front": "What is the difference between NR and FNR in awk?",
-          "back": "NR is the total record number across ALL input (it keeps counting into the second, third file). FNR resets to 1 at the start of each new file. FNR==NR is the classic test for 'still reading the first file' when processing two files.",
-          "hint": "One resets per file, one does not."
+          "id": "text-processing-mcq-awk-nf",
+          "type": "mcq",
+          "prompt": "On the line 'alice 42 London', what does $NF refer to?",
+          "choices": ["The number of fields, which is 3", "The first field, alice", "The last field, London", "An error, because NF is not a field"],
+          "answerIndex": 2,
+          "explanation": "NF is the count of fields (here 3), and $NF uses that count as an index, so it is the LAST field: London. ($NF and $3 mean the same thing on this line.)"
         },
         {
-          "id": "text-processing-fc-awk-assoc-array",
-          "type": "flashcard",
-          "front": "How do awk associative arrays make counting easy? Give a one-liner.",
-          "back": "Arrays are keyed by arbitrary strings and auto-create entries. To count occurrences of column 1: awk '{count[$1]++} END {for (k in count) print count[k], k}'. Each unique value of $1 becomes a key whose value is its tally.",
-          "hint": "count[$1]++ then loop in END."
+          "id": "text-processing-mcq-awk-dollar-zero",
+          "type": "mcq",
+          "prompt": "What does $0 mean in awk?",
+          "choices": ["The number zero", "The whole current line", "The first field", "An empty value"],
+          "answerIndex": 1,
+          "explanation": "$0 is the entire current line, unsplit. The individual columns start at $1. This is handy when you want to print the line as-is."
         },
         {
-          "id": "text-processing-fc-fs-ofs",
-          "type": "flashcard",
-          "front": "What do FS and OFS control, and how do you set FS to a colon on the command line?",
-          "back": "FS is the input field separator (how $1, $2 are split); OFS is the output field separator (what print inserts between comma-separated args). Set FS to colon with awk -F: '...' or BEGIN{FS=\":\"}. Set OFS in BEGIN, e.g. BEGIN{OFS=\"\\t\"}.",
-          "hint": "Input split vs output join; -F sets the input one."
+          "id": "text-processing-mcq-awk-F",
+          "type": "mcq",
+          "prompt": "The file /etc/passwd separates fields with colons (like 'root:x:0:0:...'). How do you tell awk to split on ':' and print the first field?",
+          "choices": ["awk '{print $1}' /etc/passwd", "awk -F: '{print $1}' /etc/passwd", "awk -i: '{print $1}' /etc/passwd", "awk '/:/ {print $1}' /etc/passwd"],
+          "answerIndex": 1,
+          "explanation": "-F sets the field separator, so -F: splits on colons and $1 becomes the username. Without -F, awk splits on spaces and the whole 'root:x:0:...' string would be $1."
+        },
+        {
+          "id": "text-processing-mcq-awk-pattern",
+          "type": "mcq",
+          "prompt": "What does `awk '$2 > 100' data.txt` print?",
+          "choices": ["The second column of every line", "Only the lines whose second column is greater than 100", "The number 100 wherever it appears", "The first 100 lines"],
+          "answerIndex": 1,
+          "explanation": "A bare pattern with no action means 'print the whole line when the pattern is true'. Here the test is $2 > 100, so only lines whose second field exceeds 100 are printed."
+        },
+        {
+          "id": "text-processing-mcq-awk-nr",
+          "type": "mcq",
+          "prompt": "In awk, what does NR hold?",
+          "choices": ["The number of fields on the current line", "The current record (line) number, a running count", "The name of the file", "The newline character"],
+          "answerIndex": 1,
+          "explanation": "NR is the record number: it counts lines as they are read, so after the last line it equals the total number of lines. NF (not NR) is the field count on the current line."
+        },
+        {
+          "id": "text-processing-mcq-awk-average",
+          "type": "mcq",
+          "prompt": "Which program prints the average (mean) of the numbers in column 1?",
+          "choices": ["awk '{ sum += $1 }' numbers.txt", "awk '{ sum += $1 } END { print sum / NR }' numbers.txt", "awk 'BEGIN { print sum / NR }' numbers.txt", "awk '{ print $1 / NR }' numbers.txt"],
+          "answerIndex": 1,
+          "explanation": "You add $1 to sum on every line, then in END (which runs once after all lines) divide sum by NR, the line count, to get the mean. Printing in BEGIN runs before any input, so sum and NR would both be 0."
+        },
+        {
+          "id": "text-processing-mcq-awk-begin-end",
+          "type": "mcq",
+          "prompt": "When does the END { ... } block in an awk program run?",
+          "choices": ["Once, before any lines are read", "Once for every line", "Once, after all the lines have been read", "Only if the file is empty"],
+          "answerIndex": 2,
+          "explanation": "END runs a single time after the last line, which makes it the place to print totals and averages. BEGIN is its mirror image, running once before the first line."
+        },
+        {
+          "id": "text-processing-mcq-awk-tool-choice",
+          "type": "mcq",
+          "prompt": "Which tool: you have a file of 'item quantity' rows and want the TOTAL of the quantity column. Best choice?",
+          "choices": ["grep (find lines)", "sed (replace text)", "awk (sum a column)", "head (first lines)"],
+          "answerIndex": 2,
+          "explanation": "Summing a column of numbers is exactly what awk is for: awk '{ sum += $2 } END { print sum }'. grep and sed do not do arithmetic, and head just shows the first few lines.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/text-processing-4.svg"
+        }
+      ]
+    },
+    {
+      "id": "text-processing-helper-tools",
+      "title": "Helper Tools: cut, sort, uniq, wc, head, tail, tr",
+      "order": 5,
+      "difficulty": 3,
+      "content": "Around grep, sed, and awk sits a family of small tools that each do **one simple job** to a stream of text. On their own they are easy; their power comes from chaining them with pipes (next lesson). Here are the ones you will use constantly.\n\n**cut** picks out columns. With `-d` you set the delimiter and with `-f` the field number(s):\n\n```bash\ncut -d, -f2 data.csv      # the 2nd field of a comma-separated file\n```\n\n**sort** puts lines in order. By default it sorts alphabetically; `-n` sorts numerically (so 10 comes after 2, not before), and `-r` reverses to descending:\n\n```bash\nsort names.txt           # A to Z\nsort -n sizes.txt        # smallest number first\nsort -rn sizes.txt       # largest number first\n```\n\n**uniq** collapses repeated lines, and `uniq -c` counts how many times each line repeated. Important: uniq only looks at lines *next to each other*, so you almost always `sort` first to bring identical lines together:\n\n```bash\nsort colors.txt | uniq        # remove duplicate lines\nsort colors.txt | uniq -c     # count how many of each\n```\n\n**wc** counts. `wc -l` is the one you will use most: it counts lines:\n\n```bash\nwc -l access.log         # how many lines (e.g. how many requests)\n```\n\n**head** and **tail** show the first or last few lines (10 by default; `-n` changes the count). `tail -f` keeps watching a file as it grows, which is great for live logs:\n\n```bash\nhead -n 5 file           # first 5 lines\ntail -n 20 file          # last 20 lines\ntail -f server.log       # follow the log as new lines arrive\n```\n\n**tr** translates or deletes characters. For example, turn every uppercase letter into lowercase, or squeeze spaces:\n\n```bash\ntr 'A-Z' 'a-z' < file    # uppercase -> lowercase\ntr -d ' ' < file         # delete all spaces\n```\n\n**Recap:** `cut` picks columns, `sort` orders lines (`-n` numeric, `-r` reverse), `uniq -c` counts adjacent duplicates (sort first!), `wc -l` counts lines, `head`/`tail` show the ends (`tail -f` follows), and `tr` swaps or deletes characters.",
+      "items": [
+        {
+          "id": "text-processing-mcq-cut",
+          "type": "mcq",
+          "prompt": "What does `cut -d, -f2 data.csv` do?",
+          "choices": ["Deletes the second line", "Prints the 2nd comma-separated field of each line", "Sorts the file by the second column", "Counts commas in the file"],
+          "answerIndex": 1,
+          "explanation": "-d, sets the delimiter to a comma and -f2 selects field 2, so you get the second column of a CSV. It selects a column, it does not delete or sort anything."
+        },
+        {
+          "id": "text-processing-mcq-sort-n",
+          "type": "mcq",
+          "prompt": "Plain `sort` puts '10' before '9'. Which flag fixes that so numbers sort by value?",
+          "choices": ["-r", "-n", "-u", "-f"],
+          "answerIndex": 1,
+          "explanation": "-n sorts numerically, so 9 comes before 10. Default sort is alphabetical, where '10' sorts before '9' because it compares the first character '1' against '9'. -r only reverses the order."
+        },
+        {
+          "id": "text-processing-mcq-sort-rn",
+          "type": "mcq",
+          "prompt": "What does `sort -rn` give you?",
+          "choices": ["Alphabetical order, A to Z", "Numeric order, smallest first", "Numeric order, largest first", "Random order"],
+          "answerIndex": 2,
+          "explanation": "-n makes the sort numeric and -r reverses it, so together you get largest-number-first. This is the usual finishing step for a 'top counts' list."
+        },
+        {
+          "id": "text-processing-mcq-uniq-needs-sort",
+          "type": "mcq",
+          "prompt": "Why do you usually run `sort` before `uniq -c`?",
+          "choices": ["sort makes uniq run faster but is optional", "uniq only compares neighbouring lines, so identical lines must first be grouped together", "uniq cannot read files directly", "sort removes the header line"],
+          "answerIndex": 1,
+          "explanation": "uniq only collapses or counts lines that are adjacent. If duplicates are scattered through the file, sort must first bring them next to each other for uniq -c to tally them correctly."
         },
         {
           "id": "text-processing-mcq-uniq-c",
           "type": "mcq",
-          "prompt": "Why must you 'sort' before 'uniq -c' in a pipeline like sort | uniq -c?",
-          "choices": ["uniq -c is faster on sorted input but works either way", "uniq only collapses ADJACENT duplicate lines, so identical lines must first be grouped together by sorting", "sort removes blank lines that confuse uniq", "uniq -c requires numeric input"],
+          "prompt": "What does the -c flag add to uniq?",
+          "choices": ["It makes the comparison case-sensitive", "It prints a count of how many times each line repeated", "It clears duplicate files", "It compresses the output"],
           "answerIndex": 1,
-          "explanation": "uniq compares only adjacent lines. Duplicates scattered through the file won't be counted together unless sort first brings identical lines next to each other. This is the basis of the sort | uniq -c | sort -rn top-N idiom."
+          "explanation": "uniq -c prefixes each line with the number of times it occurred in the (adjacent) run. That count is what turns a sorted list into a frequency tally."
         },
         {
-          "id": "text-processing-mcq-awk-mean",
+          "id": "text-processing-mcq-wc-l",
           "type": "mcq",
-          "prompt": "Which awk program prints the mean of the first numeric column?",
-          "choices": ["awk '{sum+=$1} END {print sum}'", "awk '{sum+=$1} END {print sum/NR}'", "awk 'BEGIN{print sum/NR}'", "awk '{print $1/NR}'"],
+          "prompt": "You want to know how many lines are in access.log. Which command?",
+          "choices": ["wc -w access.log", "wc -l access.log", "wc -c access.log", "head access.log"],
           "answerIndex": 1,
-          "explanation": "Accumulate the column into sum on every line, then in END divide by NR (the total number of records). Printing in BEGIN runs before any input so sum and NR are 0/empty; option 1 prints only the total."
+          "explanation": "wc -l counts lines. -w counts words and -c counts bytes/characters, neither of which is the line count. head would just show the first few lines."
         },
         {
-          "id": "text-processing-mcq-jq",
+          "id": "text-processing-mcq-head-tail",
           "type": "mcq",
-          "prompt": "What does the -r flag do in jq -r '.items[].metadata.name'?",
-          "choices": ["Reverses the output array", "Reads input recursively from subdirectories", "Outputs raw strings without surrounding JSON quotes", "Restricts output to the root object"],
+          "prompt": "Which command shows the LAST 20 lines of a file?",
+          "choices": ["head -n 20 file", "tail -n 20 file", "cut -n 20 file", "sort -n 20 file"],
+          "answerIndex": 1,
+          "explanation": "tail shows the end of a file, and -n 20 asks for 20 lines. head shows the beginning instead; cut and sort do not take a line-count like this."
+        },
+        {
+          "id": "text-processing-mcq-tail-f",
+          "type": "mcq",
+          "prompt": "What is special about `tail -f server.log`?",
+          "choices": ["It shows the first lines only", "It keeps running and prints new lines as they are added to the file", "It finds a pattern in the file", "It deletes the file after reading"],
+          "answerIndex": 1,
+          "explanation": "-f means 'follow': tail stays open and streams new lines as the file grows, which is ideal for watching a live log. It does not stop after printing the current end."
+        },
+        {
+          "id": "text-processing-mcq-tr",
+          "type": "mcq",
+          "prompt": "What does `tr 'A-Z' 'a-z' < file` do?",
+          "choices": ["Deletes all capital letters", "Translates every uppercase letter to its lowercase form", "Finds lines with capital letters", "Sorts the file by case"],
+          "answerIndex": 1,
+          "explanation": "tr maps each character in the first set to the matching character in the second set, so A->a, B->b, and so on, lowercasing the text. To delete characters you would use tr -d instead.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/text-processing-5.svg"
+        }
+      ]
+    },
+    {
+      "id": "text-processing-pipelines-jq",
+      "title": "Building Pipelines (and jq for JSON)",
+      "order": 6,
+      "difficulty": 4,
+      "content": "The real magic of these tools is **combining** them with pipes. Each tool does one small job and hands its output to the next, so a single line can answer a question about a huge file. The trick is to build the pipeline **one stage at a time** and look at the output after each `|`.\n\nThe most famous idiom is the **top-N count**. Suppose a web server log has the visitor's IP address as the first column, and you want the busiest visitors:\n\n```bash\nawk '{print $1}' access.log | sort | uniq -c | sort -rn | head\n```\n\nRead it left to right:\n1. `awk '{print $1}'` pulls out just the IP column.\n2. `sort` groups identical IPs together (so uniq can count them).\n3. `uniq -c` counts how many times each IP appears.\n4. `sort -rn` orders those counts largest-first.\n5. `head` keeps just the top few.\n\nMix in grep to filter first. To find the IPs causing the most 'not found' (404) errors:\n\n```bash\ngrep \" 404 \" access.log | awk '{print $1}' | sort | uniq -c | sort -rn | head\n```\n\nThat is grep (keep only 404 lines) -> awk (take the IP) -> the same counting tail. Each stage is simple; together they are powerful.\n\n**jq: pipelines for JSON.** A lot of modern tools output **JSON**, a structured format with braces and quotes rather than plain columns. grep and awk are clumsy with JSON because the data spans nested structures. `jq` is a small tool made just for querying JSON: you give it a path to the data you want.\n\n```bash\njq '.name' person.json              # the value of the \"name\" key\njq -r '.users[].email' data.json    # every user's email, one per line\n```\n\nThe `.name` is a path into the JSON. `.users[]` means 'each item in the users list'. The `-r` flag prints **raw** text without the surrounding quotes, which is what you want when feeding the result into another command.\n\n**Recap:** pipe simple tools together to answer big questions; the `sort | uniq -c | sort -rn` tail is the classic 'count and rank' pattern. For JSON, reach for `jq` with a path like `.users[].email`, and add `-r` for unquoted output.",
+      "items": [
+        {
+          "id": "text-processing-mcq-pipeline-idea",
+          "type": "mcq",
+          "prompt": "What is the core idea of a pipeline like `a | b | c`?",
+          "choices": ["It runs a, b, and c as three unrelated commands", "Each command's output becomes the next command's input", "It saves a, b, and c into one file", "It runs the commands in reverse order"],
+          "answerIndex": 1,
+          "explanation": "A pipe connects programs end to end: the output of a flows into b, and b's output flows into c. This lets you build a big result from small single-purpose tools."
+        },
+        {
+          "id": "text-processing-mcq-pipeline-build",
+          "type": "mcq",
+          "prompt": "What is the recommended way to build a long pipeline you are unsure about?",
+          "choices": ["Type the whole thing and hope it works", "Add one stage at a time and check the output after each |", "Always start from the last command", "Avoid pipes and use one huge awk program"],
+          "answerIndex": 1,
+          "explanation": "Building incrementally, checking the output after each | , lets you catch a mistake at the exact stage it happens instead of debugging the whole chain at once."
+        },
+        {
+          "id": "text-processing-mcq-pipeline-why-sort-first",
+          "type": "mcq",
+          "prompt": "In `... | sort | uniq -c | ...`, why is sort placed before uniq -c?",
+          "choices": ["To make the output numeric", "To bring identical lines together so uniq -c can count them", "To reverse the order", "Because uniq cannot read piped input otherwise"],
+          "answerIndex": 1,
+          "explanation": "uniq -c only counts runs of adjacent identical lines, so sort must first group matching lines next to each other. This pairing is the heart of the count-and-rank idiom."
+        },
+        {
+          "id": "text-processing-mcq-pipeline-final-sort",
+          "type": "mcq",
+          "prompt": "In the idiom `sort | uniq -c | sort -rn | head`, what is the job of the SECOND sort (`sort -rn`)?",
+          "choices": ["To group identical lines for counting", "To order the counts so the largest is at the top", "To remove duplicate counts", "To convert text to numbers"],
+          "answerIndex": 1,
+          "explanation": "After uniq -c each line begins with a count. sort -rn orders those counts numerically and in reverse, so the biggest counts rise to the top, ready for head to show the winners."
+        },
+        {
+          "id": "text-processing-mcq-pipeline-output",
+          "type": "mcq",
+          "prompt": "Given the pipeline `awk '{print $1}' access.log | sort | uniq -c | sort -rn | head`, what does the final output look like?",
+          "choices": ["The first 10 lines of the raw log", "A list of counts paired with IP addresses, busiest first", "Every unique IP in alphabetical order", "The total number of requests as a single number"],
+          "answerIndex": 1,
+          "explanation": "awk extracts the IP column, uniq -c attaches a count to each unique IP, and sort -rn | head leaves the highest counts on top. So you get lines like '57 10.0.0.5', ranked from most to least frequent."
+        },
+        {
+          "id": "text-processing-mcq-pipeline-grep-first",
+          "type": "mcq",
+          "prompt": "You only want to count 404 errors per IP. Where should grep \" 404 \" go in the pipeline?",
+          "choices": ["At the very end, after head", "First, so later stages only see the 404 lines", "It does not matter where grep goes", "Replace awk with grep entirely"],
+          "answerIndex": 1,
+          "explanation": "Filtering first with grep means every later stage works on the smaller, relevant set of 404 lines. Putting grep at the end would filter the already-counted summary, which is not what you want."
+        },
+        {
+          "id": "text-processing-mcq-jq-what",
+          "type": "mcq",
+          "prompt": "Why use jq instead of grep/awk for JSON data?",
+          "choices": ["jq is faster at sorting numbers", "jq understands JSON's nested structure, so you can ask for data by its path", "jq replaces text in place like sed", "grep cannot read files but jq can"],
+          "answerIndex": 1,
+          "explanation": "JSON is nested (objects inside arrays inside objects), which trips up line-oriented tools like grep and awk. jq parses the structure so you can pull out a value by path, like .users[].email."
+        },
+        {
+          "id": "text-processing-mcq-jq-r",
+          "type": "mcq",
+          "prompt": "What does the -r flag do in `jq -r '.name' file.json`?",
+          "choices": ["Reads the file recursively from subfolders", "Reverses the JSON array", "Prints the string value raw, without the surrounding double quotes", "Restricts output to the first match"],
           "answerIndex": 2,
-          "explanation": "-r (raw output) emits string values without JSON double-quotes, which is what you want when feeding names into a shell pipeline. Without -r each name would print wrapped in quotes."
+          "explanation": "-r means 'raw output': string values print without JSON's double quotes, which is what you want when feeding the value into another command. Without -r, a name would print as \"alice\" with quotes."
         },
         {
-          "id": "text-processing-mcq-sort-k",
+          "id": "text-processing-mcq-jq-path",
           "type": "mcq",
-          "prompt": "What does sort -k3 -rn do?",
-          "choices": ["Sorts on the 3rd column, in reverse numeric order", "Keeps only 3 columns and removes newlines", "Sorts the first 3 characters of each line", "Sorts 3 files in reverse order"],
-          "answerIndex": 0,
-          "explanation": "-k3 selects column 3 as the sort key, -n treats it as a number (so 10 sorts after 2, not before), and -r reverses to descending. Combined, you get largest-value-first ordering by the third field."
+          "prompt": "In jq, what does the path `.users[].email` ask for?",
+          "choices": ["The first user's email only", "The email field of every item in the users list", "A user whose name is email", "The number of users"],
+          "answerIndex": 1,
+          "explanation": "[] iterates over every element of the users array, and .email picks the email field from each one, giving you one email per user. To get just the first you would write .users[0].email."
+        },
+        {
+          "id": "text-processing-mcq-pipeline-tool-choice",
+          "type": "mcq",
+          "prompt": "Which tool: a command prints structured JSON and you need one field's value out of it. Best choice?",
+          "choices": ["awk (split on spaces)", "jq (query JSON by path)", "sort (order lines)", "tr (swap characters)"],
+          "answerIndex": 1,
+          "explanation": "jq is purpose-built for JSON and reads it by path, so it cleanly extracts the field. awk splitting on spaces would break on the braces, quotes, and nesting of JSON.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/text-processing-6.svg"
         }
       ]
     }
