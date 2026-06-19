@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "id": "networking",
   "title": "Networking",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Networking from scratch (beginner rework in progress): 17 sub-topics from layering and the physical layer through IP, subnetting, routing, TCP/UDP, TLS, DNS, wireless and modern transport. Beginner-first readings, MCQ practice, and diagrams; tiered easy to hard.",
   "requires": [],
   "tags": [
@@ -1003,353 +1003,597 @@
       "lessons": [
         {
           "id": "data-link-ethernet-data-link-ethernet-l1-mac-llc-addresses",
-          "title": "The Data Link Layer: MAC, LLC & the 48-bit Address",
+          "title": "The Data Link Layer: Frames and MAC Addresses",
           "order": 1,
           "difficulty": 1,
-          "content": "The **data link layer** (OSI layer 2) takes the raw bit-pipe the physical layer offers and turns it into something useful: addressed, delimited **frames** delivered across a single link or LAN segment. IEEE 802 splits it into two sublayers. The lower **MAC (Media Access Control)** sublayer owns the hardware address, the frame format, and the rules for who may transmit on a shared medium. The upper **LLC (Logical Link Control, IEEE 802.2)** sublayer was meant to multiplex upper-layer protocols and offer optional reliability. In practice, modern Ethernet (Ethernet II / DIX) skips LLC entirely and identifies the upper protocol with the EtherType field, so you will rarely meet 802.2 LLC outside legacy or 802.11 contexts.\n\nThe **MAC address** is a 48-bit (6-byte) identifier written as six hex octets, e.g. `00:1B:44:11:3A:B7`. It is structured, not random. The top three bytes are the **OUI (Organizationally Unique Identifier)**, assigned by the IEEE to a vendor; the lower three bytes are assigned by that vendor per-NIC. Two bits in the very first byte carry meaning. The least-significant bit of the first octet is the **I/G (individual/group) bit**: 0 means unicast, 1 means multicast (group). The next bit is the **U/L (universal/local) bit**: 0 means a globally-unique burned-in address, 1 means a **locally-administered address (LAA)** set by software. The all-ones address `FF:FF:FF:FF:FF:FF` is the L2 **broadcast**. As an ex-radar tech you can read this exactly like a structured tag field: a vendor prefix plus a per-unit serial, with two flag bits riding in the header.",
+          "content": "## Getting data to the device next door\n\nYou already know the physical layer just pushes raw bits (1s and 0s) down a wire or through the air. But a stream of bare bits is not very useful on its own. Which bits belong together? Who is this data for? Did any bits get garbled along the way?\n\nThe **data link layer** answers those questions. It sits **just above** the physical layer, and its job is simple to state: **move data reliably between two devices on the same local network** — for example, your laptop and the Wi-Fi router sitting in your house. \"Local network\" just means the devices near you that are directly connected, like everything in your home or one office.\n\n## Frames and addresses\n\nThe data link layer takes the bits and groups them into **frames**. A **frame** is a chunk of data with a clear *start*, some *address labels*, the actual *payload* (the data being carried), and an *error-check* value at the end. Think of it like an envelope: it has a front (who it's for, who it's from), the letter inside, and a tamper-check seal.\n\nTo write the address on that envelope, every network device uses a **MAC address** (Media Access Control address). A MAC address is a **permanent hardware ID burned into the network chip at the factory**. It is **48 bits** long and is written as six pairs of hex digits, like `a1:b2:c3:44:55:66`. Because it is built into the hardware, it normally never changes, and it identifies exactly **one device on the local network**.\n\nSo a frame says, in effect: \"From MAC `aa:aa:…`, to MAC `bb:bb:…`, here is the data.\" The address makes sure the frame reaches the one nearby device it is meant for, the same way an apartment number gets a letter to the right resident in your building.\n\n## MAC vs IP — a quick heads-up\n\nYou may have heard of **IP addresses** too. Here is the key difference, which the next sub-topics will build on: a **MAC address is the local, permanent hardware address** used to reach a device on the *same* network, while an **IP address is a logical address** used to find devices *across* different networks. For now, just remember: MAC = local and permanent; IP = logical and used to travel between networks.\n\n## Recap\n\nThe data link layer turns raw bits into addressed **frames** and delivers them between two devices on the **same local network**, using permanent **MAC addresses** to label who each frame is for.",
           "items": [
             {
+              "id": "data-link-ethernet-l1-img",
+              "type": "mcq",
+              "prompt": "Study the diagram comparing a MAC address and an IP address. Based on it, which statement is correct?",
+              "choices": [
+                "A MAC address changes every time you move your device to a new network",
+                "A MAC address is a permanent, local hardware ID, while an IP address is a logical address used to cross networks",
+                "An IP address is burned into the chip and a MAC address is assigned by software",
+                "MAC and IP addresses are two names for the exact same thing"
+              ],
+              "answerIndex": 1,
+              "explanation": "As the diagram shows, the MAC address is the permanent, factory-burned hardware ID that identifies a device on the local network, while the IP address is a logical (software-assigned) address used to reach devices across different networks. They do different jobs at different layers.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/data-link-ethernet-2.svg"
+            },
+            {
               "id": "data-link-ethernet-l1-001",
-              "type": "flashcard",
-              "front": "What are the two sublayers of the IEEE 802 data link layer, and what does each do?",
-              "back": "MAC (Media Access Control): hardware addressing, frame format, and medium-access rules. LLC (Logical Link Control, 802.2): multiplexes upper-layer protocols and offers optional flow/error control. Modern Ethernet II uses the EtherType field instead of LLC.",
-              "hint": "Lower handles the wire and the address; upper handles protocol multiplexing."
+              "type": "mcq",
+              "prompt": "In one sentence, what is the main job of the data link layer?",
+              "choices": [
+                "To choose the best path for data across the whole Internet",
+                "To move data reliably between two devices on the same local network",
+                "To convert text into the radio waves used by Wi-Fi",
+                "To decide which website a browser should open"
+              ],
+              "answerIndex": 1,
+              "explanation": "The data link layer sits just above the physical layer and handles delivery between two directly connected devices on the same local network (such as your laptop and your home router). Choosing paths across many networks is the job of a higher layer (the network layer, using IP).",
+              "image": ""
             },
             {
               "id": "data-link-ethernet-l1-002",
-              "type": "flashcard",
-              "front": "How many bits is a MAC address, and how is it split structurally?",
-              "back": "48 bits / 6 octets. The upper 3 bytes are the OUI (vendor prefix assigned by IEEE); the lower 3 bytes are assigned by the vendor per device.",
-              "hint": "Vendor prefix + per-unit serial."
+              "type": "mcq",
+              "prompt": "What is a 'frame' in networking?",
+              "choices": [
+                "A single bit travelling down a wire",
+                "A chunk of data with a start, address labels, a payload, and an error-check at the end",
+                "The metal case that holds a network switch",
+                "A list of every website a device has visited"
+              ],
+              "answerIndex": 1,
+              "explanation": "A frame is the data link layer's 'envelope': it groups bits into one unit with a clear start, address labels (who it is for and from), the payload (the data being carried), and an error-check value at the end. A single bit is just part of the physical layer's bit stream.",
+              "image": ""
             },
             {
               "id": "data-link-ethernet-l1-003",
-              "type": "flashcard",
-              "front": "In a MAC address, what do the I/G bit and the U/L bit indicate, and where are they?",
-              "back": "Both live in the first octet. The least-significant bit is I/G: 0 = unicast (individual), 1 = multicast (group). The next bit is U/L: 0 = universal/globally-unique (burned-in), 1 = locally administered (software-set).",
-              "hint": "Two lowest-order bits of the very first byte."
+              "type": "mcq",
+              "prompt": "How long is a MAC address, and how is it usually written?",
+              "choices": [
+                "32 bits, written as four numbers separated by dots like 192.168.1.5",
+                "48 bits, written as six pairs of hex digits like a1:b2:c3:44:55:66",
+                "8 bits, written as a single number from 0 to 255",
+                "128 bits, written as eight groups separated by colons"
+              ],
+              "answerIndex": 1,
+              "explanation": "A MAC address is 48 bits long and is written as six pairs of hexadecimal digits, for example a1:b2:c3:44:55:66. The dotted-decimal form like 192.168.1.5 is an IPv4 address, and the 128-bit colon form is IPv6 — both are different from a MAC address.",
+              "image": ""
             },
             {
               "id": "data-link-ethernet-l1-004",
-              "type": "flashcard",
-              "front": "What is the Ethernet broadcast MAC address?",
-              "back": "FF:FF:FF:FF:FF:FF (all 48 bits set). A frame to this address is delivered to every host in the broadcast domain.",
-              "hint": "Every bit is 1."
+              "type": "mcq",
+              "prompt": "Where does a device's MAC address come from, and how often does it normally change?",
+              "choices": [
+                "It is typed in by the user and changes every day",
+                "It is burned into the network chip at the factory and normally never changes",
+                "It is handed out fresh by the Wi-Fi router every time the device connects",
+                "It is calculated from the current time, so it is always different"
+              ],
+              "answerIndex": 1,
+              "explanation": "A MAC address is a permanent hardware ID burned into the network chip when it is manufactured, so it normally stays the same for the life of the device. The address that a router hands out when you connect is the IP address, which is a different, logical address.",
+              "image": ""
             },
             {
               "id": "data-link-ethernet-l1-005",
               "type": "mcq",
-              "prompt": "You see a frame destined for MAC address 01:00:5E:7F:00:01. Looking only at the address, what kind of frame is it?",
+              "prompt": "A MAC address vs an IP address — what is the key difference?",
               "choices": [
-                "A unicast frame (the I/G bit is 0)",
-                "A multicast frame (the I/G bit is 1)",
-                "A broadcast frame (all bits set)",
-                "A locally-administered unicast frame"
+                "A MAC address is the local, permanent hardware address; an IP address is a logical address used to cross between networks",
+                "A MAC address is used on the Internet; an IP address only works inside your house",
+                "A MAC address is longer than an IP address and is always written in decimal",
+                "There is no difference; both are assigned by the factory and never change"
               ],
-              "answerIndex": 1,
-              "explanation": "The first octet is 0x01 = 0000 0001 in binary. The least-significant bit (I/G) is 1, so it is multicast. (01:00:5E is in fact the IANA OUI used for mapping IPv4 multicast groups onto Ethernet.) It is not broadcast because not all bits are set."
+              "answerIndex": 0,
+              "explanation": "This is one of the most important distinctions in networking. The MAC address is the permanent, hardware-level address that identifies a device on the *local* network. The IP address is a logical, software-assigned address used to reach devices *across* different networks. Data crossing the Internet relies on IP; delivery to the device right next to you relies on MAC.",
+              "image": ""
             },
             {
               "id": "data-link-ethernet-l1-006",
               "type": "mcq",
-              "prompt": "A virtual machine's NIC has the MAC 02:42:AC:11:00:02. What does the first octet tell you?",
+              "prompt": "Why does a frame need to carry a destination MAC address at all?",
               "choices": [
-                "It is a multicast address",
-                "It is the burned-in address from a hardware vendor's OUI",
-                "It is a unicast, locally-administered address",
-                "It is an invalid MAC address"
+                "So the data link layer can deliver the frame to the correct nearby device instead of just every device",
+                "So the frame can be encrypted before it is sent",
+                "So the receiver knows which website the data came from",
+                "So the physical layer can decide what voltage to use"
               ],
-              "answerIndex": 2,
-              "explanation": "0x02 = 0000 0010. The I/G bit (lowest) is 0 -> unicast. The U/L bit (next) is 1 -> locally administered, i.e. set by software rather than a vendor OUI. Hypervisors and containers (e.g. Docker's 02:42 prefix) commonly use LAAs."
+              "answerIndex": 0,
+              "explanation": "The destination MAC is the address label on the envelope: it tells the local network which specific nearby device the frame is meant for, just as an apartment number directs a letter to one resident. Without it, there would be no way to single out the intended device. Encryption and website identity are handled by higher layers.",
+              "image": ""
             },
             {
               "id": "data-link-ethernet-l1-007",
               "type": "mcq",
-              "prompt": "Why does modern Ethernet II rarely use the 802.2 LLC sublayer?",
+              "prompt": "A good real-world analogy for a MAC address is:",
               "choices": [
-                "LLC is illegal under current IEEE standards",
-                "The EtherType field already identifies the upper-layer protocol, making LLC's multiplexing redundant",
-                "LLC only works on fiber, not copper",
-                "Switches strip the LLC header before forwarding"
+                "The temporary ticket number you get at a deli counter",
+                "A resident's permanent ID that an envelope is addressed to so it reaches the right apartment",
+                "The speed limit posted on a highway",
+                "The colour of the envelope the letter is mailed in"
               ],
               "answerIndex": 1,
-              "explanation": "Ethernet II carries a 2-byte EtherType that names the upper protocol directly (e.g. 0x0800 = IPv4). That makes the LLC/SNAP multiplexing machinery unnecessary, so LLC survives mainly in legacy 802.3 and in 802.11."
+              "explanation": "A MAC address is like a resident's permanent ID used to address an envelope to one specific apartment in a building — it is fixed and identifies exactly one recipient on the local network. A deli ticket changes each visit, which is more like a temporary IP address than a permanent MAC.",
+              "image": ""
             },
             {
               "id": "data-link-ethernet-l1-008",
-              "type": "flashcard",
-              "front": "What is a locally-administered address (LAA) and where do you commonly see them?",
-              "back": "A MAC with the U/L bit set to 1, meaning it was assigned by software rather than burned in from a vendor OUI. Common on VMs, containers (Docker uses 02:42:...), and bonded/failover interfaces.",
-              "hint": "U/L bit = 1; think hypervisors and containers."
+              "type": "mcq",
+              "prompt": "Which layer does the data link layer sit directly above, and what does it receive from it?",
+              "choices": [
+                "The application layer; it receives finished web pages",
+                "The physical layer; it receives a raw stream of bits",
+                "The transport layer; it receives reliable connections",
+                "There is no layer below it; the data link layer is the lowest"
+              ],
+              "answerIndex": 1,
+              "explanation": "The data link layer sits just above the physical layer. The physical layer moves raw bits (1s and 0s) over the wire or air, and the data link layer organizes those bits into addressed frames. The physical layer is the lowest layer, not the data link layer.",
+              "image": ""
+            },
+            {
+              "id": "data-link-ethernet-l1-009",
+              "type": "mcq",
+              "prompt": "Two laptops are connected to the same home Wi-Fi router. At the data link layer, how does one laptop's frame reach the other?",
+              "choices": [
+                "It is addressed using the other laptop's permanent MAC address on the local network",
+                "It must travel across the Internet and come back",
+                "It is sent to every device in the entire city until the right one answers",
+                "It uses the website's domain name as the address"
+              ],
+              "answerIndex": 0,
+              "explanation": "Both laptops are on the same local network, so the data link layer delivers the frame directly using the destination laptop's MAC address. There is no need to leave the local network. Domain names and crossing the Internet involve higher layers, not local frame delivery.",
+              "image": ""
             }
           ]
         },
         {
           "id": "data-link-ethernet-data-link-ethernet-l2-frame-format",
-          "title": "The Ethernet II Frame, Byte by Byte",
+          "title": "Inside an Ethernet Frame, Field by Field",
           "order": 2,
           "difficulty": 2,
-          "content": "Lay an Ethernet II frame out left to right and every byte has a job. First on the wire come **7 bytes of preamble** (alternating `10101010`) followed by a **1-byte SFD (Start Frame Delimiter, `10101011`)**. These eight bytes let the receiver's clock-recovery circuit lock onto the bit timing and find the frame boundary; they are a physical-layer artifact and are **not** counted as part of the frame and **not** covered by the FCS.\n\nThe frame proper begins with the **6-byte destination MAC**, then the **6-byte source MAC**, then a **2-byte EtherType** identifying the payload protocol (0x0800 IPv4, 0x86DD IPv6, 0x0806 ARP, 0x8100 a VLAN tag). Next is the **payload**, **46 to 1500 bytes**. The 1500-byte ceiling is the standard **MTU**; if the upper layer has fewer than 46 bytes it is **padded** up to 46. Finally a **4-byte FCS (Frame Check Sequence)** holds a **CRC-32** over the destination, source, type, and payload fields.\n\nDo the arithmetic: 6 + 6 + 2 + 46 + 4 = **64 bytes minimum**, and 6 + 6 + 2 + 1500 + 4 = **1518 bytes maximum** (1522 with a VLAN tag). **Jumbo frames** raise the payload to roughly 9000 bytes to cut per-frame overhead on storage and data-center links; they are non-standard, so every device in the path must agree or the frames are dropped. The CRC-32 is a powerful **error-detection** code — it catches essentially all real-world bit errors — but it is purely a checksum: Ethernet **detects and discards** corrupt frames, it never corrects them. Recovery is left to a higher layer (TCP) or simply dropped (UDP).",
+          "content": "## What is Ethernet?\n\n**Ethernet** is the dominant set of rules for **wired local networks**. When you plug a cable into a wall jack or into the back of a router, you are almost certainly using Ethernet. It defines exactly how a frame is laid out so that any Ethernet device can understand any other.\n\n## The envelope, laid out left to right\n\nLet's open up one Ethernet frame and read it from start to finish. Picture it as a row of labeled boxes:\n\n1. **Preamble + Start delimiter** — a short \"wake-up\" pattern that lets the receiver's clock lock onto the incoming bits. It is *not* counted as part of the frame and is *not* error-checked. Think of it as the receiver clearing its throat before the real message.\n2. **Destination MAC (6 bytes)** — who the frame is **for**.\n3. **Source MAC (6 bytes)** — who the frame is **from**.\n4. **Type (2 bytes)** — what kind of data is inside, so the receiver knows how to read it (for example, a value meaning \"this carries an IP packet\").\n5. **Payload (46 to 1500 bytes)** — the actual data being carried.\n6. **FCS (4 bytes)** — the **Frame Check Sequence**, the error-check at the very end.\n\n## What the FCS is for\n\nWires and radios are not perfect; a bit can flip on the way. The **FCS is an error-check value** the sender calculates from the rest of the frame using a math formula called a **CRC** (Cyclic Redundancy Check — you don't need the math, just the idea). The receiver runs the same calculation. If its answer matches the FCS, the frame is almost certainly intact. **If it does not match, the frame is corrupt and is thrown away.**\n\nHere is the key limit: Ethernet **detects** errors but does **not fix** them. A bad frame is simply discarded. Getting the data resent (if anyone bothers) is left to a higher layer. So the FCS is a smoke detector, not a fire department: it tells you something is wrong, but it does not repair the damage.\n\n## Recap\n\nAn Ethernet frame is a labeled envelope: destination MAC, source MAC, a type field, the payload, and an FCS error-check at the end. The FCS lets the receiver detect a corrupted frame and discard it — Ethernet catches errors, it does not correct them.",
           "items": [
             {
-              "id": "data-link-ethernet-l2-001",
-              "type": "flashcard",
-              "front": "Study this diagram.",
-              "back": "Review the diagram above.",
+              "id": "data-link-ethernet-l2-img",
+              "type": "mcq",
+              "prompt": "Look at the labeled Ethernet frame diagram. Reading left to right, which order are the main fields in?",
+              "choices": [
+                "FCS, payload, type, source MAC, destination MAC",
+                "Destination MAC, source MAC, type, payload, FCS",
+                "Payload, destination MAC, FCS, type, source MAC",
+                "Type, payload, destination MAC, source MAC, FCS"
+              ],
+              "answerIndex": 1,
+              "explanation": "As the diagram lays out, after the wake-up preamble the frame goes: destination MAC (who it's for), source MAC (who it's from), type (what's inside), payload (the data), and finally the FCS error-check at the end.",
               "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/data-link-ethernet-1.svg"
             },
             {
+              "id": "data-link-ethernet-l2-001",
+              "type": "mcq",
+              "prompt": "What is Ethernet, in plain terms?",
+              "choices": [
+                "The single cable that connects your house to the Internet provider",
+                "The dominant set of rules for wired local networks",
+                "A brand of Wi-Fi router",
+                "The program that opens web pages"
+              ],
+              "answerIndex": 1,
+              "explanation": "Ethernet is the dominant standard (set of rules) for wired local networks — it defines how frames are formatted and sent over cables so any Ethernet device understands any other. It is not a single cable, a brand, or an application.",
+              "image": ""
+            },
+            {
               "id": "data-link-ethernet-l2-002",
-              "type": "flashcard",
-              "front": "List the fields of an Ethernet II frame in order, with their sizes.",
-              "back": "Preamble (7 B) + SFD (1 B) [PHY sync, not part of frame] | Destination MAC (6 B) | Source MAC (6 B) | EtherType (2 B) | Payload (46-1500 B) | FCS/CRC-32 (4 B).",
-              "hint": "Sync, then dst, src, type, data, check."
+              "type": "mcq",
+              "prompt": "Within the frame, what do the destination MAC and source MAC fields tell you?",
+              "choices": [
+                "The size of the payload and the speed of the link",
+                "Who the frame is for (destination) and who it is from (source)",
+                "Which website sent the data and which one will receive it",
+                "The error-check value and the wake-up pattern"
+              ],
+              "answerIndex": 1,
+              "explanation": "The destination MAC says which device the frame is for, and the source MAC says which device it came from — the 'to' and 'from' on the envelope. Sizes, speeds, and the error-check are separate concerns, and websites are identified far higher up the stack.",
+              "image": ""
             },
             {
               "id": "data-link-ethernet-l2-003",
-              "type": "flashcard",
-              "front": "What is the minimum and maximum size of a standard (untagged) Ethernet frame, and why?",
-              "back": "Minimum 64 bytes (6+6+2+46+4), maximum 1518 bytes (6+6+2+1500+4). The 1500-byte payload is the standard MTU; payloads under 46 bytes are padded. Preamble/SFD are not counted.",
-              "hint": "Sum the header/trailer plus the 46-1500 payload range."
+              "type": "mcq",
+              "prompt": "What does the 'type' field in an Ethernet frame do?",
+              "choices": [
+                "It tells the receiver what kind of data is inside, so it knows how to read the payload",
+                "It sets how many volts the wire should use",
+                "It counts how many devices are on the network",
+                "It stores the sender's permanent MAC address"
+              ],
+              "answerIndex": 0,
+              "explanation": "The type field identifies what the payload contains (for example, a value meaning the payload is an IP packet), so the receiver hands the data to the right software. Voltages are a physical-layer concern, and the sender's address lives in the source MAC field.",
+              "image": ""
             },
             {
               "id": "data-link-ethernet-l2-004",
-              "type": "flashcard",
-              "front": "What does the EtherType field do, and give three common values.",
-              "back": "It identifies the upper-layer protocol carried in the payload. 0x0800 = IPv4, 0x86DD = IPv6, 0x0806 = ARP, 0x8100 = 802.1Q VLAN tag. Values >= 0x0600 are EtherTypes (smaller values were 802.3 length).",
-              "hint": "Two bytes after the source MAC; >= 0x0600."
+              "type": "mcq",
+              "prompt": "What is the FCS (Frame Check Sequence) used for?",
+              "choices": [
+                "To encrypt the payload so no one can read it",
+                "To let the receiver detect whether the frame was corrupted in transit",
+                "To store the destination MAC address",
+                "To speed up the connection"
+              ],
+              "answerIndex": 1,
+              "explanation": "The FCS is an error-check value at the end of the frame. The sender computes it from the rest of the frame; the receiver recomputes it and compares. A mismatch means the frame was damaged. The FCS does not encrypt, address, or speed up anything — it only detects errors.",
+              "image": ""
             },
             {
               "id": "data-link-ethernet-l2-005",
-              "type": "flashcard",
-              "front": "What is a jumbo frame and what is the catch?",
-              "back": "A frame with a payload up to ~9000 bytes (vs the standard 1500), used to reduce per-frame overhead on data-center/storage links. It is non-standard, so every NIC, switch, and router along the path must be configured for the same large MTU or the frames are dropped/fragmented.",
-              "hint": "~9000-byte payload; end-to-end agreement required."
+              "type": "mcq",
+              "prompt": "A frame arrives and the receiver's recomputed check does NOT match the FCS. What happens?",
+              "choices": [
+                "Ethernet repairs the damaged bits using the FCS and keeps the frame",
+                "The frame is thrown away; Ethernet detects errors but does not fix them",
+                "The frame is sent back to the sender at the data link layer for correction",
+                "The receiver ignores the FCS and uses the frame anyway"
+              ],
+              "answerIndex": 1,
+              "explanation": "A mismatch means the frame is corrupt, so Ethernet simply discards it. Ethernet's FCS only *detects* errors — it cannot correct them, and Ethernet does not automatically resend the frame itself. Any recovery is left to a higher layer.",
+              "image": ""
             },
             {
               "id": "data-link-ethernet-l2-006",
               "type": "mcq",
-              "prompt": "An IP packet hands only 20 bytes of payload to Ethernet. What happens?",
+              "prompt": "Why are the preamble and start delimiter NOT counted as part of the frame or covered by the FCS?",
               "choices": [
-                "The frame is sent with a 20-byte payload",
-                "The frame is rejected as too small",
-                "The payload is padded with zeros up to 46 bytes",
-                "The preamble is shortened to compensate"
+                "They are just a wake-up timing pattern that helps the receiver lock onto the bits, not real data",
+                "They are encrypted separately for security",
+                "They contain the most important data, so they get their own check",
+                "They are added by the user, not the hardware"
               ],
-              "answerIndex": 2,
-              "explanation": "The minimum payload is 46 bytes, so a short payload is padded to 46. This keeps the total frame at least 64 bytes, a requirement that dates back to collision-detection timing on shared media."
+              "answerIndex": 0,
+              "explanation": "The preamble and start delimiter are a fixed 'wake-up' pattern that lets the receiver's clock synchronize and find where the frame begins. They carry no message data, so they sit outside the frame proper and outside the FCS calculation.",
+              "image": ""
             },
             {
               "id": "data-link-ethernet-l2-007",
               "type": "mcq",
-              "prompt": "A frame arrives and its computed CRC-32 does not match the FCS field. What does the Ethernet hardware do?",
+              "prompt": "A good analogy for the FCS is:",
               "choices": [
-                "Corrects the error using the CRC and forwards the frame",
-                "Discards the frame; any recovery is left to upper layers",
-                "Requests a retransmission from the sender at layer 2",
-                "Strips the FCS and forwards the frame anyway"
+                "A spell-checker that quietly fixes your typos for you",
+                "A smoke detector — it tells you something is wrong but does not put out the fire",
+                "A return address so the letter can be mailed back",
+                "A stamp that pays for delivery"
               ],
               "answerIndex": 1,
-              "explanation": "CRC-32 is error-DETECTION only. A mismatch means corruption, so the frame is silently dropped (and counted as an error). Ethernet has no L2 retransmission for this; recovery, if any, is TCP's job, while UDP/real-time traffic just loses the data."
+              "explanation": "The FCS is like a smoke detector: it alerts the receiver that the frame is damaged, but it does not repair anything. A spell-checker that auto-corrects would be error *correction*, which Ethernet's FCS does not do.",
+              "image": ""
             },
             {
               "id": "data-link-ethernet-l2-008",
               "type": "mcq",
-              "prompt": "Which of these is NOT counted in the Ethernet frame size or covered by the FCS?",
+              "prompt": "The payload of a standard Ethernet frame can hold roughly how much data?",
               "choices": [
-                "The destination MAC address",
-                "The EtherType field",
-                "The preamble and SFD",
-                "The payload"
+                "Exactly 1 byte, always",
+                "Up to about 1500 bytes",
+                "Up to about 1 million bytes",
+                "There is no limit at all"
               ],
-              "answerIndex": 2,
-              "explanation": "The 7-byte preamble and 1-byte SFD are physical-layer synchronization bytes. They precede the frame on the wire, are not part of the 64-1518 byte frame size, and are not included in the CRC-32 computation."
+              "answerIndex": 1,
+              "explanation": "A standard Ethernet payload holds up to about 1500 bytes (with a small minimum so frames are not too short). This 1500-byte ceiling is the usual maximum amount of data per frame; bigger messages are split across many frames.",
+              "image": ""
             },
             {
               "id": "data-link-ethernet-l2-009",
-              "type": "flashcard",
-              "front": "What does the FCS contain and what does it protect?",
-              "back": "A 4-byte CRC-32 computed over the destination MAC, source MAC, EtherType, and payload. It detects (not corrects) bit errors in those fields. Preamble/SFD are excluded.",
-              "hint": "Cyclic redundancy check over the frame body, trailer position."
+              "type": "mcq",
+              "prompt": "If a frame's data gets corrupted and dropped, whose responsibility is it to recover that lost data?",
+              "choices": [
+                "Ethernet automatically resends every dropped frame itself",
+                "A higher layer must handle any resending; Ethernet just discards the bad frame",
+                "The preamble re-sends the frame",
+                "Nothing can ever recover it under any circumstances"
+              ],
+              "answerIndex": 1,
+              "explanation": "Ethernet's job ends at detecting and discarding the corrupt frame. Whether the data is resent is decided by a higher layer (you will meet protocols that do this later). So Ethernet does not recover the data itself, but recovery is still possible above it.",
+              "image": ""
             }
           ]
         },
         {
           "id": "data-link-ethernet-data-link-ethernet-l3-csma-switching",
-          "title": "From CSMA/CD to Switches: How L2 Forwarding Works",
+          "title": "Switches, Hubs, and How a Switch Learns",
           "order": 3,
           "difficulty": 3,
-          "content": "Original Ethernet was a **shared bus**: every host saw every frame and only one could transmit at a time. **CSMA/CD (Carrier Sense Multiple Access with Collision Detection)** governed it — listen before sending, and if two stations transmit at once, detect the collision, jam, back off a random interval, and retry. This is the **reason the minimum frame is 64 bytes**: a sender must still be transmitting when the most distant collision signal returns, or it would finish and never notice the collision. The 64-byte floor, the maximum cable length, and the 10 Mbps rate are bound together by this round-trip timing. On a modern **full-duplex switched link** there is no contention, so CSMA/CD is disabled and effectively irrelevant — but it still explains the legacy 64-byte minimum you compute today.\n\nThe device that killed CSMA/CD is the **switch**. A **hub** is a dumb multiport repeater: one collision domain, every port sees every bit. A **bridge** was the two-port ancestor of the switch; a switch is a fast, many-port bridge implemented in hardware. A switch **learns** by recording the *source* MAC of every incoming frame against the port it arrived on, building a **MAC/CAM forwarding table**. To forward, it looks up the *destination* MAC: \n\n- **Known unicast** -> forward out the single learned port. \n- **Unknown unicast** (not yet in the table) -> **flood** out all ports except the ingress. \n- **Broadcast** (FF:FF:FF:FF:FF:FF) -> flood everywhere. \n- **Multicast** -> flood by default, or send only to subscribed ports if IGMP snooping is enabled. \n\nCrucially, each switch port is its **own collision domain** (so collisions essentially vanish), but the whole switch is **one broadcast domain** until you introduce VLANs or a router.",
+          "content": "## The box in the middle\n\nIn a real local network the devices are not wired directly to each other — they all plug into a box in the middle. The smart version of that box is a **switch**. A **switch** is a device with many ports (sockets) that **learns which device is on which port** and forwards each frame **only where it needs to go**.\n\nThink of a smart mailroom. At first the mail clerk doesn't know where anyone sits. But every time a person hands in outgoing mail, the clerk notes their name and desk. Soon the clerk has a list and can carry each letter straight to the right desk instead of walking the whole floor.\n\n## How a switch learns: MAC → port\n\nThe switch does exactly that, using MAC addresses. It keeps a **MAC address table** — a simple list of *which MAC address is reachable through which port*.\n\n- When a frame **comes in** on a port, the switch reads the **source MAC** and records: \"this MAC lives on this port.\" That is how it *learns*.\n- When it needs to **send** a frame, it looks up the **destination MAC** in the table. If it knows the port, it forwards the frame out **only that one port**. If it has not learned that address yet, it sends the frame out **all** ports (just for that frame) to find the device.\n\nSo a switch **learns from the source address and forwards by the destination address**. Over a few moments it builds a full map of the network and cuts out wasted traffic.\n\n## A hub: the dumb version\n\nBefore switches were cheap, networks used a **hub**. A hub is a dumb version of the same box: it does **no learning**. Every frame that comes in is **copied out to every other port**, whether or not the destination is there. That is wasteful and not private — every device sees every frame. A switch sends a frame only to the right port; a hub floods it everywhere.\n\n## A bit of history: collisions and CSMA/CD\n\nOld networks (and hubs) shared one wire, so only **one device could 'talk' at a time**. If two transmitted at once, their signals overlapped — a **collision** — and both had to stop and retry. The rulebook that managed this was called **CSMA/CD**: roughly, *listen first, and if you hear a collision, back off and try again later.*\n\nSwitches mostly made this history. Because a switch gives each device its own dedicated connection, devices can send and receive at the same time without colliding. So today CSMA/CD is mostly a story about how things used to work — worth knowing, but not something a modern switched network relies on.\n\n## Recap\n\nA **switch** learns which MAC address is on which port (learning from the source, forwarding by the destination) and sends each frame only where it belongs. A **hub** is the dumb older box that floods every frame to every port. Collisions and CSMA/CD were how shared-wire networks coped before switches made them mostly obsolete.",
           "items": [
             {
+              "id": "data-link-ethernet-l3-img",
+              "type": "mcq",
+              "prompt": "Compare the switch and hub in the diagram. What is the key difference shown?",
+              "choices": [
+                "The switch floods the frame to every device; the hub sends it to only one",
+                "The switch forwards the frame to only the correct port; the hub copies it to every port",
+                "Both send the frame to every device equally",
+                "The hub learns MAC addresses and the switch does not"
+              ],
+              "answerIndex": 1,
+              "explanation": "The diagram shows the switch sending the frame down only the one line that leads to the right device, using its learned MAC table, while the hub copies the same frame out to all of its ports. The switch is selective; the hub is not.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/data-link-ethernet-3.svg"
+            },
+            {
               "id": "data-link-ethernet-l3-001",
-              "type": "flashcard",
-              "front": "What does CSMA/CD stand for and what problem does it solve?",
-              "back": "Carrier Sense Multiple Access with Collision Detection. On a shared half-duplex medium it arbitrates access: listen before sending, detect collisions, jam, back off randomly, and retry. Obsolete on full-duplex switched links.",
-              "hint": "Listen, send, detect collision, back off."
+              "type": "mcq",
+              "prompt": "What does a switch do?",
+              "choices": [
+                "It picks the best route for data across the whole Internet",
+                "It learns which device is on which port and forwards each frame only where it needs to go",
+                "It copies every frame to every port without thinking",
+                "It converts Wi-Fi signals into electricity"
+              ],
+              "answerIndex": 1,
+              "explanation": "A switch is the smart box in the middle of a local network: it learns which MAC address is reachable on which port and forwards each frame only out the correct port. Copying every frame to every port is what a (dumb) hub does, and routing across the Internet is a higher-layer job.",
+              "image": ""
             },
             {
               "id": "data-link-ethernet-l3-002",
-              "type": "flashcard",
-              "front": "Why is the minimum Ethernet frame 64 bytes, in terms of CSMA/CD?",
-              "back": "A transmitting station must still be sending when the worst-case collision signal travels to the far end of the segment and back. 64 bytes at 10 Mbps over the maximum cable length guarantees the sender is still on the wire to detect the collision (the 'slot time').",
-              "hint": "Round-trip propagation time vs transmit time."
+              "type": "mcq",
+              "prompt": "How does a switch LEARN which device is on which port?",
+              "choices": [
+                "It reads the source MAC of each incoming frame and records that MAC against the port it arrived on",
+                "It asks every device to type in its location",
+                "It reads the destination MAC and guesses the port",
+                "It is pre-programmed at the factory with every device's location"
+              ],
+              "answerIndex": 0,
+              "explanation": "When a frame arrives, the switch looks at its source MAC (who sent it) and notes 'this MAC is on this port.' That builds the MAC address table over time. It forwards using the destination MAC, but it learns from the source MAC.",
+              "image": ""
             },
             {
               "id": "data-link-ethernet-l3-003",
-              "type": "flashcard",
-              "front": "How does a switch learn where hosts are?",
-              "back": "It reads the SOURCE MAC of each incoming frame and records (source MAC -> ingress port, with an aging timer) in its MAC/CAM forwarding table. Forwarding decisions then use the DESTINATION MAC lookup.",
-              "hint": "Learn from source, forward by destination."
+              "type": "mcq",
+              "prompt": "When a switch needs to send a frame and it already knows which port the destination MAC is on, what does it do?",
+              "choices": [
+                "It floods the frame out of every port to be safe",
+                "It forwards the frame out only that one port",
+                "It drops the frame because it already knows the device",
+                "It sends the frame back out the port it came in on"
+              ],
+              "answerIndex": 1,
+              "explanation": "If the destination MAC is in its table, the switch sends the frame out only the single port that leads to that device — efficient and private. Flooding to all ports only happens when the switch has *not* yet learned where the destination is.",
+              "image": ""
             },
             {
               "id": "data-link-ethernet-l3-004",
               "type": "mcq",
-              "prompt": "Trace the switch behavior for each frame type. A switch receives frames on port 3. Which row is correct?",
+              "prompt": "What is the main difference between a hub and a switch?",
               "choices": [
-                "Unknown unicast -> drop; Known unicast -> flood; Broadcast -> single port; Multicast -> drop",
-                "Unknown unicast -> flood all but port 3; Known unicast -> forward only to the learned port; Broadcast -> flood all but port 3; Multicast -> flood (or subscribed ports with IGMP snooping)",
-                "Unknown unicast -> forward to learned port; Known unicast -> flood; Broadcast -> drop; Multicast -> flood",
-                "All four types -> flood out every port including port 3"
+                "A hub learns MAC addresses; a switch does not",
+                "A hub copies every frame to every port; a switch forwards a frame only to the correct port",
+                "A hub is faster and smarter than a switch",
+                "A hub works only with Wi-Fi and a switch only with cables"
               ],
               "answerIndex": 1,
-              "explanation": "This is the canonical L2 forwarding behavior. Unknown unicast (dst not in CAM) is flooded out all ports except ingress; known unicast goes only to the learned port; broadcast (FF:FF:FF:FF:FF:FF) floods to all but ingress; multicast floods by default unless IGMP snooping restricts it to subscribers. A switch never forwards a frame back out the port it came in on."
+              "explanation": "A hub is the dumb box: it floods every incoming frame out all other ports with no learning. A switch learns where each device is and forwards each frame only to the right port. That makes switches faster, more private, and the modern default.",
+              "image": ""
             },
             {
               "id": "data-link-ethernet-l3-005",
               "type": "mcq",
-              "prompt": "What is the key difference between a hub and a switch regarding collision domains?",
+              "prompt": "A switch receives a frame for a destination MAC it has NOT learned yet. What does it do?",
               "choices": [
-                "A hub gives each port its own collision domain; a switch shares one",
-                "Both put all ports in one collision domain",
-                "A hub is one big collision domain; a switch makes each port its own collision domain",
-                "Neither has collision domains because Ethernet is full-duplex"
+                "It throws the frame away because it doesn't know the device",
+                "It sends the frame out all ports (except the one it arrived on) to reach the device",
+                "It keeps the frame forever until the device sends something",
+                "It rewrites the destination MAC to one it knows"
               ],
-              "answerIndex": 2,
-              "explanation": "A hub is a dumb repeater: every port shares a single collision domain, so traffic from any host can collide with any other. A switch isolates each port into its own collision domain (and runs full-duplex), which is why collisions essentially disappear on switched networks."
+              "answerIndex": 1,
+              "explanation": "When the destination is unknown, the switch errs on the side of delivery: it floods the frame out every port except the ingress port. Whichever device is the real destination will respond, and the switch will then learn its port for next time.",
+              "image": ""
             },
             {
               "id": "data-link-ethernet-l3-006",
               "type": "mcq",
-              "prompt": "A switch with no VLANs configured forms how many broadcast domains and how many collision domains for its 24 ports?",
+              "prompt": "The 'smart mailroom that learns everyone's desk' is an analogy for which device?",
               "choices": [
-                "24 broadcast domains, 1 collision domain",
-                "1 broadcast domain, 24 collision domains",
-                "1 broadcast domain, 1 collision domain",
-                "24 broadcast domains, 24 collision domains"
+                "A hub",
+                "A switch",
+                "A single network cable",
+                "A MAC address"
               ],
               "answerIndex": 1,
-              "explanation": "Each switch port is its own collision domain (24 of them). But absent VLANs or a router, the entire switch is a single broadcast domain: a broadcast frame floods out all ports. Segmenting the broadcast domain requires VLANs (L2) or routing (L3)."
+              "explanation": "The smart mailroom that notes each person's desk and then delivers letters straight to the right place is a switch — it learns which MAC is on which port and forwards accordingly. A hub would be a clerk who drops a copy of every letter on every desk.",
+              "image": ""
             },
             {
               "id": "data-link-ethernet-l3-007",
-              "type": "flashcard",
-              "front": "Hub vs bridge vs switch: one line each.",
-              "back": "Hub = dumb multiport repeater, one collision domain, no addressing. Bridge = early 2-port device that learns MACs and separates segments (software). Switch = a fast, many-port hardware bridge that learns MACs and forwards per-port.",
-              "hint": "Repeater, ancestor, modern hardware version."
+              "type": "mcq",
+              "prompt": "What was a 'collision' on an old shared-wire network?",
+              "choices": [
+                "Two devices transmitting at the same time so their signals overlapped and both had to retry",
+                "Two cables physically tangling together",
+                "A frame arriving with a bad FCS",
+                "A switch forwarding to the wrong port"
+              ],
+              "answerIndex": 0,
+              "explanation": "On a shared wire only one device could transmit at a time. If two sent at once their signals overlapped — a collision — and both stopped and retried. This is unrelated to cables tangling, FCS errors, or switch forwarding mistakes.",
+              "image": ""
             },
             {
               "id": "data-link-ethernet-l3-008",
-              "type": "flashcard",
-              "front": "Why is CSMA/CD irrelevant on a modern switched link, yet still worth knowing?",
-              "back": "Full-duplex switched links have separate Tx/Rx paths and no shared medium, so collisions cannot occur and CSMA/CD is disabled. It still matters because it explains the legacy 64-byte minimum frame size and the historical cable-length/rate constraints.",
-              "hint": "Full duplex = no contention; but it explains the 64-byte floor."
+              "type": "mcq",
+              "prompt": "Why is CSMA/CD mostly just history on modern networks?",
+              "choices": [
+                "Because Wi-Fi made all cables obsolete",
+                "Because switches give each device its own connection, so devices can send and receive at once without colliding",
+                "Because frames no longer have a destination MAC",
+                "Because CSMA/CD was made illegal"
+              ],
+              "answerIndex": 1,
+              "explanation": "CSMA/CD existed to manage collisions on a shared wire. A switch gives each device a dedicated link, so devices can transmit and receive simultaneously and collisions essentially disappear. CSMA/CD is still worth knowing as history, but switched networks don't depend on it.",
+              "image": ""
+            },
+            {
+              "id": "data-link-ethernet-l3-009",
+              "type": "mcq",
+              "prompt": "In one phrase, a switch 'learns from the source and forwards by the destination.' What does that mean?",
+              "choices": [
+                "It records where frames come FROM, but decides where to send them based on who they are FOR",
+                "It ignores both the source and destination addresses",
+                "It learns the destination and forwards by the source",
+                "It only works if every frame is a broadcast"
+              ],
+              "answerIndex": 0,
+              "explanation": "A switch reads the *source* MAC of arriving frames to learn which device sits on which port, and it reads the *destination* MAC to decide which port to forward a frame out of. Source teaches it the map; destination tells it where this frame should go.",
+              "image": ""
             }
           ]
         },
         {
           "id": "data-link-ethernet-data-link-ethernet-l4-vlans-stp-lacp",
-          "title": "VLANs, 802.1Q, Spanning Tree, LACP & Flow Control",
+          "title": "Broadcast vs Unicast, VLANs & Frame Size",
           "order": 4,
           "difficulty": 4,
-          "content": "A single broadcast domain does not scale, so we segment one physical switch into many logical LANs with **VLANs (Virtual LANs)**. Hosts in different VLANs cannot reach each other at L2; traffic must cross a **router or L3 switch**, which is also where you enforce policy and security. To carry multiple VLANs over one **trunk** link, **IEEE 802.1Q** inserts a **4-byte tag** between the source MAC and EtherType. It holds a 2-byte TPID (0x8100, which appears as the EtherType), a **3-bit PCP (Priority Code Point)** for class-of-service, a 1-bit DEI, and a **12-bit VLAN ID** (4094 usable VLANs). A tagged frame's max size grows to 1522 bytes.\n\nRedundant links create **loops**, and an Ethernet frame has **no TTL** — nothing decrements and discards a circulating frame the way IP's TTL does. A broadcast caught in a loop is re-flooded forever, a **broadcast storm** that saturates links and melts the network in seconds, with MAC tables thrashing as the same source appears on multiple ports. **Spanning Tree Protocol (STP, 802.1D)** prevents this by electing a root bridge and logically **blocking** redundant ports to leave one loop-free active tree, re-converging if a link fails. Classic STP takes ~30-50 s; **RSTP (802.1w)** converges in well under a second and is the modern default.\n\nWhen you *want* to use parallel links for bandwidth and redundancy without a loop, bundle them with **LACP (802.3ad Link Aggregation)** into one logical link; the bundle load-balances flows and survives individual link failures. Finally, **802.3x flow control** lets a congested receiver send a **PAUSE** frame asking the sender to stop briefly - a blunt, link-local backpressure mechanism, largely superseded by higher-layer congestion control but still seen in lossless data-center fabrics.",
+          "content": "## Three ways to address a frame\n\nA frame's destination MAC can aim at different numbers of devices. There are three flavours:\n\n- **Unicast** — to **one** specific device. This is the everyday case: \"this frame is for that laptop.\"\n- **Broadcast** — to **every** device on the local network at once. There is a special all-devices address (every bit set to 1) that means \"everyone here, listen up.\" It is like an announcement over a building's loudspeaker. Switches send a broadcast frame out all ports.\n- **Multicast** — to a **specific group** of interested devices, not everyone and not just one. Like a memo sent only to the people who signed up for a particular newsletter.\n\nKnowing these helps explain switch behaviour: a unicast goes to one port (once learned), while a broadcast is flooded to all ports because it is meant for everyone.\n\n## Splitting one switch into VLANs\n\nBy default, every device plugged into one switch is on the same local network, and a broadcast reaches all of them. Sometimes you don't want that — say you want the staff computers separated from the guest Wi-Fi for security, even though they share one switch.\n\nA **VLAN** (Virtual LAN, where LAN = Local Area Network) lets you **split one physical switch into separate virtual networks**. Ports in VLAN A behave as one local network; ports in VLAN B behave as a totally separate one. A broadcast in VLAN A never reaches VLAN B. To send data between two VLANs you need a **router** (the device that moves data between *different* networks — covered soon).\n\nWhen VLANs need to span more than one switch, the link between the switches carries traffic for several VLANs at once. That shared link is called a **trunk**, and each frame on it gets a small **VLAN tag** added so the other switch knows which VLAN it belongs to. A normal port connected to a single device (in one VLAN) is called an **access port**.\n\n## MTU and jumbo frames (brief)\n\nRecall the payload tops out around 1500 bytes. That maximum is called the **MTU** (Maximum Transmission Unit) — the largest payload a frame may carry. Some specialized networks (like data centers) raise this to about 9000 bytes using **jumbo frames** to move bulk data more efficiently. The catch: **every device along the path must agree** on the larger size, or the oversized frames get dropped. For everyday networks, 1500 is the norm.\n\n## Recap\n\nFrames can be **unicast** (one device), **broadcast** (everyone), or **multicast** (a group). **VLANs** carve one physical switch into separate virtual networks that need a router to talk between them, with **trunks** and **VLAN tags** carrying multiple VLANs between switches. The **MTU** caps payload size at about 1500 bytes, which **jumbo frames** can raise to ~9000 when every device agrees.",
           "items": [
             {
+              "id": "data-link-ethernet-l4-img",
+              "type": "mcq",
+              "prompt": "In the VLAN diagram, two VLANs share one physical switch. What does the diagram show about them?",
+              "choices": [
+                "Every device can freely talk to every other device",
+                "Devices within the same VLAN can talk to each other, but crossing between VLAN A and VLAN B needs a router",
+                "The two VLANs require two separate physical switches",
+                "VLANs make the switch forget all MAC addresses"
+              ],
+              "answerIndex": 1,
+              "explanation": "The diagram shows one physical switch split into VLAN A and VLAN B. Devices inside the same VLAN communicate normally, but the two VLANs act as separate networks — crossing between them requires a router, even though they share one switch.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/data-link-ethernet-4.svg"
+            },
+            {
               "id": "data-link-ethernet-l4-001",
-              "type": "flashcard",
-              "front": "What is a VLAN, and how do hosts in different VLANs communicate?",
-              "back": "A VLAN is a logical broadcast domain layered onto a physical switch, isolating groups of ports at L2. Hosts in different VLANs cannot talk directly; their traffic must be routed by a router or L3 switch (inter-VLAN routing).",
-              "hint": "Logical LAN segmentation; crossing them needs L3."
+              "type": "mcq",
+              "prompt": "What does a UNICAST frame target?",
+              "choices": [
+                "One specific device",
+                "Every device on the local network",
+                "A group of devices that signed up",
+                "No devices at all"
+              ],
+              "answerIndex": 0,
+              "explanation": "Unicast means the frame is addressed to one specific device — the everyday case. 'Every device' is broadcast, and 'a group that signed up' is multicast.",
+              "image": ""
             },
             {
               "id": "data-link-ethernet-l4-002",
-              "type": "flashcard",
-              "front": "Describe the 802.1Q tag: where it sits and its fields.",
-              "back": "A 4-byte tag inserted between source MAC and EtherType. Fields: 16-bit TPID (0x8100), 3-bit PCP (priority/CoS), 1-bit DEI, 12-bit VLAN ID (4094 usable). Tagged frames can be up to 1522 bytes.",
-              "hint": "TPID + PCP + DEI + 12-bit VID, after src MAC."
+              "type": "mcq",
+              "prompt": "What is a BROADCAST frame, and what does a switch do with it?",
+              "choices": [
+                "A frame for one device; the switch sends it to one port",
+                "A frame for every device on the local network; the switch floods it out all ports",
+                "A frame with no destination; the switch drops it",
+                "A frame for a device on another network; the switch routes it"
+              ],
+              "answerIndex": 1,
+              "explanation": "A broadcast uses the special all-devices address (every bit set to 1) and is meant for every device on the local network, so a switch floods it out all of its ports. It is like a loudspeaker announcement to the whole building.",
+              "image": ""
             },
             {
               "id": "data-link-ethernet-l4-003",
               "type": "mcq",
-              "prompt": "Why is a Layer 2 loop catastrophic in a way that a Layer 3 routing loop is not?",
+              "prompt": "How is MULTICAST different from broadcast?",
               "choices": [
-                "L2 frames are larger than L3 packets so they congest faster",
-                "Ethernet frames have no TTL field, so a looping frame (especially a broadcast) circulates forever, causing a broadcast storm",
-                "Routers cannot detect loops at all",
-                "L2 loops corrupt the FCS, which L3 loops do not"
+                "Multicast goes to a specific group of interested devices, not to absolutely everyone",
+                "Multicast goes to exactly one device",
+                "Multicast goes to devices on other networks only",
+                "There is no difference between multicast and broadcast"
               ],
-              "answerIndex": 1,
-              "explanation": "IP packets carry a TTL that is decremented at each hop and dropped at zero, bounding routing loops. Ethernet frames have no such field, so a looping frame is never discarded. A broadcast or unknown-unicast frame gets re-flooded endlessly, a broadcast storm that saturates links and thrashes MAC tables within seconds."
+              "answerIndex": 0,
+              "explanation": "Multicast targets a particular group of devices that are interested (like a newsletter sent only to subscribers), whereas broadcast hits every device on the local network. Multicast is the in-between option: more than one device, but not all of them.",
+              "image": ""
             },
             {
               "id": "data-link-ethernet-l4-004",
               "type": "mcq",
-              "prompt": "What does Spanning Tree Protocol do to prevent loops?",
+              "prompt": "What is a VLAN?",
               "choices": [
-                "It adds a TTL to Ethernet frames",
-                "It elects a root bridge and logically blocks redundant ports, leaving a single loop-free active tree",
-                "It encrypts broadcast frames so they cannot loop",
-                "It routes frames using IP addresses"
+                "A faster type of network cable",
+                "A way to split one physical switch into separate virtual networks",
+                "A permanent hardware address like a MAC",
+                "The error-check at the end of a frame"
               ],
               "answerIndex": 1,
-              "explanation": "STP (802.1D) builds a loop-free topology by electing a root bridge and putting redundant ports into a blocking state, so exactly one active path exists between any two points. If a link fails it re-converges to restore connectivity. RSTP (802.1w) does the same far faster."
+              "explanation": "A VLAN (Virtual LAN) divides one physical switch into multiple separate virtual networks. Ports in one VLAN behave as their own local network, isolated from the others, which is useful for separating, say, staff and guest traffic on the same hardware.",
+              "image": ""
             },
             {
               "id": "data-link-ethernet-l4-005",
               "type": "mcq",
-              "prompt": "What is the main improvement of RSTP (802.1w) over classic STP (802.1D)?",
+              "prompt": "Two devices are on the same switch but in different VLANs. How can they communicate?",
               "choices": [
-                "It supports more VLANs",
-                "It encrypts BPDUs",
-                "It converges in well under a second instead of ~30-50 seconds",
-                "It eliminates the need for a root bridge"
+                "They cannot communicate under any circumstances",
+                "Their traffic must go through a router, which moves data between different networks",
+                "They communicate directly because they share one switch",
+                "They must first be given the same MAC address"
               ],
-              "answerIndex": 2,
-              "explanation": "RSTP's headline benefit is dramatically faster convergence (sub-second vs the ~30-50 s of classic STP), achieved with proposal/agreement handshakes and edge/point-to-point port roles. It still elects a root bridge."
+              "answerIndex": 1,
+              "explanation": "Different VLANs act as separate networks, so frames cannot pass directly between them even on one switch. A router (the device that moves data between different networks) is needed to bridge the two VLANs. Sharing a switch does not by itself let different VLANs talk.",
+              "image": ""
             },
             {
               "id": "data-link-ethernet-l4-006",
-              "type": "flashcard",
-              "front": "What is LACP (802.3ad) and what does it provide?",
-              "back": "Link Aggregation Control Protocol bundles multiple physical links into one logical link. It increases aggregate bandwidth, load-balances flows across members, and provides redundancy (the bundle survives loss of individual links) - all without creating an STP-blocked loop.",
-              "hint": "Bond parallel links into one; bandwidth + redundancy."
+              "type": "mcq",
+              "prompt": "What is a 'trunk' link, and why does it add a VLAN tag to frames?",
+              "choices": [
+                "A link to a single device; the tag stores its MAC",
+                "A link between switches that carries several VLANs at once; the tag marks which VLAN each frame belongs to",
+                "A backup cable used only when the main one fails",
+                "A link to the Internet; the tag stores the website name"
+              ],
+              "answerIndex": 1,
+              "explanation": "A trunk is a link (typically between switches) that carries traffic for multiple VLANs simultaneously. Because several VLANs share the link, each frame gets a small VLAN tag so the receiving switch knows which VLAN it belongs to. An access port, by contrast, connects a single device in one VLAN.",
+              "image": ""
             },
             {
               "id": "data-link-ethernet-l4-007",
-              "type": "flashcard",
-              "front": "What does an 802.3x PAUSE frame do?",
-              "back": "It is link-local flow control: a congested receiver sends a PAUSE frame telling the directly-connected sender to stop transmitting for a specified time, applying backpressure. It is blunt and largely superseded by higher-layer congestion control, but still used in lossless data-center fabrics.",
-              "hint": "Receiver tells the sender 'stop for a moment'."
+              "type": "mcq",
+              "prompt": "What does MTU (Maximum Transmission Unit) mean for an Ethernet frame?",
+              "choices": [
+                "The maximum number of devices on the network",
+                "The largest payload a frame may carry, normally about 1500 bytes",
+                "The minimum size a frame must be",
+                "The speed of the network link"
+              ],
+              "answerIndex": 1,
+              "explanation": "The MTU is the largest payload that fits in one frame — normally about 1500 bytes on standard Ethernet. It is a size limit on the data per frame, not a device count, a minimum size, or a speed.",
+              "image": ""
             },
             {
               "id": "data-link-ethernet-l4-008",
               "type": "mcq",
-              "prompt": "How large is the VLAN ID field in an 802.1Q tag, and how many usable VLANs does that allow?",
+              "prompt": "What is a jumbo frame, and what is the catch?",
               "choices": [
-                "8 bits, 256 VLANs",
-                "10 bits, 1024 VLANs",
-                "12 bits, 4094 usable VLANs (0 and 4095 reserved)",
-                "16 bits, 65536 VLANs"
+                "A frame with no payload; the catch is it carries no data",
+                "A frame with a payload up to about 9000 bytes; the catch is every device on the path must agree on the larger size",
+                "A frame sent twice for safety; the catch is it doubles traffic",
+                "A frame with extra MAC addresses; the catch is it confuses switches"
               ],
-              "answerIndex": 2,
-              "explanation": "The VLAN ID is 12 bits, giving 4096 values; VLAN 0 (priority-only) and 4095 (reserved) are not usable as normal VLANs, leaving 4094. This 4094 ceiling is a key motivation for VXLAN overlays in large multi-tenant data centers."
+              "answerIndex": 1,
+              "explanation": "A jumbo frame raises the payload to roughly 9000 bytes to move bulk data more efficiently (common in data centers). The catch is that every device along the path must be set up for the larger size, or the oversized frames are simply dropped.",
+              "image": ""
             },
             {
               "id": "data-link-ethernet-l4-009",
-              "type": "flashcard",
-              "front": "How does a trunk link differ from an access port?",
-              "back": "An access port belongs to a single VLAN and carries untagged frames to/from an end host. A trunk port carries traffic for multiple VLANs between switches (or to a router), using 802.1Q tags to keep the VLANs distinguished.",
-              "hint": "Access = one VLAN, untagged; trunk = many VLANs, tagged."
+              "type": "mcq",
+              "prompt": "Why might someone put staff computers and guest Wi-Fi on different VLANs even though they share one switch?",
+              "choices": [
+                "To keep the two groups separated for security, so guests can't reach the staff network",
+                "To make the switch run faster for everyone",
+                "To give every device the same IP address",
+                "To remove the need for any router on the network"
+              ],
+              "answerIndex": 0,
+              "explanation": "VLANs isolate groups of ports into separate virtual networks, so traffic (including broadcasts) in one VLAN does not reach the other. Separating staff and guest traffic for security is a classic use. It does not magically speed up the switch, share IP addresses, or remove the need for a router — in fact a router is needed if the VLANs must talk.",
+              "image": ""
             }
           ]
         }
