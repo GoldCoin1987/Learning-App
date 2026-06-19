@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "id": "linux-systems",
   "title": "Linux Systems",
-  "version": "1.14.0",
+  "version": "1.15.0",
   "description": "Linux from scratch (beginner rework in progress): 19 sub-topics from the shell through systemd, the kernel, containers, storage, networking, and embedded Linux. Beginner-first readings, code, and diagrams; tiered easy to hard.",
   "requires": [],
   "tags": [
@@ -9553,406 +9553,855 @@
       "order": 15,
       "lessons": [
         {
-          "id": "storage-lvm-storage-lvm-block-stack",
-          "title": "The Block-Device Stack & Partitioning",
+          "id": "storage-lvm-storage-lvm-the-chain",
+          "title": "From Empty Disk to Usable Storage: The Four Steps",
           "order": 1,
           "difficulty": 1,
-          "content": "Linux storage is a stack of layers, and almost every storage task is just deciding which layer to operate on. From the bottom up: a physical disk (`/dev/sda`, an NVMe namespace `/dev/nvme0n1`, or a loopback file) is a stream of fixed-size sectors (512 B or 4 KiB). On top sits an optional partition table that carves the disk into ranges; on top of partitions you may stack LVM, RAID (`md`), or encryption (`dm-crypt`); finally a *filesystem* turns one of those into named files, and `mount` grafts it into the single unified directory tree.\n\n`lsblk` is your map of this stack. `lsblk -f` adds filesystem type, LABEL, and UUID:\n\n```bash\nlsblk -f                 # tree of disks -> parts -> dm/md -> mountpoint\nlsblk -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINTS\nsudo blkid               # UUIDs/types from superblocks\ncat /proc/partitions     # kernel's raw view\n```\n\n**MBR vs GPT.** The old MBR (msdos) scheme lives in the first 512 bytes, caps disks at 2 TiB, and allows only 4 primary partitions (hence \"extended/logical\" hacks). **GPT** (GUID Partition Table) is the modern default: 128 partitions by default, disks far beyond 2 TiB, a backup table at the end of the disk, and CRC protection. Use GPT unless you have a specific legacy-BIOS reason not to.\n\nTooling: `fdisk` and `gdisk` are interactive (fdisk now handles both MBR and GPT); `parted` (and scriptable `sgdisk`) are good for automation. The radar-tech instinct applies: a disk is just addressable hardware, and a partition table is a tiny map at the front telling everyone where the regions begin and end. Mislabel that map and the bits underneath are unchanged but suddenly unreadable.",
+          "content": "**Hook.** You plug a new hard drive into a Linux machine. Nothing happens — you can't save files to it yet. A fresh disk is just empty space, like a bare plot of land. Before you can use it, you do four small things in order. Once you see this chain, almost everything about Linux storage clicks into place.\n\n**Build.** Think of building on an empty plot of land:\n\n1. **Disk** — the raw, empty space (the bare plot). Linux names disks like `/dev/sda` (the first disk) or `/dev/nvme0n1` (an NVMe SSD).\n2. **Partition** — you divide the disk into one or more sections, called *partitions*. Like surveying the plot into separate lots. A disk can have just one partition that fills it, or several.\n3. **Filesystem** — you put a *filesystem* on a partition. A filesystem is the structure that organizes files and folders (the most common one on Linux is called **ext4**). Creating it is called **formatting**, and it wipes whatever was there. This is like building on a lot and setting up a filing system inside so you can find things.\n4. **Mount** — finally you **mount** the filesystem: you attach it to a *folder* in Linux's single tree of directories (say, `/data`) so you can actually open and save files there. Like adding a driveway so you can reach the building.\n\nLinux has one big directory tree starting at `/`. Mounting is how a separate disk shows up *inside* that tree at a folder of your choosing.\n\nTwo commands let you see all of this:\n\n```bash\nlsblk        # lists disks and their partitions as a little tree\ndf -h        # shows mounted filesystems and how full each one is\n```\n\n`lsblk` means \"list block devices\" (a *block device* is just the technical name for a disk or partition). `df` means \"disk free.\" The `-h` makes sizes human-readable (like `20G` instead of a huge number).\n\n**Recap.** Disk → partition → filesystem (format) → mount. Empty space, divided up, given structure, then attached into the tree so you can use it. The rest of this topic just zooms into each step.",
           "items": [
             {
-              "id": "storage-lvm-block-stack-001",
-              "type": "flashcard",
-              "front": "Name the layers of the Linux block-device stack from raw hardware up to a file you can open.",
-              "back": "Physical disk/sectors -> (optional) partition table -> (optional) LVM / md-RAID / dm-crypt mapping -> filesystem -> mountpoint in the unified directory tree.",
-              "hint": "Disk, partition, mapper layer, filesystem, mount."
-            },
-            {
-              "id": "storage-lvm-block-stack-002",
-              "type": "flashcard",
-              "front": "What does `lsblk -f` show that plain `lsblk` does not, and why is it the first command to run?",
-              "back": "It adds FSTYPE, LABEL, UUID, and mountpoint per node, so you see the whole stack (disk -> partition -> dm/md -> mount) with filesystem identity at a glance before touching anything.",
-              "hint": "f = filesystem info: type/label/UUID."
-            },
-            {
-              "id": "storage-lvm-block-stack-003",
+              "id": "storage-lvm-the-chain-001",
               "type": "mcq",
-              "prompt": "Which statement about MBR vs GPT partition tables is correct?",
+              "prompt": "Put the steps in order: you have a brand-new empty disk and want to store files on it. What is the correct sequence?",
               "choices": [
-                "MBR supports disks larger than 2 TiB and 128 partitions by default",
-                "GPT caps a disk at 4 primary partitions and 2 TiB",
-                "GPT supports >2 TiB disks, 128 partitions by default, and keeps a backup table at the disk's end",
-                "MBR stores a CRC-protected backup table at both ends of the disk"
-              ],
-              "answerIndex": 2,
-              "explanation": "GPT is the modern scheme: large disks, 128 partitions by default, CRC-checked primary plus backup tables. MBR is the legacy 512-byte scheme limited to ~2 TiB and 4 primary partitions."
-            },
-            {
-              "id": "storage-lvm-block-stack-004",
-              "type": "mcq",
-              "prompt": "You want a scriptable, non-interactive way to partition a disk in an automation pipeline. Best fit?",
-              "choices": [
-                "Interactive `fdisk` with a human at the keyboard",
-                "`parted` (or `sgdisk`) with command-line operations",
-                "`mkfs.ext4` directly on the whole disk",
-                "Editing /proc/partitions by hand"
+                "Mount it, then format it, then partition it",
+                "Partition it, then format it (create a filesystem), then mount it",
+                "Format it, then mount it, then partition it",
+                "Mount it, then partition it, then format it"
               ],
               "answerIndex": 1,
-              "explanation": "`parted` and `sgdisk` accept full operations on the command line, making them suitable for scripts. `fdisk` is interactive, mkfs makes a filesystem (not a partition table), and /proc/partitions is read-only kernel state."
+              "explanation": "The chain is disk -> partition (divide into sections) -> filesystem/format (add the structure that organizes files) -> mount (attach it into the directory tree so you can use it). You cannot mount something that has no filesystem yet, and you cannot format a section that has not been partitioned, so the other orders are impossible."
             },
             {
-              "id": "storage-lvm-block-stack-005",
-              "type": "flashcard",
-              "front": "Why can you stack LVM, md-RAID, or dm-crypt either on whole disks OR on partitions?",
-              "back": "Each is just a device-mapper/kernel layer that consumes a block device and presents a new one. A partition is itself a block device, so any layer can sit on a whole disk or on a partition of it.",
-              "hint": "Everything in the stack is a block device feeding the next layer."
-            },
-            {
-              "id": "storage-lvm-block-stack-006",
-              "type": "flashcard",
-              "front": "Where does an MBR live physically, and what is the practical consequence of that location?",
-              "back": "In the first 512-byte sector (LBA 0). It is tiny and singular, so it has no redundancy and a single bad write to sector 0 corrupts the whole partition map.",
-              "hint": "Sector 0, no backup copy."
-            },
-            {
-              "id": "storage-lvm-block-stack-007",
+              "id": "storage-lvm-the-chain-002",
               "type": "mcq",
-              "prompt": "`lsblk` shows `nvme0n1` with children `nvme0n1p1` and `nvme0n1p2`. What are the children?",
+              "prompt": "What does it mean to \"mount\" a filesystem in Linux?",
               "choices": [
-                "Separate physical NVMe drives",
-                "Partitions of the namespace nvme0n1",
-                "LVM logical volumes",
-                "RAID mirror members"
+                "To physically screw the disk into the computer case",
+                "To attach the filesystem to a folder in the directory tree so its files become reachable",
+                "To erase the disk and set up a fresh filesystem",
+                "To divide the disk into partitions"
               ],
               "answerIndex": 1,
-              "explanation": "The `p1`/`p2` suffix denotes partitions of the NVMe namespace `nvme0n1`. (SATA disks use sda1/sda2 without the 'p'.)"
+              "explanation": "Mounting attaches a filesystem at a chosen folder (a mount point, e.g. /data) within Linux's single directory tree, so you can open and save files there. Screwing in hardware is physical installation, erasing is formatting, and dividing is partitioning -- different steps."
             },
             {
-              "id": "storage-lvm-block-stack-008",
+              "id": "storage-lvm-the-chain-003",
               "type": "mcq",
-              "prompt": "Which command reports the UUID and filesystem type read directly from on-disk superblocks?",
+              "prompt": "In the \"empty plot of land\" analogy, which everyday action matches FORMATTING a partition?",
               "choices": [
-                "`df -h`",
-                "`blkid`",
-                "`du -sh`",
-                "`free -m`"
+                "Surveying the plot into separate lots",
+                "Building on a lot and setting up a filing system inside it",
+                "Adding a driveway so you can reach the building",
+                "Buying the bare, empty plot"
               ],
               "answerIndex": 1,
-              "explanation": "`blkid` (and `lsblk -f`) read identifying metadata (UUID, LABEL, TYPE) from superblocks. `df` reports mounted-FS usage, `du` reports directory usage, `free` reports memory."
+              "explanation": "Formatting creates the filesystem -- the structure that organizes files -- which is like building and adding an internal filing system. Surveying into lots is partitioning, the driveway is mounting, and the bare plot is the raw disk."
             },
             {
-              "id": "storage-lvm-block-stack-009",
-              "type": "flashcard",
-              "front": "What is a loopback (loop) device and why is it perfect for practicing storage?",
-              "back": "A regular file presented as a block device via `losetup` (e.g. `losetup -f --show disk.img`). You can partition it, mkfs it, build LVM/RAID on it, and mount it exactly like a real disk -- with zero hardware risk.",
-              "hint": "A file pretending to be /dev/sdX."
+              "id": "storage-lvm-the-chain-004",
+              "type": "mcq",
+              "prompt": "Which command lists the disks attached to the machine and the partitions on them as a small tree?",
+              "choices": [
+                "`df`",
+                "`lsblk`",
+                "`cd`",
+                "`mount`"
+              ],
+              "answerIndex": 1,
+              "explanation": "`lsblk` (list block devices) shows disks and their partitions in a tree. `df` shows free space on already-mounted filesystems, `cd` changes the current folder, and `mount` (with no arguments) lists what is currently mounted -- useful, but not the disk/partition tree."
+            },
+            {
+              "id": "storage-lvm-the-chain-005",
+              "type": "mcq",
+              "prompt": "A \"filesystem\" in this context is best described as which of the following?",
+              "choices": [
+                "A brand of hard drive",
+                "The structure that organizes files and folders on a partition (for example, ext4)",
+                "The cable that connects a disk to the motherboard",
+                "The folder where Linux stores user accounts"
+              ],
+              "answerIndex": 1,
+              "explanation": "A filesystem is the on-disk structure that turns raw space into named files and folders; ext4 is the common Linux example. It is not hardware, a cable, or a particular folder."
+            },
+            {
+              "id": "storage-lvm-the-chain-006",
+              "type": "mcq",
+              "prompt": "Why can't you just save files to a fresh disk the moment you plug it in?",
+              "choices": [
+                "The disk needs to charge its battery first",
+                "It is raw empty space with no partition or filesystem yet, and it is not attached into the directory tree",
+                "Linux can only use disks made by certain manufacturers",
+                "You must reboot before any new disk works"
+              ],
+              "answerIndex": 1,
+              "explanation": "A new disk is just empty space. It needs a partition, a filesystem (format), and a mount point before files can be stored. Disks have no battery, Linux is not brand-locked, and a reboot is not required to use new storage."
+            },
+            {
+              "id": "storage-lvm-the-chain-007",
+              "type": "mcq",
+              "prompt": "You run `df -h` and see a line for `/data` showing `20G` total and `5G` used. What does this tell you?",
+              "choices": [
+                "The disk /data has not been formatted yet",
+                "A filesystem is mounted at /data, it holds about 20 GB, and roughly 5 GB are in use",
+                "There are 20 partitions on the disk",
+                "The /data folder cannot be written to"
+              ],
+              "answerIndex": 1,
+              "explanation": "`df -h` lists mounted filesystems with their size and usage in human-readable units. A line for /data means something is mounted there; 20G total / 5G used is its capacity and current usage. It does not count partitions or imply the folder is read-only."
+            },
+            {
+              "id": "storage-lvm-the-chain-008",
+              "type": "mcq",
+              "prompt": "Linux organizes everything under a single directory tree starting at `/`. How does a separate second disk fit into that one tree?",
+              "choices": [
+                "It gets its own separate tree with a different top, like D: on Windows",
+                "It is mounted at a folder (a mount point) inside the one tree, so its files appear under that folder",
+                "Its files are automatically copied into /home",
+                "It cannot be used until the first disk is removed"
+              ],
+              "answerIndex": 1,
+              "explanation": "Unlike Windows drive letters, Linux has one unified tree. A second disk's filesystem is mounted at a folder (e.g. /data or /mnt/backup) and its contents appear there. Nothing is auto-copied, and multiple disks coexist fine."
+            },
+            {
+              "id": "storage-lvm-the-chain-009",
+              "type": "mcq",
+              "prompt": "What is the most important thing to remember about formatting (creating a filesystem on) a partition?",
+              "choices": [
+                "It is reversible with a single undo command",
+                "It erases what was on that partition, so it is destructive",
+                "It makes the partition larger",
+                "It must be done every time you reboot"
+              ],
+              "answerIndex": 1,
+              "explanation": "Formatting lays down a fresh, empty filesystem structure, which wipes existing contents -- it is destructive and not casually reversible. It does not change the partition's size and is a one-time step, not a per-boot one."
+            },
+            {
+              "id": "storage-lvm-the-chain-010",
+              "type": "mcq",
+              "prompt": "Match the analogy to the real step: \"adding a driveway so you can reach the finished building\" corresponds to which Linux step?",
+              "choices": [
+                "Partitioning the disk",
+                "Mounting the filesystem",
+                "Formatting the partition",
+                "Buying the disk"
+              ],
+              "answerIndex": 1,
+              "explanation": "The driveway is what finally lets you reach the building -- that is mounting, which makes the filesystem reachable in the directory tree. Partitioning divides the land, formatting builds and sets up the filing system, and buying the plot is acquiring the raw disk.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/storage-lvm-2.svg"
+            }
+          ]
+        },
+        {
+          "id": "storage-lvm-storage-lvm-partitioning",
+          "title": "Disks & Partitioning: MBR vs GPT",
+          "order": 2,
+          "difficulty": 1,
+          "content": "**Hook.** A partition divides one physical disk into separate sections, so you can keep things apart (for example, the operating system on one section and your data on another). To do that, the disk needs a tiny *map* near its front that records where each section begins and ends. That map is the **partition table**, and there are two kinds: the old **MBR** and the modern **GPT**.\n\n**Build.** Think of the partition table as the index page of a notebook: it just lists where each chapter starts. Crucially, editing the map does **not** touch the data in the sections — it only changes the labels. (That is also why a corrupted map can make perfectly intact data suddenly unreadable.)\n\n**MBR (Master Boot Record)** is the legacy scheme. It lives in the very first 512 bytes of the disk. Its limits: it only handles disks up to about **2 TiB**, allows only **4 main partitions**, and keeps a single copy of the map with no backup.\n\n**GPT (GUID Partition Table)** is the modern default and the one to use unless you have a specific old-hardware reason. It supports **huge disks**, up to **128 partitions** by default, and keeps a **backup copy** of the map at the end of the disk in case the front gets damaged. (GUID just means a long, globally-unique ID number.)\n\nThe tools:\n\n```bash\nlsblk                  # SEE the disks and partitions (always look first)\nsudo fdisk /dev/sdb    # interactive editor to create/change partitions\nsudo parted /dev/sdb   # another partition editor, good for scripts\n```\n\nYou will see partitions named by adding a number to the disk: `/dev/sda` has `/dev/sda1`, `/dev/sda2`. NVMe SSDs add a `p`: `/dev/nvme0n1` has `/dev/nvme0n1p1`.\n\n**Recap.** A partition table is a small map at the front of the disk that carves it into sections. Prefer **GPT** (big disks, many partitions, a backup map) over the legacy **MBR**. Use `lsblk` to look before you touch anything with `fdisk` or `parted`.",
+          "items": [
+            {
+              "id": "storage-lvm-partitioning-001",
+              "type": "mcq",
+              "prompt": "What is a partition table?",
+              "choices": [
+                "A list of every file stored on the disk",
+                "A small map near the front of the disk recording where each partition begins and ends",
+                "The part of the disk that holds the operating system",
+                "A table of users allowed to access the disk"
+              ],
+              "answerIndex": 1,
+              "explanation": "The partition table is the disk's map of sections -- where each partition starts and stops. It is not a file list (the filesystem tracks those), not the OS itself, and not a permissions list."
+            },
+            {
+              "id": "storage-lvm-partitioning-002",
+              "type": "mcq",
+              "prompt": "Which statement correctly compares MBR and GPT?",
+              "choices": [
+                "MBR supports huge disks and 128 partitions; GPT is limited to 2 TiB",
+                "GPT supports large disks, up to 128 partitions, and keeps a backup copy of the map; MBR is the older, more limited scheme",
+                "MBR keeps a backup map at both ends of the disk; GPT keeps none",
+                "GPT only works on disks smaller than MBR can handle"
+              ],
+              "answerIndex": 1,
+              "explanation": "GPT is the modern scheme: big disks, up to 128 partitions, and a backup map at the disk's end. MBR is the legacy 512-byte scheme limited to ~2 TiB and 4 main partitions with a single, unbacked-up map."
+            },
+            {
+              "id": "storage-lvm-partitioning-003",
+              "type": "mcq",
+              "prompt": "For a brand-new modern machine with a large disk, which partition table should you normally choose?",
+              "choices": [
+                "MBR, because it is older and therefore more reliable",
+                "GPT, the modern default that handles large disks and keeps a backup map",
+                "Neither; large disks do not need a partition table",
+                "Whichever one is alphabetically first"
+              ],
+              "answerIndex": 1,
+              "explanation": "GPT is the recommended default on modern hardware: it handles large disks, allows many partitions, and stores a backup of the map. MBR's age does not make it more reliable, and any usable disk needs a partition table (or to be handed whole to another layer)."
+            },
+            {
+              "id": "storage-lvm-partitioning-004",
+              "type": "mcq",
+              "prompt": "Why is it safe-by-design that editing a partition table does not move your file data?",
+              "choices": [
+                "Because the table only records where sections start and end; it is just a map, not the data itself",
+                "Because Linux secretly copies all data to RAM first",
+                "Because partition editors refuse to run on disks with data",
+                "Because data is stored inside the partition table"
+              ],
+              "answerIndex": 0,
+              "explanation": "The table is a small index of section boundaries; rewriting it changes labels, not the bytes in each section. (That is also why a wrong map can make intact data unreadable.) Data is not stored in the table, not parked in RAM, and editors will happily edit a disk that has data -- so be careful."
+            },
+            {
+              "id": "storage-lvm-partitioning-005",
+              "type": "mcq",
+              "prompt": "On a SATA disk named `/dev/sda`, how would its first and second partitions normally be named?",
+              "choices": [
+                "/dev/sda-1 and /dev/sda-2",
+                "/dev/sda1 and /dev/sda2",
+                "/dev/part1 and /dev/part2",
+                "/dev/sdb and /dev/sdc"
+              ],
+              "answerIndex": 1,
+              "explanation": "Partitions are the disk name with a number appended: /dev/sda1, /dev/sda2. NVMe drives insert a 'p' (nvme0n1p1). /dev/sdb and /dev/sdc would be separate disks, not partitions of sda."
+            },
+            {
+              "id": "storage-lvm-partitioning-006",
+              "type": "mcq",
+              "prompt": "You want to LOOK at the current disks and partitions before changing anything. Which command is the right first move?",
+              "choices": [
+                "`sudo fdisk /dev/sda` and start deleting partitions",
+                "`lsblk`",
+                "`df -h /`",
+                "`rm -rf /dev/sda`"
+              ],
+              "answerIndex": 1,
+              "explanation": "`lsblk` safely lists disks and partitions so you know exactly what you are working with. Jumping into fdisk to delete is dangerous, `df` shows mounted-filesystem usage (not the full partition layout), and `rm -rf` on a device path is a destructive mistake."
+            },
+            {
+              "id": "storage-lvm-partitioning-007",
+              "type": "mcq",
+              "prompt": "What is one practical risk that comes from MBR keeping only a single copy of its map in the first sector?",
+              "choices": [
+                "The disk spins more slowly",
+                "If that one sector is damaged, the whole partition map can be lost with no backup to fall back on",
+                "It uses far more electricity",
+                "Files automatically shrink over time"
+              ],
+              "answerIndex": 1,
+              "explanation": "MBR's single, unbacked-up map means damage to that first sector can lose the entire partition layout. GPT mitigates this with a backup copy at the disk's end. Disk speed, power use, and file size are unrelated to this."
+            },
+            {
+              "id": "storage-lvm-partitioning-008",
+              "type": "mcq",
+              "prompt": "Roughly what are MBR's two best-known limits?",
+              "choices": [
+                "No limit on size, but only 2 partitions",
+                "About a 2 TiB maximum disk size and only 4 main partitions",
+                "Exactly 128 partitions and a 16 TiB cap",
+                "It cannot be read by Linux at all"
+              ],
+              "answerIndex": 1,
+              "explanation": "MBR caps disks at roughly 2 TiB and allows only 4 main (primary) partitions. The 128-partition figure belongs to GPT, and Linux reads MBR just fine -- it is simply the older, more limited scheme."
+            },
+            {
+              "id": "storage-lvm-partitioning-009",
+              "type": "mcq",
+              "prompt": "Which pair of tools is used to create or change partitions (edit the map), as opposed to just viewing it?",
+              "choices": [
+                "`df` and `du`",
+                "`fdisk` and `parted`",
+                "`cat` and `less`",
+                "`ping` and `ssh`"
+              ],
+              "answerIndex": 1,
+              "explanation": "`fdisk` (interactive) and `parted` (also scriptable) edit partition tables. `df`/`du` report space usage, `cat`/`less` read text, and `ping`/`ssh` are networking tools."
+            },
+            {
+              "id": "storage-lvm-partitioning-010",
+              "type": "mcq",
+              "prompt": "What does the \"GUID\" in GPT (GUID Partition Table) refer to?",
+              "choices": [
+                "A graphical user interface for disks",
+                "A long, globally-unique ID number used to label the table and its partitions",
+                "The brand name of the disk",
+                "A type of cable connector"
+              ],
+              "answerIndex": 1,
+              "explanation": "GUID stands for Globally Unique Identifier -- a long unique ID. GPT uses these IDs to label the table and partitions. It is not a graphical interface, a brand, or a connector.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/storage-lvm-3.svg"
             }
           ]
         },
         {
           "id": "storage-lvm-storage-lvm-filesystems",
-          "title": "Filesystems: Journaling vs Copy-on-Write, mkfs & Mounting",
-          "order": 2,
+          "title": "Filesystems: ext4, Journaling, mkfs & fsck",
+          "order": 3,
           "difficulty": 2,
-          "content": "A filesystem is the bookkeeping that turns a flat block device into files, directories, and metadata. The split that matters today is **journaling vs copy-on-write (CoW)**.\n\n**Journaling (ext4, XFS).** Before changing the live structures, the FS writes its intent to a journal, then replays or discards it after a crash so the FS stays consistent. ext4 has three modes set via `data=`: `ordered` (default -- journals metadata, but forces data blocks to disk before the metadata commit), `writeback` (journals metadata only, fastest, data may lag -> stale blocks after crash), and `journal` (journals data too -- safest, slowest). XFS journals metadata only, scales superbly to huge files and parallel I/O, and **cannot shrink** -- only grow.\n\n**Copy-on-write (Btrfs, ZFS).** CoW never overwrites live data; it writes new blocks and atomically flips pointers. This gives nearly free **snapshots**, **checksums** on data+metadata (detecting silent corruption/bit-rot -- a real concern your radar background will appreciate), built-in multi-device/RAID, and compression. The cost is fragmentation and more tuning.\n\nSpecial filesystems: **tmpfs** is RAM-backed (`/tmp`, `/run`) -- fast and volatile. **overlayfs** unions a read-only lower dir with a writable upper dir and is the backbone of container images (Module 14).\n\n```bash\nsudo mkfs.ext4 -L data /dev/vg0/lv_data\nsudo mkfs.xfs  /dev/vg0/lv_data\nsudo fsck.ext4 -f /dev/sdb1     # NEVER fsck a mounted rw fs\nsudo tune2fs -l /dev/sdb1       # ext4 superblock + UUID\n```\n\nRule: `fsck` only on an unmounted (or read-only) filesystem; checking a live read-write FS can corrupt it. XFS uses `xfs_repair` instead, only when unmounted.",
+          "content": "**Hook.** A partition by itself is just a block of space — there is no notion of \"a file\" inside it yet. A **filesystem** is the bookkeeping that turns that space into named files and folders, and tracks where each file's data lives. On Linux the everyday default is **ext4**.\n\n**Build.** Creating a filesystem on a partition is called **formatting**, done with the `mkfs` family (\"make filesystem\"):\n\n```bash\nsudo mkfs.ext4 /dev/sdb1     # format /dev/sdb1 as ext4 (this ERASES it)\n```\n\nThe most important feature of ext4 is **journaling**. Imagine writing in pencil what you are *about* to do before you do it. If the power dies mid-write, the system reads that note on the next boot and either finishes the job or undoes it cleanly — so the filesystem stays consistent instead of becoming a corrupted mess. The journal protects the *structure*; it is a safety net against crashes.\n\nA quick tour of other filesystems you'll hear about (you don't need them yet):\n\n- **XFS** — another journaling filesystem, strong with very large files. It can grow but **never shrink**.\n- **Btrfs / ZFS** — \"copy-on-write\" filesystems: instead of overwriting data, they write new copies, which makes near-free *snapshots* (instant point-in-time copies) and *checksums* that detect silently corrupted bytes (\"bit-rot\").\n- **FAT / exFAT** — simple and understood by Windows, macOS, and cameras; good for USB sticks you share between systems.\n- **tmpfs** — lives in RAM, so it is very fast but vanishes on reboot. Used for scratch areas like `/run`.\n\nIf a filesystem gets damaged (say, after a bad shutdown on a non-journaled disk), **fsck** (\"filesystem check\") repairs it:\n\n```bash\nsudo fsck /dev/sdb1     # only on an UNMOUNTED filesystem\n```\n\n**One firm rule:** never run `fsck` on a filesystem that is currently mounted and writable. The repair tool and the running system would have conflicting views and could corrupt your data. Unmount it first.\n\n**Recap.** A filesystem (usually ext4) organizes a partition into files; `mkfs` creates one (and erases the partition). Journaling keeps things consistent across crashes. `fsck` repairs damage — but only when the filesystem is unmounted.",
           "items": [
             {
               "id": "storage-lvm-filesystems-001",
-              "type": "flashcard",
-              "front": "Explain journaling vs copy-on-write in one sentence each.",
-              "back": "Journaling: record the intended change in a journal first, then apply it, so a crash leaves the FS consistent (replay/rollback). Copy-on-write: never overwrite live blocks -- write new ones and atomically swap pointers, which makes snapshots and checksums cheap.",
-              "hint": "Write-ahead intent log vs write-elsewhere-then-flip-pointer."
+              "type": "mcq",
+              "prompt": "What is the job of a filesystem?",
+              "choices": [
+                "To divide a disk into partitions",
+                "To organize a partition's space into named files and folders and track where each file's data is",
+                "To connect the computer to a network",
+                "To back up data to the cloud automatically"
+              ],
+              "answerIndex": 1,
+              "explanation": "A filesystem turns raw space into files and folders and records where each file lives. Dividing into partitions is the partition table's job; networking and cloud backup are unrelated."
             },
             {
               "id": "storage-lvm-filesystems-002",
               "type": "mcq",
-              "prompt": "ext4 is mounted with `data=writeback`. After a crash, what is the risk relative to the default `data=ordered`?",
+              "prompt": "In plain terms, what does journaling (as in ext4) do?",
               "choices": [
-                "No risk; writeback is fully data-journaled",
-                "Metadata may point at file blocks that were never written, exposing stale/garbage data",
-                "The whole partition table is rewritten",
-                "Snapshots become unreadable"
+                "It keeps a diary of which users logged in",
+                "It notes what it is about to change before changing it, so a crash mid-write can be cleaned up and the filesystem stays consistent",
+                "It compresses every file to save space",
+                "It encrypts the filesystem"
               ],
               "answerIndex": 1,
-              "explanation": "`writeback` journals only metadata and does not order data writes before metadata commit, so after a crash a file's metadata can reference blocks whose data never hit disk -- you may read stale content. `ordered` forces data out before the metadata commit; `journal` logs data too."
+              "explanation": "Journaling records the intended change first; after a crash the system replays or undoes it so the filesystem stays consistent. It is not a login log, not compression, and not encryption."
             },
             {
               "id": "storage-lvm-filesystems-003",
-              "type": "flashcard",
-              "front": "Which two desirable properties fall out 'for free' from copy-on-write, and why?",
-              "back": "Snapshots (just keep the old block pointers around -- nothing was overwritten) and data checksums (every write is new, so a checksum can be computed and verified, catching silent bit-rot).",
-              "hint": "Old pointers survive; new writes get checksummed."
+              "type": "mcq",
+              "prompt": "Which command creates an ext4 filesystem on the partition /dev/sdb1?",
+              "choices": [
+                "`mount.ext4 /dev/sdb1`",
+                "`mkfs.ext4 /dev/sdb1`",
+                "`fdisk.ext4 /dev/sdb1`",
+                "`df.ext4 /dev/sdb1`"
+              ],
+              "answerIndex": 1,
+              "explanation": "`mkfs.ext4` (make filesystem, ext4 variant) formats the partition. There is no mount.ext4/fdisk.ext4/df.ext4 in this sense -- mount attaches, fdisk partitions, and df reports usage."
             },
             {
               "id": "storage-lvm-filesystems-004",
               "type": "mcq",
-              "prompt": "A teammate runs `fsck` on a mounted, read-write ext4 root filesystem. What is the danger?",
+              "prompt": "A teammate is about to run `fsck` on the root filesystem while the system is running normally and the filesystem is mounted read-write. Why is this dangerous?",
               "choices": [
-                "None -- fsck is always safe online",
-                "It only prints a warning and exits with no effect",
-                "The kernel and fsck have inconsistent views of the FS, so fsck's 'repairs' can corrupt live data",
-                "It silently converts the FS to XFS"
+                "fsck is always perfectly safe, so there is no danger",
+                "The running system is still changing the filesystem while fsck tries to repair it, so their conflicting views can corrupt the data",
+                "fsck will reformat the disk without asking",
+                "fsck only works on Windows filesystems"
               ],
-              "answerIndex": 2,
-              "explanation": "fsck assumes exclusive access. On a live rw filesystem the kernel is still mutating structures, so fsck's idea of what is correct is stale and its writes can corrupt the FS. Run it only when unmounted or mounted read-only."
+              "answerIndex": 1,
+              "explanation": "fsck assumes it has exclusive access. On a live, writable filesystem the kernel keeps changing things, so fsck's repairs are based on a stale picture and can corrupt data. Run it only when the filesystem is unmounted (or read-only). fsck repairs; it does not blindly reformat."
             },
             {
               "id": "storage-lvm-filesystems-005",
-              "type": "flashcard",
-              "front": "When would you pick XFS, and what is its notable limitation?",
-              "back": "Pick XFS for large files and high-parallelism workloads (big databases, media, many cores) where its allocation and scalability shine. Limitation: it can be grown (`xfs_growfs`) but NEVER shrunk.",
-              "hint": "Great big-and-parallel FS; grow-only."
+              "type": "mcq",
+              "prompt": "You need a filesystem on a USB stick that you will share between a Linux laptop, a Windows PC, and a digital camera. Which is the natural choice?",
+              "choices": [
+                "ext4, because it is the Linux default",
+                "FAT or exFAT, because it is widely understood across operating systems and devices",
+                "tmpfs, because it is fast",
+                "XFS, because it handles large files"
+              ],
+              "answerIndex": 1,
+              "explanation": "FAT/exFAT is the interop choice that Windows, macOS, Linux, and cameras all read. ext4 is Linux-centric, tmpfs lives only in RAM and disappears on reboot, and XFS is a Linux server filesystem -- none are ideal for cross-device sharing."
             },
             {
               "id": "storage-lvm-filesystems-006",
               "type": "mcq",
-              "prompt": "Why is overlayfs central to container images?",
+              "prompt": "What is special about tmpfs, and what is the consequence?",
               "choices": [
-                "It encrypts every layer of the image",
-                "It unions a read-only lower directory with a writable upper directory, so containers share immutable base layers and write only their diffs",
-                "It is the only filesystem that supports UUIDs",
-                "It stores everything in RAM and loses it on reboot"
+                "It is the most durable filesystem, ideal for long-term archives",
+                "It lives in RAM, so it is very fast but its contents disappear on reboot",
+                "It automatically encrypts everything",
+                "It can only be used on USB drives"
               ],
               "answerIndex": 1,
-              "explanation": "overlayfs merges a read-only lower dir (shared base image layers) with a writable upper dir (container's changes), enabling layer sharing and copy-on-write semantics at the directory level. tmpfs is the RAM-backed, volatile one."
+              "explanation": "tmpfs is RAM-backed: fast but volatile, so it is wiped on reboot -- great for scratch/temporary areas, wrong for anything you must keep. It is not durable, not an encryption layer, and not USB-only."
             },
             {
               "id": "storage-lvm-filesystems-007",
-              "type": "flashcard",
-              "front": "What is tmpfs and what is the consequence of putting /tmp or build artifacts on it?",
-              "back": "A RAM-backed filesystem (may spill to swap). It is very fast but volatile -- contents vanish on reboot/unmount and consume RAM. Great for scratch/caches, wrong for anything you must keep.",
-              "hint": "RAM filesystem -> fast but gone on reboot."
+              "type": "mcq",
+              "prompt": "Copy-on-write filesystems like Btrfs and ZFS write new copies instead of overwriting data in place. Which two beginner-friendly benefits does that enable?",
+              "choices": [
+                "Faster networking and lower power use",
+                "Near-instant snapshots (point-in-time copies) and checksums that detect silently corrupted data",
+                "Automatic partitioning and a backup partition map",
+                "Larger fonts and a graphical interface"
+              ],
+              "answerIndex": 1,
+              "explanation": "Because old data is not overwritten, keeping a snapshot is cheap, and every new write can carry a checksum that flags bit-rot on read. These are storage-integrity features, not networking, partitioning, or UI features."
             },
             {
               "id": "storage-lvm-filesystems-008",
               "type": "mcq",
-              "prompt": "Which command set correctly creates an ext4 filesystem with label `data` and then inspects its superblock/UUID?",
+              "prompt": "What must you always remember before running `fsck` on a filesystem?",
               "choices": [
-                "`mkfs.ext4 -L data /dev/vg0/lv_data` then `tune2fs -l /dev/vg0/lv_data`",
-                "`mount -L data /dev/vg0/lv_data` then `df -h`",
-                "`fdisk /dev/vg0/lv_data` then `du -sh`",
-                "`lvextend -L data` then `blkid -p`"
+                "Make sure it is mounted and busy",
+                "Make sure it is unmounted (or mounted read-only) first",
+                "Make sure at least 10 users are logged in",
+                "Make sure it is the root filesystem"
               ],
-              "answerIndex": 0,
-              "explanation": "`mkfs.ext4 -L data` formats and labels; `tune2fs -l` dumps the ext4 superblock including the UUID and label. The other options confuse mounting, partitioning, and LV resizing with formatting/inspection."
+              "answerIndex": 1,
+              "explanation": "fsck needs exclusive, stable access, so the filesystem must be unmounted (or read-only) before checking. Checking a mounted, busy, writable filesystem -- especially the live root -- risks corruption."
             },
             {
               "id": "storage-lvm-filesystems-009",
-              "type": "flashcard",
-              "front": "Data-integrity angle: how does a CoW filesystem like ZFS/Btrfs catch silent bit-rot that ext4/XFS cannot?",
-              "back": "It stores checksums of data and metadata and verifies them on every read; a mismatch flags corruption (and with redundancy can self-heal from a good copy). Traditional journaling FSs only protect consistency of structure, not the correctness of stored bytes.",
-              "hint": "Checksums verified on read, not just a consistency journal."
+              "type": "mcq",
+              "prompt": "What does formatting a partition (running mkfs on it) do to any data already there?",
+              "choices": [
+                "It carefully preserves all existing files",
+                "It lays down a fresh, empty filesystem, effectively erasing what was there",
+                "It only adds new files and never removes any",
+                "It moves the files to another partition first"
+              ],
+              "answerIndex": 1,
+              "explanation": "mkfs writes a new, empty filesystem structure, which wipes prior contents -- formatting is destructive. It does not preserve, merely-append, or relocate old data, so confirm the target first."
+            },
+            {
+              "id": "storage-lvm-filesystems-010",
+              "type": "mcq",
+              "prompt": "Which statement about XFS is correct?",
+              "choices": [
+                "It can be shrunk easily at any time",
+                "It is a journaling filesystem that can grow but cannot be shrunk",
+                "It stores all data in RAM",
+                "It is only usable on Windows"
+              ],
+              "answerIndex": 1,
+              "explanation": "XFS journals like ext4 and is strong with large files, but it can only grow, never shrink. It is a normal on-disk filesystem (not RAM-based) and is a Linux filesystem, not a Windows one.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/storage-lvm-4.svg"
             }
           ]
         },
         {
           "id": "storage-lvm-storage-lvm-fstab-mount",
-          "title": "Mounting, /etc/fstab, UUIDs & systemd Mount Units",
-          "order": 3,
-          "difficulty": 3,
-          "content": "Mounting attaches a filesystem to a point in the tree. Doing it by hand is `mount /dev/vg0/lv_data /data`; making it survive reboot is `/etc/fstab` (or a systemd mount unit).\n\n**Why UUIDs, not /dev/sdX.** Kernel device names are *not stable*: add a disk, change a controller, or boot with USB attached and yesterday's `/dev/sdb` is today's `/dev/sdc`. An fstab entry keyed on `/dev/sdb1` can then mount the wrong filesystem -- or fail to boot. UUIDs (or LABELs) name the *filesystem itself*, so they follow the data regardless of enumeration order. Get them with `lsblk -f` or `blkid`.\n\n**fstab fields (six, space-separated):** `<spec> <mountpoint> <fstype> <options> <dump> <pass>`.\n\n```bash\n# /etc/fstab\nUUID=4d2a-... /data ext4 defaults,noatime,nosuid 0 2\n```\n\nKey options: `noatime` (don't write an access timestamp on every read -- a real I/O win), `ro` (read-only -- protects reference data and forensic images), `nosuid`/`nodev`/`noexec` (harden untrusted mounts), `defaults` (rw,suid,dev,exec,auto,nouser,async). The 5th field is dump (almost always 0); the 6th is fsck order: `1` for root, `2` for other ext-family FSs, `0` to skip. Validate without rebooting: `sudo mount -a` then `findmnt --verify`.\n\n**systemd mount units.** systemd generates a `.mount` unit per fstab line, but you can also write `data.mount` directly (the filename must be the escaped mountpoint, e.g. `data.mount` for `/data`). Use `x-systemd.automount` for mount-on-first-access, and `nofail`/`x-systemd.device-timeout=` so a missing device doesn't block boot. `findmnt` shows the live mount tree.",
+          "title": "Mounting & /etc/fstab: Making Mounts Stick at Boot",
+          "order": 4,
+          "difficulty": 2,
+          "content": "**Hook.** Mounting by hand works for right now, but it is forgotten the moment you reboot. To make a filesystem mount **automatically every boot**, you add one line to a special file called **/etc/fstab** (the \"filesystem table\").\n\n**Build.** First, the manual version. To attach a filesystem to a folder yourself:\n\n```bash\nsudo mount /dev/sdb1 /data     # attach /dev/sdb1 at the folder /data\nsudo umount /data              # detach it again (note: umount, no 'n')\n```\n\nNow the automatic version. An `/etc/fstab` line has **six fields**, separated by spaces, in this order:\n\n```\nUUID=4d2a-9f1c   /data   ext4   defaults,noatime   0   2\n```\n\n1. **what to mount** — best given as a **UUID** (explained below), not `/dev/sdb1`.\n2. **where** — the mount point folder, e.g. `/data`.\n3. **type** — the filesystem, e.g. `ext4`.\n4. **options** — how to mount it (see below).\n5. **dump** — an old backup flag; use `0`.\n6. **pass** — boot-time check order: `1` for the root filesystem, `2` for others, `0` to skip.\n\n**Why a UUID instead of /dev/sdb1?** Disk names are not fixed. Add a disk or move a cable, and yesterday's `/dev/sdb` may become today's `/dev/sdc`. A **UUID** (Universally Unique Identifier) is a permanent ID stamped on the *filesystem itself*, so it always points to the right data. Find UUIDs with:\n\n```bash\nlsblk -f     # shows each filesystem's type and UUID\n```\n\n**Common options:** `defaults` (sensible normal settings), `noatime` (don't record a \"last read\" timestamp on every read — a small speed win), `ro` (read-only, protect the data), and `nofail` (don't halt the boot if this disk is missing — handy for removable drives).\n\n**The boot caution.** A mistake in `/etc/fstab` can stop the machine from booting and drop you into an emergency repair prompt. So always test your new line *without* rebooting:\n\n```bash\nsudo mount -a     # mounts everything in fstab; surfaces typos right now\n```\n\nIf `mount -a` succeeds with no errors, the line is safe.\n\n**Recap.** Mount by hand with `mount`; make it permanent with a six-field line in `/etc/fstab`, keyed by **UUID** so it survives disk renaming. Always run `mount -a` to test before you trust it at boot.",
           "items": [
             {
               "id": "storage-lvm-fstab-mount-001",
-              "type": "flashcard",
-              "front": "Why should fstab entries use UUID= (or LABEL=) instead of /dev/sdX?",
-              "back": "Kernel device names depend on enumeration order and can change when hardware is added/moved, so /dev/sdb1 may later point at a different disk. A UUID names the filesystem itself, so it always follows the correct data -- preventing wrong-filesystem mounts or boot failures.",
-              "hint": "Device names drift; UUIDs are stable identifiers."
+              "type": "mcq",
+              "prompt": "What is the purpose of the /etc/fstab file?",
+              "choices": [
+                "It lists every file on the system",
+                "It lists filesystems to mount automatically at boot, and where and how to mount each",
+                "It stores user passwords",
+                "It records network settings"
+              ],
+              "answerIndex": 1,
+              "explanation": "/etc/fstab (filesystem table) tells the system what to mount at boot, at which folder, and with which options. It is not a per-file list, a password store, or network config."
             },
             {
               "id": "storage-lvm-fstab-mount-002",
               "type": "mcq",
-              "prompt": "What are the six fields of an /etc/fstab line, in order?",
+              "prompt": "Why should an /etc/fstab entry usually identify a filesystem by its UUID instead of by /dev/sdb1?",
               "choices": [
-                "mountpoint, spec, options, fstype, pass, dump",
-                "spec, mountpoint, fstype, options, dump, pass",
-                "fstype, spec, mountpoint, dump, options, pass",
-                "spec, fstype, options, mountpoint, pass, dump"
+                "UUIDs are shorter and easier to type",
+                "Disk names like /dev/sdb1 can change when hardware is added or moved, while a UUID is a permanent ID stamped on the filesystem itself",
+                "Linux cannot mount anything by /dev name",
+                "UUIDs make the disk faster"
               ],
               "answerIndex": 1,
-              "explanation": "Order is: spec (UUID/LABEL/device), mountpoint, filesystem type, mount options, dump flag, and fsck pass number."
+              "explanation": "Kernel names (/dev/sdb1) depend on detection order and can shift, so an fstab keyed on them may mount the wrong disk or fail. A UUID names the filesystem itself and always follows the right data. UUIDs are longer, not shorter, and have no effect on speed."
             },
             {
               "id": "storage-lvm-fstab-mount-003",
-              "type": "flashcard",
-              "front": "What does the mount option `noatime` do and why is it commonly used?",
-              "back": "It suppresses updating a file's access-time metadata on every read. That eliminates a metadata write per read, cutting I/O and wear -- especially valuable on read-heavy workloads and flash/SSD.",
-              "hint": "Stop writing 'last read' timestamps."
+              "type": "mcq",
+              "prompt": "What are the six fields of an /etc/fstab line, in order?",
+              "choices": [
+                "mount point, what to mount, options, type, pass, dump",
+                "what to mount, mount point, filesystem type, options, dump, pass",
+                "type, options, what to mount, mount point, dump, pass",
+                "what to mount, options, type, mount point, pass, dump"
+              ],
+              "answerIndex": 1,
+              "explanation": "The order is: what to mount (UUID/device), mount point, filesystem type, options, dump flag, pass (fsck order). The other orderings scramble these fields."
             },
             {
               "id": "storage-lvm-fstab-mount-004",
               "type": "mcq",
-              "prompt": "You add a new data disk's fstab entry and want to confirm it is correct WITHOUT rebooting into a possibly broken boot. Best approach?",
+              "prompt": "You added a new line to /etc/fstab and want to confirm it works WITHOUT risking a broken boot. What is the safe check?",
               "choices": [
-                "Reboot immediately and watch the console",
-                "`sudo mount -a` then `findmnt --verify` to test the entries live",
-                "Delete /etc/fstab and re-create it",
-                "Run `fsck` on the running root filesystem"
+                "Reboot immediately and hope it comes back",
+                "Run `sudo mount -a`, which mounts everything in fstab and surfaces any typos right now",
+                "Delete /etc/fstab and start over",
+                "Run `fsck` on the live root filesystem"
               ],
               "answerIndex": 1,
-              "explanation": "`mount -a` mounts everything in fstab (surfacing typos), and `findmnt --verify` checks the file for problems. This catches mistakes before a reboot can leave you at an emergency prompt."
+              "explanation": "`mount -a` applies every fstab entry immediately, so a bad line shows up as an error while you can still fix it -- no reboot gamble. Rebooting blind, deleting fstab, or fscking the live root are all risky."
             },
             {
               "id": "storage-lvm-fstab-mount-005",
-              "type": "flashcard",
-              "front": "What is the purpose of the 6th fstab field (fsck pass), and what values are typical?",
-              "back": "It sets boot-time fsck order: 1 for the root filesystem (checked first), 2 for other ext-family filesystems (checked after root, in parallel across disks), and 0 to skip the check (used for swap, network mounts, XFS/Btrfs which self-check).",
-              "hint": "Root=1, others=2, skip=0."
+              "type": "mcq",
+              "prompt": "What is the real-world danger of a mistake in /etc/fstab?",
+              "choices": [
+                "Nothing; fstab errors are silently ignored",
+                "A bad entry can stop the machine from booting normally and drop it into an emergency repair prompt",
+                "It will delete all your files",
+                "It changes your password"
+              ],
+              "answerIndex": 1,
+              "explanation": "Because fstab is read during boot, a faulty line can halt boot and land you at an emergency shell. It does not silently vanish, delete files, or touch passwords -- which is exactly why you test with mount -a first."
             },
             {
               "id": "storage-lvm-fstab-mount-006",
               "type": "mcq",
-              "prompt": "A removable/secondary disk may be absent at boot. Which fstab option prevents a missing device from dropping the system into emergency mode?",
+              "prompt": "Which command finds a filesystem's UUID so you can put it in /etc/fstab?",
               "choices": [
-                "noatime",
-                "ro",
-                "nofail (often with x-systemd.device-timeout=)",
-                "nosuid"
+                "`df -h`",
+                "`lsblk -f`",
+                "`du -sh`",
+                "`free -m`"
               ],
-              "answerIndex": 2,
-              "explanation": "`nofail` tells systemd not to fail the boot if the device is missing; pairing it with `x-systemd.device-timeout=` bounds how long boot waits. noatime/ro/nosuid affect behavior, not the missing-device boot blocking."
+              "answerIndex": 1,
+              "explanation": "`lsblk -f` lists each filesystem with its type and UUID. `df` shows usage of mounted filesystems, `du` measures folder sizes, and `free` reports memory -- none show UUIDs."
             },
             {
               "id": "storage-lvm-fstab-mount-007",
               "type": "mcq",
-              "prompt": "Which set of options best hardens an automounted USB stick containing untrusted files?",
+              "prompt": "A removable backup drive is sometimes unplugged at boot. Which fstab option keeps a missing drive from blocking the whole boot?",
               "choices": [
-                "rw,suid,dev,exec",
-                "ro,nosuid,nodev,noexec",
-                "defaults,noatime",
-                "rw,auto,async"
+                "noatime",
+                "ro",
+                "nofail",
+                "defaults"
               ],
-              "answerIndex": 1,
-              "explanation": "`ro` blocks writes; `nosuid` ignores setuid bits; `nodev` ignores device nodes; `noexec` blocks running binaries -- the standard hardening set for untrusted media. The others permit execution and privilege escalation vectors."
+              "answerIndex": 2,
+              "explanation": "`nofail` tells the system not to fail the boot if that device is absent. `noatime` skips access-time updates, `ro` mounts read-only, and `defaults` is the normal option set -- none of those address a missing device at boot."
             },
             {
               "id": "storage-lvm-fstab-mount-008",
-              "type": "flashcard",
-              "front": "How does systemd relate to /etc/fstab, and what does x-systemd.automount add?",
-              "back": "systemd's generator turns each fstab line into a .mount unit at boot. The `x-systemd.automount` option makes the filesystem mount lazily on first access (via an .automount unit) instead of eagerly at boot -- useful for slow or rarely used mounts.",
-              "hint": "fstab -> generated .mount units; automount = mount on first access."
+              "type": "mcq",
+              "prompt": "What does the mount option `noatime` do, in beginner terms?",
+              "choices": [
+                "It makes the filesystem read-only",
+                "It stops recording a \"last read\" timestamp on every file read, saving a little work",
+                "It mounts the filesystem only at night",
+                "It disables the filesystem's journal"
+              ],
+              "answerIndex": 1,
+              "explanation": "`noatime` suppresses the access-time update that would otherwise happen on every read, trimming needless writes. It is unrelated to read-only mode, time of day, or journaling."
             },
             {
               "id": "storage-lvm-fstab-mount-009",
-              "type": "flashcard",
-              "front": "Which command displays the current live mount tree (and can verify fstab), replacing eyeballing /proc/mounts?",
-              "back": "`findmnt` -- it shows the hierarchical mount tree with sources, types, and options; `findmnt --verify` sanity-checks /etc/fstab.",
-              "hint": "find + mnt."
+              "type": "mcq",
+              "prompt": "Which command detaches a currently mounted filesystem?",
+              "choices": [
+                "`unmount /data`",
+                "`umount /data`",
+                "`mount -d /data`",
+                "`detach /data`"
+              ],
+              "answerIndex": 1,
+              "explanation": "The command is `umount` (spelled without the first 'n'). `unmount`, `mount -d`, and `detach` are not the real commands -- a classic beginner spelling trap."
+            },
+            {
+              "id": "storage-lvm-fstab-mount-010",
+              "type": "mcq",
+              "prompt": "In the sixth fstab field (the \"pass\"/check order), what value is normally used for the root filesystem versus other data filesystems?",
+              "choices": [
+                "0 for root, 0 for others",
+                "1 for root, 2 for other filesystems (and 0 to skip the check)",
+                "9 for root, 9 for others",
+                "2 for root, 1 for others"
+              ],
+              "answerIndex": 1,
+              "explanation": "The pass field sets boot-time check order: 1 for the root filesystem (checked first), 2 for other filesystems, and 0 to skip checking. Equal or reversed values are not the convention.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/storage-lvm-5.svg"
             }
           ]
         },
         {
-          "id": "storage-lvm-storage-lvm-lvm-raid",
-          "title": "LVM, Online Resize, RAID, Swap & Encryption",
-          "order": 4,
-          "difficulty": 4,
-          "content": "**LVM** inserts a flexible abstraction between disks and filesystems. Physical disks/partitions become **PVs** (`pvcreate`); PVs pool into a **VG** (`vgcreate vg0 ...`), which is just a bag of fixed-size *physical extents*; you carve **LVs** out of that pool (`lvcreate -L 20G -n lv_data vg0`). Because the VG is a pool, you can grow an LV by handing it free extents from any PV -- no repartitioning, no downtime.\n\n**Growing an LV and its filesystem online -- the headline skill:**\n\n```bash\nsudo lvextend -L +10G /dev/vg0/lv_data    # add space to the LV\nsudo resize2fs /dev/vg0/lv_data           # ext4: grow FS to fill it\n# or, for XFS (must be mounted):\nsudo xfs_growfs /data\n# shortcut: lvextend -r resizes the FS for you\n```\n\nOrder matters: grow the LV first, then the filesystem. (Shrinking is the reverse and is risky -- shrink the FS first, and XFS can't shrink at all.)\n\n**Snapshots** are CoW: `lvcreate -s -L 2G -n snap0 /dev/vg0/lv_data` freezes a point-in-time view for backups; **thin provisioning** (thin pools) lets you allocate LVs larger than the backing store, consuming extents only on write -- powerful but you must monitor the pool or writes fail when it fills.\n\n**RAID (mdadm):** 0 = stripe (speed, zero redundancy), 1 = mirror (survive one disk), 5 = stripe+parity (n-1 capacity, survive one disk), 10 = mirrored stripes (speed + redundancy). **Swap:** a partition or file (`mkswap`, `swapon`); `vm.swappiness` (0-100, default ~60) tunes how eagerly the kernel swaps. **LUKS/dm-crypt** gives block-level encryption: `cryptsetup luksFormat`, then `luksOpen` exposes a decrypted mapper device you put a FS or PV on.\n\nMonitoring: `df -h` (free space), `du -sh *` (what's using it), `iostat -xz 1` (per-device I/O), `smartctl -a /dev/sda` (drive health/SMART). **The cardinal danger:** `dd`/`mkfs`/`wipefs` take a target device and do not ask twice -- `dd if=img of=/dev/sda` to the wrong disk instantly destroys it. Always confirm the device with `lsblk` first, and prefer UUIDs and `lsblk -f` over guessed `/dev/sdX` names.",
+          "id": "storage-lvm-storage-lvm-lvm",
+          "title": "LVM: Pooling Disks & Resizing Storage on the Fly",
+          "order": 5,
+          "difficulty": 3,
+          "content": "**Hook.** With plain partitions, a partition's size is locked in when you create it. If `/data` fills up, growing it is painful. **LVM** (Logical Volume Manager) fixes this by adding a flexible layer between your disks and your filesystems. Its superpower: you can **pool several disks together and resize storage while the system stays running** — no reboot, no repartitioning.\n\n**Build.** Picture combining several plots of land into one big estate, then dividing that estate into rooms you can enlarge whenever you like. LVM has three layers, bottom to top:\n\n1. **PV — Physical Volume.** A real disk or partition prepared for LVM with `pvcreate`. (Tagging a plot of land for the estate.)\n2. **VG — Volume Group.** One or more PVs gathered into a single **pool** of space with `vgcreate`. (The combined estate.)\n3. **LV — Logical Volume.** A virtual \"disk\" carved out of the pool with `lvcreate`. You put a filesystem on an LV and mount it, exactly like a partition. (A room in the estate.)\n\n```bash\nsudo pvcreate /dev/sdb /dev/sdc        # 1. prepare two disks as PVs\nsudo vgcreate vg0 /dev/sdb /dev/sdc    # 2. pool them into VG 'vg0'\nsudo lvcreate -L 20G -n lv_data vg0    # 3. carve a 20 GB LV named lv_data\nsudo mkfs.ext4 /dev/vg0/lv_data        # format it like any partition\n```\n\n**Growing storage online — the headline trick.** Because the VG is a pool of free space, you can hand more of it to an LV and grow the filesystem while it stays mounted. The order matters: **enlarge the container first, then the filesystem.**\n\n```bash\nsudo lvextend -L +10G /dev/vg0/lv_data    # 1. make the LV 10 GB bigger\nsudo resize2fs /dev/vg0/lv_data           # 2. grow the ext4 filesystem to fill it\n```\n\n**Snapshots.** LVM can take a **snapshot** — a frozen point-in-time view of an LV — which is great for taking a backup of a consistent moment while the system keeps running.\n\n**Thin provisioning (one-line idea).** LVM can also hand out LVs that *promise* more space than physically exists, using real space only as data is written. Flexible, but you must watch the pool so it never actually runs out.\n\n**Recap.** LVM stacks **PV → VG (pool) → LV**. Because the VG is a shared pool, you can grow an LV and its filesystem live with `lvextend` then `resize2fs` — the flexibility plain partitions don't have.",
           "items": [
             {
-              "id": "storage-lvm-lvm-raid-001",
-              "type": "flashcard",
-              "front": "Define PV, VG, and LV in the LVM model.",
-              "back": "PV (Physical Volume): a disk/partition tagged for LVM and sliced into physical extents. VG (Volume Group): a pool of extents aggregated from one or more PVs. LV (Logical Volume): a virtual block device carved from the VG's extents, on which you put a filesystem.",
-              "hint": "Disk->PV, pool->VG, virtual disk->LV."
-            },
-            {
-              "id": "storage-lvm-lvm-raid-002",
+              "id": "storage-lvm-lvm-001",
               "type": "mcq",
-              "prompt": "You must grow `/data` (ext4 on /dev/vg0/lv_data) on a live system with no downtime. Correct sequence?",
+              "prompt": "What does LVM let you do that plain, fixed partitions do not?",
               "choices": [
-                "`resize2fs` first, then `lvextend`",
-                "`lvextend -L +10G /dev/vg0/lv_data` then `resize2fs /dev/vg0/lv_data`",
-                "`umount /data`, `mkfs.ext4`, remount",
-                "`lvreduce` then `xfs_growfs`"
+                "Make the disk physically spin faster",
+                "Pool multiple disks into one space and resize storage (grow a volume) while the system stays running",
+                "Browse the internet without a network card",
+                "Run Windows programs directly"
               ],
               "answerIndex": 1,
-              "explanation": "Enlarge the container (LV) first with lvextend, then grow the filesystem into the new space with resize2fs (ext4 grows online). Doing resize2fs first has no room to grow into; mkfs would destroy the data; lvreduce shrinks."
+              "explanation": "LVM's whole point is flexibility: pool disks into a volume group and grow logical volumes online, no repartitioning or reboot. Plain partitions are fixed at creation. It has nothing to do with spindle speed, networking, or running Windows software."
             },
             {
-              "id": "storage-lvm-lvm-raid-003",
-              "type": "flashcard",
-              "front": "Why does the VG-as-extent-pool design make online growth possible at all?",
-              "back": "An LV is just a mapping over physical extents in the VG. Growing it means assigning more free extents from the pool and updating the map -- a metadata change with no data movement -- so the LV (and an online-growable FS like ext4/XFS) can expand while mounted.",
-              "hint": "Growth = handing out more extents + remap, no copy."
-            },
-            {
-              "id": "storage-lvm-lvm-raid-004",
+              "id": "storage-lvm-lvm-002",
               "type": "mcq",
-              "prompt": "What characterizes an LVM thin pool, and what operational duty does it impose?",
+              "prompt": "Match the LVM layers from bottom to top.",
               "choices": [
-                "It mirrors data across two disks automatically; no monitoring needed",
-                "It lets you provision LVs whose total size exceeds the backing storage, allocating extents only on write -- so you must monitor pool usage or writes fail when it fills",
-                "It encrypts the volume group transparently",
-                "It permanently disables snapshots"
+                "LV (a disk prepared for LVM) -> VG (a virtual disk) -> PV (a pool)",
+                "PV (a disk/partition prepared for LVM) -> VG (a pool of PVs) -> LV (a virtual disk carved from the pool)",
+                "VG (a single disk) -> PV (a pool) -> LV (a partition table)",
+                "PV (a filesystem) -> LV (a pool) -> VG (a mount point)"
               ],
               "answerIndex": 1,
-              "explanation": "Thin provisioning overcommits: LVs can sum to more than physical space, with extents consumed lazily on write. If the pool fills, writes to thin volumes fail or freeze -- so monitoring/alerting on pool usage is mandatory."
+              "explanation": "Bottom to top: PV (physical volume = a disk/partition prepared for LVM), VG (volume group = a pool gathered from PVs), LV (logical volume = a virtual disk carved from the pool that you format and mount). The other orderings mislabel the layers."
             },
             {
-              "id": "storage-lvm-lvm-raid-005",
+              "id": "storage-lvm-lvm-003",
               "type": "mcq",
-              "prompt": "Match the mdadm RAID level to its property: which is correct?",
+              "prompt": "Put the steps in order: starting from two raw disks, build an LVM logical volume you can format. What is the correct sequence of commands?",
               "choices": [
-                "RAID 0 survives a single disk failure",
-                "RAID 5 stripes with distributed parity, gives ~n-1 usable capacity, and survives one disk failure",
-                "RAID 1 stripes data with no redundancy for maximum speed",
-                "RAID 10 has no redundancy"
+                "lvcreate, then vgcreate, then pvcreate",
+                "pvcreate (prepare the disks), then vgcreate (pool them), then lvcreate (carve a logical volume)",
+                "vgcreate, then pvcreate, then mkfs",
+                "mkfs, then lvcreate, then pvcreate"
               ],
               "answerIndex": 1,
-              "explanation": "RAID 5 = striping plus distributed parity: usable capacity ~ (n-1) disks, tolerates one failed disk. RAID 0 is a no-redundancy stripe, RAID 1 is a mirror, RAID 10 is mirrored stripes (speed + redundancy)."
+              "explanation": "You must prepare each disk as a PV (pvcreate), gather them into a pool (vgcreate), then carve an LV from the pool (lvcreate) -- only after that do you format with mkfs. The other orders try to build higher layers before the ones they depend on exist."
             },
             {
-              "id": "storage-lvm-lvm-raid-006",
-              "type": "flashcard",
-              "front": "How is an LVM snapshot created, what makes it cheap, and what is the gotcha?",
-              "back": "`lvcreate -s -L <size> -n snap0 /dev/vg0/lv_data` creates a CoW snapshot: only blocks that change after creation are copied, so it starts near-free. Gotcha: a classic (non-thin) snapshot has a fixed size and is dropped/invalidated if too many writes overflow it -- size it for the expected churn.",
-              "hint": "CoW snapshot; size it for write churn or it drops."
-            },
-            {
-              "id": "storage-lvm-lvm-raid-007",
-              "type": "flashcard",
-              "front": "What is vm.swappiness and what do low vs high values mean?",
-              "back": "A 0-100 knob (default ~60) controlling how aggressively the kernel reclaims anonymous memory to swap vs reclaiming page cache. Low (e.g. 10) = avoid swapping, keep processes in RAM; high = swap more readily, favoring page cache. Tune low for latency-sensitive/large-RAM hosts.",
-              "hint": "Higher = swap sooner; lower = keep RAM resident."
-            },
-            {
-              "id": "storage-lvm-lvm-raid-008",
+              "id": "storage-lvm-lvm-004",
               "type": "mcq",
-              "prompt": "What is the single biggest irreversible danger when imaging or formatting devices, and how do you avoid it?",
+              "prompt": "You must grow /data (an ext4 filesystem on /dev/vg0/lv_data) on a live system without downtime. What is the correct order?",
               "choices": [
-                "`dd`/`mkfs` ask for confirmation, so mistakes are recoverable",
-                "Writing to the wrong /dev/sdX (e.g. `dd of=/dev/sda` instead of /dev/sdb) instantly destroys that disk; verify with `lsblk -f` first",
-                "Using UUIDs in fstab can wipe a disk",
-                "Running `df -h` can corrupt a filesystem"
+                "Run resize2fs first, then lvextend",
+                "Run lvextend to enlarge the LV, then resize2fs to grow the filesystem into the new space",
+                "Unmount it, reformat with mkfs, and remount",
+                "Run lvreduce, then mount -a"
               ],
               "answerIndex": 1,
-              "explanation": "`dd`, `mkfs`, and `wipefs` write to the named device with no second prompt; aiming at the wrong /dev/sdX overwrites a live disk irrecoverably. Always confirm the target with `lsblk -f`/`blkid` before writing. df is read-only."
+              "explanation": "Enlarge the container first (lvextend), then grow the filesystem to fill it (resize2fs); ext4 grows while mounted. Running resize2fs first gives it no room to grow into, mkfs would erase the data, and lvreduce shrinks rather than grows."
             },
             {
-              "id": "storage-lvm-lvm-raid-009",
-              "type": "flashcard",
-              "front": "Outline the LUKS/dm-crypt workflow to get an encrypted, usable block device.",
-              "back": "`cryptsetup luksFormat /dev/sdb1` (set up the LUKS header + passphrase), then `cryptsetup luksOpen /dev/sdb1 cryptdata` exposes a decrypted device at /dev/mapper/cryptdata. You then mkfs/mount it (or use it as an LVM PV). luksClose locks it again.",
-              "hint": "luksFormat -> luksOpen -> /dev/mapper/... -> mkfs/mount."
-            },
-            {
-              "id": "storage-lvm-lvm-raid-010",
+              "id": "storage-lvm-lvm-005",
               "type": "mcq",
-              "prompt": "A volume is slow and you suspect either a failing disk or saturated I/O. Which pair of tools targets those two questions?",
+              "prompt": "What is the role of a volume group (VG) in LVM?",
               "choices": [
-                "`du` for disk health, `df` for I/O latency",
-                "`smartctl -a /dev/sda` for drive health/SMART, `iostat -xz 1` for per-device I/O load and latency",
-                "`free -m` for SMART, `mount` for throughput",
-                "`lvextend` for health, `blkid` for I/O"
+                "It is the filesystem you mount",
+                "It is a single pool of space gathered from one or more physical volumes, from which logical volumes are carved",
+                "It is the partition table at the front of the disk",
+                "It is the folder where files are mounted"
               ],
               "answerIndex": 1,
-              "explanation": "`smartctl` reads SMART attributes (reallocated sectors, errors, health) to assess a failing drive; `iostat -xz 1` shows per-device utilization, queue, and await to spot I/O saturation. The others measure space or memory, not health/throughput."
+              "explanation": "A VG pools the space of its PVs into one reservoir; LVs are then carved from that pool. It is not itself the mounted filesystem, the partition table, or the mount point folder."
             },
             {
-              "id": "storage-lvm-lvm-raid-011",
-              "type": "flashcard",
-              "front": "Diagram: the LVM stack from physical disks up to mounted filesystem, including where snapshots and online growth fit.",
-              "back": "Disks/partitions -> pvcreate -> PVs -> vgcreate -> VG (extent pool) -> lvcreate -> LVs (lv_root, lv_data, snapshot) -> mkfs -> filesystem -> mount. lvextend hands free VG extents to an LV, then resize2fs/xfs_growfs grows the FS online; snapshots are CoW LVs off the same VG.",
-              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/storage-lvm-1.svg"
+              "id": "storage-lvm-lvm-006",
+              "type": "mcq",
+              "prompt": "Why does pooling disks into a volume group make online growth possible?",
+              "choices": [
+                "Because the data is copied to a faster disk each time",
+                "Because the pool holds free space that can simply be assigned to a logical volume, updating a map rather than moving data, so it can happen while mounted",
+                "Because LVM turns off the filesystem during growth",
+                "Because the disks are physically merged into one platter"
+              ],
+              "answerIndex": 1,
+              "explanation": "Growing an LV just assigns it more free space from the pool and updates LVM's internal map -- no data is relocated -- so it works on a live, mounted volume. Nothing is copied to a faster disk, the filesystem stays online, and disks are not physically merged."
+            },
+            {
+              "id": "storage-lvm-lvm-007",
+              "type": "mcq",
+              "prompt": "What is an LVM snapshot useful for?",
+              "choices": [
+                "Permanently deleting old files",
+                "Freezing a point-in-time view of a logical volume, for example to back up a consistent moment while the system keeps running",
+                "Speeding up the CPU",
+                "Encrypting the network connection"
+              ],
+              "answerIndex": 1,
+              "explanation": "A snapshot captures an LV as it was at one instant, so a backup can read a consistent picture without stopping the system. It does not delete files, change CPU speed, or affect networking."
+            },
+            {
+              "id": "storage-lvm-lvm-008",
+              "type": "mcq",
+              "prompt": "Which command prepares a raw disk or partition so it can be used by LVM (turns it into a physical volume)?",
+              "choices": [
+                "`mkfs.ext4`",
+                "`pvcreate`",
+                "`mount`",
+                "`resize2fs`"
+              ],
+              "answerIndex": 1,
+              "explanation": "`pvcreate` tags a disk/partition as an LVM physical volume. `mkfs.ext4` makes a filesystem, `mount` attaches one, and `resize2fs` grows an ext4 filesystem -- none of those create a PV."
+            },
+            {
+              "id": "storage-lvm-lvm-009",
+              "type": "mcq",
+              "prompt": "LVM \"thin provisioning\" lets you create logical volumes that promise more space than physically exists, using real space only as data is written. What duty does that impose?",
+              "choices": [
+                "None; thin pools can never run out",
+                "You must monitor the pool so it does not actually fill up, because writes fail if the real space runs out",
+                "You must reformat the pool every week",
+                "You must disable snapshots"
+              ],
+              "answerIndex": 1,
+              "explanation": "Thin provisioning overcommits space, so the pool can genuinely run dry; if it does, writes to thin volumes fail. That makes monitoring pool usage mandatory. It does not require weekly reformatting or disabling snapshots."
+            },
+            {
+              "id": "storage-lvm-lvm-010",
+              "type": "mcq",
+              "prompt": "After `lvextend` makes the logical volume bigger, why do you still need to run `resize2fs`?",
+              "choices": [
+                "Because lvextend only enlarges the container; the filesystem inside must be told to expand to fill the new space",
+                "Because resize2fs re-encrypts the data",
+                "Because lvextend deletes the filesystem and resize2fs rebuilds it",
+                "Because resize2fs is what mounts the volume"
+              ],
+              "answerIndex": 0,
+              "explanation": "lvextend grows the logical volume (the container), but the ext4 filesystem still thinks it is the old size until resize2fs expands it to fill the new room. resize2fs does not encrypt, delete/rebuild, or mount anything.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/storage-lvm-6.svg"
+            }
+          ]
+        },
+        {
+          "id": "storage-lvm-storage-lvm-extras",
+          "title": "Swap, RAID, Encryption & Checking Your Storage",
+          "order": 6,
+          "difficulty": 3,
+          "content": "**Hook.** A few more storage ideas round out the picture. You don't need to configure these as a beginner — the goal is to recognize the words and know roughly what each one is for.\n\n**Build.**\n\n**Swap — overflow space for memory.** When a machine runs low on RAM (its fast working memory), Linux can move some less-used data to a reserved area on disk called **swap**, freeing RAM for active work. Disk is far slower than RAM, so heavy swapping feels sluggish, but it stops the system from running out of memory entirely. Swap can be a partition or a file:\n\n```bash\nsudo mkswap /dev/sdb2     # prepare a swap area\nsudo swapon /dev/sdb2     # start using it\n```\n\nA knob called `swappiness` (0–100) tunes how eagerly Linux reaches for swap.\n\n**RAID — combining disks for safety or speed.** RAID groups several disks so they act as one, managed on Linux with a tool called `mdadm`. The common levels:\n\n- **RAID 0** — splits data across disks for speed, but **no protection**: lose one disk, lose everything.\n- **RAID 1** — a **mirror**: the same data on two disks, so one can fail and your data survives.\n- **RAID 5** — spreads data plus recovery info across three or more disks; survives one disk failing while wasting less space than a full mirror.\n- **RAID 10** — combines mirroring and striping for both speed and safety.\n\nKey idea: RAID is about staying running when a disk dies — it is **not** a substitute for backups.\n\n**Encryption (LUKS) — locking the data.** **LUKS** is Linux's standard way to encrypt a disk so the contents are unreadable without a passphrase — essential for laptops and removable drives that could be lost or stolen. It is set up with the `cryptsetup` tool; once unlocked with the passphrase, the disk is used normally.\n\n**Checking your storage.** Three everyday commands answer \"how full is it / what's using the space / what's the layout\":\n\n```bash\ndf -h        # free space on each mounted filesystem\ndu -sh *     # how much space each folder here is using\nlsblk -f     # the disk -> partition -> filesystem map, with types and UUIDs\n```\n\n**Recap.** **Swap** is disk used as overflow memory; **RAID** combines disks for redundancy or speed (not a backup); **LUKS** encrypts a disk behind a passphrase. Day to day, `df`, `du`, and `lsblk -f` tell you how your storage is doing.",
+          "items": [
+            {
+              "id": "storage-lvm-extras-001",
+              "type": "mcq",
+              "prompt": "What is swap used for?",
+              "choices": [
+                "Encrypting the disk",
+                "Disk space used as overflow when RAM (working memory) fills up, so the system does not run out of memory",
+                "Combining disks into one for speed",
+                "Storing the partition table"
+              ],
+              "answerIndex": 1,
+              "explanation": "Swap is reserved disk space the system uses as overflow memory when RAM is full, trading speed for not running out of memory. It is not encryption, not disk-combining (that is RAID), and not the partition table."
+            },
+            {
+              "id": "storage-lvm-extras-002",
+              "type": "mcq",
+              "prompt": "Why does heavy swapping make a system feel slow?",
+              "choices": [
+                "Because swap encrypts everything twice",
+                "Because disk is much slower than RAM, so moving working data to disk and back adds delay",
+                "Because swap disables the CPU",
+                "Because swap deletes files to make room"
+              ],
+              "answerIndex": 1,
+              "explanation": "Swap lives on disk, which is far slower than RAM, so relying on it heavily introduces noticeable delay. It does not encrypt data, disable the CPU, or delete files."
+            },
+            {
+              "id": "storage-lvm-extras-003",
+              "type": "mcq",
+              "prompt": "What does RAID 1 (a mirror) give you?",
+              "choices": [
+                "Maximum speed with no protection if a disk fails",
+                "The same data kept on two disks, so if one disk fails your data survives",
+                "More total storage than the disks combined",
+                "Automatic offsite backups"
+              ],
+              "answerIndex": 1,
+              "explanation": "RAID 1 mirrors identical data onto two disks, so one can fail without data loss. The no-protection speed option is RAID 0; mirroring does not increase total capacity and is not an offsite backup."
+            },
+            {
+              "id": "storage-lvm-extras-004",
+              "type": "mcq",
+              "prompt": "Which statement about RAID 0 is correct?",
+              "choices": [
+                "It mirrors data for safety",
+                "It splits data across disks for speed but offers no protection — if one disk fails, all data is lost",
+                "It survives two disks failing at once",
+                "It encrypts each disk"
+              ],
+              "answerIndex": 1,
+              "explanation": "RAID 0 stripes data across disks for performance and capacity but has zero redundancy: losing any one disk loses everything. Mirroring for safety is RAID 1, and RAID 0 provides no fault tolerance or encryption."
+            },
+            {
+              "id": "storage-lvm-extras-005",
+              "type": "mcq",
+              "prompt": "A common and important misconception: is RAID a replacement for backups?",
+              "choices": [
+                "Yes, RAID means you never need backups",
+                "No — RAID keeps you running if a disk dies, but it does not protect against deletion, corruption, or disaster, so you still need backups",
+                "Yes, but only RAID 5 replaces backups",
+                "No, because RAID actually erases data on a schedule"
+              ],
+              "answerIndex": 1,
+              "explanation": "RAID guards against hardware failure of a disk, but an accidental delete, a corruption, or a fire affects all the disks together. Backups remain necessary. No RAID level replaces backups, and RAID does not erase data on a schedule."
+            },
+            {
+              "id": "storage-lvm-extras-006",
+              "type": "mcq",
+              "prompt": "What does LUKS provide?",
+              "choices": [
+                "A way to combine disks for speed",
+                "Disk encryption, so the contents are unreadable without the correct passphrase",
+                "A faster filesystem",
+                "Automatic partitioning"
+              ],
+              "answerIndex": 1,
+              "explanation": "LUKS is Linux's standard full-disk encryption: without the passphrase the data is unreadable -- ideal for laptops and removable drives. It is not disk-combining (RAID), a filesystem, or a partitioning tool."
+            },
+            {
+              "id": "storage-lvm-extras-007",
+              "type": "mcq",
+              "prompt": "You want to see how much free space is left on each mounted filesystem. Which command?",
+              "choices": [
+                "`du -sh *`",
+                "`df -h`",
+                "`mkswap`",
+                "`cryptsetup`"
+              ],
+              "answerIndex": 1,
+              "explanation": "`df -h` reports free and used space per mounted filesystem in human-readable units. `du` measures folder sizes, `mkswap` prepares swap, and `cryptsetup` manages LUKS encryption."
+            },
+            {
+              "id": "storage-lvm-extras-008",
+              "type": "mcq",
+              "prompt": "You need to find which folders in the current directory are eating the most space. Which command fits best?",
+              "choices": [
+                "`df -h`",
+                "`du -sh *`",
+                "`swapon`",
+                "`lsblk`"
+              ],
+              "answerIndex": 1,
+              "explanation": "`du -sh *` summarizes the size of each item in the current directory, pinpointing space hogs. `df` shows whole-filesystem usage (not per-folder), `swapon` enables swap, and `lsblk` lists block devices."
+            },
+            {
+              "id": "storage-lvm-extras-009",
+              "type": "mcq",
+              "prompt": "Which command shows the full disk -> partition -> filesystem map, including filesystem types and UUIDs?",
+              "choices": [
+                "`free -m`",
+                "`lsblk -f`",
+                "`du -sh`",
+                "`mkswap`"
+              ],
+              "answerIndex": 1,
+              "explanation": "`lsblk -f` lists block devices as a tree and adds filesystem type and UUID for each -- the one-stop layout view. `free` reports memory, `du` reports folder sizes, and `mkswap` prepares swap."
+            },
+            {
+              "id": "storage-lvm-extras-010",
+              "type": "mcq",
+              "prompt": "Which tool is used to manage software RAID arrays on Linux?",
+              "choices": [
+                "`cryptsetup`",
+                "`mdadm`",
+                "`resize2fs`",
+                "`df`"
+              ],
+              "answerIndex": 1,
+              "explanation": "`mdadm` creates and manages Linux software RAID arrays. `cryptsetup` handles LUKS encryption, `resize2fs` grows ext4 filesystems, and `df` reports filesystem usage."
+            },
+            {
+              "id": "storage-lvm-extras-011",
+              "type": "mcq",
+              "prompt": "Recognizing the words: a coworker says \"the laptop's drive is LUKS-encrypted and we put the database on a RAID 1 mirror.\" What does that combination mean?",
+              "choices": [
+                "The drive contents need a passphrase to read, and the database lives on two disks so one can fail without data loss",
+                "The drive is split for speed with no protection, and the database is stored in RAM",
+                "The drive is unencrypted, and the database has no redundancy",
+                "Both phrases describe swap space"
+              ],
+              "answerIndex": 0,
+              "explanation": "LUKS-encrypted means the drive is unreadable without the passphrase; RAID 1 mirror means identical copies on two disks so a single disk failure does not lose the database. The other options confuse these with RAID 0, RAM storage, or swap.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/storage-lvm-7.svg"
             }
           ]
         }
