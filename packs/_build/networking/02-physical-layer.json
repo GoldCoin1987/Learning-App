@@ -4,280 +4,393 @@
   "order": 2,
   "lessons": [
     {
-      "id": "physical-layer-signals-and-coding",
-      "title": "From Bits to Signals: Baseband, Symbols, and Line Coding",
+      "id": "physical-layer-l1",
+      "title": "The Bottom Layer: Turning Bits Into a Signal",
       "order": 1,
       "difficulty": 1,
-      "content": "The physical layer answers one question: how do we put a bit on a wire (or fiber, or air)? The simplest scheme is **baseband** — the digital signal occupies the channel from DC upward, with voltage levels representing symbols directly. This is what Ethernet over copper does. **Broadband** instead modulates the bits onto a carrier (or several), sharing the medium in frequency — think cable TV (DOCSIS) or the RF you knew from radar, where the *information* rides on a carrier rather than living at baseband.\n\nA crucial distinction is **symbol rate (baud)** vs **bit rate**. The baud rate is symbols per second; the bit rate is $\\text{baud} \\times \\log_2(M)$ where $M$ is the number of distinguishable symbols. With two levels ($M=2$) one symbol carries one bit. **PAM-4**, used in 2.5G/5G/10G/25G-per-lane Ethernet, uses four amplitude levels ($M=4$), so each symbol carries 2 bits — doubling bit rate without doubling the Nyquist bandwidth. This is exactly the amplitude-discrimination tradeoff you knew from analog: more levels packed into the same swing means smaller noise margins.\n\n**Line coding** is the choice of how symbols represent bits over time, and it exists for three engineering reasons, not aesthetics:\n\n- **Clock recovery**: the receiver has no separate clock wire; it extracts timing from signal transitions. Long runs of identical bits with no edges starve the recovered clock and let it drift.\n- **DC balance**: transformers and AC-coupled, capacitively-isolated front ends cannot pass DC. A code that averages to zero (equal 1s and 0s over a window) survives that coupling.\n- **Run-length limits**: bounding the longest stretch without a transition guarantees the PLL stays locked.\n\nEverything in this module is your home turf re-skinned: eye diagrams, jitter, and noise margins are the lens.",
+      "content": "You already know a network splits its work into **layers** (stacked jobs, each talking only to its neighbors). The **physical layer** is the bottom one. It has just one job, and it is wonderfully simple to picture.\n\nEverything a computer stores is **bits** — 1s and 0s. But a 1 is just an idea; you cannot mail an idea down a wire. So the physical layer's job is to turn those bits into something that can physically *travel*, send it across the gap, and turn it back into the same bits at the other end. The 'something that travels' is called a **signal** — a physical thing the far end can detect and measure.\n\nThink of **Morse code**: you flip a light or a buzzer on and off, and the pattern of on/off carries letters. That on/off is a signal. The physical layer does the same trick, just far faster, using one of three things: **electrical voltage** (a higher or lower 'push' of electricity) on a copper wire, **flashes of light** sent down a thin glass thread, or **radio waves** sent through the open air. At the far end, a receiver watches that signal and writes down the bits again.\n\nThe three common ways to carry a signal are called **media** (one is a *medium*): copper cable, fiber-optic, and wireless. We will meet each one next.\n\n**Recap:** The physical layer is the bottom layer. Its only job is bits in -> a physical signal that travels (voltage, light, or radio) -> the same bits out the other side.",
       "items": [
         {
-          "id": "physical-layer-fc-baseband-broadband",
-          "type": "flashcard",
-          "front": "Baseband vs broadband signaling — what is the core difference?",
-          "back": "Baseband puts the digital signal directly onto the medium starting at DC (e.g., Ethernet over copper, voltage levels = symbols). Broadband modulates the bits onto one or more carriers and shares the medium in frequency (e.g., DOCSIS cable, RF links). Baseband uses the whole low-frequency band for one signal; broadband multiplexes several signals in frequency.",
-          "hint": "Where in the frequency spectrum does the information live?"
-        },
-        {
-          "id": "physical-layer-fc-baud-vs-bitrate",
-          "type": "flashcard",
-          "front": "How are symbol rate (baud) and bit rate related?",
-          "back": "bit rate = baud x log2(M), where M is the number of distinguishable symbols. With M=2 (binary), 1 symbol = 1 bit so baud equals bit rate. With PAM-4 (M=4), each symbol carries 2 bits, so the bit rate is twice the baud for the same Nyquist bandwidth.",
-          "hint": "Bits per symbol = log2(number of symbol levels)."
-        },
-        {
-          "id": "physical-layer-fc-why-line-coding",
-          "type": "flashcard",
-          "front": "Name the three engineering reasons line coding exists.",
-          "back": "1) Clock recovery — the receiver derives its bit clock from signal transitions, so the code must guarantee edges. 2) DC balance — AC-coupled/transformer-isolated front ends cannot pass DC, so the code should average to zero. 3) Run-length limits — bounding the longest run without a transition keeps the PLL locked and limits baseline wander.",
-          "hint": "Think timing, AC coupling, and worst-case identical-bit runs."
-        },
-        {
-          "id": "physical-layer-fc-pam4",
-          "type": "flashcard",
-          "front": "Why does modern Ethernet (e.g., per-lane 10G/25G) use PAM-4 instead of binary?",
-          "back": "PAM-4 uses 4 amplitude levels (M=4), carrying 2 bits per symbol. This doubles the bit rate without doubling the symbol rate / Nyquist bandwidth, which matters when the channel's usable bandwidth is the limiting factor. The cost is shrunken noise margins (3 eyes instead of 1), demanding better SNR, FEC, and DSP equalization.",
-          "hint": "More levels = more bits/symbol, but smaller voltage margins."
-        },
-        {
-          "id": "physical-layer-mcq-bitrate-calc",
+          "id": "physical-layer-l1-mc1",
           "type": "mcq",
-          "prompt": "A link runs at 5 Gbaud using PAM-4 signaling. What is its raw bit rate (before coding overhead)?",
+          "prompt": "What is the one job of the physical layer?",
           "choices": [
-            "5 Gbit/s",
-            "10 Gbit/s",
-            "2.5 Gbit/s",
-            "20 Gbit/s"
+            "To decide which website you are visiting",
+            "To turn bits into a physical signal that can travel, then turn it back into the same bits at the far end",
+            "To store your files safely on a hard drive",
+            "To pick the fastest path across the whole internet"
           ],
           "answerIndex": 1,
-          "explanation": "PAM-4 has M=4 symbols, so log2(4) = 2 bits per symbol. Bit rate = 5 Gbaud x 2 = 10 Gbit/s. PAM-4 is precisely the trick that lets you double the data rate within the same symbol-rate / bandwidth envelope."
+          "explanation": "The physical layer is the bottom of the stack and does exactly one thing: it converts 1s and 0s into something physical (voltage, light, or radio waves), sends it, and converts it back to bits. Choosing websites and picking routes are jobs for higher layers; storing files is not a networking job at all.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/physical-layer-2.svg"
         },
         {
-          "id": "physical-layer-mcq-clock-recovery",
+          "id": "physical-layer-l1-mc2",
           "type": "mcq",
-          "prompt": "A receiver recovers its bit clock from the incoming data stream itself (no separate clock line). Which transmitted pattern most threatens this clock recovery under plain NRZ?",
+          "prompt": "In networking, what is a 'signal'?",
           "choices": [
-            "A rapidly alternating 0101010101 pattern",
-            "A long run of identical bits, e.g., 0000000000",
-            "A random mix of roughly equal 1s and 0s",
-            "A short 2-bit burst followed by idle"
+            "A warning message that something has gone wrong",
+            "A physical thing the far end can detect and measure, such as a voltage, a flash of light, or a radio wave",
+            "Another word for a single bit",
+            "The name of the cable that connects two computers"
           ],
           "answerIndex": 1,
-          "explanation": "Under NRZ the level holds constant across each bit cell, so a long run of identical bits produces no transitions. With no edges, the receiver's PLL has nothing to lock onto and drifts, eventually sampling at the wrong instant. This is exactly why self-clocking or run-length-limited codes (Manchester, 8B/10B, scramblers) exist."
+          "explanation": "A signal is the physical thing that actually travels and carries the bits: a voltage on copper, light in fiber, or a radio wave in the air. It is not the bit itself (a bit is the idea being carried), and it is not the cable (the cable is the medium the signal travels through).",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/physical-layer-2.svg"
         },
         {
-          "id": "physical-layer-mcq-dc-balance",
+          "id": "physical-layer-l1-mc3",
           "type": "mcq",
-          "prompt": "Why does a line code aim for DC balance (equal average of high and low over a window)?",
+          "prompt": "Why can't a computer just send the bit '1' down a wire directly?",
           "choices": [
-            "It increases the maximum achievable symbol rate",
-            "Transformer-coupled / AC-coupled receiver front ends cannot pass DC, so a nonzero average causes baseline wander and bit errors",
-            "It reduces the number of bits per symbol needed",
-            "It is required to compute the CRC at the data link layer"
+            "A wire can only carry the bit '0', never a '1'",
+            "A bit is just stored information; to travel it must first be turned into something physical like a voltage or a pulse of light",
+            "Wires are too slow to carry a '1'",
+            "The '1' would arrive as a '0' unless it is encrypted first"
           ],
           "answerIndex": 1,
-          "explanation": "Magnetics (Ethernet transformers) and capacitive AC coupling block DC. A code with a nonzero running average accumulates a drifting baseline, shrinking the eye and causing errors. DC-balanced codes (Manchester is inherently balanced; 8B/10B uses running disparity) keep the average near zero so AC coupling works."
+          "explanation": "A bit is an abstract value, not a physical object, so it cannot move on its own. The physical layer represents it with something measurable (high vs low voltage, light on vs off, etc.). Wires carry both 1s and 0s fine, and speed or encryption is not the reason a bit needs to be turned into a signal.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/physical-layer-2.svg"
         },
         {
-          "id": "physical-layer-fc-self-clocking",
-          "type": "flashcard",
-          "front": "What does 'self-clocking' mean for a line code, and why is it valuable?",
-          "back": "A self-clocking code guarantees enough signal transitions that the receiver can recover the bit clock from the data alone, with no separate clock wire. Manchester is the classic example (a guaranteed mid-cell transition every bit). It's valuable because a separate clock line would suffer skew over distance, and recovering timing from the data keeps transmitter and receiver in sync.",
-          "hint": "No clock wire — extract timing from the edges in the data."
+          "id": "physical-layer-l1-mc4",
+          "type": "mcq",
+          "prompt": "Morse code (flipping a light on and off to spell letters) is used in this lesson as an everyday example of what idea?",
+          "choices": [
+            "Turning a pattern of on/off into meaning a far-away person can read",
+            "How computers store files on disk",
+            "Why fiber is faster than copper",
+            "How the internet finds the shortest route"
+          ],
+          "answerIndex": 0,
+          "explanation": "Morse code shows the core physical-layer idea: an on/off signal carries information that someone at the other end can decode. That is exactly what the physical layer does, only much faster and automatically. The other options are about different topics entirely.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/physical-layer-2.svg"
         },
         {
-          "id": "physical-layer-fc-symbol-noise-margin",
-          "type": "flashcard",
-          "front": "From an analog/eye-diagram standpoint, what is the tradeoff of adding more symbol levels (e.g., PAM-2 to PAM-4 to PAM-16)?",
-          "back": "More levels pack more bits per symbol into the same symbol rate/bandwidth, but they subdivide the available voltage swing into smaller steps. That shrinks the vertical eye opening and noise margin, so each step up demands higher SNR (and usually FEC + DSP equalization). It is the classic capacity-vs-noise-margin tradeoff visible directly in the eye diagram.",
-          "hint": "Same swing, more levels = thinner eyes."
+          "id": "physical-layer-l1-mc5",
+          "type": "mcq",
+          "prompt": "Which three things does the physical layer commonly use to carry a signal?",
+          "choices": [
+            "Passwords, files, and folders",
+            "Electrical voltage on copper, flashes of light in fiber, and radio waves in the air",
+            "Web pages, emails, and videos",
+            "Routers, switches, and firewalls"
+          ],
+          "answerIndex": 1,
+          "explanation": "The three common ways to physically carry bits are voltage on copper wire, light in glass fiber, and radio waves through the air. Web pages and emails are content carried by higher layers; routers and firewalls are devices that operate above the physical layer.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/physical-layer-2.svg"
+        },
+        {
+          "id": "physical-layer-l1-mc6",
+          "type": "mcq",
+          "prompt": "The word 'medium' (plural 'media') in this lesson means what?",
+          "choices": [
+            "A medium-sized network, between small and large",
+            "The physical path a signal travels through, such as copper cable, fiber, or air",
+            "A program that plays music and video",
+            "The middle layer of the network stack"
+          ],
+          "answerIndex": 1,
+          "explanation": "A medium is simply the physical stuff a signal moves through: a copper cable, a glass fiber, or the open air for radio. It has nothing to do with size, media players, or being in the middle of the stack.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/physical-layer-3.svg"
+        },
+        {
+          "id": "physical-layer-l1-mc7",
+          "type": "mcq",
+          "prompt": "When the physical layer is working correctly, what should come out of the receiving end?",
+          "choices": [
+            "A web page, fully drawn on the screen",
+            "The same bits that went in at the sending end",
+            "A signal that is stronger than the one that was sent",
+            "A list of every computer on the network"
+          ],
+          "answerIndex": 1,
+          "explanation": "The physical layer's promise is faithful delivery of bits: the same 1s and 0s come out as went in. Drawing a web page is a much-higher-layer job, the received signal is normally weaker (not stronger), and listing computers is not a physical-layer task.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/physical-layer-2.svg"
+        },
+        {
+          "id": "physical-layer-l1-mc8",
+          "type": "mcq",
+          "prompt": "Where does the physical layer sit in the stack of layers?",
+          "choices": [
+            "At the very top, closest to the user's app",
+            "At the very bottom, closest to the actual wire, fiber, or air",
+            "It floats between all the other layers at once",
+            "It sits outside the stack and is not really a layer"
+          ],
+          "answerIndex": 1,
+          "explanation": "The physical layer is the bottom layer, right next to the real-world medium. Everything else rides on top of it. The top layers are the ones closest to the user's application; the physical layer is as far from the user and as close to the hardware as you can get.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/physical-layer-2.svg"
         }
       ]
     },
     {
-      "id": "physical-layer-encoding-zoo-and-shannon",
-      "title": "The Encoding Zoo and the Shannon-Hartley Limit",
+      "id": "physical-layer-l2",
+      "title": "Three Media, Speed, and Putting Bits on a Wave",
       "order": 2,
       "difficulty": 2,
-      "content": "Real systems chain specific line codes, each solving a problem the previous one left open.\n\n- **NRZ** (Non-Return-to-Zero): level = bit value. Simplest, most bandwidth-efficient, but no guaranteed transitions — fails clock recovery and DC balance on long runs.\n- **NRZI** (NRZ-Inverted): a transition encodes a 1, no transition encodes a 0 (or vice versa). Differential, so polarity-independent, but a long run of 0s still has no edges — hence it's paired with a run-length-limiting code.\n- **Manchester** (10BASE-T): each bit has a guaranteed mid-cell transition — inherently self-clocking and DC-balanced. The cost is a transition rate up to twice the bit rate, so it needs roughly double the bandwidth.\n- **4B/5B** (100BASE-TX): maps every 4 data bits to a 5-bit symbol chosen so no symbol has more than three consecutive zeros — bounding run length cheaply (25% overhead). 100BASE-TX then sends these via MLT-3 to cut the spectrum.\n- **8B/10B** (1G Ethernet, PCIe, SATA, Fibre Channel): maps 8 bits to 10, maintaining **running disparity** for tight DC balance and guaranteed transitions, at 25% overhead.\n- **64B/66B** (10G+ Ethernet): replaces the 25% table overhead with a 2-bit sync header plus a self-synchronous scrambler — only ~3% overhead, the right choice at 10 Gbit/s and beyond.\n- **PAM-4** (modern high-speed lanes): multilevel amplitude, paired with FEC.\n\nWhy stop scaling levels and rates? The **Shannon-Hartley theorem** sets the ceiling:\n\n$$C = B\\,\\log_2\\!\\left(1 + \\mathrm{SNR}\\right)$$\n\nwhere $C$ is capacity in bit/s, $B$ is bandwidth in Hz, and $\\mathrm{SNR}$ is the linear (not dB) signal-to-noise ratio. This is the same noise-limited ceiling you reasoned about for radar detection: you buy capacity with bandwidth linearly, but with SNR only logarithmically. Doubling bandwidth doubles capacity; getting another bit per symbol requires roughly 6 dB more SNR. Every real link runs below $C$ because of coding overhead, implementation loss, and margin.",
+      "content": "We send signals over three **media**: copper, fiber, and wireless. None is best at everything, so the choice is always a trade-off between **cost**, **distance** (how far before the signal gets too weak), **speed**, and **interference** (unwanted noise getting in).\n\n- **Copper cable** carries electrical voltage. It is cheap and familiar (it is the cable plugged into most desk computers), but the signal fades over short distances and copper acts like an antenna, so it picks up electrical noise.\n- **Fiber-optic** sends flashes of light down a hair-thin glass thread, like light through a glass pipe. It costs more and is more delicate, but it carries data the fastest, travels the farthest, and because it uses light it is immune to electrical interference.\n- **Wireless / radio** sends radio waves through the open air. There is no cable to run, which is convenient, but everyone shares the same air, so it suffers the most interference and is usually slower and shorter-range than fiber.\n\nTwo words people mix up. **Bandwidth** and **bit rate** both relate to 'how fast,' but: **bit rate** is how many bits you actually push per second (measured in bits per second, *bps*) - the headline 'speed.' **Bandwidth** is the *capacity* of the medium - how much room it has to carry a signal. More bandwidth means room for a higher bit rate, the way a wider pipe can carry more water.\n\nHow do bits actually ride on a signal? Two plain ideas. **Line coding** is the rulebook for how a 1 or a 0 maps to a voltage level on a wire (for example, high voltage = 1, low voltage = 0). **Modulation** means taking a steady wave (a *carrier*) and *changing* it - making it bigger or smaller, faster or slower - so those changes spell out the bits. Either way, the receiver watches the signal and reads the bits back.\n\n**Recap:** Copper, fiber, and wireless each trade off cost, distance, speed, and interference. Bit rate is bits-per-second; bandwidth is the capacity that allows it. Line coding maps bits to voltage levels; modulation changes a wave to carry bits.",
       "items": [
         {
-          "id": "physical-layer-fc-nrz-vs-nrzi",
-          "type": "flashcard",
-          "front": "NRZ vs NRZI — how do they differ in encoding a bit?",
-          "back": "NRZ: the signal LEVEL represents the bit value (high = 1, low = 0). NRZI: a TRANSITION (change of level) represents one bit value (commonly a 1), and no transition represents the other (a 0). NRZI is differential, so it tolerates polarity inversion, but a long run of the no-transition bit still produces no edges — so it's paired with a run-length-limiting code like 4B/5B.",
-          "hint": "Level-based vs transition-based."
-        },
-        {
-          "id": "physical-layer-fc-manchester-cost",
-          "type": "flashcard",
-          "front": "What does Manchester encoding guarantee, and what does it cost?",
-          "back": "It guarantees a transition in the middle of every bit cell, making it inherently self-clocking and DC-balanced (each bit is half-high, half-low). The cost is bandwidth: the transition rate is up to twice the bit rate, so Manchester needs roughly double the channel bandwidth of NRZ. That's why it suited 10 Mbit/s Ethernet but was abandoned at higher rates.",
-          "hint": "Great timing/DC properties; expensive in bandwidth."
-        },
-        {
-          "id": "physical-layer-fc-8b10b",
-          "type": "flashcard",
-          "front": "What problem does 8B/10B solve and how, and what is its overhead?",
-          "back": "8B/10B (1G Ethernet, PCIe gen1/2, SATA, Fibre Channel) maps each 8-bit byte to a 10-bit symbol chosen to bound run length and maintain DC balance via 'running disparity' (it tracks the cumulative 1s-vs-0s imbalance and picks symbol variants to cancel it). Overhead is 25% (10 bits sent per 8 data bits). It also provides spare control symbols (e.g., comma/K-codes) for framing.",
-          "hint": "8->10 bits, running disparity, 25% overhead."
-        },
-        {
-          "id": "physical-layer-fc-64b66b",
-          "type": "flashcard",
-          "front": "Why did 10G Ethernet switch from 8B/10B to 64B/66B?",
-          "back": "8B/10B's 25% overhead is expensive at 10 Gbit/s. 64B/66B prepends a 2-bit sync header to each 64-bit block and uses a self-synchronous scrambler to provide transitions and statistical DC balance, cutting overhead to about 3% (66/64). The scrambler replaces the lookup-table approach; the 2-bit header marks data vs control blocks and provides block alignment.",
-          "hint": "Scrambler + 2-bit sync header, ~3% vs 25%."
-        },
-        {
-          "id": "physical-layer-mcq-shannon-calc",
+          "id": "physical-layer-l2-mc1",
           "type": "mcq",
-          "prompt": "A channel has bandwidth B = 20 MHz and a linear SNR of 1023 (about 30 dB). Using C = B*log2(1 + SNR), what is the approximate Shannon capacity?",
+          "prompt": "Which statement best captures the copper vs fiber vs wireless trade-off?",
           "choices": [
-            "About 60 Mbit/s",
-            "About 200 Mbit/s",
-            "About 20 Mbit/s",
-            "About 600 Mbit/s"
+            "Fiber is best in every way, so the other two are never used",
+            "Each medium trades off cost, distance, speed, and interference, so the best choice depends on the situation",
+            "Wireless is always the fastest because it has no cable to slow it down",
+            "Copper is immune to interference, which is why it is used everywhere"
           ],
           "answerIndex": 1,
-          "explanation": "1 + SNR = 1024 = 2^10, so log2(1024) = 10. C = 20 MHz x 10 = 200 Mbit/s. Note SNR must be linear, not dB: 30 dB = 10^(30/10) = 1000 ~ 1023. This is the noise-limited ceiling; a real 802.11 link in 20 MHz achieves less due to coding overhead, guard intervals, and margin."
+          "explanation": "No single medium wins on every measure, so engineers weigh cost, distance, speed, and interference for each job. Fiber is fastest and longest-reach but pricier; wireless is convenient but the most interference-prone and usually slower; copper is cheap but short-range and noise-prone, not interference-immune.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/physical-layer-3.svg"
         },
         {
-          "id": "physical-layer-mcq-shannon-scaling",
+          "id": "physical-layer-l2-mc2",
           "type": "mcq",
-          "prompt": "Per Shannon-Hartley, you want to increase a link's capacity. Which statement is correct?",
+          "prompt": "Why is fiber-optic immune to electrical interference, while copper is not?",
           "choices": [
-            "Doubling bandwidth and doubling SNR raise capacity by the same amount",
-            "Capacity scales linearly with bandwidth but only logarithmically with SNR, so beyond a point more bandwidth buys far more capacity than more power",
-            "Capacity scales logarithmically with bandwidth and linearly with SNR",
-            "Capacity is independent of bandwidth once SNR exceeds 0 dB"
+            "Fiber carries bits as flashes of light, which electrical noise cannot disturb, while copper carries electrical voltage that nearby electrical noise can add to",
+            "Fiber is wrapped in metal shielding and copper never is",
+            "Fiber moves so fast that noise cannot keep up with it",
+            "Copper is older, and old cables always attract more noise"
+          ],
+          "answerIndex": 0,
+          "explanation": "Fiber uses light, and stray electrical fields simply do not affect a beam of light, so it shrugs off electrical interference. Copper carries an electrical signal, and nearby electrical noise adds onto that signal. It is the light-vs-electricity difference, not shielding, speed, or age.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/physical-layer-3.svg"
+        },
+        {
+          "id": "physical-layer-l2-mc3",
+          "type": "mcq",
+          "prompt": "What is the main everyday advantage of wireless over copper and fiber?",
+          "choices": [
+            "It is always faster than both",
+            "There is no cable to run, so devices can move around freely",
+            "It never suffers from interference",
+            "It can carry signals an unlimited distance"
           ],
           "answerIndex": 1,
-          "explanation": "In C = B*log2(1+SNR), B is a linear multiplier while SNR sits inside a log. Doubling B doubles C; gaining one more bit/symbol of capacity needs roughly a 4x (about 6 dB) SNR increase. This is why modern high-rate links chase bandwidth (wider channels, more lanes/fiber) rather than brute-forcing transmit power."
+          "explanation": "Wireless's big win is convenience: no physical cable, so phones and laptops can roam. It is usually slower than fiber, suffers the most interference because the air is shared, and has limited range. The freedom from cables is the real trade-off it buys.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/physical-layer-3.svg"
         },
         {
-          "id": "physical-layer-mcq-snr-units",
+          "id": "physical-layer-l2-mc4",
           "type": "mcq",
-          "prompt": "An engineer measures SNR = 25 dB and plugs 25 directly into C = B*log2(1 + SNR). What is the error?",
+          "prompt": "In plain terms, what is 'bit rate'?",
           "choices": [
-            "None — dB is the correct unit for the Shannon formula",
-            "SNR in the formula must be a linear ratio; 25 dB is about 316, not 25, so capacity is badly underestimated",
-            "The formula needs SNR in dB but should use log10, not log2",
-            "Bandwidth must also be converted to dB for consistency"
+            "How many bits you actually send per second",
+            "How heavy the cable is",
+            "The number of computers on the network",
+            "How long a cable is allowed to be"
+          ],
+          "answerIndex": 0,
+          "explanation": "Bit rate is the headline speed: bits pushed per second (bits per second, bps). It is not about cable weight, length, or how many machines are connected. A higher bit rate means more data moved each second.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/physical-layer-3.svg"
+        },
+        {
+          "id": "physical-layer-l2-mc5",
+          "type": "mcq",
+          "prompt": "The lesson compares bandwidth to a water pipe. What does 'more bandwidth' give you?",
+          "choices": [
+            "A heavier cable that lasts longer",
+            "More room in the medium to carry a signal, allowing a higher bit rate",
+            "A guarantee that no bits will ever be lost",
+            "A shorter distance the signal can travel"
           ],
           "answerIndex": 1,
-          "explanation": "The SNR in Shannon-Hartley is a linear power ratio, not decibels. 25 dB = 10^(25/10) ~ 316. Using 25 instead of 316 gives log2(26) ~ 4.7 vs log2(317) ~ 8.3 — nearly half the true capacity. Mixing dB and linear is a classic, and costly, unit error.",
-          "hint": "dB to linear: 10^(dB/10) for a power ratio."
+          "explanation": "Bandwidth is capacity, like the width of a pipe: a wider pipe can carry more water, and more bandwidth makes room for a higher bit rate. It does not by itself guarantee error-free delivery, change the cable's durability, or shorten the reach.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/physical-layer-3.svg"
         },
         {
-          "id": "physical-layer-fc-4b5b",
-          "type": "flashcard",
-          "front": "What does 4B/5B encoding accomplish in 100BASE-TX?",
-          "back": "It maps each 4-bit nibble to a 5-bit code word, choosing only those 5-bit patterns with no more than three consecutive zeros (and limited leading/trailing zeros). This bounds run length so the receiver clock stays locked, at 25% overhead. 100BASE-TX then transmits the 5-bit stream using MLT-3, a 3-level code that concentrates spectral energy at a lower frequency to fit Cat5 copper.",
-          "hint": "4->5 bits to limit consecutive zeros; paired with MLT-3."
+          "id": "physical-layer-l2-mc6",
+          "type": "mcq",
+          "prompt": "What does 'line coding' mean?",
+          "choices": [
+            "Writing software in straight lines",
+            "The rulebook for how a 1 or a 0 maps to a voltage level on a wire",
+            "Splitting one cable into several smaller cables",
+            "Encrypting data so attackers cannot read it"
+          ],
+          "answerIndex": 1,
+          "explanation": "Line coding is simply the agreed rule for representing bits as voltage levels, for example high voltage for a 1 and low voltage for a 0, so the receiver can read them back. It is not programming, cable-splitting, or encryption.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/physical-layer-5.svg"
         },
         {
-          "id": "physical-layer-fc-shannon-radar-link",
-          "type": "flashcard",
-          "front": "Connect Shannon-Hartley to your radar/analog noise intuition: what is it really saying?",
-          "back": "It says a channel's error-free capacity is fundamentally capped by its bandwidth and SNR — the same noise floor that set your radar detection threshold. You can trade bandwidth for SNR and vice versa, but you cannot beat the log2(1+SNR) bits-per-Hz ceiling. More transmit power yields diminishing returns (log), while more bandwidth pays off linearly. Coding gets you close to C; it never exceeds it.",
-          "hint": "The same noise-limited detection ceiling, expressed as bits/Hz."
+          "id": "physical-layer-l2-mc7",
+          "type": "mcq",
+          "prompt": "In plain language, what does 'modulation' mean?",
+          "choices": [
+            "Deleting bits to make a message shorter",
+            "Taking a steady wave and changing it (bigger/smaller, faster/slower) so the changes spell out the bits",
+            "Turning a wireless signal into a wired one",
+            "Choosing which website to load"
+          ],
+          "answerIndex": 1,
+          "explanation": "Modulation means changing a carrier wave so its variations carry data: make the wave taller for a 1 and shorter for a 0, for instance. It does not delete data, convert wireless to wired, or pick websites; those are unrelated.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/physical-layer-5.svg"
+        },
+        {
+          "id": "physical-layer-l2-mc8",
+          "type": "mcq",
+          "prompt": "Look at the modulation diagram: a big wave means 1 and a small wave means 0. How does the receiver recover the bits?",
+          "choices": [
+            "It counts how many cables are plugged in",
+            "It measures the size of the wave in each time slot and writes down 1 for a big wave, 0 for a small one",
+            "It asks the sender to repeat every bit out loud",
+            "It guesses randomly and corrects later"
+          ],
+          "answerIndex": 1,
+          "explanation": "With this kind of modulation the information is in the wave's size, so the receiver simply measures each slot: a big swing is a 1, a small swing is a 0. That is the whole idea of reading a modulated signal; no counting cables, repeating, or guessing is involved.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/physical-layer-5.svg"
+        },
+        {
+          "id": "physical-layer-l2-mc9",
+          "type": "mcq",
+          "prompt": "Which everyday situation best fits choosing copper over fiber?",
+          "choices": [
+            "Linking two cities hundreds of kilometers apart at the highest possible speed",
+            "Connecting a desktop computer to a wall jack a few meters away, cheaply",
+            "Sending data where absolutely no electrical interference can be tolerated",
+            "A link that must run for tens of kilometers without any signal boost"
+          ],
+          "answerIndex": 1,
+          "explanation": "Copper shines for short, cheap, everyday runs like a desktop to a nearby jack. Long city-to-city links, interference-free needs, and very long unboosted runs all point to fiber, which is faster, longer-reach, and immune to electrical noise.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/physical-layer-3.svg"
         }
       ]
     },
     {
-      "id": "physical-layer-copper-fiber-and-link",
-      "title": "Copper, Fiber, and Bringing the Link Up",
+      "id": "physical-layer-l3",
+      "title": "Noise, Limits, and the Cables That Connect It All",
       "order": 3,
       "difficulty": 3,
-      "content": "**Copper / twisted pair.** Ethernet over copper rides **differential signaling**: each pair carries equal-and-opposite voltages, so the receiver reads the difference. Interference couples almost equally onto both wires (common mode) and cancels in the subtraction — **common-mode rejection**, the same trick you used to pull signals out of noise on instrumentation lines. Twisting sets and stabilizes the **characteristic impedance at 100 ohm**; impedance discontinuities cause reflections, exactly like a mismatched feedline. Cat5e/6/6a/7/8 differ mainly in tested bandwidth and shielding: Cat5e (100 MHz, 1G), Cat6 (250 MHz), Cat6a (500 MHz, 10G to 100m), Cat8 (2 GHz, 25/40G short runs). Crosstalk is energy leaking between pairs: **NEXT** (Near-End) is measured at the transmitting end, **FEXT** (Far-End) at the far end. The **100 m limit** is set by attenuation and round-trip timing budgets, not an arbitrary rule.\n\n**Fiber.** **Multimode (MMF)** has a wide core (50/62.5 um) so many propagation modes travel slightly different path lengths — **modal dispersion** spreads the pulse and limits distance; used short-reach at **850 nm** (and 1310 nm). **Single-mode (SMF)** has a ~9 um core supporting one mode, eliminating modal dispersion; used at **1310 nm** and **1550 nm** for long reach, limited mainly by **chromatic dispersion** and attenuation (1550 nm has the lowest loss, hence long-haul). Pluggable transceivers — **SFP/SFP+/QSFP** — let you match optics to the link and compute an attenuation/power budget.\n\n**Bringing the link up.** **Auto-negotiation** exchanges capabilities (speed, duplex) via link pulses before data flows; a mismatch causes the classic duplex-mismatch slowdown. **PoE** (802.3af/at/bt) delivers up to ~90 W over the same pairs. Finally, **BER** (bit error rate) quantifies the PHY's quality — driven by SNR, dispersion, crosstalk, and reflections — and is what FEC and good cabling exist to keep low.",
+      "content": "A signal does not travel forever unharmed. Two things wear it down. **Attenuation** means the signal gets *weaker* the farther it goes - like a voice fading as you walk away from someone. **Noise** (or **interference**) means unwanted junk gets mixed in - like trying to be heard across a loud, crowded room. Picture shouting across that room: the farther away your friend is, the fainter your voice (attenuation), and the more other chatter drowns you out (noise). Eventually the listener can no longer tell your words apart, and the receiver makes mistakes - it reads a 1 as a 0. That is why long copper runs and weak Wi-Fi get unreliable.\n\nThis leads to a key idea: every channel has a **maximum data rate**. You cannot send bits infinitely fast. The limit goes up with **more bandwidth** (more room to work in) and a **cleaner signal** (less noise compared to signal). In short: *more bandwidth plus a cleaner signal equals more bits per second*. That is the whole idea behind the famous Shannon and Nyquist results - there is a ceiling, set by how wide and how clean your channel is. (We will skip the formulas; the idea is what matters.)\n\nFinally, the cables and connectors are standardized so gear from different makers fits together. Copper **Ethernet cable** comes in graded **categories** - you may have seen 'Cat5e,' 'Cat6,' or 'Cat8' on a cable. Higher numbers support more bandwidth and faster speeds. **Fiber** comes in two flavors: **multimode**, with a wider core, cheaper and used for shorter distances; and **single-mode**, with a very thin core that carries light the farthest, used for long hauls.\n\nOne more pair of terms about direction. A link is **half duplex** if data can flow both ways but only one direction at a time (like a walkie-talkie: you talk, then I talk). It is **full duplex** if both directions can happen at once (like a phone call where both people can speak together). Modern wired links are full duplex.\n\n**Recap:** Attenuation weakens a signal over distance and noise corrupts it, so every channel has a max data rate - more bandwidth and a cleaner signal allow more bits. Cable categories (Cat5e/6/8) and fiber types (multimode/single-mode) are standardized, and links are half duplex (one way at a time) or full duplex (both at once).",
       "items": [
         {
-          "id": "physical-layer-fc-differential-cmrr",
-          "type": "flashcard",
-          "front": "Why does twisted-pair Ethernet use differential signaling, and how does it reject noise?",
-          "back": "Each pair carries equal-and-opposite (differential) voltages; the receiver looks only at the difference between the two wires. External interference (EMI) couples nearly equally onto both wires as a common-mode signal, which cancels when the receiver subtracts. This common-mode rejection lets the link survive noisy environments. The twisting keeps the two wires equally exposed so the coupling stays balanced.",
-          "hint": "Equal-and-opposite signal; interference is common-mode and cancels."
-        },
-        {
-          "id": "physical-layer-fc-impedance-100ohm",
-          "type": "flashcard",
-          "front": "Why is twisted-pair characteristic impedance specified at 100 ohm, and what happens on a mismatch?",
-          "back": "A controlled, uniform 100 ohm impedance (set by conductor geometry and the twist) ensures the source, cable, and receiver are matched so signal energy transfers without reflection. Any discontinuity — a kink, bad connector, or wrong cable — creates an impedance mismatch that reflects part of the signal back, causing return loss, intersymbol interference, and bit errors. Same principle as matching a radar feedline.",
-          "hint": "Matched impedance = no reflections; mismatch = reflections/ISI."
-        },
-        {
-          "id": "physical-layer-fc-next-fext",
-          "type": "flashcard",
-          "front": "Distinguish NEXT from FEXT.",
-          "back": "Both are crosstalk — unwanted coupling of a signal from one pair into another. NEXT (Near-End Crosstalk) is measured at the same end as the disturbing transmitter (the interferer's strong outgoing signal leaking into your weak incoming receive pair). FEXT (Far-End Crosstalk) is measured at the opposite end from the transmitter. NEXT is usually the bigger problem because the interfering signal is still strong at the near end.",
-          "hint": "Measured at the transmitter end (near) vs the far end."
-        },
-        {
-          "id": "physical-layer-fc-100m-limit",
-          "type": "flashcard",
-          "front": "Why is the twisted-pair Ethernet segment limited to 100 m?",
-          "back": "It's a budget, not an arbitrary number: signal attenuation over the cable plus connector losses must keep SNR high enough for a low BER, and legacy timing/round-trip constraints (and the standardized 90 m permanent link + 10 m patch model) bound the length. Beyond ~100 m attenuation and accumulated noise push BER too high. Fiber or repeaters/switches extend reach.",
-          "hint": "Attenuation + timing budget; 90 m link + 10 m patch."
-        },
-        {
-          "id": "physical-layer-mcq-smf-vs-mmf",
+          "id": "physical-layer-l3-mc1",
           "type": "mcq",
-          "prompt": "Why does single-mode fiber (SMF) reach much farther than multimode fiber (MMF)?",
+          "prompt": "What does 'attenuation' mean?",
           "choices": [
-            "SMF carries more optical power because its core is larger",
-            "SMF's ~9 um core supports essentially one propagation mode, eliminating modal dispersion that spreads pulses in MMF's wide core",
-            "SMF uses 850 nm light, which attenuates less than MMF's 1550 nm",
-            "MMF cannot be used with laser sources, only LEDs, which limits its range"
+            "A signal getting weaker the farther it travels",
+            "A signal speeding up over distance",
+            "Two cables being plugged into the same port",
+            "Bits being encrypted for safety"
+          ],
+          "answerIndex": 0,
+          "explanation": "Attenuation is the natural weakening of a signal as it travels, just as a voice fades with distance. It is not about speeding up, plugging in cables, or encryption. Attenuation is a big reason links have distance limits.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/physical-layer-4.svg"
+        },
+        {
+          "id": "physical-layer-l3-mc2",
+          "type": "mcq",
+          "prompt": "The lesson uses 'shouting across a noisy, crowded room' to explain which idea?",
+          "choices": [
+            "Why fiber costs more than copper",
+            "Signal versus noise: your fading voice is the signal, the crowd's chatter is the noise that can drown it out",
+            "How a switch learns where computers are",
+            "Why bandwidth is measured in bits per second"
           ],
           "answerIndex": 1,
-          "explanation": "MMF's wide core (50/62.5 um) lets many modes travel slightly different path lengths, so a pulse smears out (modal dispersion), limiting distance. SMF's ~9 um core supports a single mode, removing modal dispersion; its reach is then limited mainly by chromatic dispersion and attenuation. SMF typically runs at 1310/1550 nm (1550 nm has the lowest loss); 850 nm is the short-reach MMF wavelength."
+          "explanation": "The crowded room captures signal versus noise: your voice (the signal) fades with distance (attenuation) while other chatter (noise) competes with it. When noise overwhelms the signal, the listener mishears, just as a receiver misreads bits. The other options are unrelated topics.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/physical-layer-4.svg"
         },
         {
-          "id": "physical-layer-mcq-wavelength-longhaul",
+          "id": "physical-layer-l3-mc3",
           "type": "mcq",
-          "prompt": "For the longest-haul single-mode fiber links, which wavelength is preferred and why?",
+          "prompt": "Why do signals become unreliable over long distances or with lots of interference?",
           "choices": [
-            "850 nm, because short wavelengths attenuate least",
-            "1310 nm, because it has zero chromatic dispersion and the lowest loss",
-            "1550 nm, because silica fiber has its lowest attenuation there (enabling EDFA amplification)",
-            "650 nm visible light, because it is easiest to align"
-          ],
-          "answerIndex": 2,
-          "explanation": "Silica fiber's attenuation minimum is near 1550 nm, so long-haul/DWDM links use it; it also sits in the band where erbium-doped fiber amplifiers (EDFAs) work. 1310 nm is the low/zero chromatic-dispersion window but has higher loss; 850 nm is short-reach multimode. Lower loss means longer spans between amplifiers."
-        },
-        {
-          "id": "physical-layer-mcq-duplex-mismatch",
-          "type": "mcq",
-          "prompt": "Auto-negotiation is disabled on one switch port and hard-set to full duplex, while the other end auto-negotiates. What is the classic symptom?",
-          "choices": [
-            "The link fails to come up at all",
-            "A duplex mismatch: the auto end falls back to half duplex, causing late collisions, CRC errors, and severe throughput loss under load",
-            "The link runs at full speed with no issues",
-            "Both ends silently negotiate 10 Mbit/s and stay there permanently"
+            "The bits get heavier and sink in the cable",
+            "Attenuation makes the signal faint and noise mixes in, so the receiver can no longer tell a 1 from a 0",
+            "The internet automatically slows down at night",
+            "Cables run out of bits to send"
           ],
           "answerIndex": 1,
-          "explanation": "When one end can't negotiate duplex, the auto-negotiating end defaults to half duplex while the forced end runs full duplex. The full-duplex side transmits whenever it wants; the half-duplex side sees that as collisions, producing late collisions, FCS/CRC errors, and throughput that collapses under bidirectional load. The link still passes small pings, which makes it a sneaky bug."
+          "explanation": "As distance grows the signal weakens (attenuation) and unwanted noise piles on, until the receiver cannot reliably distinguish 1s from 0s and makes errors. Bits have no weight, cables do not 'run out' of them, and time of day is not the cause.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/physical-layer-4.svg"
         },
         {
-          "id": "physical-layer-fc-poe",
-          "type": "flashcard",
-          "front": "What does Power over Ethernet (PoE) do, and roughly how much power do the standards deliver?",
-          "back": "PoE delivers DC power to a device (AP, IP camera, phone) over the same twisted pairs that carry data, removing the need for a separate power adapter. 802.3af (PoE) provides ~15.4 W at the source (~12.95 W at the device), 802.3at (PoE+) ~30 W, and 802.3bt (PoE++ / 4PPoE) up to ~60 W (Type 3) or ~90 W (Type 4) using all four pairs.",
-          "hint": "Power + data on one cable; af/at/bt tiers."
+          "id": "physical-layer-l3-mc4",
+          "type": "mcq",
+          "prompt": "As a concept (no formulas), what raises a channel's maximum data rate?",
+          "choices": [
+            "More bandwidth and a cleaner signal (less noise) both let you send more bits per second",
+            "Only the brand of the cable matters",
+            "A longer cable always allows more bits per second",
+            "Lowering the bandwidth so noise has less room"
+          ],
+          "answerIndex": 0,
+          "explanation": "The capacity idea behind Shannon and Nyquist is that more bandwidth (more room) and a cleaner signal (higher signal compared to noise) together raise the ceiling on bits per second. A longer cable actually hurts (more attenuation), brand is not the principle, and shrinking bandwidth lowers, not raises, the limit.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/physical-layer-4.svg"
         },
         {
-          "id": "physical-layer-fc-ber",
-          "type": "flashcard",
-          "front": "What is BER, what drives it, and how is it kept low?",
-          "back": "BER (Bit Error Rate) is the fraction of received bits that are wrong, e.g., 10^-12 means one error per trillion bits. It's driven by SNR, attenuation, dispersion (fiber), crosstalk and reflections (copper), and jitter. It's kept low by good cabling/impedance matching, adequate link margin, equalization/DSP, and forward error correction (FEC). It's the PHY's bottom-line quality metric and ties directly to the eye-diagram opening.",
-          "hint": "Errors per bit; SNR/dispersion/crosstalk drive it; FEC fights it."
+          "id": "physical-layer-l3-mc5",
+          "type": "mcq",
+          "prompt": "The Shannon/Nyquist result is best summarized for a beginner as which idea?",
+          "choices": [
+            "Signals can travel infinitely fast if the cable is new",
+            "There is a ceiling on how fast a channel can carry bits, set by how wide (bandwidth) and how clean (low noise) it is",
+            "Noise always helps a signal get through",
+            "Only wireless links have a speed limit"
+          ],
+          "answerIndex": 1,
+          "explanation": "The one-line takeaway is that every channel has a maximum data rate determined by its bandwidth and its noise level. Speeds are never infinite, noise always hurts, and the limit applies to all media, wired and wireless alike.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/physical-layer-4.svg"
         },
         {
-          "id": "physical-layer-img-nrz-manchester",
-          "type": "flashcard",
-          "image": "https://raw.githubusercontent.com/studyforge/packs/main/networking/images/physical-layer-1.svg",
-          "front": "Study this waveform: the byte 0b10110010 under NRZ vs Manchester. What two properties does Manchester guarantee that NRZ does not, and at what cost?",
-          "back": "Manchester puts a guaranteed transition in the middle of every bit cell, giving it (1) self-clocking (the receiver recovers its clock from those edges, even on long runs where NRZ goes flat) and (2) DC balance (each cell is half-high/half-low, so the average is zero and AC coupling works). The cost is bandwidth: the transition rate is up to twice the bit rate. NRZ is bandwidth-efficient but has no edges during long identical-bit runs."
+          "id": "physical-layer-l3-mc6",
+          "type": "mcq",
+          "prompt": "On an Ethernet cable you see 'Cat6' instead of 'Cat5e'. What does the higher category generally mean?",
+          "choices": [
+            "It is a thinner, cheaper cable",
+            "It supports more bandwidth and faster speeds",
+            "It can only be used outdoors",
+            "It works without being plugged in"
+          ],
+          "answerIndex": 1,
+          "explanation": "Cable categories are graded: a higher number like Cat6 (versus Cat5e) supports more bandwidth and therefore higher speeds. Higher categories are typically built better, not thinner-and-cheaper, are not outdoor-only, and still need to be plugged in.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/physical-layer-3.svg"
+        },
+        {
+          "id": "physical-layer-l3-mc7",
+          "type": "mcq",
+          "prompt": "What is the main difference between single-mode and multimode fiber?",
+          "choices": [
+            "Single-mode carries electricity; multimode carries light",
+            "Single-mode has a very thin core and reaches the farthest; multimode has a wider core, is cheaper, and is used for shorter distances",
+            "Multimode is always faster and longer-range than single-mode",
+            "Single-mode is wireless and multimode is wired"
+          ],
+          "answerIndex": 1,
+          "explanation": "Both are fiber and both carry light. Single-mode's very thin core sends light the farthest, ideal for long hauls; multimode's wider core is cheaper and suits shorter runs. Multimode is not the longer-range option, and neither is wireless.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/physical-layer-3.svg"
+        },
+        {
+          "id": "physical-layer-l3-mc8",
+          "type": "mcq",
+          "prompt": "A walkie-talkie lets you talk OR listen, but not both at the same time. Which term describes this?",
+          "choices": [
+            "Full duplex",
+            "Half duplex",
+            "Attenuation",
+            "Bandwidth"
+          ],
+          "answerIndex": 1,
+          "explanation": "Half duplex means data can flow both ways but only one direction at a time, exactly like a walkie-talkie. Full duplex would allow both directions at once (like a phone call). Attenuation and bandwidth describe signal strength and capacity, not direction.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/physical-layer-4.svg"
+        },
+        {
+          "id": "physical-layer-l3-mc9",
+          "type": "mcq",
+          "prompt": "A phone call where both people can speak and be heard at the same time is an example of what?",
+          "choices": [
+            "Half duplex",
+            "Full duplex",
+            "No duplex (one-way only)",
+            "Interference"
+          ],
+          "answerIndex": 1,
+          "explanation": "Full duplex means both directions can happen simultaneously, like a normal phone call. Half duplex would force one speaker at a time; one-way only would block a reply entirely. Interference is unwanted noise, not a description of direction.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/physical-layer-4.svg"
         }
       ]
     }
