@@ -2,8 +2,8 @@
   "schemaVersion": 2,
   "id": "linux-systems",
   "title": "Linux Systems",
-  "version": "1.18.0",
-  "description": "Linux from scratch (beginner rework in progress): 19 sub-topics from the shell through systemd, the kernel, containers, storage, networking, and embedded Linux. Beginner-first readings, code, and diagrams; tiered easy to hard.",
+  "version": "2.0.0",
+  "description": "Linux from scratch for complete beginners: 19 sub-topics from the shell, files and permissions through processes, systemd, the kernel, package management, text processing, bash scripting, containers, storage, networking, and embedded Linux. Beginner-first readings, a diagram in nearly every lesson, MCQ practice, tiered easy to hard.",
   "requires": [],
   "tags": [
     "linux",
@@ -12544,304 +12544,791 @@
       "order": 19,
       "lessons": [
         {
-          "id": "infra-tooling-infra-tooling-l1-iac-ansible",
-          "title": "Infrastructure as Code: The Declarative Mindset & Ansible",
+          "id": "infra-tooling-infra-tooling-l1",
+          "title": "One Computer by Hand vs a Whole Fleet",
           "order": 1,
           "difficulty": 1,
-          "content": "Configuring one box by hand is fine. Configuring fifty the same way, repeatably, after someone reboots or rebuilds them, is the modern job. The shift is from *remembered commands* to a **committed artifact** that describes the desired end state. That artifact is **Infrastructure as Code (IaC)**.\n\nThe key word is **declarative**: you say *what* the machine should look like (\"package nginx installed, this config present, this service running\"), not *how* to get there step by step. The tool figures out the diff and only changes what's wrong. That makes runs **idempotent** — run it once or ten times, the end state is identical and re-runs after the first are mostly no-ops.\n\n**Ansible** is the most accessible and widely demanded tool here, and the one to learn first. It is **agentless**: nothing is installed on the targets — it connects over plain **SSH** and runs Python. You describe state in **playbooks** (YAML), targeting hosts listed in an **inventory**.\n\n```yaml\n# site.yml — run with: ansible-playbook -i inventory site.yml\n- hosts: webservers\n  become: true            # use sudo\n  tasks:\n    - name: Install nginx\n      ansible.builtin.package:\n        name: nginx\n        state: present\n    - name: Ensure nginx is enabled and running\n      ansible.builtin.service:\n        name: nginx\n        state: started\n        enabled: true\n```\n\nThink of each task as an assertion of state, not a script line. **Terraform** is its sibling, but for a different layer: it *provisions* cloud infrastructure (VMs, networks, DNS) rather than configuring the inside of an OS. Ansible configures; Terraform provisions.",
+          "content": "**Hook.** Setting up one computer by hand is fine. You log in, install a few programs, edit a couple of files, start a service, and you are done. But now imagine you must set up fifty computers the *exact same way* - and keep them that way for years, even after one gets wiped and rebuilt. Doing that by hand is slow, and worse, every machine ends up a little bit different. This lesson is about that gap.\n\n**Build.** A group of machines you manage together is often called a **fleet** (just a friendly word for \"many servers\"). The trouble with hand-setup is that the recipe lives only in your memory or in scattered notes. Did you remember every step on machine #37? Did a teammate do it the same way? When something breaks at 2am, can anyone rebuild it exactly? A **server** here just means a computer that runs a service for other computers (a website, a database, and so on).\n\nThe modern fix is to stop relying on *remembered* steps and instead make the setup **reproducible**: written down so precisely that a tool can redo it perfectly, the same way, every time, on every machine. \"By hand\" does not scale; \"reproducible\" does.\n\n**Recap.** One machine by hand is fine. Many machines, kept identical and rebuildable, is the real job - and the goal is *reproducible*, not *remembered*.",
           "items": [
             {
-              "id": "infra-tooling-l1-fc1",
-              "type": "flashcard",
-              "front": "What does \"declarative\" mean in the context of configuration management?",
-              "back": "You describe the desired end state (what the machine should look like) rather than the step-by-step procedure to get there. The tool computes the difference and changes only what's out of state.",
-              "hint": "What, not how."
-            },
-            {
-              "id": "infra-tooling-l1-fc2",
-              "type": "flashcard",
-              "front": "What does it mean for a playbook to be idempotent, and why does it matter?",
-              "back": "Running it once or many times converges the host to the same end state; after the first run, subsequent runs are mostly no-ops. It means the artifact — not your memory of commands — is the reliable source of truth and is safe to re-run anytime.",
-              "hint": "Re-runnable, same result."
-            },
-            {
-              "id": "infra-tooling-l1-fc3",
-              "type": "flashcard",
-              "front": "Why is Ansible described as \"agentless,\" and what does it use to reach targets?",
-              "back": "Nothing needs to be installed on the managed nodes. Ansible connects over standard SSH from a control node and runs Python on the target, then collects results. This makes adoption easy — if you can SSH in, you can manage it.",
-              "hint": "SSH + Python, no daemon."
-            },
-            {
-              "id": "infra-tooling-l1-fc4",
-              "type": "flashcard",
-              "front": "In Ansible, what is a playbook vs an inventory?",
-              "back": "A playbook is a YAML file describing the desired state as a list of tasks/plays. An inventory is the list of target hosts (and groups like 'webservers'), with optional per-host/per-group variables, that the playbook runs against.",
-              "hint": "What to do vs where to do it."
-            },
-            {
-              "id": "infra-tooling-l1-fc5",
-              "type": "flashcard",
-              "front": "Ansible vs Terraform: what layer does each operate at?",
-              "back": "Terraform provisions infrastructure — it creates cloud resources (VMs, networks, DNS, load balancers). Ansible configures the inside of those machines (packages, files, services). Provision with Terraform, then configure with Ansible.",
-              "hint": "Create the box vs set up the box."
-            },
-            {
-              "id": "infra-tooling-l1-mc1",
+              "id": "infra-tooling-l1-mcq-1",
               "type": "mcq",
-              "prompt": "You run an Ansible playbook that asserts nginx is installed and running. The package is already installed and the service is already up. What happens on this run?",
+              "prompt": "In this module, what does the word \"fleet\" mean?",
               "choices": [
-                "It errors because the package is already present",
-                "It reinstalls nginx and restarts the service to be safe",
-                "It reports the tasks as 'ok' (no change), because the desired state already holds",
-                "It uninstalls and reinstalls to guarantee a clean state"
-              ],
-              "answerIndex": 2,
-              "explanation": "Idempotent, declarative tasks check current state against desired state and only act on a difference. Since the state already matches, the tasks report 'ok'/changed=0 — a no-op."
-            },
-            {
-              "id": "infra-tooling-l1-mc2",
-              "type": "mcq",
-              "prompt": "Which statement best captures the core value of Infrastructure as Code over manual setup?",
-              "choices": [
-                "It runs commands faster than typing them by hand",
-                "It expresses a host's setup as a committed, re-runnable artifact that can be reviewed, versioned, and reproduced",
-                "It eliminates the need for SSH access to machines",
-                "It removes the need to understand the underlying Linux tools"
+                "A single very powerful computer",
+                "A group of many computers (servers) you manage together",
+                "A type of network cable",
+                "A backup copy of one server"
               ],
               "answerIndex": 1,
-              "explanation": "IaC turns 'set this machine up like this' into a versioned artifact you can review and re-run, rather than a list of remembered commands. Speed is incidental; you still need SSH and Linux knowledge underneath."
+              "explanation": "A fleet is simply many machines managed together. The whole challenge of this module is keeping many machines consistent, not running one big one.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/infra-tooling-2.svg"
             },
             {
-              "id": "infra-tooling-l1-mc3",
+              "id": "infra-tooling-l1-mcq-2",
               "type": "mcq",
-              "prompt": "In the Ansible task `state: present` on a package, what is `present` describing?",
+              "prompt": "Why is setting up ONE computer by hand usually fine?",
               "choices": [
-                "The order in which tasks execute",
-                "A shell command to run on the target",
-                "The desired end state of the resource (installed), which Ansible enforces",
-                "The SSH connection mode"
-              ],
-              "answerIndex": 2,
-              "explanation": "`state: present` declares the desired condition of the resource — the package should be installed. Ansible compares against current state and installs only if it isn't already there. It is a state assertion, not a command."
-            },
-            {
-              "id": "infra-tooling-l1-mc4",
-              "type": "mcq",
-              "prompt": "A teammate says \"just SSH in and rerun the setup script we wrote.\" Why is a declarative Ansible playbook preferable for fleet management?",
-              "choices": [
-                "Shell scripts cannot install packages",
-                "An imperative script may not be safely re-runnable (it can double-apply or fail on partial state), while a declarative playbook converges to the same state every run",
-                "Ansible runs without any network access",
-                "Playbooks execute instantly regardless of fleet size"
+                "Because one computer cannot run services",
+                "Because it is a small, one-time job you can do and verify directly",
+                "Because hand setup is always faster than any tool",
+                "Because a single computer never needs to be rebuilt"
               ],
               "answerIndex": 1,
-              "explanation": "A hand-written imperative script often isn't idempotent — re-running can duplicate edits or fail when the box is partially configured. A declarative playbook checks and converges to the declared state safely on every run."
+              "explanation": "For one machine, doing it by hand is a small job you can check yourself. The problems show up only when you must repeat it identically across many machines over time."
+            },
+            {
+              "id": "infra-tooling-l1-mcq-3",
+              "type": "mcq",
+              "prompt": "What is the main problem with setting up fifty machines by hand?",
+              "choices": [
+                "It is impossible to install software on more than one machine",
+                "It is slow and the machines drift into being slightly different from each other",
+                "Servers cannot be connected to a network",
+                "Each machine needs a different operating system"
+              ],
+              "answerIndex": 1,
+              "explanation": "By hand, you cannot realistically repeat every step perfectly fifty times, so machines end up subtly different ('drift'). Consistency at scale is the hard part."
+            },
+            {
+              "id": "infra-tooling-l1-mcq-4",
+              "type": "mcq",
+              "prompt": "A server, as used here, is best described as:",
+              "choices": [
+                "A person who manages computers",
+                "A computer that provides a service (like a website or database) to others",
+                "A kind of password",
+                "A backup tape"
+              ],
+              "answerIndex": 1,
+              "explanation": "A server is just a computer running a service for other computers. The word does not imply anything fancier than that."
+            },
+            {
+              "id": "infra-tooling-l1-mcq-5",
+              "type": "mcq",
+              "prompt": "The module says the goal is to be \"reproducible, not remembered.\" What does that mean?",
+              "choices": [
+                "Memorize the steps so well you never need notes",
+                "Write the setup down so precisely that it can be redone perfectly every time, instead of relying on memory",
+                "Reproduce the hardware exactly, buying identical computers",
+                "Remember to back up your servers every night"
+              ],
+              "answerIndex": 1,
+              "explanation": "'Reproducible' means the setup is captured precisely enough to redo perfectly and automatically. Relying on a person's memory ('remembered') is exactly what fails at scale."
+            },
+            {
+              "id": "infra-tooling-l1-mcq-6",
+              "type": "mcq",
+              "prompt": "What goes wrong when the only record of how a server was set up is in one person's head?",
+              "choices": [
+                "The server runs faster but uses more power",
+                "If that person forgets, is unavailable, or leaves, the exact setup can be lost and hard to rebuild",
+                "The server automatically deletes its own files",
+                "Nothing - human memory is the most reliable record"
+              ],
+              "answerIndex": 1,
+              "explanation": "Knowledge trapped in one head is fragile: people forget, take vacations, and leave. A written, repeatable description survives all of that."
+            },
+            {
+              "id": "infra-tooling-l1-mcq-7",
+              "type": "mcq",
+              "prompt": "Which everyday comparison best captures \"by hand\" vs \"reproducible\"?",
+              "choices": [
+                "A calculator vs an abacus",
+                "One chef cooking from memory vs a written recipe any cook can follow",
+                "A car vs a bicycle",
+                "A phone call vs a letter"
+              ],
+              "answerIndex": 1,
+              "explanation": "A written recipe can be followed by anyone, repeatedly, with the same result - just like written setup-as-code. One chef's memory is the fragile 'by hand' version."
+            },
+            {
+              "id": "infra-tooling-l1-mcq-8",
+              "type": "mcq",
+              "prompt": "Why does \"by hand\" not scale, while \"reproducible\" does?",
+              "choices": [
+                "Hands get tired but computers do not",
+                "A repeatable, written setup can be applied to 1 or 1000 machines the same way, while manual steps must be re-done and re-checked each time",
+                "Reproducible setups need no electricity",
+                "Manual setup only works on weekends"
+              ],
+              "answerIndex": 1,
+              "explanation": "Once the setup is written precisely, applying it to many machines is cheap and consistent. Manual work grows with every machine and invites mistakes - that is what 'does not scale' means."
+            },
+            {
+              "id": "infra-tooling-l1-mcq-9",
+              "type": "mcq",
+              "prompt": "Which statement is the honest scope of this whole module?",
+              "choices": [
+                "By the end you will be a senior expert in every tool mentioned",
+                "It is an orientation: the goal is that the vocabulary and the landscape feel familiar, not mastery of each tool",
+                "It teaches only one tool and nothing else exists",
+                "It replaces the need to ever set up a machine by hand again"
+              ],
+              "answerIndex": 1,
+              "explanation": "This module is orientation. It aims to make the words and the big picture familiar so they are not intimidating later - deep mastery of each tool comes with hands-on practice."
             }
           ]
         },
         {
-          "id": "infra-tooling-infra-tooling-l2-access-secrets-scheduling",
-          "title": "Remote Access at Scale, Secrets, and Scheduling",
+          "id": "infra-tooling-infra-tooling-l2",
+          "title": "SSH: Controlling a Machine From Far Away",
           "order": 2,
-          "difficulty": 2,
-          "content": "Managing a fleet means reaching machines that aren't directly on your network and doing it without typing passwords or leaking credentials.\n\n**SSH config & jump hosts.** Internal hosts usually sit behind a **bastion** (jump host) — the one box exposed to the internet. Rather than chaining `ssh` commands, encode it once in `~/.ssh/config` so `ssh web-01` transparently hops through the bastion:\n\n```\nHost bastion\n    HostName bastion.example.com\n    User deploy\nHost web-* db-*\n    User deploy\n    ProxyJump bastion       # tunnel through the bastion automatically\n```\n\n**Key management.** Use SSH **keys**, not passwords — generate `ssh-ed25519`, push the public key to targets (`ssh-copy-id`), and protect the private key with a passphrase loaded into `ssh-agent`. Harden `sshd` to disable password auth entirely. Keys are also how Ansible authenticates non-interactively.\n\n**Secrets: don't commit them.** Your playbooks live in git — so API tokens, DB passwords, and private keys must **never** be checked in as plaintext. Use a **vault**: Ansible Vault encrypts variable files at rest; teams often centralize on **HashiCorp Vault** or a cloud secrets manager that issues short-lived credentials. The rule: code in git, secrets in a vault, injected at run time.\n\n**Scheduling: cron vs systemd timers.** Classic **cron** (`crontab -e`) still works for simple recurring jobs. Modern systems increasingly prefer **systemd timers** (Module 6): a `.timer` triggers a `.service`. Timers give you journald logging, dependency ordering, `Persistent=true` to catch missed runs after downtime, randomized delays, and resource control — things bare cron lacks.",
+          "difficulty": 1,
+          "content": "**Hook.** Before you can manage many machines, you need a safe way to reach into *one* machine that is somewhere else - maybe in another building or a data center far away - and run commands on it as if you were sitting in front of it. The standard tool for that is **SSH**.\n\n**Build.** SSH stands for **Secure Shell**. Think of it as a locked, private phone line into another computer's command line. Everything you send and receive is **encrypted** (scrambled so only the two ends can read it), so no one listening in between can see your commands or steal what comes back. You typically type something like `ssh you@server.example.com`, and you land at that machine's prompt.\n\nHow does the remote machine know it is really you? You *can* use a password, but the safer, standard way is an **SSH key pair**: two matching files. The **private key** stays secret on your computer and proves your identity. The matching **public key** is placed on the server (it acts like a lock that only your private key opens). Keys are stronger than passwords, and - crucially for automation - they let a *tool* log in without a human there to type a password.\n\nWhen you manage many machines, you can pre-write connection details in a small file (`~/.ssh/config`) so that `ssh web-01` just works. Some machines are not reachable directly; you reach them by first hopping through one gateway machine, called a **bastion** or **jump host** - the single guarded door into a private network.\n\n**Recap.** SSH is an encrypted, password-or-key login into a remote machine's command line. Key pairs are safer than passwords and let tools log in automatically - the foundation everything else here builds on.",
           "items": [
             {
-              "id": "infra-tooling-l2-fc1",
-              "type": "flashcard",
-              "front": "What is a bastion / jump host, and what does ProxyJump do?",
-              "back": "A bastion is the single hardened host exposed to the outside that you hop through to reach internal machines. `ProxyJump bastion` (in ~/.ssh/config or `ssh -J`) tells SSH to transparently tunnel the connection to the target through the bastion in one command.",
-              "hint": "One door into the internal network."
-            },
-            {
-              "id": "infra-tooling-l2-fc2",
-              "type": "flashcard",
-              "front": "Why use SSH keys over passwords for fleet access, and what protects the private key?",
-              "back": "Keys enable non-interactive, scriptable auth (needed by tools like Ansible) and are far stronger than passwords. The private key stays on your machine, protected by a passphrase that ssh-agent caches in memory so you type it once per session.",
-              "hint": "Keypair + agent + passphrase."
-            },
-            {
-              "id": "infra-tooling-l2-fc3",
-              "type": "flashcard",
-              "front": "What is the cardinal rule about secrets and version control?",
-              "back": "Never commit plaintext secrets (passwords, tokens, private keys) to git. Code lives in the repo; secrets live in a vault (Ansible Vault, HashiCorp Vault, or a cloud secrets manager) and are decrypted/injected only at run time.",
-              "hint": "Code in git, secrets in a vault."
-            },
-            {
-              "id": "infra-tooling-l2-fc4",
-              "type": "flashcard",
-              "front": "Name two capabilities systemd timers offer that classic cron does not.",
-              "back": "Among others: integrated journald logging of the job, dependency ordering against other units, `Persistent=true` to run missed jobs after downtime, randomized delays (RandomizedDelaySec) to avoid thundering herds, and cgroup resource limits.",
-              "hint": "Logging, persistence, ordering, limits."
-            },
-            {
-              "id": "infra-tooling-l2-fc5",
-              "type": "flashcard",
-              "front": "What does a vault that issues short-lived (dynamic) credentials buy you over a static password?",
-              "back": "Credentials are generated on demand and expire quickly, so a leaked secret has a small blast radius and limited lifetime. There's no long-lived password sitting in config to be stolen, rotated by hand, or accidentally committed.",
-              "hint": "Short TTL = small blast radius."
-            },
-            {
-              "id": "infra-tooling-l2-mc1",
+              "id": "infra-tooling-l2-mcq-1",
               "type": "mcq",
-              "prompt": "You need to ssh to web-01, which is only reachable from inside the network behind bastion.example.com. What's the cleanest standing solution?",
+              "prompt": "What does SSH let you do?",
               "choices": [
-                "Give web-01 a public IP and open SSH to the world",
-                "Add a `ProxyJump bastion` entry for web-* in ~/.ssh/config so `ssh web-01` tunnels through automatically",
-                "Copy your private key onto the bastion and ssh from there",
-                "Disable the firewall on web-01 during your session"
+                "Speed up a computer's hard drive",
+                "Securely log in to a remote computer and run commands on it as if you were there",
+                "Translate code from one language to another",
+                "Back up files to a USB stick"
               ],
               "answerIndex": 1,
-              "explanation": "ProxyJump in ssh_config makes `ssh web-01` hop through the bastion transparently with one command, keeping web-01 off the public internet and your private key on your own machine (never copied to the bastion)."
+              "explanation": "SSH (Secure Shell) gives you a remote command line on another machine. It is the basic way to control a computer that is somewhere else.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/infra-tooling-3.svg"
             },
             {
-              "id": "infra-tooling-l2-mc2",
+              "id": "infra-tooling-l2-mcq-2",
               "type": "mcq",
-              "prompt": "A backup job must still run after a server was powered off during its scheduled time. Which scheduling choice handles this most cleanly?",
+              "prompt": "What does the \"Secure\" in Secure Shell refer to?",
               "choices": [
-                "A cron entry, which automatically replays missed jobs",
-                "A systemd timer with `Persistent=true`, which runs the job at next boot if the trigger was missed",
-                "Neither can recover a missed run",
-                "An @reboot cron line, which runs the backup on every boot regardless"
-              ],
-              "answerIndex": 1,
-              "explanation": "Classic cron simply skips runs that occur while the machine is off. A systemd timer with `Persistent=true` records the last run and fires the missed job once at next boot — exactly the recovery behavior wanted."
-            },
-            {
-              "id": "infra-tooling-l2-mc3",
-              "type": "mcq",
-              "prompt": "Your Ansible repo needs a database password to configure an app. What is the correct way to handle it?",
-              "choices": [
-                "Hard-code it in the playbook so the run is self-contained",
-                "Store it in a vars file committed to git but in a private repo",
-                "Keep it in an encrypted vault (e.g. Ansible Vault) and inject it at run time, never committing plaintext",
-                "Pass it on the command line in shell history every time"
-              ],
-              "answerIndex": 2,
-              "explanation": "Even a private repo can leak; plaintext secrets in git are the classic mistake. Encrypt with a vault and inject at run time so the repo holds only ciphertext, and access is controlled separately from the code."
-            },
-            {
-              "id": "infra-tooling-l2-mc4",
-              "type": "mcq",
-              "prompt": "Why does Ansible's agentless model depend heavily on good SSH key management?",
-              "choices": [
-                "Because Ansible encrypts playbooks with SSH keys",
-                "Because Ansible authenticates to every target over SSH and runs non-interactively, so it needs key-based (passwordless) auth that ssh-agent or a service key can provide",
-                "Because SSH keys replace the need for an inventory file",
-                "Because keys make playbooks idempotent"
-              ],
-              "answerIndex": 1,
-              "explanation": "Ansible logs into each node over SSH and must do so without a human typing a password. Key-based auth (with an agent or a dedicated automation key) provides the non-interactive, auditable access this requires."
-            }
-          ]
-        },
-        {
-          "id": "infra-tooling-infra-tooling-l3-observability-immutable-cicd",
-          "title": "Observability, Immutable Infrastructure & the Production Horizon",
-          "order": 3,
-          "difficulty": 3,
-          "content": "Provisioning a fleet is only half the job — in production you must *see* it and *ship to* it safely.\n\n**The observability stack.** Logs start local in **journald** (Module 6), then get shipped off-box to an **aggregator** (Loki, Elasticsearch, or a hosted service) so you can query across all hosts at once — you don't SSH to ten boxes to grep. Metrics follow a different path: **Prometheus** *scrapes* numeric time-series (CPU, request rate, queue depth) from exporters running on each host, stores them, and **Grafana** dashboards and alerts on them. For the deepest layer — \"what syscalls/files is this process actually touching?\" — **eBPF** tooling (bpftrace/bcc, Module 17) instruments the live kernel with near-zero overhead. Roughly: journald/Loki = logs, Prometheus/Grafana = metrics, eBPF = deep kernel-level tracing.\n\n**Immutable infrastructure.** Instead of patching long-lived \"pet\" servers in place (which drift into unique, un-reproducible states), you bake a known-good image and **replace** the whole instance to change it — servers become disposable \"cattle.\" Containers (Module 14) are the natural unit; a registry holds versioned images.\n\n**Kubernetes** is the scale-out horizon: a declarative orchestrator that schedules containers across many hosts, restarts failures, and rolls out new versions — IaC's philosophy applied to a whole cluster.\n\n**CI/CD touches Linux** at every step: a pipeline checks out code, **builds and tests inside containers** for reproducibility, produces an image, and deploys it (often via the same Ansible/Terraform/k8s tooling).\n\n```bash\n# Each pipeline stage is just Linux in a container\ndocker build -t app:$GIT_SHA .\ndocker run --rm app:$GIT_SHA pytest   # test in a clean, reproducible env\n```\n\n**Honest scope:** this module is orientation. The goal is that the *vocabulary and landscape* are familiar in interviews and on the job — not mastery of each tool.",
-          "items": [
-            {
-              "id": "infra-tooling-l3-fc1",
-              "type": "flashcard",
-              "front": "Trace the path of a log line in a fleet observability stack.",
-              "back": "It's written locally to journald on the host, then shipped/forwarded to a central aggregator (Loki, Elasticsearch, or a hosted log service) where you can search across all hosts at once instead of SSHing into each box to grep.",
-              "hint": "journald, then ship to a central store."
-            },
-            {
-              "id": "infra-tooling-l3-fc2",
-              "type": "flashcard",
-              "front": "How do Prometheus and Grafana divide responsibility for metrics?",
-              "back": "Prometheus scrapes and stores numeric time-series metrics from exporters on each host and evaluates alerting rules. Grafana queries Prometheus to render dashboards and visualize/alert on those metrics. Prometheus = collect/store, Grafana = visualize.",
-              "hint": "Scrape/store vs dashboard."
-            },
-            {
-              "id": "infra-tooling-l3-fc3",
-              "type": "flashcard",
-              "front": "Where does eBPF fit relative to logs and metrics in observability?",
-              "back": "It's the deepest layer: eBPF (via bpftrace/bcc) instruments the running kernel to answer 'what syscalls, files, or network events is this process actually doing right now?' with near-zero overhead — detail that pre-emitted logs and metrics can't provide.",
-              "hint": "Live kernel-level tracing."
-            },
-            {
-              "id": "infra-tooling-l3-fc4",
-              "type": "flashcard",
-              "front": "What is immutable infrastructure (and the pets-vs-cattle idea)?",
-              "back": "Rather than patching long-lived 'pet' servers in place (which drift into unique, un-reproducible states), you bake a versioned known-good image and replace the whole instance to change it. Servers become disposable, interchangeable 'cattle.'",
-              "hint": "Replace, don't patch in place."
-            },
-            {
-              "id": "infra-tooling-l3-fc5",
-              "type": "flashcard",
-              "front": "What role does Kubernetes play in the infrastructure landscape?",
-              "back": "It's a declarative container orchestrator: you declare desired state (N replicas of this image) and it schedules containers across a cluster of hosts, restarts failures, and rolls out updates. It's the scale-out endpoint of the same declarative/IaC philosophy.",
-              "hint": "Declarative orchestration across many hosts."
-            },
-            {
-              "id": "infra-tooling-l3-fc6",
-              "type": "flashcard",
-              "front": "Why do CI/CD pipelines build and test inside containers?",
-              "back": "Containers give a clean, pinned, reproducible environment so a build/test behaves identically on every run and on every machine (your laptop, the CI runner, production). It eliminates 'works on my machine' drift and produces a versioned artifact to deploy.",
-              "hint": "Reproducible, isolated build environment."
-            },
-            {
-              "id": "infra-tooling-l3-mc1",
-              "type": "mcq",
-              "prompt": "You need to know exactly which files and syscalls a misbehaving production process is touching, live, without restarting it. Which tool layer fits?",
-              "choices": [
-                "Grafana dashboards over Prometheus metrics",
-                "Centralized log search in Loki/Elasticsearch",
-                "eBPF tracing (bpftrace/bcc) attached to the running kernel",
-                "Re-reading the Ansible playbook that configured it"
-              ],
-              "answerIndex": 2,
-              "explanation": "Metrics and logs only show what was pre-instrumented or emitted. eBPF attaches to the live kernel to observe actual syscalls, file access, and network events with low overhead — exactly this 'what is it really doing right now' question."
-            },
-            {
-              "id": "infra-tooling-l3-mc2",
-              "type": "mcq",
-              "prompt": "A server has been hand-patched for two years and no one can reproduce its exact state. Which philosophy directly prevents this problem?",
-              "choices": [
-                "Immutable infrastructure — bake a versioned image and replace instances instead of patching in place",
-                "Adding more Prometheus exporters to the host",
-                "Switching from cron to systemd timers",
-                "Giving the server a public IP for easier access"
+                "The connection is encrypted, so eavesdroppers cannot read it",
+                "The remote computer is kept in a locked room",
+                "It only works between computers owned by the same person",
+                "It scans the remote machine for viruses"
               ],
               "answerIndex": 0,
-              "explanation": "The drift comes from mutating a long-lived 'pet' in place. Immutable infrastructure builds a known-good image and replaces the whole instance on change, so the running state always matches a versioned, reproducible artifact."
+              "explanation": "SSH encrypts the traffic between the two ends, so anyone intercepting it in between just sees scrambled data. That is the 'secure' part."
             },
             {
-              "id": "infra-tooling-l3-mc3",
+              "id": "infra-tooling-l2-mcq-3",
               "type": "mcq",
-              "prompt": "Why is querying a central log aggregator preferable to SSHing into each host to grep journald?",
+              "prompt": "In an SSH key pair, which key must you keep secret, and where does it stay?",
               "choices": [
-                "journald cannot be read with journalctl",
-                "It lets you search and correlate logs across the whole fleet at once, which doesn't scale by hand per-host",
-                "Aggregators replace the need for metrics entirely",
-                "It makes the logs immutable on each host"
+                "The public key, stored on the server",
+                "The private key, kept secret on your own computer",
+                "Both keys are public and shared freely",
+                "Neither - keys are just longer passwords typed each time"
               ],
               "answerIndex": 1,
-              "explanation": "Per-host grepping doesn't scale and can't correlate events across machines. Shipping journald logs to a central aggregator lets you query and correlate the entire fleet from one place — the point of log aggregation."
+              "explanation": "The private key stays secret on your machine and proves who you are. The public key is the non-secret 'lock' you place on servers. Never share the private key."
             },
             {
-              "id": "infra-tooling-l3-mc4",
+              "id": "infra-tooling-l2-mcq-4",
               "type": "mcq",
-              "prompt": "How does Kubernetes extend the declarative/idempotent idea you saw with Ansible?",
+              "prompt": "Why are SSH keys preferred over passwords for automation?",
               "choices": [
-                "It replaces SSH with a faster custom protocol",
-                "You declare desired cluster state (e.g. 3 replicas of an image) and it continuously reconciles reality to match — restarting and rescheduling as needed",
-                "It is an imperative tool where you run each container by hand",
-                "It only manages a single host, like a local container runtime"
+                "Keys are shorter and easier to type",
+                "Keys let a tool log in without a human present to type a password, and they are stronger than passwords",
+                "Passwords do not work over a network at all",
+                "Keys make the connection unencrypted, which is faster"
               ],
               "answerIndex": 1,
-              "explanation": "Kubernetes is declarative at cluster scale: you state the desired end state and a control loop continuously reconciles actual state to match (restarting failures, rescheduling, rolling out updates) — the same 'declare and converge' philosophy as a playbook, applied across many hosts."
+              "explanation": "Automation runs with no human at the keyboard, so it needs login that does not require typing a password. Key-based auth provides that, and is more secure too."
             },
             {
-              "id": "infra-tooling-l3-img",
-              "type": "flashcard",
-              "front": "Study this diagram.",
-              "back": "Review the diagram above.",
-              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/infra-tooling-1.svg"
+              "id": "infra-tooling-l2-mcq-5",
+              "type": "mcq",
+              "prompt": "What is a bastion (jump host)?",
+              "choices": [
+                "A backup server that stores copies of files",
+                "A single guarded gateway machine you hop through to reach machines on a private network",
+                "A faster type of SSH key",
+                "The main database of a company"
+              ],
+              "answerIndex": 1,
+              "explanation": "A bastion is the one exposed 'door' into an otherwise private network. You connect to it first, then on to the internal machines - keeping the rest off the open internet."
+            },
+            {
+              "id": "infra-tooling-l2-mcq-6",
+              "type": "mcq",
+              "prompt": "What is the point of an `~/.ssh/config` file?",
+              "choices": [
+                "It stores your passwords in plain text for convenience",
+                "It saves connection details (host, user, jump host) so short commands like `ssh web-01` just work",
+                "It encrypts your hard drive",
+                "It lists every command you have ever run"
+              ],
+              "answerIndex": 1,
+              "explanation": "The SSH config file records per-host settings once, so you do not retype them. It is about convenience and consistency, not storing secrets."
+            },
+            {
+              "id": "infra-tooling-l2-mcq-7",
+              "type": "mcq",
+              "prompt": "The public key acts most like which everyday object?",
+              "choices": [
+                "A diary you keep hidden",
+                "A lock you can hand out, which only your private key opens",
+                "A spare house that anyone can live in",
+                "A phone number that changes daily"
+              ],
+              "answerIndex": 1,
+              "explanation": "You can freely place the public key (the 'lock') on many servers; only the matching private key (which you keep) can open it. That is why sharing the public key is safe."
+            },
+            {
+              "id": "infra-tooling-l2-mcq-8",
+              "type": "mcq",
+              "prompt": "If someone steals your private key, what is the risk?",
+              "choices": [
+                "None - the private key is useless without your password manager",
+                "They could log in to any machine that trusts your matching public key, impersonating you",
+                "Your screen brightness changes",
+                "The public key automatically deletes itself"
+              ],
+              "answerIndex": 1,
+              "explanation": "The private key proves identity, so a stolen private key lets an attacker log in as you wherever the public key is installed. That is exactly why it must stay secret (and ideally be protected by a passphrase)."
+            },
+            {
+              "id": "infra-tooling-l2-mcq-9",
+              "type": "mcq",
+              "prompt": "Why is SSH described as the foundation for managing a fleet?",
+              "choices": [
+                "Because it stores all your code",
+                "Because the tools that configure many machines reach those machines over SSH",
+                "Because it replaces the operating system",
+                "Because it is the only way to write a website"
+              ],
+              "answerIndex": 1,
+              "explanation": "Fleet tools need a secure, scriptable way into each machine. SSH (with keys) is that channel, which is why everything else here sits on top of it."
+            }
+          ]
+        },
+        {
+          "id": "infra-tooling-infra-tooling-l3",
+          "title": "Infrastructure as Code: Write It Down, Let a Tool Apply It",
+          "order": 3,
+          "difficulty": 1,
+          "content": "**Hook.** You can now reach a machine over SSH and type commands. But typing is still *remembering*. The next leap is to write the setup down as a file - as **code** - and let a tool apply it for you. This idea is called **Infrastructure as Code** (often shortened to **IaC**).\n\n**Build.** \"Infrastructure\" just means the machines and the things on them (servers, the software they run, their settings). \"As code\" means you describe all of that in plain text files that you save, share, and track - exactly like the source code of a program. A teammate can read it, review a change before it happens, and keep a history of what changed and when.\n\nCompare two recipes for a dish. One lives only in a single chef's head; if that chef is out, the dish changes or disappears. The other is *written down*, so any cook can produce the same dish every time. Infrastructure as Code is the written recipe for your machines.\n\nThere is also a powerful shift in *how* you describe things. Instead of writing step-by-step instructions (\"do this, then this\") - called **imperative** - good IaC tools are mostly **declarative**: you state the *end result you want* (\"the web server should be installed and running\") and the tool figures out the steps to make reality match. You describe *what*, not *how*. The tool then applies it **automatically** (no human typing each command) and **repeatably** (the same way every time).\n\n**Recap.** Infrastructure as Code means writing your machines' setup as saved, reviewable text and letting a tool apply it. Declarative tools let you say *what you want* and handle the *how* - the written-recipe approach to running computers.",
+          "items": [
+            {
+              "id": "infra-tooling-l3-mcq-1",
+              "type": "mcq",
+              "prompt": "What does \"Infrastructure as Code\" (IaC) mean?",
+              "choices": [
+                "Writing computer games in a special language",
+                "Describing your machines and their setup in saved text files, like source code, so a tool can apply it",
+                "Building physical server rooms out of concrete",
+                "Encrypting all your files automatically"
+              ],
+              "answerIndex": 1,
+              "explanation": "IaC captures the setup of machines as text you keep and version like code. A tool then reads it and makes the machines match - that is the whole idea.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/infra-tooling-4.svg"
+            },
+            {
+              "id": "infra-tooling-l3-mcq-2",
+              "type": "mcq",
+              "prompt": "Infrastructure as Code is most like which of these?",
+              "choices": [
+                "A chef who keeps the recipe only in their memory",
+                "A written recipe that any cook can follow to get the same dish every time",
+                "Tasting a dish and guessing the ingredients",
+                "Throwing out the recipe after cooking once"
+              ],
+              "answerIndex": 1,
+              "explanation": "The written recipe is the point: it can be read, reviewed, and re-followed for the same result. The chef's memory is the fragile, by-hand approach IaC replaces."
+            },
+            {
+              "id": "infra-tooling-l3-mcq-3",
+              "type": "mcq",
+              "prompt": "Why is keeping infrastructure 'as code' (in text files) valuable for a team?",
+              "choices": [
+                "Text files run faster than other files",
+                "Teammates can read it, review changes before they happen, and keep a history of what changed",
+                "It hides the setup so no one can see it",
+                "It removes the need for any servers"
+              ],
+              "answerIndex": 1,
+              "explanation": "Because it is just text like source code, you get review, sharing, and history - the same benefits version control gives normal code. That is a big reason teams adopt IaC."
+            },
+            {
+              "id": "infra-tooling-l3-mcq-4",
+              "type": "mcq",
+              "prompt": "What is the difference between 'declarative' and 'imperative' descriptions?",
+              "choices": [
+                "Declarative is written in English; imperative is written in numbers",
+                "Declarative states the end result you want; imperative lists the step-by-step actions to take",
+                "Declarative is slower; imperative is always faster",
+                "They mean the same thing"
+              ],
+              "answerIndex": 1,
+              "explanation": "Declarative = describe the desired end state ('nginx installed and running'). Imperative = spell out each step. IaC tools lean declarative so they can work out the 'how' for you."
+            },
+            {
+              "id": "infra-tooling-l3-mcq-5",
+              "type": "mcq",
+              "prompt": "A declarative tool lets you describe mainly what?",
+              "choices": [
+                "The exact order of every keystroke",
+                "What the final result should be, leaving the tool to work out the steps",
+                "Which employee should do the work",
+                "The price of the hardware"
+              ],
+              "answerIndex": 1,
+              "explanation": "Declarative means you say 'what I want the end state to be' and the tool determines the steps. That is the opposite of dictating each action yourself."
+            },
+            {
+              "id": "infra-tooling-l3-mcq-6",
+              "type": "mcq",
+              "prompt": "In IaC, what does it mean that the tool applies your description \"automatically\"?",
+              "choices": [
+                "A human still types every command, just faster",
+                "The tool carries out the needed steps itself, without a person typing each command",
+                "It only works if you are watching the screen",
+                "It needs you to approve each file copy by hand"
+              ],
+              "answerIndex": 1,
+              "explanation": "Automatic means the tool does the work itself from your written description - no human typing each step. That is what makes it scale across many machines."
+            },
+            {
+              "id": "infra-tooling-l3-mcq-7",
+              "type": "mcq",
+              "prompt": "How does IaC connect to the earlier 'reproducible, not remembered' idea?",
+              "choices": [
+                "It does not - IaC is about speed only",
+                "The code IS the reproducible written record; the tool re-applies it the same way instead of relying on memory",
+                "It replaces servers with people's memories",
+                "It only works the very first time and never again"
+              ],
+              "answerIndex": 1,
+              "explanation": "IaC is the concrete form of 'reproducible': the setup is written down and re-applied identically, so nothing depends on someone remembering the steps."
+            },
+            {
+              "id": "infra-tooling-l3-mcq-8",
+              "type": "mcq",
+              "prompt": "Which of these is the best one-line summary of IaC's payoff?",
+              "choices": [
+                "You never need to understand Linux again",
+                "'Set this machine up exactly like this' becomes a saved, re-runnable file instead of a list of remembered commands",
+                "Servers no longer need electricity",
+                "All passwords are stored in the code for convenience"
+              ],
+              "answerIndex": 1,
+              "explanation": "IaC turns 'set it up like this' into a durable, re-runnable artifact. (Storing passwords in the code would be a serious mistake - secrets are handled separately, as a later lesson covers.)"
+            },
+            {
+              "id": "infra-tooling-l3-mcq-9",
+              "type": "mcq",
+              "prompt": "Does using IaC mean you no longer need to understand the underlying Linux tools?",
+              "choices": [
+                "Yes - IaC replaces all Linux knowledge",
+                "No - you still describe real Linux actions (install packages, edit files, start services); IaC organizes and automates them, it does not erase them",
+                "Yes - the tool invents its own operating system",
+                "No - because IaC only works on Windows"
+              ],
+              "answerIndex": 1,
+              "explanation": "IaC automates real Linux work; it does not remove the need to understand it. You are still installing packages, managing files, and running services - just describing them as code."
+            }
+          ]
+        },
+        {
+          "id": "infra-tooling-infra-tooling-l4",
+          "title": "Ansible: Reading a Checklist Over SSH",
+          "order": 4,
+          "difficulty": 2,
+          "content": "**Hook.** Infrastructure as Code is the idea; **Ansible** is one of the most popular and beginner-friendly tools that *does* it. Ansible reads a checklist you write and makes your machines match it - over the SSH connection you already understand.\n\n**Build.** Ansible's biggest friendliness win is that it is **agentless**. Many tools require you to first install a special helper program (an \"agent\") on every machine before you can manage it. Ansible does not. It connects to each machine over plain **SSH** and does its work. The rule of thumb: *if you can SSH into it, Ansible can manage it* - nothing to install first.\n\nYou tell Ansible two things:\n\n- A **playbook**: a file (written in **YAML**, a simple indented text format) that lists *what each machine should look like* - the checklist. Each item is a small statement of desired state, like \"the package `nginx` should be installed\" and \"the `nginx` service should be running.\"\n- An **inventory**: the list of *which machines* to apply it to, often in named groups like `webservers`.\n\n```yaml\n# site.yml - run with: ansible-playbook -i inventory site.yml\n- hosts: webservers          # which machines (from the inventory)\n  become: true               # act as administrator (like sudo)\n  tasks:\n    - name: Make sure nginx is installed\n      ansible.builtin.package:\n        name: nginx\n        state: present        # desired state: installed\n    - name: Make sure nginx is running\n      ansible.builtin.service:\n        name: nginx\n        state: started        # desired state: running\n```\n\nRead each task as *an assertion of how things should be*, not a script line to blindly execute. The machine running Ansible (your laptop or a central server) is the **control node**; the managed machines need only SSH access.\n\n**Recap.** Ansible applies Infrastructure as Code with no agent to install - just SSH. A **playbook** says *what* each machine should look like; an **inventory** says *which* machines to apply it to.",
+          "items": [
+            {
+              "id": "infra-tooling-l4-mcq-1",
+              "type": "mcq",
+              "prompt": "What is Ansible, in one sentence?",
+              "choices": [
+                "A web browser for servers",
+                "A popular tool that reads a checklist you write and makes machines match it, working over SSH",
+                "A programming language like Python",
+                "A type of computer hardware"
+              ],
+              "answerIndex": 1,
+              "explanation": "Ansible is a configuration tool: you describe the desired setup in a file and it makes the machines match, connecting over SSH. It is one concrete way to do Infrastructure as Code.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/infra-tooling-5.svg"
+            },
+            {
+              "id": "infra-tooling-l4-mcq-2",
+              "type": "mcq",
+              "prompt": "What does it mean that Ansible is \"agentless\"?",
+              "choices": [
+                "It runs without any network connection",
+                "You do NOT have to install a special helper program on each managed machine first; it uses SSH",
+                "It works without electricity",
+                "It cannot manage more than one machine at a time"
+              ],
+              "answerIndex": 1,
+              "explanation": "Agentless means no pre-installed helper ('agent') is required on the targets. If you can SSH in, Ansible can manage it - which makes getting started easy."
+            },
+            {
+              "id": "infra-tooling-l4-mcq-3",
+              "type": "mcq",
+              "prompt": "How does Ansible reach the machines it manages?",
+              "choices": [
+                "Through a custom protocol you must install everywhere first",
+                "Over standard SSH, the same secure remote-login channel from the earlier lesson",
+                "By plugging in a USB cable",
+                "Through the machine's web browser"
+              ],
+              "answerIndex": 1,
+              "explanation": "Ansible uses ordinary SSH to connect to each machine. That is why good SSH key setup (from the SSH lesson) matters so much for it."
+            },
+            {
+              "id": "infra-tooling-l4-mcq-4",
+              "type": "mcq",
+              "prompt": "What is an Ansible playbook?",
+              "choices": [
+                "The list of which machines to manage",
+                "A file (in YAML) describing what each machine should look like - the checklist of desired state",
+                "A password vault",
+                "A log of past errors"
+              ],
+              "answerIndex": 1,
+              "explanation": "A playbook is the 'what should be true' checklist, written in YAML. (The list of WHICH machines is the inventory - a different file.)"
+            },
+            {
+              "id": "infra-tooling-l4-mcq-5",
+              "type": "mcq",
+              "prompt": "What is an Ansible inventory?",
+              "choices": [
+                "The checklist of tasks to perform",
+                "The list of which machines (often in named groups) to apply the playbook to",
+                "The amount of disk space left",
+                "A backup of the operating system"
+              ],
+              "answerIndex": 1,
+              "explanation": "The inventory answers 'which machines?' - often grouped, e.g. 'webservers'. The playbook answers 'what should be done?'. Keep the two roles straight."
+            },
+            {
+              "id": "infra-tooling-l4-mcq-6",
+              "type": "mcq",
+              "prompt": "In the task `state: present` for a package, what is `present` describing?",
+              "choices": [
+                "The order tasks run in",
+                "The desired end state - that the package should be installed - which Ansible then enforces",
+                "A raw shell command to execute",
+                "The SSH username"
+              ],
+              "answerIndex": 1,
+              "explanation": "`state: present` declares the desired condition (installed). Ansible checks current state and installs only if needed. It is a statement of desired state, not a command to run blindly."
+            },
+            {
+              "id": "infra-tooling-l4-mcq-7",
+              "type": "mcq",
+              "prompt": "Why should you read an Ansible task as an \"assertion of state\" rather than a script line?",
+              "choices": [
+                "Because tasks are written in a secret code",
+                "Because each task declares how things SHOULD be, and Ansible only acts if reality differs from that",
+                "Because tasks always run in random order",
+                "Because tasks cannot install software"
+              ],
+              "answerIndex": 1,
+              "explanation": "Declarative tasks state the desired condition; Ansible compares and changes only what is off. That mindset (assert state, not 'do step') is key to using it well."
+            },
+            {
+              "id": "infra-tooling-l4-mcq-8",
+              "type": "mcq",
+              "prompt": "What is the 'control node' in an Ansible setup?",
+              "choices": [
+                "The most important managed server",
+                "The machine that runs Ansible and connects out to the managed machines",
+                "A piece of network hardware",
+                "The database that stores all the data"
+              ],
+              "answerIndex": 1,
+              "explanation": "The control node is where Ansible runs (your laptop or a central server). It reaches out over SSH to the managed machines, which need no agent."
+            },
+            {
+              "id": "infra-tooling-l4-mcq-9",
+              "type": "mcq",
+              "prompt": "A teammate says: \"Just SSH in and re-run the setup shell script we wrote.\" Why might an Ansible playbook be preferable for many machines?",
+              "choices": [
+                "Shell scripts cannot install packages",
+                "A plain script may not be safe to re-run (it can double-apply or fail on a half-set-up box), while a declarative playbook just brings each machine to the stated end state",
+                "Ansible runs with no network at all",
+                "Playbooks finish instantly no matter how many machines"
+              ],
+              "answerIndex": 1,
+              "explanation": "A hand-written script often is not safe to re-run, whereas a declarative playbook checks and converges to the desired state each time. (Why that re-run safety works is the next lesson: idempotency.)"
+            }
+          ]
+        },
+        {
+          "id": "infra-tooling-infra-tooling-l5",
+          "title": "Idempotency: Why Re-Running Is Always Safe",
+          "order": 5,
+          "difficulty": 2,
+          "content": "**Hook.** Here is the property that makes tools like Ansible safe and trustworthy: you can run the same playbook again and again, and nothing bad happens. The fancy word for this is **idempotent** - and it is worth understanding clearly, because it is *why* IaC works.\n\n**Build.** Picture a **thermostat**. You set it to 70 degrees once. It does not keep pumping out heat forever; it checks the room and only acts when the temperature is off, then stops. Setting it to 70 a second time changes nothing - the room is already 70. That is the idea of a **desired state**: you declare the target, and the system keeps things matching it.\n\n**Idempotent** means: doing the operation again gives the *same end result* as doing it once. A good Ansible task works exactly like the thermostat. For each item it first **checks**: \"Is this already true?\" If yes, it leaves it alone (a **no-op** - it does nothing). If no, it fixes just that one thing. So:\n\n- **First run:** the machine is not set up, so Ansible makes changes.\n- **Second run (same playbook):** everything already matches, so Ansible reports \"ok\" and changes nothing.\n\nContrast that with a naive shell script that blindly runs `echo \"...\" >> config` every time: run it three times and you get three duplicate lines. *That* is not idempotent. Because Ansible describes desired state and checks before acting, re-running is always safe - you do not have to remember whether you already ran it.\n\n**Recap.** Idempotent = running it again lands you in the same end state, with no harm. The tool checks first and fixes only what is off, like a thermostat holding a set temperature. That re-run safety is the reason a written, re-applied artifact can be trusted as the source of truth.",
+          "items": [
+            {
+              "id": "infra-tooling-l5-mcq-1",
+              "type": "mcq",
+              "prompt": "What does \"idempotent\" mean?",
+              "choices": [
+                "Running an operation again gives the same end result as running it once - no extra changes",
+                "An operation that can only ever be run a single time",
+                "An operation that runs faster each time you repeat it",
+                "An operation that requires a password"
+              ],
+              "answerIndex": 0,
+              "explanation": "Idempotent means repeating the operation does not change the result beyond the first application. Run it once or ten times - the end state is the same.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/infra-tooling-6.svg"
+            },
+            {
+              "id": "infra-tooling-l5-mcq-2",
+              "type": "mcq",
+              "prompt": "Which everyday device best illustrates idempotency / desired state?",
+              "choices": [
+                "A stopwatch that counts up forever",
+                "A thermostat you set to 70 degrees, which then just holds the room at 70",
+                "A light switch that toggles randomly",
+                "A clock that loses time"
+              ],
+              "answerIndex": 1,
+              "explanation": "A thermostat holds a declared target: setting 70 again does nothing because the room is already 70. That is exactly desired-state, idempotent behavior."
+            },
+            {
+              "id": "infra-tooling-l5-mcq-3",
+              "type": "mcq",
+              "prompt": "You run a playbook that says nginx should be installed and running. It already is. What happens on this run?",
+              "choices": [
+                "It errors because nginx is already there",
+                "It reports the tasks as 'ok' and makes no changes (a no-op)",
+                "It reinstalls nginx to be safe",
+                "It uninstalls and reinstalls nginx"
+              ],
+              "answerIndex": 1,
+              "explanation": "Because the desired state already holds, Ansible checks, sees nothing to do, and reports 'ok' with no changes. Idempotent tasks do not redo work that is already done."
+            },
+            {
+              "id": "infra-tooling-l5-mcq-4",
+              "type": "mcq",
+              "prompt": "On the FIRST run against a brand-new machine, what does an idempotent playbook do?",
+              "choices": [
+                "Nothing, because idempotent means it never changes anything",
+                "It makes the changes needed to reach the desired state (installs, configures, starts things)",
+                "It only prints a warning",
+                "It deletes the machine"
+              ],
+              "answerIndex": 1,
+              "explanation": "Idempotent does not mean 'never changes anything' - it means re-running causes no extra changes. The first run still does the real work to reach the desired state."
+            },
+            {
+              "id": "infra-tooling-l5-mcq-5",
+              "type": "mcq",
+              "prompt": "How does an idempotent task decide whether to act?",
+              "choices": [
+                "It always acts, every time",
+                "It first checks 'is this already true?' and only changes the thing if it is not",
+                "It flips a coin",
+                "It acts only on the first Tuesday of the month"
+              ],
+              "answerIndex": 1,
+              "explanation": "The check-then-act pattern is the heart of idempotency: verify the current state, and fix only what differs from the desired state."
+            },
+            {
+              "id": "infra-tooling-l5-mcq-6",
+              "type": "mcq",
+              "prompt": "What is a \"no-op\"?",
+              "choices": [
+                "An operation that fails with an error",
+                "An operation that does nothing because the desired state already holds",
+                "A brand-new operating system",
+                "A command that runs twice as fast"
+              ],
+              "answerIndex": 1,
+              "explanation": "A no-op ('no operation') is when the tool finds nothing to change and so does nothing. On a fully-configured machine, most tasks become no-ops."
+            },
+            {
+              "id": "infra-tooling-l5-mcq-7",
+              "type": "mcq",
+              "prompt": "Which of these is NOT idempotent?",
+              "choices": [
+                "A task that ensures a package is 'present' (installed)",
+                "A task that ensures a service is 'started'",
+                "A script that appends a line to a config file every single time it runs",
+                "A task that ensures a config file has an exact, specified content"
+              ],
+              "answerIndex": 2,
+              "explanation": "Blindly appending a line each run keeps adding duplicates, so repeated runs change the result - not idempotent. Ensuring 'installed', 'started', or 'exact content' all converge to one stable state."
+            },
+            {
+              "id": "infra-tooling-l5-mcq-8",
+              "type": "mcq",
+              "prompt": "Why does idempotency make a written playbook trustworthy as the 'source of truth'?",
+              "choices": [
+                "Because it makes the playbook run faster",
+                "Because you can safely re-apply it any time to guarantee the machine matches the description, without fear of damage from re-running",
+                "Because it encrypts the playbook",
+                "Because it means the playbook never needs to change"
+              ],
+              "answerIndex": 1,
+              "explanation": "Re-run safety means the artifact can always be re-applied to reassert the desired state. That reliability is exactly what lets the code, not someone's memory, be the source of truth."
+            },
+            {
+              "id": "infra-tooling-l5-mcq-9",
+              "type": "mcq",
+              "prompt": "A machine has drifted - someone manually stopped nginx. You re-run the idempotent playbook. What happens?",
+              "choices": [
+                "Nothing, because idempotent tools never change anything",
+                "It notices nginx is stopped (off from desired state) and starts it again, fixing just that",
+                "It errors and refuses to run",
+                "It reinstalls the whole operating system"
+              ],
+              "answerIndex": 1,
+              "explanation": "Idempotency plus desired-state means re-running corrects drift: it acts only on what is now wrong (nginx stopped) and brings it back to the declared state. This is a key reason to re-run regularly."
+            }
+          ]
+        },
+        {
+          "id": "infra-tooling-infra-tooling-l6",
+          "title": "The Production Landscape: Provision, Ship, Watch",
+          "order": 6,
+          "difficulty": 3,
+          "content": "**Hook.** You now have the core: SSH, Infrastructure as Code, Ansible, and idempotency. In a real production setting, a few more tools sit around that core. The goal here is *not* to master them - it is to recognize the words and know where each fits on the map.\n\n**Build.** Think of running software in production as four stages, plus a couple of things that cut across all of them.\n\n1. **Provision** - create the machines and cloud resources in the first place (the servers, networks, addresses). The well-known tool here is **Terraform**. Handy contrast: *Terraform creates the empty machines; Ansible sets up what is inside them.*\n\n2. **Configure** - set up the inside of each machine: packages, files, services. That is **Ansible**, which you just learned.\n\n3. **Ship code** - get new versions of your software built, tested, and deployed automatically. This is **CI/CD** (Continuous Integration / Continuous Delivery): an automated pipeline that, on every code change, builds and tests the software - usually inside **containers** (lightweight, isolated bundles of an app and its dependencies) so each run is clean and repeatable. When you run *many* containers across many machines, a system called **Kubernetes** schedules and supervises them - it is the same declarative, desired-state idea as Ansible, but applied to a whole cluster.\n\n4. **Watch** (called **observability**) - once it is running, you must be able to see whether it is healthy. Three layers: **logs** (text messages the software writes, gathered from all machines into one searchable place instead of logging into each); **metrics** (numbers over time like CPU use or requests per second) - the common pairing is **Prometheus** to collect and store them and **Grafana** to draw the dashboards; and for the deepest, live questions (\"what exactly is this program doing right now?\"), **eBPF** tooling inspects the running kernel safely (covered in its own module).\n\nTwo things cut across everything: **Secrets** - passwords, keys, tokens - must be kept in a locked **vault** and *never written into the code or checked into version control*. And **scheduled jobs** that must run on a clock use either classic **cron** or **systemd timers** (covered in the systemd module; timers add logging and missed-run recovery).\n\n**Recap.** The landscape: Terraform provisions, Ansible configures, CI/CD ships (via containers, scaled by Kubernetes), and observability (logs + Prometheus/Grafana metrics + eBPF) watches. Secrets live in a vault, never in code. One idea ties it together: *describe what you want as code; let tools make reality match, automatically and repeatably.*",
+          "items": [
+            {
+              "id": "infra-tooling-l6-mcq-1",
+              "type": "mcq",
+              "prompt": "What is the difference in job between Terraform and Ansible?",
+              "choices": [
+                "They are the same tool with different names",
+                "Terraform creates the machines/cloud resources (provisioning); Ansible sets up what is inside them (configuring)",
+                "Terraform watches dashboards; Ansible stores passwords",
+                "Terraform is for Windows; Ansible is for Linux"
+              ],
+              "answerIndex": 1,
+              "explanation": "A clean split: Terraform provisions (makes the empty machines and networks exist), then Ansible configures the inside (packages, files, services). Provision first, then configure.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/infra-tooling-7.svg"
+            },
+            {
+              "id": "infra-tooling-l6-mcq-2",
+              "type": "mcq",
+              "prompt": "What does CI/CD (Continuous Integration / Continuous Delivery) do?",
+              "choices": [
+                "It encrypts hard drives",
+                "It is an automated pipeline that builds, tests, and deploys your software whenever the code changes",
+                "It is a type of network cable",
+                "It manually emails code to teammates"
+              ],
+              "answerIndex": 1,
+              "explanation": "CI/CD automates the path from a code change to running software: build, test, deploy. It is how teams ship frequently and reliably instead of by hand."
+            },
+            {
+              "id": "infra-tooling-l6-mcq-3",
+              "type": "mcq",
+              "prompt": "Why do CI/CD pipelines often build and test inside containers?",
+              "choices": [
+                "Containers make the code run on a phone",
+                "Containers give a clean, repeatable environment so the build/test behaves the same every time and on every machine",
+                "Containers delete the test results automatically",
+                "Containers are required by law"
+              ],
+              "answerIndex": 1,
+              "explanation": "A container pins the environment, so a build/test is reproducible - the same on a laptop, the CI server, and production. That kills 'but it worked on my machine' problems."
+            },
+            {
+              "id": "infra-tooling-l6-mcq-4",
+              "type": "mcq",
+              "prompt": "How does Kubernetes relate to the declarative/desired-state idea from Ansible?",
+              "choices": [
+                "It abandons that idea entirely",
+                "It applies the same idea at cluster scale: you declare the desired state (e.g. 3 copies of this container) and it keeps reality matching, restarting and rescheduling as needed",
+                "It only manages a single machine",
+                "It replaces SSH with a faster cable"
+              ],
+              "answerIndex": 1,
+              "explanation": "Kubernetes is declarative across many machines: you state the desired end state and a control loop continuously reconciles reality to match - the same 'declare and converge' philosophy as a playbook, scaled up."
+            },
+            {
+              "id": "infra-tooling-l6-mcq-5",
+              "type": "mcq",
+              "prompt": "In observability, what is the difference between logs and metrics?",
+              "choices": [
+                "Logs are numbers; metrics are text",
+                "Logs are text messages the software writes; metrics are numbers tracked over time (like CPU use or requests per second)",
+                "They are identical",
+                "Logs run the software; metrics store passwords"
+              ],
+              "answerIndex": 1,
+              "explanation": "Logs = text records of events. Metrics = numeric measurements over time. They answer different questions, which is why production setups collect both."
+            },
+            {
+              "id": "infra-tooling-l6-mcq-6",
+              "type": "mcq",
+              "prompt": "How do Prometheus and Grafana typically divide the work for metrics?",
+              "choices": [
+                "Prometheus draws the dashboards; Grafana stores the data",
+                "Prometheus collects and stores the numeric metrics; Grafana draws the dashboards and graphs from them",
+                "Both only handle text logs",
+                "Neither has anything to do with metrics"
+              ],
+              "answerIndex": 1,
+              "explanation": "The common pairing: Prometheus gathers and stores the time-series numbers; Grafana visualizes them as dashboards and alerts. Collect/store vs visualize."
+            },
+            {
+              "id": "infra-tooling-l6-mcq-7",
+              "type": "mcq",
+              "prompt": "Why is gathering logs from all machines into one searchable place better than logging into each machine to read them?",
+              "choices": [
+                "It makes the logs run the software faster",
+                "You can search and compare events across the whole fleet at once, which does not scale if you must visit each machine by hand",
+                "It deletes the logs to save space",
+                "It is the only way logs can be written at all"
+              ],
+              "answerIndex": 1,
+              "explanation": "Central log collection lets you query and correlate across many machines from one place. Logging into each box to grep does not scale and cannot easily compare across machines."
+            },
+            {
+              "id": "infra-tooling-l6-mcq-8",
+              "type": "mcq",
+              "prompt": "Where does eBPF fit among logs and metrics?",
+              "choices": [
+                "It replaces all logging and metrics",
+                "It is the deepest, live layer - it safely inspects the running kernel to answer 'what exactly is this program doing right now?'",
+                "It is a type of password vault",
+                "It is an older tool that predates logs"
+              ],
+              "answerIndex": 1,
+              "explanation": "eBPF answers live, low-level questions about a running system (syscalls, files, network events) that pre-written logs and metrics cannot. It sits below them as the deep-inspection layer."
+            },
+            {
+              "id": "infra-tooling-l6-mcq-9",
+              "type": "mcq",
+              "prompt": "What is the cardinal rule about secrets (passwords, keys, tokens)?",
+              "choices": [
+                "Always write them directly into your code so the setup is self-contained",
+                "Keep them in a locked vault and never write them into the code or check them into version control",
+                "Email them to the whole team for safety",
+                "Store them in the dashboard title"
+              ],
+              "answerIndex": 1,
+              "explanation": "Secrets must live in a vault and be injected at run time, never committed in code - even a private repository can leak. Plaintext secrets in version control is a classic, dangerous mistake."
+            },
+            {
+              "id": "infra-tooling-l6-mcq-10",
+              "type": "mcq",
+              "prompt": "For jobs that must run on a schedule (like a nightly backup), which two tools were mentioned?",
+              "choices": [
+                "Terraform and Grafana",
+                "Classic cron and systemd timers",
+                "Prometheus and Kubernetes",
+                "SSH and YAML"
+              ],
+              "answerIndex": 1,
+              "explanation": "Scheduling on Linux is done with classic cron or with systemd timers (covered in the systemd module). Timers add benefits like logging and catching runs missed during downtime.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/infra-tooling-8.svg"
+            },
+            {
+              "id": "infra-tooling-l6-mcq-11",
+              "type": "mcq",
+              "prompt": "What single idea ties this whole landscape together?",
+              "choices": [
+                "Always do everything by hand for control",
+                "Describe what you want as code, and let tools make reality match it automatically and repeatably",
+                "Avoid writing anything down",
+                "Use as many different tools as possible for their own sake"
+              ],
+              "answerIndex": 1,
+              "explanation": "From provisioning to shipping to watching, the unifying thread is declarative, code-driven automation: state the desired result and let tools converge reality to it - reproducible, not remembered."
             }
           ]
         }
