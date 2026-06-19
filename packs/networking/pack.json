@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "id": "networking",
   "title": "Networking",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Networking from scratch (beginner rework in progress): 17 sub-topics from layering and the physical layer through IP, subnetting, routing, TCP/UDP, TLS, DNS, wireless and modern transport. Beginner-first readings, MCQ practice, and diagrams; tiered easy to hard.",
   "requires": [],
   "tags": [
@@ -1609,269 +1609,413 @@
           "title": "The Address Resolution Problem",
           "order": 1,
           "difficulty": 1,
-          "content": "You have an IP address; to actually put bits on the wire you need a **MAC address**. The Ethernet frame header carries a destination MAC, not an IP. So before a host can send the first packet to a same-subnet peer, it must answer: *\"Given 192.168.1.20, what is the 48-bit hardware address I should put in the frame?\"* That translation is the job of **ARP** (Address Resolution Protocol, RFC 826). It is the literal glue between Layer 3 (logical IP) and Layer 2 (physical MAC).\n\nThe exchange is two messages. **ARP request**: the sender broadcasts a frame to `ff:ff:ff:ff:ff:ff` asking \"Who has 192.168.1.20? Tell 192.168.1.10.\" Because it's a broadcast, every host in the broadcast domain (the switched LAN / VLAN) receives and inspects it. **ARP reply**: only the host that owns that IP responds, and it replies as a **unicast** straight back to the requester's MAC: \".20 is at bb:bb:bb:22:22:22.\"\n\nNotice ARP rides directly on Ethernet (EtherType 0x0806) — it is *not* carried inside IP. It's a peer of IP, not a passenger. ARP only resolves addresses *within one subnet*; it has no concept of routing. The moment a destination is on a different subnet, the question changes entirely (covered in the next lesson). For a radar tech: think of the broadcast request as an omnidirectional interrogation pulse, and the unicast reply as the single transponder that recognizes its own code answering back on a directed beam.",
+          "content": "Imagine you know a coworker's name but not where they sit. To actually hand them a note, you need their desk. So you call out across the room: \"Who is Sam? Raise your hand!\" Sam raises a hand, and now you know where to walk. Networking has the exact same gap.\n\nYou already met two kinds of address: a **MAC address** (the device's permanent hardware address, used to deliver data on your *local* network) and an **IP address** (a logical address that software uses). Here is the catch: to actually send data to a device on your local network, the message must be wrapped in a **frame**, and the frame is labeled with the destination's **MAC** address, not its IP. But usually you only know the other device's **IP**. You have the name; you need the desk.\n\n**ARP (Address Resolution Protocol)** is the lookup that fills this gap. It works in two simple steps:\n\n1. **Ask everyone (the request).** Your device shouts to every device on the local network: \"Who has IP 192.168.1.5? Tell me your MAC.\" This shout-to-all is called a **broadcast**.\n2. **One device answers (the reply).** Only the device that owns that IP answers, and it replies *directly* to you (a **unicast**, meaning a message to one specific device): \"That's me - my MAC is bb:bb:bb:22:22:22.\"\n\nPeople nickname these two messages **\"who-has\"** (the request) and **\"is-at\"** (the reply). Once you have the answer, you can finally label the frame correctly and send your data.\n\n**Recap:** You have the IP but need the MAC to build the frame. ARP asks the whole local network \"who has this IP?\", the owner replies with its MAC, and now you can deliver the data.",
           "items": [
-            {
-              "id": "arp-resolution-fc-001",
-              "type": "flashcard",
-              "front": "What problem does ARP solve?",
-              "back": "You have a destination IPv4 address but the Ethernet frame needs a destination MAC address. ARP resolves an IP on the local subnet to its hardware (MAC) address.",
-              "hint": "L3 logical address -> L2 hardware address."
-            },
-            {
-              "id": "arp-resolution-fc-002",
-              "type": "flashcard",
-              "front": "What destination MAC does an ARP request use, and why?",
-              "back": "ff:ff:ff:ff:ff:ff (broadcast). The sender doesn't yet know the target's MAC, so it must flood the request to every host in the broadcast domain.",
-              "hint": "All ones.",
-              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/arp-1.svg"
-            },
-            {
-              "id": "arp-resolution-fc-003",
-              "type": "flashcard",
-              "front": "Is the ARP reply broadcast or unicast?",
-              "back": "Unicast. The responder already learned the requester's MAC from the request frame, so it answers directly to that host instead of bothering everyone.",
-              "hint": "It learned the asker's MAC from the request."
-            },
-            {
-              "id": "arp-resolution-fc-004",
-              "type": "flashcard",
-              "front": "Does ARP run on top of IP?",
-              "back": "No. ARP rides directly on Ethernet with its own EtherType (0x0806). It is a peer of IP, not encapsulated inside an IP packet.",
-              "hint": "Its own EtherType, not IP protocol number."
-            },
-            {
-              "id": "arp-resolution-fc-005",
-              "type": "flashcard",
-              "front": "What is the scope of ARP resolution?",
-              "back": "A single subnet / broadcast domain. ARP cannot resolve an address that lives on another subnet; broadcasts don't cross routers.",
-              "hint": "Routers stop broadcasts."
-            },
             {
               "id": "arp-resolution-mcq-001",
               "type": "mcq",
-              "prompt": "A host wants to send an IP packet to 192.168.1.20 on its own subnet but has no entry for it. What does it do first?",
+              "prompt": "What problem does ARP solve?",
               "choices": [
-                "Send the IP packet to the default gateway",
-                "Broadcast an ARP request asking who owns 192.168.1.20",
-                "Send a DNS query for the hostname",
-                "Unicast an ARP request directly to 192.168.1.20"
+                "You have a device's MAC address but need to find its IP address",
+                "You have a device's IP address but need its MAC address to build the frame",
+                "You need to find the fastest route across the whole Internet",
+                "You need to turn a website name like example.com into an IP address"
               ],
               "answerIndex": 1,
-              "explanation": "It can't unicast yet because it doesn't know the MAC. It broadcasts an ARP request; only the owner of .20 replies, this time as a unicast."
+              "explanation": "To deliver data on the local network, the frame must be labeled with the destination's MAC (hardware) address, but you usually only know its IP. ARP looks up the MAC for a known IP. Turning a name into an IP is a different job (DNS), and finding routes is the job of routing.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/arp-2.svg"
             },
             {
               "id": "arp-resolution-mcq-002",
               "type": "mcq",
-              "prompt": "Which field in the outgoing Ethernet frame does ARP ultimately fill in?",
+              "prompt": "What does the acronym ARP stand for?",
               "choices": [
-                "Destination IP address",
-                "Source IP address",
-                "Destination MAC address",
-                "EtherType"
+                "Address Resolution Protocol",
+                "Automatic Routing Protocol",
+                "Address Reply Packet",
+                "Available Resource Pool"
               ],
-              "answerIndex": 2,
-              "explanation": "The frame already carries the IPs inside the IP header; ARP supplies the destination MAC for the Layer-2 header so the frame can actually be delivered on the wire."
+              "answerIndex": 0,
+              "explanation": "ARP is the Address Resolution Protocol. \"Resolution\" here means turning one kind of address (an IP) into another (a MAC) - resolving the gap between them."
             },
             {
               "id": "arp-resolution-mcq-003",
               "type": "mcq",
-              "prompt": "At which layer boundary does ARP sit?",
+              "prompt": "A device needs to send data to 192.168.1.5 on its own local network but does not yet know that device's MAC address. What does it do first?",
               "choices": [
-                "Between the application and transport layers",
-                "Between the transport and network layers",
-                "Between the network (L3) and data-link (L2) layers",
-                "Between the data-link and physical layers"
+                "Send the data to its gateway and let the gateway figure it out",
+                "Broadcast an ARP request asking 'who has 192.168.1.5?'",
+                "Give up, because you cannot reach a device without its MAC",
+                "Send the ARP request straight to 192.168.1.5 only"
               ],
-              "answerIndex": 2,
-              "explanation": "ARP maps L3 IP addresses to L2 MAC addresses, making it the glue at the network/data-link boundary."
+              "answerIndex": 1,
+              "explanation": "It cannot send the request to that one device yet, because it does not know its MAC. So it broadcasts the 'who-has' request to everyone on the local network; only the owner of that IP will answer.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/arp-2.svg"
+            },
+            {
+              "id": "arp-resolution-mcq-004",
+              "type": "mcq",
+              "prompt": "Why is the ARP REQUEST sent as a broadcast (to every device on the local network)?",
+              "choices": [
+                "Because broadcasts are faster than other messages",
+                "Because the sender does not yet know the target's MAC, so it must ask everyone",
+                "Because ARP always copies every message to every device for safety",
+                "Because the gateway requires a copy of every request"
+              ],
+              "answerIndex": 1,
+              "explanation": "The whole point of ARP is that the sender does NOT know the target's MAC. With no specific address to aim at, the only way to reach the right device is to ask everyone and let the owner answer. It is like calling a name across a room because you do not know where the person sits."
+            },
+            {
+              "id": "arp-resolution-mcq-005",
+              "type": "mcq",
+              "prompt": "Is the ARP REPLY sent to everyone, or just to the device that asked?",
+              "choices": [
+                "To everyone, so all devices learn the mapping",
+                "Just to the device that asked (a unicast)",
+                "To the gateway, which passes it along",
+                "To nobody; the asker has to guess the answer"
+              ],
+              "answerIndex": 1,
+              "explanation": "The reply is a unicast - sent only to the asker. The replying device learned the asker's MAC from the request frame, so it can answer directly instead of bothering everyone again.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/arp-2.svg"
+            },
+            {
+              "id": "arp-resolution-mcq-006",
+              "type": "mcq",
+              "prompt": "In ARP's plain-English nicknames, the request is called \"who-has\" and the reply is called \"is-at\". Which message carries the actual MAC address being looked up?",
+              "choices": [
+                "The 'who-has' request",
+                "The 'is-at' reply",
+                "Both carry it equally",
+                "Neither; the MAC is sent separately"
+              ],
+              "answerIndex": 1,
+              "explanation": "The 'who-has' request asks the question ('who has this IP?'). The 'is-at' reply gives the answer ('that IP is at this MAC'), so the reply is what carries the MAC the asker wanted."
+            },
+            {
+              "id": "arp-resolution-mcq-007",
+              "type": "mcq",
+              "prompt": "After a device gets the ARP reply with the target's MAC, what can it finally do?",
+              "choices": [
+                "Build the frame with the correct destination MAC and send its data",
+                "Change its own IP address to match",
+                "Stop using IP addresses from now on",
+                "Send the data without any address labels"
+              ],
+              "answerIndex": 0,
+              "explanation": "The MAC was the missing piece. With it, the device labels the frame's destination MAC correctly and the data can be delivered on the local network. The IP address is still used too - ARP just supplied the matching MAC."
+            },
+            {
+              "id": "arp-resolution-mcq-008",
+              "type": "mcq",
+              "prompt": "Which everyday comparison best matches what ARP does?",
+              "choices": [
+                "A map app calculating the shortest driving route",
+                "Knowing a coworker's name but calling out to find which desk is theirs",
+                "A translator turning English into another language word for word",
+                "A lock that only opens with the correct password"
+              ],
+              "answerIndex": 1,
+              "explanation": "ARP is the 'I know the name (IP) but need the desk (MAC)' lookup: you call out to the room (broadcast) and the right person raises a hand (reply). Route-finding and translation are different networking jobs."
+            },
+            {
+              "id": "arp-resolution-mcq-009",
+              "type": "mcq",
+              "prompt": "A frame (the wrapper that actually carries data on the local network) is labeled with which kind of destination address?",
+              "choices": [
+                "The destination's IP address",
+                "The destination's MAC address",
+                "The website's domain name",
+                "No address at all"
+              ],
+              "answerIndex": 1,
+              "explanation": "On the local network, delivery uses the MAC (hardware) address, so the frame is labeled with the destination MAC. That is exactly why you need ARP: you must turn the IP you know into the MAC the frame requires."
             }
           ]
         },
         {
-          "id": "arp-arp-cache-firstcontact",
-          "title": "The ARP Cache & First Contact",
+          "id": "arp-arp-cache-scope",
+          "title": "The ARP Cache & Staying on the Local Network",
           "order": 2,
           "difficulty": 2,
-          "content": "Broadcasting for every packet would be absurd, so each host keeps an **ARP cache** (the neighbor table): a short-lived map of IP -> MAC. View it with `arp -a` (legacy) or the modern Linux `ip neigh`, which also exposes states like `REACHABLE`, `STALE`, `DELAY`, and `FAILED`. Entries **age out** (typically tens of seconds to a few minutes) so the table tracks reality as hosts move, swap NICs, or change addresses. A stale or wrong entry is a classic cause of \"works, then mysteriously doesn't\" bugs.\n\nThe defining question is **first contact**, and the answer pivots on one decision the sending host makes: *is the destination IP on my own subnet, or not?* It computes this with its subnet mask.\n\n**Same subnet:** Host A (192.168.1.10/24) talks to B (192.168.1.20). A finds B is local, ARPs for B's MAC, and builds a frame addressed *directly to B's MAC*. One ARP exchange, then the ICMP/data flows host-to-host.\n\n**Across a router:** A (192.168.1.10/24) talks to 8.8.8.8. A computes that 8.8.8.8 is *not* local, so it must hand the packet to its **default gateway** (192.168.1.1). It does **not** ARP for 8.8.8.8 — that would be pointless, since the reply could never come back. Instead it ARPs for the *gateway's* MAC, then builds a frame whose **destination MAC is the router's**, but whose **destination IP is still 8.8.8.8**. The router strips the frame, makes its own forwarding decision, and re-frames toward the next hop. Key insight: the **IP addresses stay end-to-end; the MAC addresses are rewritten hop by hop.** Every router crossing triggers a fresh ARP for the next-hop MAC.",
+          "content": "Asking the whole network \"who has this IP?\" before *every* message would be noisy and slow - like shouting a coworker's name across the room every single time you want to say something. So each device keeps a small notebook of answers it has already learned.\n\n**The ARP cache.** This notebook is called the **ARP cache** (or neighbor table): a short list mapping **IP -> MAC** for devices it has talked to recently. Before asking, a device checks the cache. If the answer is there, it skips the broadcast and sends right away. You can look at this list yourself: on modern Linux type `ip neigh`, or the older command `arp -a`. Entries do not last forever - each one **expires** after a short time (seconds to minutes) and is dropped. Why expire? Because a device might move, swap its network card (a new MAC), or get a new IP. If the cache never expired, you could end up sending data to an address that is wrong or gone. Expiring and re-asking keeps the notebook honest.\n\n**ARP only works on ONE local network.** The shout in step 1 only reaches devices on your own local network; it does not travel across the Internet. So what if you want to reach a far-away server like 8.8.8.8 on a *different* network? You do **not** ARP for 8.8.8.8 - the shout could never reach it. Instead, your device sends the data to its **gateway** (also called the default gateway or router: the \"door\" out of your local network). It ARPs for the **gateway's** MAC, then builds a frame whose destination MAC is the gateway, while the destination IP stays 8.8.8.8. The gateway takes it from there.\n\n**Recap:** The ARP cache remembers IP -> MAC so you do not re-ask constantly, and entries expire to stay accurate. ARP only reaches your local network, so to talk to another network you ARP for the gateway's MAC, not the far-away destination's.",
           "items": [
-            {
-              "id": "arp-cache-fc-001",
-              "type": "flashcard",
-              "front": "What is the ARP cache and why does it exist?",
-              "back": "A per-host table of recently resolved IP->MAC mappings. It avoids broadcasting an ARP request for every single packet by remembering neighbors for a short time.",
-              "hint": "Avoid re-broadcasting constantly."
-            },
-            {
-              "id": "arp-cache-fc-002",
-              "type": "flashcard",
-              "front": "Modern Linux command to view/manage the neighbor (ARP) table?",
-              "back": "`ip neigh` (the legacy command is `arp -a`). `ip neigh` shows states such as REACHABLE, STALE, DELAY, and FAILED.",
-              "hint": "iproute2 'neighbor' object."
-            },
-            {
-              "id": "arp-cache-fc-003",
-              "type": "flashcard",
-              "front": "Why do ARP cache entries age out?",
-              "back": "So the table tracks reality: hosts move, NICs/MACs change, IPs get reassigned. A never-expiring entry would deliver frames to the wrong (or gone) MAC.",
-              "hint": "Hardware and addresses change over time."
-            },
-            {
-              "id": "arp-cache-fc-004",
-              "type": "flashcard",
-              "front": "First contact, SAME subnet: what happens packet by packet?",
-              "back": "Host computes the destination is local -> ARP-broadcasts for its MAC -> gets unicast reply -> caches it -> sends the frame with the destination's own MAC. Then the actual data (e.g., ICMP echo) flows directly.",
-              "hint": "ARP for the destination itself."
-            },
-            {
-              "id": "arp-cache-fc-005",
-              "type": "flashcard",
-              "front": "First contact ACROSS a router: whose MAC does the sender ARP for?",
-              "back": "The default gateway's MAC, NOT the remote host's. The frame's destination MAC is the router; the destination IP remains the far-away host. ARPing for an off-subnet IP would be useless.",
-              "hint": "You can't ARP something a broadcast can't reach."
-            },
-            {
-              "id": "arp-cache-fc-006",
-              "type": "flashcard",
-              "front": "As a packet crosses multiple routers, what stays constant and what changes?",
-              "back": "Source/destination IP addresses stay end-to-end. The L2 MAC addresses are rewritten at every hop (each router ARPs for the next hop). TTL also decrements per hop.",
-              "hint": "L3 fixed, L2 per-hop."
-            },
             {
               "id": "arp-cache-mcq-001",
               "type": "mcq",
-              "prompt": "Host 192.168.1.10/24 wants to ping 8.8.8.8. What does it ARP for?",
+              "prompt": "What is the ARP cache?",
               "choices": [
-                "8.8.8.8 directly",
-                "Its own default gateway's IP",
-                "The DNS server",
-                "Nothing; ARP is not used for off-subnet traffic at all"
+                "A list of every website you have visited",
+                "A short list a device keeps mapping IP -> MAC for devices it talked to recently",
+                "A backup copy of all the data you have sent",
+                "A list of passwords for nearby devices"
               ],
               "answerIndex": 1,
-              "explanation": "8.8.8.8 is off-subnet, so the host sends the packet to its default gateway. It ARPs for the gateway's MAC; the frame's dst MAC is the router, but the dst IP stays 8.8.8.8."
+              "explanation": "The ARP cache (or neighbor table) stores recently learned IP-to-MAC mappings so the device does not have to broadcast a fresh request every single time it sends data.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/arp-3.svg"
             },
             {
               "id": "arp-cache-mcq-002",
               "type": "mcq",
-              "prompt": "On the same subnet, after A resolves B's MAC and caches it, what is in the destination MAC field of A's data frames to B?",
+              "prompt": "Why does a device keep an ARP cache instead of asking every time?",
               "choices": [
-                "ff:ff:ff:ff:ff:ff",
-                "The default gateway's MAC",
-                "B's own MAC address",
-                "A's own MAC address"
+                "To avoid broadcasting a 'who-has' request for every single message",
+                "Because ARP replies are not allowed more than once",
+                "To hide its MAC address from other devices",
+                "Because the gateway charges a fee for each request"
               ],
-              "answerIndex": 2,
-              "explanation": "Same-subnet delivery is direct: the frame carries B's actual MAC. No gateway is involved."
+              "answerIndex": 0,
+              "explanation": "Re-asking the whole network before every message would be slow and noisy. The cache lets the device reuse an answer it already learned, so it can send right away.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/arp-3.svg"
             },
             {
               "id": "arp-cache-mcq-003",
               "type": "mcq",
-              "prompt": "You see intermittent connectivity to a server right after its NIC was replaced. ARP-related cause?",
+              "prompt": "On a modern Linux system, which command shows the ARP / neighbor table?",
               "choices": [
-                "DNS TTL too high",
-                "A stale ARP cache entry still pointing at the old MAC until it ages out",
-                "The subnet mask is wrong",
-                "TCP window scaling disabled"
+                "ip neigh",
+                "ping all",
+                "show mac",
+                "list arp cache"
+              ],
+              "answerIndex": 0,
+              "explanation": "`ip neigh` shows the neighbor (ARP) table on modern Linux. The older command `arp -a` does the same thing. The other options are not real commands."
+            },
+            {
+              "id": "arp-cache-mcq-004",
+              "type": "mcq",
+              "prompt": "Why do ARP cache entries expire after a short time instead of lasting forever?",
+              "choices": [
+                "To make the device run faster",
+                "Because a device might move, get a new network card, or a new IP, so old mappings can become wrong",
+                "Because the cache can only hold one entry at a time",
+                "To force you to type the command again"
               ],
               "answerIndex": 1,
-              "explanation": "Until the stale IP->old-MAC entry ages out (or a gratuitous ARP refreshes it), frames go to a MAC that no longer exists, producing intermittent failures."
+              "explanation": "Hardware and addresses can change. If a mapping never expired, you might keep sending to a MAC that is wrong or no longer exists. Expiring and re-asking keeps the cache accurate.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/arp-3.svg"
+            },
+            {
+              "id": "arp-cache-mcq-005",
+              "type": "mcq",
+              "prompt": "Your computer (192.168.1.10) wants to reach a far-away server at 8.8.8.8 on a different network. Whose MAC address does it ARP for?",
+              "choices": [
+                "8.8.8.8's MAC, directly",
+                "Its own gateway's MAC",
+                "Nobody's; ARP is skipped entirely for far-away servers",
+                "Every device's MAC, one by one"
+              ],
+              "answerIndex": 1,
+              "explanation": "8.8.8.8 is on another network, so the local 'who-has' shout could never reach it. The computer instead ARPs for its gateway's MAC and hands the data to the gateway, which forwards it onward.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/arp-4.svg"
+            },
+            {
+              "id": "arp-cache-mcq-006",
+              "type": "mcq",
+              "prompt": "When sending to the far-away server 8.8.8.8 through your gateway, what goes in the frame's destination MAC and destination IP?",
+              "choices": [
+                "Destination MAC = gateway's MAC; destination IP = 8.8.8.8",
+                "Destination MAC = 8.8.8.8's MAC; destination IP = gateway's IP",
+                "Both the MAC and IP are the gateway's",
+                "Both the MAC and IP are 8.8.8.8's"
+              ],
+              "answerIndex": 0,
+              "explanation": "The frame is delivered to the gateway, so its destination MAC is the gateway's MAC. But the data is ultimately for 8.8.8.8, so the destination IP stays 8.8.8.8. The gateway uses that IP to forward the data onward.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/arp-4.svg"
+            },
+            {
+              "id": "arp-cache-mcq-007",
+              "type": "mcq",
+              "prompt": "What is a 'gateway' (default gateway) in plain terms?",
+              "choices": [
+                "A backup of your files kept on the network",
+                "The router that acts as the door out of your local network to other networks",
+                "Another name for your own computer's MAC address",
+                "A list of every device on the Internet"
+              ],
+              "answerIndex": 1,
+              "explanation": "The gateway is the router that connects your local network to other networks. Anything destined for a different network is handed to the gateway, which forwards it on."
+            },
+            {
+              "id": "arp-cache-mcq-008",
+              "type": "mcq",
+              "prompt": "How far does an ARP 'who-has' broadcast actually reach?",
+              "choices": [
+                "Across the entire Internet",
+                "Only devices on the same local network",
+                "Only the single device named in the request",
+                "Only devices made by the same manufacturer"
+              ],
+              "answerIndex": 1,
+              "explanation": "An ARP broadcast stays on your local network; it does not cross out onto the wider Internet. That is exactly why reaching another network requires going through the gateway instead of ARPing the far-away device."
+            },
+            {
+              "id": "arp-cache-mcq-009",
+              "type": "mcq",
+              "prompt": "A server's network card was just replaced (giving it a new MAC), and now your computer's connection to it works on and off. What is a likely ARP-related cause?",
+              "choices": [
+                "Your computer forgot its own IP address",
+                "An old (stale) ARP cache entry still points to the server's previous MAC until it expires",
+                "The server is now on the Internet instead of the local network",
+                "ARP requests are being sent too quickly"
+              ],
+              "answerIndex": 1,
+              "explanation": "Until the stale entry expires, your computer keeps sending to the old MAC, which no longer exists - so delivery fails intermittently. Once the entry expires and ARP re-asks, it learns the new MAC and the connection settles. This is why caches expire."
+            },
+            {
+              "id": "arp-cache-mcq-010",
+              "type": "mcq",
+              "prompt": "Two devices on the SAME local network are talking. After the asker learns the other's MAC, what is in the destination MAC of its data frames?",
+              "choices": [
+                "The gateway's MAC",
+                "The other device's own MAC",
+                "A broadcast to everyone",
+                "Its own MAC"
+              ],
+              "answerIndex": 1,
+              "explanation": "When both devices are on the same local network, delivery is direct: the frame carries the other device's actual MAC. The gateway is only involved when the destination is on a different network."
             }
           ]
         },
         {
-          "id": "arp-arp-gratuitous-spoof-ndp",
-          "title": "Gratuitous ARP, Proxy ARP, Spoofing & IPv6 NDP",
+          "id": "arp-arp-trust-and-ipv6",
+          "title": "ARP Spoofing, Gratuitous ARP & IPv6's NDP",
           "order": 3,
           "difficulty": 3,
-          "content": "**Gratuitous ARP (GARP)** is an unsolicited ARP announcement: a host broadcasts \"this IP is at *my* MAC\" without anyone asking. Uses: **IP conflict detection** (boot-time announce; if someone else replies, there's a duplicate), refreshing neighbors' caches, and **failover**. In **VRRP/HSRP**, when a backup router takes over the virtual IP, it sends a GARP so every switch and host updates to the new MAC instantly instead of waiting for cache aging — the mechanism behind near-seamless gateway failover.\n\n**Proxy ARP** lets a router answer ARP requests *on behalf of* hosts on another segment, replying with its own MAC so a misconfigured or split host still reaches them. Handy historically; today it's mostly a foot-gun that masks real subnet design problems.\n\n**ARP spoofing/poisoning** is the canonical L2 attack. ARP has **no authentication** — any host can send a forged reply claiming \"the gateway's IP is at *my* MAC.\" Victims cache the lie and send their traffic to the attacker, enabling man-in-the-middle or denial of service. Tools like `arpspoof` make it trivial; defenses are Dynamic ARP Inspection, DHCP snooping, and static entries. It works precisely because ARP trusts any reply.\n\n**IPv6 has no ARP.** Its replacement is the **Neighbor Discovery Protocol (NDP)**, carried inside **ICMPv6**. The four core messages: **Neighbor Solicitation/Advertisement (NS/NA)** do ARP's job (using multicast, not broadcast — IPv6 has no broadcast), and **Router Solicitation/Advertisement (RS/RA)** handle gateway discovery and feed SLAAC autoconfiguration. Finally, the ancestors: **RARP** (MAC -> IP, the reverse lookup for diskless boot) and **BOOTP** evolved into **DHCP** — the modern way hosts learn their own address, gateway, and DNS.",
+          "content": "ARP is wonderfully simple, but that simplicity has a downside: it is **trusting**. When a reply arrives saying \"this IP is at this MAC,\" ARP has no way to check whether that is true. It just believes it and saves it. That opens the door to a trick.\n\n**ARP spoofing (also called ARP poisoning).** An attacker on your local network sends a fake reply: \"the gateway's IP, 192.168.1.1, is at *my* MAC.\" Your device cannot tell it is a lie, so it caches the wrong MAC. Now traffic you meant for the gateway goes to the attacker instead. The attacker can quietly read it, change it, or block it - this is called a **man-in-the-middle** attack (someone secretly sitting between you and your destination). It works precisely because ARP trusts any reply. (Managed network switches offer defenses, but the takeaway for now is just *why* the trick is possible: ARP has no built-in proof.)\n\n**Gratuitous ARP.** Normally a device replies only when asked. A **gratuitous ARP** is an *unprompted* announcement: a device broadcasts \"this IP is at my MAC\" without anyone asking. It is used for friendly reasons - for example, to warn if two devices accidentally share the same IP, or to tell everyone \"a backup device has taken over this IP, please update your notebooks.\" (Interestingly, the spoofing trick above is a hostile misuse of the same \"announce a mapping\" idea.)\n\n**Proxy ARP** is a less common case where a router answers ARP requests on behalf of other devices, using its own MAC so traffic flows through it. You just need to recognize the name.\n\n**IPv6 does not use ARP at all.** The newer version of IP, called **IPv6**, replaces ARP with the **Neighbor Discovery Protocol (NDP)**. NDP does the same job - find the MAC for an address - but it asks a small targeted group instead of shouting to absolutely everyone. The idea is identical (find the hardware address for a logical one); only the newer mechanism differs.\n\n**Recap:** ARP trusts every reply, which makes ARP spoofing possible (an attacker lies about owning an IP to intercept traffic). Gratuitous ARP is an unprompted announcement used for conflict warnings and failover. IPv6 retires ARP in favor of NDP, which does the same lookup in a tidier way.",
           "items": [
             {
-              "id": "arp-gsn-fc-001",
-              "type": "flashcard",
-              "front": "What is a gratuitous ARP and name two uses.",
-              "back": "An unsolicited ARP announcing 'this IP is at my MAC' with no request. Uses: IP-conflict detection at boot, and failover (e.g., VRRP/HSRP) to instantly update neighbor caches to the new MAC.",
-              "hint": "Nobody asked, but here's my mapping."
-            },
-            {
-              "id": "arp-gsn-fc-002",
-              "type": "flashcard",
-              "front": "Why does VRRP/HSRP send a gratuitous ARP during failover?",
-              "back": "So switches and hosts immediately relearn that the virtual gateway IP now lives at the new active router's MAC, instead of waiting for stale entries to age out. Enables fast, near-seamless failover.",
-              "hint": "Refresh everyone's cache right now."
-            },
-            {
-              "id": "arp-gsn-fc-003",
-              "type": "flashcard",
-              "front": "What is proxy ARP?",
-              "back": "A router answering ARP requests on behalf of hosts on another segment, supplying its own MAC so traffic flows through it. Mostly historical / a workaround that hides real subnetting problems.",
-              "hint": "Router answers for someone else."
-            },
-            {
-              "id": "arp-gsn-fc-004",
-              "type": "flashcard",
-              "front": "Why does ARP spoofing work so easily?",
-              "back": "ARP has no authentication. Any host can send a forged unsolicited reply mapping the gateway's IP to the attacker's MAC; victims cache it blindly, enabling man-in-the-middle or DoS.",
-              "hint": "No way to verify a reply is legit."
-            },
-            {
-              "id": "arp-gsn-fc-005",
-              "type": "flashcard",
-              "front": "What replaces ARP in IPv6, and what protocol carries it?",
-              "back": "The Neighbor Discovery Protocol (NDP), carried inside ICMPv6. It uses multicast (IPv6 has no broadcast) instead of broadcast.",
-              "hint": "NDP over ICMPv6."
-            },
-            {
-              "id": "arp-gsn-fc-006",
-              "type": "flashcard",
-              "front": "Name the four core NDP message types and their roles.",
-              "back": "Neighbor Solicitation/Advertisement (NS/NA) = address resolution (ARP's job). Router Solicitation/Advertisement (RS/RA) = gateway discovery and SLAAC autoconfiguration parameters.",
-              "hint": "NS/NA for neighbors, RS/RA for routers."
-            },
-            {
-              "id": "arp-gsn-fc-007",
-              "type": "flashcard",
-              "front": "What are RARP and BOOTP, historically?",
-              "back": "RARP (Reverse ARP) maps a known MAC to an IP, used by diskless hosts to learn their own address. BOOTP extended that idea; both are ancestors of DHCP.",
-              "hint": "Early ways to get your own IP -> DHCP."
-            },
-            {
-              "id": "arp-gsn-mcq-001",
+              "id": "arp-trust-mcq-001",
               "type": "mcq",
-              "prompt": "An attacker on your LAN sends frames claiming the gateway IP 192.168.1.1 maps to the attacker's MAC. What is this, and why does it succeed?",
+              "prompt": "What is ARP spoofing (ARP poisoning)?",
               "choices": [
-                "Proxy ARP; routers are allowed to answer for any IP",
-                "ARP spoofing; ARP replies are unauthenticated and cached blindly",
-                "Gratuitous ARP for conflict detection; it's benign",
-                "RARP; it reverses the IP-to-MAC mapping"
+                "Sending too many ARP requests until the network slows down",
+                "An attacker sending a fake reply claiming someone else's IP is at the attacker's MAC",
+                "A device forgetting its ARP cache on purpose",
+                "Two devices accidentally getting the same MAC from the factory"
               ],
               "answerIndex": 1,
-              "explanation": "It's ARP spoofing/poisoning. Because ARP has no authentication, victims accept the forged reply and route their traffic through the attacker (MITM)."
+              "explanation": "ARP spoofing is lying: the attacker claims an IP (often the gateway's) maps to the attacker's MAC. Victims cache the lie and send their traffic to the attacker. Flooding requests is a different kind of problem.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/arp-5.svg"
             },
             {
-              "id": "arp-gsn-mcq-002",
+              "id": "arp-trust-mcq-002",
               "type": "mcq",
-              "prompt": "Which IPv6 NDP message pair performs the same function ARP did (resolving a neighbor's link-layer address)?",
+              "prompt": "Why does ARP spoofing work in the first place?",
               "choices": [
-                "Router Solicitation / Router Advertisement",
-                "Echo Request / Echo Reply",
-                "Neighbor Solicitation / Neighbor Advertisement",
-                "Discover / Offer"
-              ],
-              "answerIndex": 2,
-              "explanation": "NS/NA resolve an IPv6 address to a MAC, the direct analog of ARP request/reply. RS/RA handle router/gateway discovery instead."
-            },
-            {
-              "id": "arp-gsn-mcq-003",
-              "type": "mcq",
-              "prompt": "Why can't IPv6 NDP use broadcast the way ARP does?",
-              "choices": [
-                "IPv6 frames are too large for broadcast",
-                "IPv6 has no broadcast address; NDP uses multicast (solicited-node) instead",
-                "Broadcast is blocked by all IPv6 routers",
-                "NDP runs over TCP, which can't broadcast"
+                "Because ARP replies cannot be turned off",
+                "Because ARP has no way to check whether a reply is true; it trusts and caches it",
+                "Because the gateway approves every fake reply",
+                "Because MAC addresses are easy to guess"
               ],
               "answerIndex": 1,
-              "explanation": "IPv6 eliminated broadcast entirely. NDP relies on multicast (notably the solicited-node multicast group), which is more targeted than ARP's flood."
+              "explanation": "ARP has no built-in proof or authentication. A reply that says 'this IP is at this MAC' is simply believed and stored, so a forged reply is accepted just like a real one.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/arp-5.svg"
+            },
+            {
+              "id": "arp-trust-mcq-003",
+              "type": "mcq",
+              "prompt": "When an attacker successfully convinces your device that the gateway's IP is at the attacker's MAC, what happens to your traffic meant for the gateway?",
+              "choices": [
+                "It is deleted immediately",
+                "It goes to the attacker, who can read, change, or block it (a man-in-the-middle)",
+                "It is sent to every device on the network",
+                "It loops back to your own computer"
+              ],
+              "answerIndex": 1,
+              "explanation": "Your device now sends gateway-bound traffic to the attacker's MAC. Sitting in the middle, the attacker can secretly inspect, alter, or drop it - the classic man-in-the-middle position.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/arp-5.svg"
+            },
+            {
+              "id": "arp-trust-mcq-004",
+              "type": "mcq",
+              "prompt": "A 'man-in-the-middle' attack means what, in plain terms?",
+              "choices": [
+                "An attacker secretly positions themselves between you and your destination to see or alter traffic",
+                "A device that is too far from the gateway to connect",
+                "Two networks joined by a single cable",
+                "A backup router waiting to take over"
+              ],
+              "answerIndex": 0,
+              "explanation": "A man-in-the-middle quietly sits between two parties, so traffic passes through them. ARP spoofing is one way to get into that position on a local network."
+            },
+            {
+              "id": "arp-trust-mcq-005",
+              "type": "mcq",
+              "prompt": "What is a gratuitous ARP?",
+              "choices": [
+                "An ARP request sent to the wrong device by mistake",
+                "An unprompted announcement: a device broadcasts 'this IP is at my MAC' without being asked",
+                "An ARP reply that contains no MAC address",
+                "A request that must be paid for"
+              ],
+              "answerIndex": 1,
+              "explanation": "Normally a device answers only when asked. A gratuitous ARP is volunteered with no question - the device simply announces its IP-to-MAC mapping to everyone."
+            },
+            {
+              "id": "arp-trust-mcq-006",
+              "type": "mcq",
+              "prompt": "Which of these is a normal, friendly use of gratuitous ARP?",
+              "choices": [
+                "Stealing another device's traffic",
+                "Warning that two devices may be using the same IP, or announcing that a backup device has taken over an IP",
+                "Encrypting all data on the network",
+                "Speeding up the Internet connection"
+              ],
+              "answerIndex": 1,
+              "explanation": "Gratuitous ARP is used for helpful things like detecting duplicate IPs and telling everyone to update their cache after a failover. (The spoofing attack is a hostile misuse of the same 'announce a mapping' idea.)"
+            },
+            {
+              "id": "arp-trust-mcq-007",
+              "type": "mcq",
+              "prompt": "What is proxy ARP, briefly?",
+              "choices": [
+                "A router answering ARP requests on behalf of other devices, using its own MAC",
+                "A faster version of ARP for big networks",
+                "An ARP message that hides the sender's IP",
+                "A backup copy of the ARP cache"
+              ],
+              "answerIndex": 0,
+              "explanation": "With proxy ARP, a router replies to ARP requests for other devices, giving its own MAC so traffic flows through it. For now you just need to recognize the term."
+            },
+            {
+              "id": "arp-trust-mcq-008",
+              "type": "mcq",
+              "prompt": "Does IPv6 (the newer version of IP) use ARP?",
+              "choices": [
+                "Yes, exactly the same ARP as before",
+                "No - IPv6 replaces ARP with the Neighbor Discovery Protocol (NDP)",
+                "Yes, but only for far-away devices",
+                "No - IPv6 does not need to find MAC addresses at all"
+              ],
+              "answerIndex": 1,
+              "explanation": "IPv6 retires ARP and uses NDP (Neighbor Discovery Protocol) instead. NDP still needs to find a device's MAC; it just uses a newer, tidier mechanism."
+            },
+            {
+              "id": "arp-trust-mcq-009",
+              "type": "mcq",
+              "prompt": "What job does IPv6's NDP do that is the same as ARP's job?",
+              "choices": [
+                "Finding the MAC (hardware) address for a known logical address on the local network",
+                "Choosing the cheapest Internet provider",
+                "Turning a website name into an IP address",
+                "Encrypting the data inside each frame"
+              ],
+              "answerIndex": 0,
+              "explanation": "NDP does the same core lookup ARP did - resolve a logical address to a hardware (MAC) address on the local network. The underlying idea is identical; only the newer method differs (it asks a targeted group rather than shouting to absolutely everyone)."
+            },
+            {
+              "id": "arp-trust-mcq-010",
+              "type": "mcq",
+              "prompt": "A teammate suggests defending against ARP spoofing by 'making ARP check that each reply is genuine.' Why is plain ARP unable to do that on its own?",
+              "choices": [
+                "Because ARP only runs on weekends",
+                "Because ARP has no built-in way to prove a reply is true - it simply trusts and caches whatever it receives",
+                "Because ARP replies are always encrypted",
+                "Because the gateway blocks all ARP replies"
+              ],
+              "answerIndex": 1,
+              "explanation": "Plain ARP carries no proof of identity, so it cannot tell a real reply from a forged one. Defenses against spoofing therefore come from outside ARP itself, such as features on managed network switches."
             }
           ]
         }
