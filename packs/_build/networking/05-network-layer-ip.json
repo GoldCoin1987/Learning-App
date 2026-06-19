@@ -8,88 +8,133 @@
       "title": "The IPv4 Header, Field by Field",
       "order": 1,
       "difficulty": 1,
-      "content": "IP is the **thin waist** of the Internet: everything rides over IP, and IP rides over everything. The IPv4 header is normally 20 bytes (no options) and you should be able to read it from a hex dump the way you once read a radar pulse's framing bits.\n\nWalking the header top to bottom:\n\n- **Version (4 bits)** = 4 for IPv4.\n- **IHL (4 bits)** = header length in 32-bit words. Minimum value 5 (20 bytes); larger only when **options** are present.\n- **DSCP/ECN (8 bits)** = the old Type of Service byte. The top 6 bits (DSCP) mark QoS class; the low 2 bits (ECN) let routers signal congestion *without dropping*.\n- **Total Length (16 bits)** = entire datagram (header + payload) in bytes; caps a single datagram at 65,535.\n- **Identification / Flags / Fragment Offset** = the fragmentation machinery (next lesson). Flags include **DF** (Don't Fragment) and **MF** (More Fragments).\n- **TTL (8 bits)** = decremented at every hop; hits zero and the packet is discarded with an ICMP message. This is what stops L3 routing loops.\n- **Protocol (8 bits)** = what's inside: 1=ICMP, 6=TCP, 17=UDP.\n- **Header Checksum (16 bits)** = covers the header *only*; because TTL changes each hop, every router recomputes it.\n- **Source / Destination Address (32 bits each)**.\n- **Options + padding** = rare, security/diagnostics; their presence is why IHL exists.\n\nNote what is **not** here: no sequence numbers, no acknowledgements, no ports. IP is connectionless and best-effort. Reliability and process addressing are the transport layer's job.",
+      "content": "So far, everything you have learned moves data **within one local network**. Switches and MAC addresses are like the mail room of a single building: they hand notes from desk to desk, but only inside that building. They have no idea how to reach an office across the country.\n\nThe **network layer** (also called the **Internet layer**) is the part that solves the bigger problem: getting data **across many connected networks** to a computer **anywhere in the world**. That ability to link separate networks together is exactly what gives the *inter-net* its name.\n\nTo make this work, every device gets an **IP address** (Internet Protocol address) - a logical, world-wide address, like 192.168.1.5. Think of it as a **postal address**: while a MAC address is more like a person's name (it identifies the device but doesn't tell the world where it is), an IP address tells the whole network *how to route data to you*.\n\nAn **IPv4 address** is 32 bits long, but we write it as **four numbers from 0 to 255, separated by dots** - for example 192.168.1.5. Each of the four numbers is one 8-bit chunk (an **octet**).\n\nHow does data actually get there? Special devices called **routers** sit between networks. When you send data, your computer wraps it into a **packet** and the packet carries a **source IP** (you) and a **destination IP** (the far computer). Each router reads the destination IP and passes the packet on to the next network, one hop closer - like a parcel handed from one sorting center to the next until it reaches the right town.\n\nThe label a router reads is the **header**, written in plain terms it contains: the **source IP**, the **destination IP**, a **TTL** (a hop limit, covered next), and a **protocol** field that says what kind of data is inside. There is also a small **header checksum** that lets a router catch a corrupted label. The actual data rides behind the header, sealed inside like a letter in an envelope.\n\n**Recap:** The network layer carries data across many networks to reach a device anywhere. Every device has an IP address (32 bits, written a.b.c.d); packets carry a source and destination IP; routers read the destination and forward each packet network-to-network until it arrives.",
       "items": [
         {
-          "id": "network-layer-ip-ipv4-header-001",
-          "type": "flashcard",
-          "front": "How long is an IPv4 header with no options, and what field tells you its length?",
-          "back": "20 bytes with no options. The IHL (Internet Header Length) field gives the length in 32-bit words: minimum 5 (5 x 4 = 20 bytes). IHL > 5 means options are present (up to 60 bytes total).",
-          "hint": "IHL counts 32-bit words.",
-          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/network-layer-ip-1.svg"
-        },
-        {
-          "id": "network-layer-ip-ipv4-header-002",
-          "type": "flashcard",
-          "front": "What does the Protocol field identify, and give three common values.",
-          "back": "It identifies the encapsulated upper-layer payload so the receiver knows how to demultiplex it. Common values: 1 = ICMP, 6 = TCP, 17 = UDP.",
-          "hint": "It points at the next header up the stack."
-        },
-        {
-          "id": "network-layer-ip-ipv4-header-003",
-          "type": "flashcard",
-          "front": "The IPv4 header checksum covers what, and why must every router recompute it?",
-          "back": "It covers the header only, not the payload. Because TTL is decremented at every hop, the header changes, so each router must recompute the checksum. (TCP/UDP carry their own checksums covering the data.)",
-          "hint": "TTL changes each hop."
-        },
-        {
-          "id": "network-layer-ip-ipv4-header-004",
-          "type": "flashcard",
-          "front": "What is the DSCP/ECN byte, and what was it formerly called?",
-          "back": "Formerly the Type of Service (ToS) byte. The high 6 bits are DSCP (Differentiated Services Code Point) for QoS classification; the low 2 bits are ECN (Explicit Congestion Notification), letting routers signal congestion by marking packets instead of dropping them.",
-          "hint": "6 bits class + 2 bits congestion."
-        },
-        {
-          "id": "network-layer-ip-ipv4-header-005",
+          "id": "network-layer-ip-ipv4-header-mcq-001",
           "type": "mcq",
-          "prompt": "An IPv4 header's first byte is 0x45. What does this tell you?",
+          "prompt": "What does the network layer (Internet layer) do that the data link layer (switches, MAC addresses) cannot?",
           "choices": [
-            "Version 4, IHL 5 (a 20-byte header with no options)",
-            "Version 5, with DSCP set to expedited forwarding",
-            "TTL of 69 hops remaining",
-            "Protocol 69, an experimental transport"
+            "Carry data across many connected networks to a device anywhere in the world",
+            "Move data faster between two desks in the same room",
+            "Turn a website name like example.com into an address",
+            "Detect which physical cable is unplugged"
           ],
           "answerIndex": 0,
-          "explanation": "The high nibble (4) is the Version and the low nibble (5) is the IHL. IHL=5 means 5 x 32-bit words = 20 bytes, i.e. no options. 0x45 is the canonical first byte of an ordinary IPv4 packet."
+          "explanation": "The data link layer only moves data within one local network (one 'building'). The network layer adds global, routable addressing so data can hop across many separate networks to reach a computer anywhere - that is what makes it the inter-net. Turning names into addresses is a different job (DNS).",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/network-layer-ip-2.svg"
         },
         {
-          "id": "network-layer-ip-ipv4-header-006",
+          "id": "network-layer-ip-ipv4-header-mcq-002",
           "type": "mcq",
-          "prompt": "Which of these is NOT carried in the IPv4 header?",
+          "prompt": "What is an IP address?",
           "choices": [
-            "Source port number",
-            "Time To Live",
-            "Protocol number",
-            "Destination address"
+            "A logical, routable address that tells the network how to reach a device, like a postal address",
+            "The permanent hardware address burned into a network card",
+            "The name of the company that made the device",
+            "A password that lets a device join the network"
           ],
           "answerIndex": 0,
-          "explanation": "Ports live in the transport header (TCP/UDP), not in IP. IP addresses hosts; ports address processes. This separation is exactly the connectionless, best-effort nature of IP: it has no notion of a connection or a process endpoint."
+          "explanation": "An IP (Internet Protocol) address is a logical address used to route data across networks - like a postal address that tells the whole world how to deliver mail to you. The permanent hardware address is the MAC address, which only works on the local network.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/network-layer-ip-3.svg"
         },
         {
-          "id": "network-layer-ip-ipv4-header-007",
+          "id": "network-layer-ip-ipv4-header-mcq-003",
           "type": "mcq",
-          "prompt": "What is the maximum value of the Total Length field, and what does it bound?",
+          "prompt": "How is an IPv4 address written, and how many bits is it?",
           "choices": [
-            "65,535 bytes, the size of a single IP datagram (header + payload)",
-            "1,500 bytes, the Ethernet MTU",
-            "1,460 bytes, the TCP maximum segment size",
-            "4,294,967,295 bytes, since it is a 32-bit counter"
+            "Four numbers from 0 to 255 separated by dots (a.b.c.d); 32 bits total",
+            "Six pairs of hex digits separated by colons; 48 bits total",
+            "Eight groups of hex digits separated by colons; 128 bits total",
+            "A single number from 0 to 255; 8 bits total"
           ],
           "answerIndex": 0,
-          "explanation": "Total Length is 16 bits, so the maximum datagram is 2^16 - 1 = 65,535 bytes including the header. The 1,500-byte limit is the link-layer MTU, a separate constraint that drives fragmentation."
+          "explanation": "An IPv4 address is 32 bits, written for humans as four 8-bit numbers (each 0-255) separated by dots, e.g. 192.168.1.5. Six hex pairs describe a MAC address (48 bits); eight hex groups describe an IPv6 address (128 bits).",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/network-layer-ip-3.svg"
         },
         {
-          "id": "network-layer-ip-ipv4-header-008",
+          "id": "network-layer-ip-ipv4-header-mcq-004",
           "type": "mcq",
-          "prompt": "Why does IP provide no acknowledgements, sequence numbers, or retransmission?",
+          "prompt": "Which of these is a valid IPv4 address?",
           "choices": [
-            "IP is connectionless and best-effort by design; reliability is delegated to the transport layer (TCP) or the application",
-            "Those features were removed in IPv4 to save header space and never existed",
-            "Routers strip them to speed up forwarding",
-            "They are present but only used when the DF flag is set"
+            "192.168.1.5",
+            "300.1.1.1",
+            "192.168.1",
+            "aa:bb:cc:dd:ee:ff"
           ],
           "answerIndex": 0,
-          "explanation": "IP deliberately offers only best-effort, connectionless delivery: it will try to deliver a datagram but makes no guarantees about ordering, duplication, or loss. The end-to-end principle pushes reliability to the edges (TCP), keeping the network core simple and fast."
+          "explanation": "Each of the four numbers must be 0-255, so 300 is invalid (over 255), '192.168.1' is missing its fourth number, and aa:bb:cc:dd:ee:ff is a MAC address, not an IP. 192.168.1.5 fits the a.b.c.d pattern with every part in range.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/network-layer-ip-3.svg"
+        },
+        {
+          "id": "network-layer-ip-ipv4-header-mcq-005",
+          "type": "mcq",
+          "prompt": "What is a router's main job?",
+          "choices": [
+            "Read a packet's destination IP and pass it on toward the next network, one hop closer",
+            "Store every web page so devices do not have to download them again",
+            "Give each device its permanent MAC address",
+            "Translate a website name into an IP address"
+          ],
+          "answerIndex": 0,
+          "explanation": "A router sits between networks. It reads the destination IP on each packet and forwards it to the next network on the way to its destination - like a parcel handed from sorting center to sorting center. Switches stay inside one network; routers connect networks together.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/network-layer-ip-2.svg"
+        },
+        {
+          "id": "network-layer-ip-ipv4-header-mcq-006",
+          "type": "mcq",
+          "prompt": "A packet leaves your PC and crosses three routers to reach a distant server. What stays the same on the packet the entire way?",
+          "choices": [
+            "The source IP and destination IP it carries",
+            "The cable it travels on",
+            "The router it is sitting in",
+            "Nothing - the whole packet is rebuilt from scratch at each router"
+          ],
+          "answerIndex": 0,
+          "explanation": "The packet keeps the same source and destination IP from end to end - that is how every router along the way knows where it is ultimately headed. The physical links and the local hardware addresses change hop to hop, but the IP destination is the constant goal.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/network-layer-ip-2.svg"
+        },
+        {
+          "id": "network-layer-ip-ipv4-header-mcq-007",
+          "type": "mcq",
+          "prompt": "The IP header is often compared to the address written on an envelope. In that comparison, what is the 'letter inside'?",
+          "choices": [
+            "The data (payload) the packet is carrying",
+            "The source IP address",
+            "The router that forwards the packet",
+            "The checksum that guards the header"
+          ],
+          "answerIndex": 0,
+          "explanation": "The header is the addressing label (source IP, destination IP, and so on); the data being carried rides behind it, sealed inside like a letter in an envelope. A router only needs to read the header (the envelope) to forward the packet; it does not need to open the letter.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/network-layer-ip-4.svg"
+        },
+        {
+          "id": "network-layer-ip-ipv4-header-mcq-008",
+          "type": "mcq",
+          "prompt": "Which set of items lives in the IP header?",
+          "choices": [
+            "Source IP, destination IP, TTL (hop limit), and a protocol field",
+            "Your WiFi password and the name of the network",
+            "The full text of the web page being requested",
+            "The serial number of every router on the path"
+          ],
+          "answerIndex": 0,
+          "explanation": "The header carries the addressing and delivery information a router needs: the source IP, the destination IP, a TTL (hop limit), and a protocol field saying what kind of data is inside (plus a small header checksum). The actual content is the payload behind the header, not part of it.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/network-layer-ip-4.svg"
+        },
+        {
+          "id": "network-layer-ip-ipv4-header-mcq-009",
+          "type": "mcq",
+          "prompt": "Why is a MAC address NOT enough to reach a computer on the other side of the world?",
+          "choices": [
+            "A MAC address only identifies a device on its local network; it does not tell routers which network the device is on",
+            "MAC addresses change every few seconds, so they expire too quickly",
+            "MAC addresses are too short to fit inside a packet",
+            "MAC addresses only work over WiFi, never over cables"
+          ],
+          "answerIndex": 0,
+          "explanation": "A MAC address is like a person's name: it identifies a device but says nothing about where in the world it sits. Routers forward by network, and a MAC has no network information. The IP address is the routable, location-aware address that lets data cross network after network.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/network-layer-ip-2.svg"
         }
       ]
     },
@@ -98,87 +143,125 @@
       "title": "Fragmentation, MTU & Path MTU Discovery",
       "order": 2,
       "difficulty": 2,
-      "content": "Every link has a **Maximum Transmission Unit (MTU)** — the largest payload its frames can carry. Classic Ethernet is 1500 bytes. When an IP datagram is larger than the next link's MTU, IPv4 can **fragment** it.\n\nFragmentation uses three header fields together:\n\n- **Identification** — all fragments of one original datagram share this value, so the destination can group them.\n- **Flags** — **MF** (More Fragments) is set on every fragment except the last; **DF** (Don't Fragment) forbids fragmentation entirely.\n- **Fragment Offset** — where this fragment's data sits in the original, measured in 8-byte units.\n\nReassembly happens **only at the final destination**, never at intermediate routers, and if any fragment is lost the whole datagram is dropped. Fragmentation is therefore avoided today: it hurts performance and is a security headache.\n\nThe modern alternative is **Path MTU Discovery (PMTUD)**: the sender sets **DF=1** and sends a large packet. If a router along the path has a smaller MTU, it drops the packet and returns an **ICMP \"Fragmentation Needed\"** message stating the link MTU. The sender shrinks its packets and retries.\n\nPMTUD's notorious failure is the **PMTU black hole**: a misconfigured firewall silently blocks the ICMP Fragmentation-Needed messages. The sender never learns to shrink, keeps sending oversized DF packets that keep getting dropped, and the connection stalls. This is endemic in **VPNs and tunnels**, where encapsulation overhead shrinks the effective MTU. The classic symptom — small packets (ping, SSH login) work but large transfers (file copy, web pages) hang — is the giveaway that you are chasing a PMTU/fragmentation problem, not a routing or DNS problem.",
+      "content": "When you mail a postcard, the postal service *tries* to deliver it - but it does not promise. It could get lost, and two copies of a flyer might both show up. IP works the same way. This is called **best-effort, connectionless delivery**.\n\n**Best-effort** means IP will try its hardest to deliver each packet but makes **no guarantee**. A packet can be **lost**, **duplicated**, or **arrive out of order**. **Connectionless** means each packet is sent on its own, with no setup call beforehand and no memory of past packets - like dropping separate postcards in a mailbox rather than holding a phone conversation.\n\nThat may sound unreliable, and on its own it is. The fix comes later: a higher layer called **TCP** adds the guarantees (resending lost packets, putting them back in order). IP stays simple and fast; reliability is added on top when needed.\n\nNow, about those addresses. An IP address actually splits into two parts: a **network part** (which network you are on) and a **host part** (which device on that network). It is like a street name plus a house number. Routers care mostly about the network part to get a packet to the right network; the host part picks the exact device once it arrives. Exactly where the split falls is decided by the *subnet*, the subject of the next sub-topic.\n\nThere are also two flavors of IPv4 address. **Public** addresses are unique across the whole Internet. **Private** addresses are reserved for use *inside* homes and offices and are never routed on the public Internet. The common private ranges (defined by a rule called RFC 1918) are **10.x.x.x** (written 10.0.0.0/8), **172.16.x.x-172.31.x.x**, and **192.168.x.x** (192.168.0.0/16) - which is why so many home devices start with 192.168. A trick called **NAT** lets many private devices share one public address; that gets its own treatment later.\n\nOne more practical wrinkle. Each link can only carry packets up to a certain size, called the **MTU (Maximum Transmission Unit)** - on common networks about 1500 bytes. If a packet is too big for the next link, IPv4 can **fragment** it (chop it into smaller pieces that are reassembled at the destination). Fragmentation is avoided today because it is slow and fragile, but the idea is worth knowing.\n\n**Recap:** IP is best-effort and connectionless - it tries but makes no promises, so packets can be lost, duplicated, or reordered (TCP fixes that later). An address has a network part and a host part. Private ranges like 192.168.x.x are used inside homes and offices, and oversized packets may be fragmented to fit a link's MTU.",
       "items": [
         {
-          "id": "network-layer-ip-fragmentation-mtu-001",
-          "type": "flashcard",
-          "front": "What is an MTU, and what is the typical Ethernet value?",
-          "back": "Maximum Transmission Unit: the largest payload a link's frame can carry. Standard Ethernet MTU is 1500 bytes. A datagram larger than the next-hop MTU must be fragmented or rejected (if DF is set).",
-          "hint": "Largest payload one frame can carry."
-        },
-        {
-          "id": "network-layer-ip-fragmentation-mtu-002",
-          "type": "flashcard",
-          "front": "Which three IPv4 fields cooperate to perform fragmentation and reassembly?",
-          "back": "Identification (shared by all fragments of one datagram), Flags (MF = More Fragments on all but the last; DF = Don't Fragment), and Fragment Offset (position in the original, in 8-byte units).",
-          "hint": "ID groups them, offset orders them, MF marks the end."
-        },
-        {
-          "id": "network-layer-ip-fragmentation-mtu-003",
-          "type": "flashcard",
-          "front": "Where are IP fragments reassembled, and what happens if one is lost?",
-          "back": "Only at the final destination host — never at intermediate routers. If any single fragment is lost, the destination cannot reassemble and discards the entire datagram, forcing the upper layer to resend all of it.",
-          "hint": "Endpoints only; all-or-nothing."
-        },
-        {
-          "id": "network-layer-ip-fragmentation-mtu-004",
-          "type": "flashcard",
-          "front": "How does Path MTU Discovery (PMTUD) work?",
-          "back": "The sender sets DF=1 on packets. A router whose outgoing link is too small drops the packet and replies with ICMP Type 3 Code 4 (Destination Unreachable: Fragmentation Needed), reporting the next-hop MTU. The sender lowers its packet size and retries, converging on the smallest MTU along the path.",
-          "hint": "DF=1 plus an ICMP that reports the link MTU."
-        },
-        {
-          "id": "network-layer-ip-fragmentation-mtu-005",
+          "id": "network-layer-ip-fragmentation-mtu-mcq-001",
           "type": "mcq",
-          "prompt": "Ping to a server succeeds and SSH logins work, but large file transfers and many web pages stall completely. What is the most likely cause?",
+          "prompt": "What does it mean that IP delivery is \"best-effort\"?",
           "choices": [
-            "A Path MTU / fragmentation problem (likely a PMTUD black hole on a tunnel or VPN)",
-            "The destination's DNS records are stale",
-            "TTL is set too low to reach the server",
-            "The routing table is missing a default route"
+            "IP tries to deliver each packet but makes no guarantee - packets can be lost, duplicated, or arrive out of order",
+            "IP guarantees every packet arrives exactly once, in order",
+            "IP only delivers packets when the network is completely idle",
+            "IP delivers the most important packets first and discards the rest"
           ],
           "answerIndex": 0,
-          "explanation": "Small packets fit any MTU and pass fine, so reachability (ping, login handshake) works. Large packets exceed a smaller path MTU; with DF set they are dropped, and if the ICMP Fragmentation-Needed messages are filtered the sender never shrinks them — a PMTU black hole. This pattern is the textbook signature of an MTU/fragmentation issue, common with VPNs and tunnels."
+          "explanation": "Best-effort means IP makes its best attempt but promises nothing: a packet may be lost, may show up twice, or may arrive in a different order than it was sent. Guarantees like ordered, exactly-once delivery are added later by TCP, not by IP itself."
         },
         {
-          "id": "network-layer-ip-fragmentation-mtu-006",
+          "id": "network-layer-ip-fragmentation-mtu-mcq-002",
           "type": "mcq",
-          "prompt": "What is a PMTU \"black hole\"?",
+          "prompt": "What does \"connectionless\" mean for IP?",
           "choices": [
-            "A firewall silently drops the ICMP Fragmentation-Needed messages, so the sender never learns to shrink its DF packets and they keep being discarded",
-            "A router with a routing loop swallows packets until TTL expires",
-            "An IP address range that is unrouteable on the public Internet",
-            "A buffer overflow that consumes oversized datagrams"
+            "Each packet is sent on its own, with no prior setup and no memory of earlier packets",
+            "Devices must dial a connection and keep it open before any packet is sent",
+            "Packets can only be sent while a cable is physically connected",
+            "Only one device on the network can send at a time"
           ],
           "answerIndex": 0,
-          "explanation": "PMTUD depends on ICMP feedback. If a misconfigured firewall blocks the ICMP Type 3 Code 4 messages, the sender never receives the signal to reduce packet size; its oversized DF packets are dropped at the bottleneck link with no error returned, so large transfers hang indefinitely."
+          "explanation": "Connectionless means IP does not set up a session first; it just sends each packet independently, like dropping separate postcards in a mailbox. There is no 'phone call' established beforehand and no built-in memory linking one packet to the next."
         },
         {
-          "id": "network-layer-ip-fragmentation-mtu-007",
+          "id": "network-layer-ip-fragmentation-mtu-mcq-003",
           "type": "mcq",
-          "prompt": "A datagram arrives at a router whose outbound link MTU is smaller than the packet, and the packet has DF=1. What does the router do?",
+          "prompt": "If IP can lose, duplicate, or reorder packets, how do applications still get reliable, in-order data?",
           "choices": [
-            "Drop the packet and send back ICMP Destination Unreachable: Fragmentation Needed",
-            "Fragment it anyway and clear the DF bit",
-            "Buffer it until a larger-MTU path becomes available",
-            "Forward it unchanged and let the next hop deal with it"
+            "A higher layer, TCP, adds reliability on top of IP - resending lost packets and reordering them",
+            "IP secretly guarantees delivery; 'best-effort' is just a name",
+            "Routers store every packet forever so nothing is ever lost",
+            "Applications simply accept that data is often wrong"
           ],
           "answerIndex": 0,
-          "explanation": "DF=1 forbids fragmentation. The router cannot shrink the packet, so it discards it and returns ICMP Type 3 Code 4 (Fragmentation Needed) reporting the link MTU. This is exactly the feedback PMTUD relies on; if it is blocked, you get a black hole."
+          "explanation": "IP stays simple and best-effort on purpose. When an application needs guarantees, it uses TCP, which sits on top of IP and handles resending lost packets and putting them back in order. This keeps the network core fast while still allowing reliable communication when needed."
         },
         {
-          "id": "network-layer-ip-fragmentation-mtu-008",
+          "id": "network-layer-ip-fragmentation-mtu-mcq-004",
           "type": "mcq",
-          "prompt": "Why do VPNs and tunnels so often trigger MTU problems?",
+          "prompt": "An IP address splits into two parts. What are they?",
           "choices": [
-            "Encapsulation adds header overhead, reducing the effective MTU below 1500, so packets sized for plain Ethernet no longer fit",
-            "Tunnels disable the TTL field, allowing infinite-size packets",
-            "VPN encryption increases the Total Length field beyond 65,535 bytes",
-            "Tunnels always use a fixed 576-byte MTU mandated by IPv4"
+            "A network part (which network) and a host part (which device on it)",
+            "A public part and a secret part",
+            "A sending half and a receiving half",
+            "A name part and a password part"
           ],
           "answerIndex": 0,
-          "explanation": "A tunnel wraps each original packet in additional outer headers (e.g. IPsec, GRE, WireGuard). Those bytes eat into the 1500-byte budget, so the inner effective MTU drops (often to ~1400). Packets sized for 1500 with DF set then fail to traverse the tunnel, and if PMTUD's ICMP is blocked the transfer black-holes."
+          "explanation": "An IP address has a network part and a host part - like a street name plus a house number. Routers use the network part to get a packet to the right network; the host part identifies the exact device once it arrives. Where the split falls is set by the subnet (next sub-topic).",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/network-layer-ip-3.svg"
+        },
+        {
+          "id": "network-layer-ip-fragmentation-mtu-mcq-005",
+          "type": "mcq",
+          "prompt": "Your home devices have addresses like 192.168.1.5 and 192.168.1.42. What kind of addresses are these?",
+          "choices": [
+            "Private addresses, reserved for use inside homes and offices and not routed on the public Internet",
+            "Public addresses, unique across the whole Internet",
+            "Invalid addresses that should never appear",
+            "Temporary addresses that expire after one packet"
+          ],
+          "answerIndex": 0,
+          "explanation": "192.168.x.x is one of the reserved private ranges (RFC 1918), used inside local networks. Private addresses are not unique worldwide and are not routed on the public Internet. Public addresses are the globally unique ones; a trick called NAT lets many private devices share one public address."
+        },
+        {
+          "id": "network-layer-ip-fragmentation-mtu-mcq-006",
+          "type": "mcq",
+          "prompt": "Which of these is one of the private IPv4 ranges used inside homes and offices?",
+          "choices": [
+            "10.0.0.0/8 (the 10.x.x.x addresses)",
+            "8.8.8.8 only",
+            "Every address starting with 1",
+            "203.0.113.0 through 203.0.113.255 by default"
+          ],
+          "answerIndex": 0,
+          "explanation": "The private ranges defined by RFC 1918 are 10.x.x.x (10.0.0.0/8), 172.16.x.x-172.31.x.x, and 192.168.x.x. The 10.x range is common in larger offices. 8.8.8.8 is a public address; the 203.0.113.x block is a documentation example, not a general private range."
+        },
+        {
+          "id": "network-layer-ip-fragmentation-mtu-mcq-007",
+          "type": "mcq",
+          "prompt": "What is an MTU?",
+          "choices": [
+            "The largest packet size a given link can carry (about 1500 bytes on common networks)",
+            "The number of routers a packet is allowed to cross",
+            "The speed of the connection in megabits per second",
+            "The maximum number of devices allowed on a network"
+          ],
+          "answerIndex": 0,
+          "explanation": "MTU (Maximum Transmission Unit) is the biggest packet a link can carry in one piece - commonly around 1500 bytes. It is a size limit, not a speed or a hop count. A packet larger than the next link's MTU must be fragmented (or rejected)."
+        },
+        {
+          "id": "network-layer-ip-fragmentation-mtu-mcq-008",
+          "type": "mcq",
+          "prompt": "What does it mean to \"fragment\" an IP packet?",
+          "choices": [
+            "Split it into smaller pieces so it fits a link's MTU, then reassemble it at the destination",
+            "Encrypt it so routers in the middle cannot read it",
+            "Throw it away because it is too large to handle",
+            "Copy it to several destinations at once"
+          ],
+          "answerIndex": 0,
+          "explanation": "Fragmentation chops an oversized packet into smaller pieces that each fit the link's MTU; the destination puts the pieces back together. It is avoided in modern networks because it is slow and fragile (losing one piece loses the whole packet), but the concept explains many size-related problems."
+        },
+        {
+          "id": "network-layer-ip-fragmentation-mtu-mcq-009",
+          "type": "mcq",
+          "prompt": "Why might a network use private addresses (like 192.168.x.x) plus NAT instead of giving every device a public address?",
+          "choices": [
+            "There are not enough public IPv4 addresses to go around, so devices share using private addresses and NAT",
+            "Private addresses travel faster than public ones",
+            "Public addresses are illegal inside a home",
+            "NAT makes the data link layer unnecessary"
+          ],
+          "answerIndex": 0,
+          "explanation": "IPv4 has a limited supply of public addresses. Homes and offices use private addresses internally and rely on NAT to let many devices share a single public address when reaching the Internet. (The long-term fix for address scarcity is IPv6, which has its own sub-topic.)"
         }
       ]
     },
@@ -187,87 +270,127 @@
       "title": "TTL, ICMP & the Forwarding/Routing Split",
       "order": 3,
       "difficulty": 3,
-      "content": "**TTL** (Time To Live) is decremented by one at every router. When it reaches zero the packet is discarded and the router sends back **ICMP Time Exceeded**. This is what prevents L3 routing loops — contrast Ethernet at L2, which has *no* hop counter and relies on Spanning Tree to break loops.\n\n**ICMP** is IP's signaling companion (protocol 1). Key messages:\n- **Echo Request / Echo Reply** — `ping`; reachability and RTT.\n- **Time Exceeded** — TTL hit zero; the engine behind **traceroute**.\n- **Destination Unreachable** — no route, host down, or port closed.\n- **Fragmentation Needed** (a Destination-Unreachable code) — PMTUD's feedback.\n- **Redirect** — a router telling a host a better next hop exists.\n\n**Traceroute** exploits TTL: send a packet with TTL=1, the first router decrements it to 0 and returns Time Exceeded (revealing hop 1); TTL=2 reveals hop 2; and so on, mapping the path hop by hop.\n\nThe **forwarding decision** at each router is **longest-prefix match**: the destination IP is compared against every routing-table prefix, and the entry with the most specific (longest) matching prefix wins. A `/0` default route is the fallback when nothing more specific matches.\n\nFinally, the architectural distinction the whole modern stack builds on: **forwarding** is the per-packet **data plane** — fast, local, \"which interface does this packet leave by?\" **Routing** is the **control plane** — building and maintaining the table via protocols like OSPF and BGP. Forwarding consults the table; routing populates it. Separating the two is the conceptual seed of SDN.",
+      "content": "Here is a worry: if routers just keep passing packets along, what stops a lost packet from going in circles forever? Picture a misconfigured network where Router A sends to B, B sends back to A, and the packet bounces between them endlessly, slowly clogging the network. Something has to stop it.\n\nThat something is the **TTL (Time To Live)** field in every packet's header. Despite the name, it is really a **hop limit**: a small number (often starting at 64) that **every router subtracts 1 from** as it forwards the packet. When the TTL reaches **0**, the router throws the packet away instead of forwarding it again. So a packet stuck in a loop counts down and dies, rather than circling forever. TTL is the safety valve that keeps lost packets from piling up.\n\nWhen a router drops a packet because its TTL hit 0, it usually sends a little notice back to the sender saying \"your packet expired before reaching the destination.\" That notice is an **ICMP** message. **ICMP (Internet Control Message Protocol)** is IP's built-in messenger for status and error reports - it does not carry your data, it carries news *about* delivery. You have probably used it without knowing: the **ping** command sends an ICMP \"are you there?\" and listens for an \"I'm here\" reply, which is how you check whether another computer is reachable.\n\nLet's also be precise about the two jobs a router does, because people mix them up:\n\n- **Forwarding** is the moment-to-moment action: a packet arrives, the router reads its destination IP and immediately sends it out the right direction toward the next network. This happens for every single packet, very fast.\n- **Routing** is the slower background work of *figuring out the map* - learning which networks exist and what the best next step is for each. The result is stored in a **routing table** the router consults when forwarding.\n\nA simple way to remember it: **forwarding moves one packet now; routing builds the map that forwarding uses.** Pulling these two apart cleanly is an idea modern networks lean on heavily.\n\n**Recap:** TTL is a hop limit that every router decrements; at 0 the packet is dropped so it cannot loop forever. ICMP is IP's messenger for status and errors (ping uses it). Forwarding is sending each packet onward right now; routing is building the table that tells forwarding where to send.",
       "items": [
         {
-          "id": "network-layer-ip-icmp-forwarding-001",
-          "type": "flashcard",
-          "front": "How does TTL prevent routing loops at L3, and why does Ethernet need a different mechanism?",
-          "back": "Each router decrements TTL by 1; at zero the packet is dropped (and ICMP Time Exceeded is sent), so a looping packet eventually dies. Ethernet frames have no hop counter, so an L2 loop would circulate forever — which is why switches need Spanning Tree Protocol to break loops.",
-          "hint": "L3 has a counter; L2 needs STP."
-        },
-        {
-          "id": "network-layer-ip-icmp-forwarding-002",
-          "type": "flashcard",
-          "front": "How does traceroute use TTL and ICMP to map a path?",
-          "back": "It sends probes with increasing TTL: TTL=1 expires at hop 1, which returns ICMP Time Exceeded (revealing that router); TTL=2 reveals hop 2; and so on. Each Time Exceeded message identifies the router where the packet died, building the path hop by hop.",
-          "hint": "Increment TTL, collect each Time Exceeded."
-        },
-        {
-          "id": "network-layer-ip-icmp-forwarding-003",
-          "type": "flashcard",
-          "front": "Name the ICMP messages behind ping, traceroute, and PMTUD.",
-          "back": "Ping = Echo Request / Echo Reply. Traceroute = Time Exceeded (TTL reached 0). PMTUD = Destination Unreachable, code 'Fragmentation Needed'. Other notables: Destination Unreachable (no route/host/port) and Redirect (better next hop).",
-          "hint": "Echo, Time Exceeded, Frag-Needed."
-        },
-        {
-          "id": "network-layer-ip-icmp-forwarding-004",
-          "type": "flashcard",
-          "front": "What is longest-prefix match?",
-          "back": "The forwarding rule: a router compares the destination IP against all routing-table prefixes and selects the entry with the most specific (longest) matching prefix. A /24 beats a /16 beats the /0 default route. It guarantees a single, deterministic next hop.",
-          "hint": "Most specific matching route wins."
-        },
-        {
-          "id": "network-layer-ip-icmp-forwarding-005",
+          "id": "network-layer-ip-icmp-forwarding-mcq-001",
           "type": "mcq",
-          "prompt": "A routing table has entries for 10.0.0.0/8, 10.1.0.0/16, 10.1.2.0/24, and 0.0.0.0/0. A packet is destined for 10.1.2.50. Which entry is used?",
+          "prompt": "What is the TTL field in an IP packet for?",
           "choices": [
-            "10.1.2.0/24 — the longest (most specific) matching prefix",
-            "0.0.0.0/0 — the default route always wins",
-            "10.0.0.0/8 — the first matching entry in the table",
-            "10.1.0.0/16 — the entry with the median prefix length"
+            "It is a hop limit: each router subtracts 1, and at 0 the packet is dropped so it cannot loop forever",
+            "It measures how many seconds the data is allowed to be useful",
+            "It stores the destination IP address",
+            "It counts how many bytes of data the packet carries"
           ],
           "answerIndex": 0,
-          "explanation": "10.1.2.50 matches all four prefixes, but forwarding uses longest-prefix match: the /24 is the most specific match and wins. Table order is irrelevant; only prefix length decides. The /0 default is consulted only when nothing more specific matches."
+          "explanation": "TTL (Time To Live) is really a hop counter. Every router decrements it by 1; when it reaches 0 the packet is discarded. This guarantees that a packet caught in a routing loop eventually dies instead of circling forever and clogging the network.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/network-layer-ip-5.svg"
         },
         {
-          "id": "network-layer-ip-icmp-forwarding-006",
+          "id": "network-layer-ip-icmp-forwarding-mcq-002",
           "type": "mcq",
-          "prompt": "Which statement correctly distinguishes forwarding from routing?",
+          "prompt": "A packet starts with TTL=64. It has now passed through 64 routers without reaching its destination. What happens next?",
           "choices": [
-            "Forwarding is the per-packet data-plane action of choosing an output interface; routing is the control-plane process of building the table (OSPF, BGP)",
-            "Forwarding builds the routing table; routing moves individual packets",
-            "Forwarding happens only on hosts; routing happens only on routers",
-            "They are two names for the same per-packet operation"
+            "The next router sees TTL=0 and drops the packet",
+            "The TTL resets to 64 and the packet keeps going",
+            "The packet is delivered anyway, ignoring the TTL",
+            "The packet speeds up to make up for lost time"
           ],
           "answerIndex": 0,
-          "explanation": "Forwarding (data plane) is the fast, per-packet lookup that sends each packet out the right interface. Routing (control plane) runs protocols like OSPF and BGP to compute and maintain the table that forwarding consults. This separation is exactly what SDN centralizes and generalizes."
+          "explanation": "Each hop subtracts 1, so after 64 hops the TTL is 0. A router will not forward a packet whose TTL has reached 0; it discards it. TTL never resets on its own - that is the whole point, so looping packets are guaranteed to die.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/network-layer-ip-5.svg"
         },
         {
-          "id": "network-layer-ip-icmp-forwarding-007",
+          "id": "network-layer-ip-icmp-forwarding-mcq-003",
           "type": "mcq",
-          "prompt": "You ping a host and receive 'ICMP Time Exceeded' replies instead of Echo Replies. What does that indicate?",
+          "prompt": "What problem does TTL prevent?",
           "choices": [
-            "Packets are expiring in transit (TTL reaching zero before arrival), often a routing loop or a too-small TTL",
-            "The destination host is up and responding normally",
-            "The destination port is closed",
-            "Path MTU is too small for the echo request"
+            "Lost packets circling forever in a loop and clogging the network",
+            "Two devices accidentally getting the same IP address",
+            "Data being read by the wrong person",
+            "A cable being plugged into the wrong port"
           ],
           "answerIndex": 0,
-          "explanation": "Time Exceeded means TTL hit zero before the packet reached the destination. That points to packets dying in transit — commonly a routing loop bouncing the packet until TTL runs out, or an artificially low initial TTL. It is distinct from Destination Unreachable (no route/host/port) and from Echo Reply (success)."
+          "explanation": "Without a hop limit, a packet caught in a routing loop would travel between routers endlessly, wasting bandwidth. TTL forces every packet to count down and eventually be dropped, so loops cannot accumulate runaway traffic.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/network-layer-ip-5.svg"
         },
         {
-          "id": "network-layer-ip-icmp-forwarding-008",
+          "id": "network-layer-ip-icmp-forwarding-mcq-004",
           "type": "mcq",
-          "prompt": "What is the purpose of an ICMP Redirect message?",
+          "prompt": "What is ICMP used for?",
           "choices": [
-            "A router informs a host on the same subnet that a better next-hop router exists for a given destination",
-            "A router tells the sender to fragment its packets",
-            "It reverses the source and destination addresses for return traffic",
-            "It forces the host to lower its TTL value"
+            "Carrying status and error messages about delivery, such as 'your packet expired' or ping replies",
+            "Carrying the actual web page or file data between computers",
+            "Assigning IP addresses to new devices",
+            "Encrypting traffic so it cannot be read"
           ],
           "answerIndex": 0,
-          "explanation": "ICMP Redirect lets a router tell a directly-connected host, 'for that destination, send to this other gateway on our shared subnet instead of through me.' It optimizes the host's next-hop choice. (It is often disabled today for security, since forged redirects can be used to reroute traffic.)"
+          "explanation": "ICMP (Internet Control Message Protocol) is IP's messenger for news about delivery - errors and status, not user data. Examples: a 'packet expired' notice when TTL hits 0, and the ping request/reply used to test whether a host is reachable."
+        },
+        {
+          "id": "network-layer-ip-icmp-forwarding-mcq-005",
+          "type": "mcq",
+          "prompt": "You run the ping command to check if another computer is reachable. Which protocol does ping use?",
+          "choices": [
+            "ICMP - it sends an 'are you there?' message and listens for a reply",
+            "TTL, which is a separate protocol for testing reachability",
+            "DNS, because ping must look up a name first",
+            "The MAC protocol, since ping works only on the local network"
+          ],
+          "answerIndex": 0,
+          "explanation": "Ping sends an ICMP echo request ('are you there?') and waits for an ICMP echo reply ('I'm here'). TTL is a field inside the IP header, not a protocol. DNS may be used to turn a name into an IP first, but the reachability test itself is ICMP."
+        },
+        {
+          "id": "network-layer-ip-icmp-forwarding-mcq-006",
+          "type": "mcq",
+          "prompt": "What is 'forwarding' on a router?",
+          "choices": [
+            "The fast, per-packet action of reading a packet's destination and sending it out toward the next network",
+            "The slow background work of learning which networks exist",
+            "Storing a copy of every packet for later",
+            "Turning a device on and off to refresh its connection"
+          ],
+          "answerIndex": 0,
+          "explanation": "Forwarding is what happens to each individual packet right now: the router reads its destination IP and immediately sends it the right way. It is fast and happens for every packet. Learning the network map is the separate, slower job called routing."
+        },
+        {
+          "id": "network-layer-ip-icmp-forwarding-mcq-007",
+          "type": "mcq",
+          "prompt": "What is 'routing', as distinct from forwarding?",
+          "choices": [
+            "Building and maintaining the map (the routing table) that tells the router where to send packets",
+            "Physically moving each packet out an interface",
+            "Encrypting the packet before it leaves",
+            "Counting down the TTL of each packet"
+          ],
+          "answerIndex": 0,
+          "explanation": "Routing is the background work of figuring out which networks exist and the best next step toward each, storing the result in a routing table. Forwarding then consults that table to move each packet. A handy phrase: forwarding moves one packet now; routing builds the map forwarding uses."
+        },
+        {
+          "id": "network-layer-ip-icmp-forwarding-mcq-008",
+          "type": "mcq",
+          "prompt": "Which statement correctly pairs the two jobs with what they do?",
+          "choices": [
+            "Forwarding moves one packet now; routing builds the map that forwarding uses",
+            "Forwarding builds the map; routing moves one packet now",
+            "Both forwarding and routing only run on home computers, never on routers",
+            "Forwarding and routing are two names for the exact same single step"
+          ],
+          "answerIndex": 0,
+          "explanation": "Forwarding is the immediate per-packet send; routing is the slower process that builds the routing table. They are distinct: routing populates the table, and forwarding consults it. They are not the same step, and forwarding is exactly what routers do constantly."
+        },
+        {
+          "id": "network-layer-ip-icmp-forwarding-mcq-009",
+          "type": "mcq",
+          "prompt": "Even with TTL and routers working perfectly, IP still gives no promise that a packet arrives. What does that tell you about IP's delivery model?",
+          "choices": [
+            "It is best-effort: IP tries to deliver but does not guarantee it; reliability is added later by TCP",
+            "It is fully guaranteed: every packet always arrives in order",
+            "TTL guarantees delivery once it is above 0",
+            "Routers resend any packet that is lost automatically"
+          ],
+          "answerIndex": 0,
+          "explanation": "TTL only stops loops; it does not promise delivery. IP is best-effort and connectionless - it tries, but packets can still be lost, duplicated, or reordered. When an application needs guarantees, TCP layered on top of IP provides them. Routers themselves do not resend lost packets."
         }
       ]
     }
