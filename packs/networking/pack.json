@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "id": "networking",
   "title": "Networking",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "Networking from scratch (beginner rework in progress): 17 sub-topics from layering and the physical layer through IP, subnetting, routing, TCP/UDP, TLS, DNS, wireless and modern transport. Beginner-first readings, MCQ practice, and diagrams; tiered easy to hard.",
   "requires": [],
   "tags": [
@@ -3852,278 +3852,519 @@
       "order": 9,
       "lessons": [
         {
-          "id": "nat-dhcp-dns-nat-dhcp-dns-lesson-nat",
-          "title": "NAT: SNAT, DNAT, PAT and the cost of address translation",
+          "id": "nat-dhcp-dns-nat-dhcp-dns-dhcp",
+          "title": "DHCP: How a Device Gets an Address Automatically",
           "order": 1,
           "difficulty": 1,
-          "content": "Network Address Translation rewrites IP headers (and often ports) as packets cross a boundary, letting many private hosts share scarce public addresses. **SNAT** (source NAT) rewrites the source address on the way out; **DNAT** (destination NAT) rewrites the destination on the way in — that is exactly what a port-forward is. What your home router actually does is **PAT**, also called *NAT overload* or *masquerade*: it maps many internal `(IP:port)` pairs onto one public IP by also rewriting the source port, then remembers each mapping in a **connection-tracking (conntrack) table**. Return packets are matched against that table and translated back. Entries are keyed by the 5-tuple and time out, which is why long-idle TCP connections sometimes die behind NAT.\n\nThe cost is that NAT **breaks the end-to-end principle**: an outside host can't initiate a connection to an inside host because no conntrack entry exists yet and the address is unroutable. This breaks peer-to-peer, VoIP, and gaming. The workaround is **hole punching**: **STUN** lets a host discover its public mapping; **TURN** relays traffic when direct punching fails; **ICE** is the framework that tries candidate paths and picks one. **Carrier-Grade NAT (CGNAT)** stacks a second NAT layer at the ISP, sharing one public IP across many customers — multiplying these problems. IPv6's vast address space is meant to *kill* NAT and restore true end-to-end reachability (with firewalls, not translation, providing security).",
+          "content": "**The everyday picture.** You bring a new phone home, join the Wi-Fi, and it just works. You never typed in an address, a gateway, or anything technical. Behind the scenes, a service called **DHCP** did all of that for you. DHCP stands for **Dynamic Host Configuration Protocol** — a long name for a simple idea: *automatically hand a new device the settings it needs to use the network the moment it joins.*\n\n**Why it exists.** Every device on a network needs an **IP address** (its address on the network, like a house number on a street). It also needs to know a couple of other things, which we will meet in a moment. In the old days a person had to type all of this into each device by hand. That is slow, easy to get wrong, and impossible when guests come and go all day. DHCP removes the chore: a device asks for settings, and a **DHCP server** (usually built into your home router) gives them out.\n\n**An everyday hook.** Think of checking into a hotel. You walk up to the front desk, and the clerk hands you a room key on arrival — you do not pick your own room or rewire the building. When you leave, the room goes back into the pool for the next guest. DHCP works the same way: it hands out an address when a device arrives and takes it back when the device is done.\n\n**What DHCP actually gives you.** When DHCP assigns an address, it usually includes three other useful things, so the device is fully ready to use the internet:\n\n- the **IP address** itself (your number on this network),\n- the **default gateway** (the address of the router — the \"door\" out to the rest of the internet),\n- the **DNS server** (the helper that turns names like `example.com` into addresses, covered in a later lesson),\n- and a **lease time** (how long you may keep the address before checking back in).\n\n**Recap.** DHCP automatically configures a device the instant it joins a network: it hands out an IP address plus the gateway and DNS settings, so you never have to set them by hand. Next we will watch the short back-and-forth conversation that makes this happen.",
           "items": [
             {
-              "id": "nat-dhcp-dns-fc-snat-dnat",
-              "type": "flashcard",
-              "front": "Difference between SNAT and DNAT?",
-              "back": "SNAT rewrites the SOURCE address/port on egress (e.g. private hosts sharing a public IP). DNAT rewrites the DESTINATION on ingress (e.g. a port-forward steering inbound traffic to an internal host).",
-              "hint": "Which header field, which direction?"
-            },
-            {
-              "id": "nat-dhcp-dns-fc-pat",
-              "type": "flashcard",
-              "front": "What is PAT (NAT overload / masquerade) and why is it needed?",
-              "back": "PAT maps many internal (IP:port) pairs onto a single public IP by also rewriting the source port. It lets a whole LAN share one public address — what every home router does.",
-              "hint": "It also touches the port, not just the IP."
-            },
-            {
-              "id": "nat-dhcp-dns-fc-conntrack",
-              "type": "flashcard",
-              "front": "What is the conntrack table's role in NAT?",
-              "back": "It stores each translation mapping keyed by the connection 5-tuple so return packets can be reverse-translated. Entries time out, which is why idle connections behind NAT can drop.",
-              "hint": "How does the router know where to send the reply?"
-            },
-            {
-              "id": "nat-dhcp-dns-fc-e2e",
-              "type": "flashcard",
-              "front": "How does NAT break the end-to-end principle?",
-              "back": "An external host cannot initiate a connection inward: the internal address is unroutable and no conntrack mapping exists until the inside host sends first. This breaks P2P, VoIP and inbound services.",
-              "hint": "Who has to speak first?"
-            },
-            {
-              "id": "nat-dhcp-dns-fc-stun-turn-ice",
-              "type": "flashcard",
-              "front": "STUN vs TURN vs ICE?",
-              "back": "STUN discovers your public IP:port mapping for hole punching. TURN relays traffic through a server when direct punching fails. ICE is the framework that gathers candidates, tests paths, and selects the best.",
-              "hint": "Discover, relay, orchestrate."
-            },
-            {
-              "id": "nat-dhcp-dns-mcq-overload",
+              "id": "nat-dhcp-dns-dhcp-001",
               "type": "mcq",
-              "prompt": "A home router gives 200 devices internet access through one public IPv4 address. Which mechanism makes this possible?",
+              "prompt": "In plain terms, what does DHCP do?",
               "choices": [
-                "DNAT with a static one-to-one map per device",
-                "PAT (NAT overload) rewriting source ports into a conntrack table",
-                "Proxy ARP advertising each host's MAC",
-                "DHCP assigning each device a public address"
-              ],
-              "answerIndex": 1,
-              "explanation": "Many-to-one sharing requires rewriting source ports so replies can be demultiplexed back to the right host; mappings live in the conntrack table. That is PAT / NAT overload."
-            },
-            {
-              "id": "nat-dhcp-dns-mcq-cgnat",
-              "type": "mcq",
-              "prompt": "What is Carrier-Grade NAT (CGNAT)?",
-              "choices": [
-                "NAT performed only on IPv6 traffic",
-                "A second NAT layer at the ISP sharing one public IP across many subscribers",
-                "A NAT that never times out conntrack entries",
-                "Hardware NAT built into the customer's router"
-              ],
-              "answerIndex": 1,
-              "explanation": "CGNAT stacks ISP-side NAT on top of the customer's NAT, sharing scarce public IPv4 across many subscribers and compounding inbound-reachability problems."
-            },
-            {
-              "id": "nat-dhcp-dns-mcq-ipv6",
-              "type": "mcq",
-              "prompt": "Why does IPv6 aim to eliminate NAT?",
-              "choices": [
-                "IPv6 has too few addresses to translate",
-                "Its huge address space lets every host be globally addressable, restoring end-to-end reachability",
-                "IPv6 routers cannot perform port rewriting",
-                "NAT is illegal under the IPv6 standard"
-              ],
-              "answerIndex": 1,
-              "explanation": "IPv6's address space removes the scarcity that forced NAT, so hosts can be globally addressable again; firewalls (not translation) provide security."
-            }
-          ]
-        },
-        {
-          "id": "nat-dhcp-dns-nat-dhcp-dns-lesson-dhcp",
-          "title": "DHCP: the DORA lease, relays, and renewal",
-          "order": 2,
-          "difficulty": 2,
-          "content": "DHCP automates host configuration through the **DORA** exchange. **Discover:** a booting client with no address broadcasts a DHCPDISCOVER (source `0.0.0.0`, destination `255.255.255.255`, UDP 67/68) asking any server to identify itself. **Offer:** each server replies with a DHCPOFFER proposing an IP plus options. **Request:** the client broadcasts a DHCPREQUEST naming the chosen server (so the others withdraw their offers). **Acknowledge:** that server sends DHCPACK confirming the lease and full configuration. Because the client has no IP yet, the early steps must be **broadcast** at layer 2.\n\nAn offer carries an address, subnet mask, and **options**: default gateway (router), DNS servers, NTP, domain name, lease time, and boot/PXE info for network boot. The lease is time-bounded. At **T1** (≈50% of the lease) the client tries to **renew** by unicasting REQUEST directly to its server; if that fails, at **T2** (≈87.5%) it **rebinds** by broadcasting to any server. If the lease expires it must start DORA over.\n\nTo serve clients on subnets without a local server, a **DHCP relay agent** (often the router) forwards the broadcast as unicast to the server and stamps the **giaddr** (gateway IP address) field so the server knows which subnet's pool to draw from and where to send replies. **DHCPv6** differs: it uses multicast (`ff02::1:2`) instead of broadcast, a Solicit/Advertise/Request/Reply flow, and DUIDs to identify clients — and it often coexists with IPv6 SLAAC router advertisements rather than replacing them.",
-          "items": [
-            {
-              "id": "nat-dhcp-dns-fc-dora-recall",
-              "type": "flashcard",
-              "front": "Recall the full DHCP DORA exchange from memory, naming who broadcasts and what each step does.",
-              "back": "Discover: client broadcasts DHCPDISCOVER (0.0.0.0 -> 255.255.255.255) seeking servers. Offer: server(s) reply with a proposed IP + options. Request: client BROADCASTS DHCPREQUEST naming the chosen server (others withdraw). Acknowledge: chosen server sends DHCPACK confirming the lease.",
-              "hint": "Discover, Offer, Request, Acknowledge."
-            },
-            {
-              "id": "nat-dhcp-dns-fc-broadcast",
-              "type": "flashcard",
-              "front": "Why are the early DHCP messages broadcast rather than unicast?",
-              "back": "The client has no IP address yet and doesn't know any server's address, so it cannot unicast. It broadcasts to 255.255.255.255 so any reachable server can respond.",
-              "hint": "What does the client lack at boot?"
-            },
-            {
-              "id": "nat-dhcp-dns-fc-t1-t2",
-              "type": "flashcard",
-              "front": "What happens at T1 and T2 during a DHCP lease?",
-              "back": "T1 (~50% of lease): client RENEWS by unicasting REQUEST to its own server. T2 (~87.5%): if renewal failed, client REBINDS by broadcasting to any server. On expiry, restart DORA.",
-              "hint": "Renew unicast, then rebind broadcast."
-            },
-            {
-              "id": "nat-dhcp-dns-fc-giaddr",
-              "type": "flashcard",
-              "front": "What does a DHCP relay agent do, and what is giaddr for?",
-              "back": "The relay forwards broadcast DHCP requests as unicast to a server on another subnet. It sets giaddr (gateway IP address) so the server picks the correct subnet's address pool and knows where to send replies.",
-              "hint": "How does a server help clients it can't hear directly?"
-            },
-            {
-              "id": "nat-dhcp-dns-fc-options",
-              "type": "flashcard",
-              "front": "Name several configuration parameters DHCP delivers via options.",
-              "back": "Default gateway (router), DNS server list, subnet mask, lease time, domain name, NTP servers, and PXE/boot-file info for network booting.",
-              "hint": "Everything beyond the IP itself."
-            },
-            {
-              "id": "nat-dhcp-dns-mcq-request-broadcast",
-              "type": "mcq",
-              "prompt": "Why is the DHCPREQUEST (third message) typically broadcast rather than unicast to the chosen server?",
-              "choices": [
-                "The client still has no usable IP and other servers must learn their offers were declined",
-                "Servers cannot receive unicast on UDP 67",
-                "Broadcast is encrypted while unicast is not",
-                "It carries the giaddr field which requires broadcast"
+                "It automatically gives a device the network settings it needs (like an IP address) when the device joins",
+                "It encrypts all the traffic leaving your home network",
+                "It speeds up your internet connection by compressing data",
+                "It blocks viruses from reaching your computer"
               ],
               "answerIndex": 0,
-              "explanation": "The client hasn't committed an address yet, and broadcasting the REQUEST lets the non-selected servers see the client picked someone else so they release their reserved offers."
+              "explanation": "DHCP's whole job is automatic setup: when a device joins a network, DHCP hands it an IP address and other settings so it can communicate without anyone typing them by hand. It does not encrypt, compress, or scan for viruses — those are different jobs done by other tools.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/nat-dhcp-dns-1.svg"
             },
             {
-              "id": "nat-dhcp-dns-mcq-dhcpv6",
+              "id": "nat-dhcp-dns-dhcp-002",
               "type": "mcq",
-              "prompt": "Which is a real difference between DHCPv6 and DHCPv4?",
+              "prompt": "What problem did DHCP solve compared with the old way of doing things?",
               "choices": [
-                "DHCPv6 uses TCP instead of UDP",
-                "DHCPv6 uses multicast and DUIDs, and often coexists with SLAAC",
-                "DHCPv6 eliminates the concept of leases",
-                "DHCPv6 assigns MAC addresses instead of IPs"
+                "People used to type an address into every device by hand, which was slow and error-prone",
+                "Networks used to have no addresses at all",
+                "The internet used to be too fast to manage safely",
+                "Devices used to share a single keyboard to log in"
               ],
-              "answerIndex": 1,
-              "explanation": "DHCPv6 replaces broadcast with multicast (ff02::1:2), identifies clients with DUIDs via a Solicit/Advertise/Request/Reply flow, and frequently works alongside SLAAC router advertisements."
+              "answerIndex": 0,
+              "explanation": "Before DHCP, someone had to manually configure each device's address and settings. That is tedious and easy to get wrong, and hopeless for devices that come and go. DHCP automates it. Networks always needed addresses; that is exactly the chore DHCP took over.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/nat-dhcp-dns-1.svg"
             },
             {
-              "id": "nat-dhcp-dns-mcq-relay-pool",
+              "id": "nat-dhcp-dns-dhcp-003",
               "type": "mcq",
-              "prompt": "A central DHCP server serves clients on many subnets. How does it choose which pool to assign from for a given request?",
+              "prompt": "Which everyday situation is the closest analogy to DHCP?",
               "choices": [
-                "From the client's MAC vendor prefix",
-                "From the giaddr stamped by the relay agent",
-                "From the TTL of the DISCOVER packet",
-                "It assigns randomly and the client corrects it"
+                "A hotel front desk handing you a room key when you arrive, and reclaiming it when you leave",
+                "A library fining you for an overdue book",
+                "A vending machine that only takes exact change",
+                "A traffic light cycling through colors on a timer"
               ],
-              "answerIndex": 1,
-              "explanation": "The relay agent fills giaddr with the gateway/subnet address it received the broadcast on; the server matches that to the correct address pool and routes replies back through the relay."
+              "answerIndex": 0,
+              "explanation": "DHCP assigns an address on arrival and takes it back later for reuse, exactly like a hotel issuing and reclaiming room keys. The other examples do not capture the 'assign on arrival, return to the pool later' idea.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/nat-dhcp-dns-1.svg"
             },
             {
-              "id": "nat-dhcp-dns-img-dora",
-              "type": "flashcard",
-              "front": "Study this diagram.",
-              "back": "Review the diagram above.",
-              "image": "https://raw.githubusercontent.com/studyforge/packs/main/networking/images/nat-dhcp-dns-1.svg"
+              "id": "nat-dhcp-dns-dhcp-004",
+              "type": "mcq",
+              "prompt": "Besides the IP address itself, what else does DHCP commonly hand to a device?",
+              "choices": [
+                "The default gateway (the router's address) and a DNS server to use",
+                "A list of every website you are allowed to visit",
+                "The Wi-Fi password for the neighbors' network",
+                "A backup copy of the device's files"
+              ],
+              "answerIndex": 0,
+              "explanation": "A useful address needs companions: the default gateway (the way out to the rest of the internet) and a DNS server (to look up names). DHCP delivers these together so the device is ready to go. It does not manage allowed-site lists, other networks' passwords, or backups.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/nat-dhcp-dns-1.svg"
+            },
+            {
+              "id": "nat-dhcp-dns-dhcp-005",
+              "type": "mcq",
+              "prompt": "The DHCP conversation is often remembered by the word DORA. What do its four steps stand for?",
+              "choices": [
+                "Discover, Offer, Request, Acknowledge",
+                "Detect, Open, Receive, Accept",
+                "Download, Order, Reply, Approve",
+                "Dial, Offer, Reserve, Activate"
+              ],
+              "answerIndex": 0,
+              "explanation": "DORA = Discover (device asks if any server is there), Offer (a server proposes an address), Request (the device says yes to that offer), Acknowledge (the server confirms). The other expansions are made up.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/nat-dhcp-dns-1.svg"
+            },
+            {
+              "id": "nat-dhcp-dns-dhcp-006",
+              "type": "mcq",
+              "prompt": "In the DORA exchange, what happens in the first step, Discover?",
+              "choices": [
+                "The new device, which has no address yet, calls out to ask whether any DHCP server is available",
+                "The server picks a device at random and assigns it an address",
+                "The device downloads a list of all addresses already in use",
+                "The router reboots to clear its memory"
+              ],
+              "answerIndex": 0,
+              "explanation": "In Discover, the device has just joined and has no address, so it broadcasts a message essentially asking, 'Is there a DHCP server out there that can set me up?' The server does not initiate; the device speaks first. No address list is downloaded and nothing reboots.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/nat-dhcp-dns-1.svg"
+            },
+            {
+              "id": "nat-dhcp-dns-dhcp-007",
+              "type": "mcq",
+              "prompt": "Why must the device's first DHCP messages be 'shouted' to everyone on the local network rather than sent to one specific server?",
+              "choices": [
+                "The device has no address yet and does not know any server's address, so it cannot send a private message to just one",
+                "Shouting is always faster than a direct message",
+                "DHCP servers refuse to read private messages",
+                "It is required so that the neighbors' router can join in"
+              ],
+              "answerIndex": 0,
+              "explanation": "At the very start the device has no IP and does not yet know which machine is the DHCP server, so it cannot address a single recipient. Broadcasting reaches whatever server is listening. Once it has an address it can talk directly. Speed and 'refusing private messages' are not the reason.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/nat-dhcp-dns-1.svg"
+            },
+            {
+              "id": "nat-dhcp-dns-dhcp-008",
+              "type": "mcq",
+              "prompt": "DHCP gives out an address as a 'lease' rather than forever. What does a lease mean here?",
+              "choices": [
+                "The device may use the address for a set time, then must check back in to keep it or let it go",
+                "The device must pay a fee for the address",
+                "The address can never be used by any other device again",
+                "The address only works while the device is plugged into power"
+              ],
+              "answerIndex": 0,
+              "explanation": "A lease is a time-limited loan of the address. Before it runs out, the device renews to keep using it; if it leaves, the address eventually returns to the pool for someone else. There is no money involved, and addresses are reused, which is the whole point of a lease.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/nat-dhcp-dns-1.svg"
+            },
+            {
+              "id": "nat-dhcp-dns-dhcp-009",
+              "type": "mcq",
+              "prompt": "Roughly halfway through its lease, what does a device normally try to do?",
+              "choices": [
+                "Renew the lease by quietly asking the same server to extend it, before it expires",
+                "Immediately give the address back and go offline",
+                "Start the whole DORA exchange over from scratch every few seconds",
+                "Ask every other device to vote on whether it can keep the address"
+              ],
+              "answerIndex": 0,
+              "explanation": "Devices renew early (around the halfway point) by contacting the server that gave them the address and asking to extend it, so they keep working without interruption. Only if renewal keeps failing as expiry nears does it fall back to asking any server, and finally restart DORA. It does not go offline or hold a vote.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/nat-dhcp-dns-1.svg"
+            },
+            {
+              "id": "nat-dhcp-dns-dhcp-010",
+              "type": "mcq",
+              "prompt": "A home printer keeps getting a different address, which makes it hard to find. A DHCP 'reservation' fixes this. What is a reservation?",
+              "choices": [
+                "A rule that always hands the same specific device the same address each time",
+                "A way to hide the printer from the rest of the network",
+                "A second internet connection just for the printer",
+                "A setting that turns off DHCP for the whole house"
+              ],
+              "answerIndex": 0,
+              "explanation": "A reservation tells the DHCP server: 'whenever this particular device asks, give it this same address.' The device still uses DHCP (no manual setup), but its address is now predictable, which is handy for printers and servers. It does not hide the device or add a second connection.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/nat-dhcp-dns-1.svg"
+            },
+            {
+              "id": "nat-dhcp-dns-dhcp-011",
+              "type": "mcq",
+              "prompt": "In the Offer step of DORA, what is the DHCP server doing?",
+              "choices": [
+                "Proposing an address (and settings) the device may use, in reply to the Discover",
+                "Confirming that the device has finished and is leaving the network",
+                "Asking the device for its password",
+                "Erasing the device's old configuration"
+              ],
+              "answerIndex": 0,
+              "explanation": "After hearing a Discover, the server replies with an Offer: 'You can have this address, with these settings.' The device then formally Requests it and the server Acknowledges. Confirming a departure, asking for passwords, and erasing config are not part of the Offer.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/nat-dhcp-dns-1.svg"
             }
           ]
         },
         {
-          "id": "nat-dhcp-dns-nat-dhcp-dns-lesson-dns",
-          "title": "DNS: hierarchy, resolution, records, and the modern stack",
-          "order": 3,
-          "difficulty": 3,
-          "content": "DNS maps names to data through a delegated **hierarchy**: the **root** (`.`) delegates to **TLD** servers (`.com`, `.org`), which delegate to the **authoritative** servers for a domain. Your host runs a **stub resolver** that asks a **recursive resolver**; the resolver does the legwork **iteratively** — querying root, then TLD, then authoritative, following *referrals* at each step — then returns the answer and **caches** it for the record's **TTL**. *Recursive* means \"do all the work and bring me the answer\"; *iterative* means \"give me your best referral and I'll chase it myself.\"\n\nKey **record types**: **A** (IPv4), **AAAA** (IPv6), **CNAME** (alias to another name), **MX** (mail exchanger), **NS** (delegates a zone), **SOA** (zone authority/serial/timers), **TXT** (arbitrary text, e.g. SPF/DKIM), **SRV** (service host+port), and **PTR** (reverse: IP→name). TTLs govern caching; **negative caching** (NXDOMAIN) is governed by the SOA. DNS rides **UDP/53**, falling back to **TCP/53** when responses exceed the limit (large answers, zone transfers, DNSSEC); **EDNS** advertises larger UDP buffers.\n\nModern DNS hardens privacy and trust: **DoH** (DNS over HTTPS) and **DoT** (DNS over TLS) encrypt queries so they can't be read or tampered with on the wire, while **DNSSEC** signs records so resolvers can verify *authenticity* (it provides integrity, not confidentiality). Classic **failure modes** are why \"it's always DNS\": **stale cache** serving old records after a change, **split-horizon** returning different answers inside vs outside a network, and over-long **negative caching** pinning an NXDOMAIN.",
+          "id": "nat-dhcp-dns-nat-dhcp-dns-nat",
+          "title": "NAT: Sharing One Public Address Among Many Devices",
+          "order": 2,
+          "difficulty": 2,
+          "content": "**The everyday picture.** Look around a typical home: a laptop, a couple of phones, a TV, maybe a game console — all online at once. Yet your internet provider usually gives your home just **one** public address that the rest of the internet can see. So how do a dozen devices share a single address? The answer is **NAT**, short for **Network Address Translation**.\n\n**First, two kinds of address.** Recall that some IP addresses are **private** — reserved for use inside a home or office and not valid out on the internet. (These come from set-aside ranges, defined in a rule called **RFC 1918**, such as the familiar `192.168.x.x`.) Other addresses are **public** — globally unique and reachable from anywhere. Inside your home, every device gets its own *private* address from DHCP. To the outside world, your whole home appears as one *public* address.\n\n**What NAT does.** Your router sits at the boundary. When a device sends a request out to the internet, the router **rewrites the address** on the way out: it swaps the device's private address for the home's one public address. When the reply comes back, the router rewrites it again so it reaches the right device inside. NAT is simply this translation between *many private addresses inside* and *one public address outside*.\n\n**An everyday hook.** Picture a company with one main phone number and a receptionist. Outside callers all dial the same number; the receptionist routes each call to the right extension inside. The single public phone number is the public IP; the extensions are your private devices; the receptionist is the router doing NAT.\n\n**How replies find the right device: port numbers.** If three devices all visit the same website through one public address, how does the router know which reply goes where? It uses **port numbers** — think of them as extension numbers tacked onto an address. For each outgoing connection the router notes, in a small **mapping table**, which inside device-and-port a given outside port belongs to. When a reply arrives, the router looks it up and sends it to the matching device. (Because the router also juggles port numbers this way, this common form of NAT is sometimes called **PAT**, for Port Address Translation.)\n\n**One catch: connections from outside.** NAT is built around connections that *start inside*. A request from a device inside creates a mapping, so its reply can return. But if someone on the internet tries to start a *brand-new* connection to a device inside your home, there is no mapping yet, and the router does not know where to send it — so it drops it. To deliberately allow this (say, to run a game server or a webcam at home), you add a **port-forwarding** rule that says, 'anything arriving on this port, send it to this inside device.'\n\n**Recap.** NAT lets many devices on private addresses share one public address by rewriting addresses at the router and tracking each connection by port number in a mapping table. Connections that start inside work automatically; letting connections in from outside needs port forwarding.",
           "items": [
             {
-              "id": "nat-dhcp-dns-fc-resolution-walk",
-              "type": "flashcard",
-              "front": "Narrate the full resolution of www.example.com from a cold cache, end to end.",
-              "back": "Stub resolver sends a recursive query to the recursive resolver. Resolver (iteratively): asks a ROOT server -> referral to .com TLD servers; asks a TLD server -> referral to example.com authoritative NS; asks the AUTHORITATIVE server -> returns the A/AAAA record. Resolver caches each result per its TTL and returns the answer to the stub.",
-              "hint": "Stub -> recursive; recursive iterates root -> TLD -> authoritative -> cache."
-            },
-            {
-              "id": "nat-dhcp-dns-fc-recursive-iterative",
-              "type": "flashcard",
-              "front": "Recursive vs iterative resolution?",
-              "back": "Recursive: the resolver does all the work and returns the final answer (stub -> recursive resolver). Iterative: a server returns its best referral and the asker chases it (recursive resolver -> root/TLD/authoritative).",
-              "hint": "Who chases the referrals?"
-            },
-            {
-              "id": "nat-dhcp-dns-fc-records",
-              "type": "flashcard",
-              "front": "What do A, AAAA, CNAME, MX, NS, SOA, TXT, SRV, and PTR records hold?",
-              "back": "A=IPv4, AAAA=IPv6, CNAME=alias to another name, MX=mail exchanger, NS=delegates a zone, SOA=zone authority/serial/timers, TXT=arbitrary text (SPF/DKIM), SRV=service host+port, PTR=reverse lookup (IP->name).",
-              "hint": "Address, alias, mail, delegation, authority, text, service, reverse."
-            },
-            {
-              "id": "nat-dhcp-dns-fc-doh-dot-dnssec",
-              "type": "flashcard",
-              "front": "DoH/DoT vs DNSSEC — what does each protect?",
-              "back": "DoH (over HTTPS) and DoT (over TLS) encrypt queries for CONFIDENTIALITY/privacy on the wire. DNSSEC signs records for AUTHENTICITY/integrity (it does NOT encrypt). They solve different problems and can be combined.",
-              "hint": "Privacy of transport vs proof of the data."
-            },
-            {
-              "id": "nat-dhcp-dns-fc-udp-tcp",
-              "type": "flashcard",
-              "front": "Why does DNS use UDP/53 but sometimes TCP/53?",
-              "back": "UDP/53 is fast and cheap for typical small queries. DNS falls back to TCP/53 for responses too large for a single datagram (large answers, DNSSEC, zone transfers); EDNS lets clients advertise bigger UDP buffers to delay that fallback.",
-              "hint": "Small/fast by default, fall back when the answer is too big."
-            },
-            {
-              "id": "nat-dhcp-dns-mcq-cname",
+              "id": "nat-dhcp-dns-nat-001",
               "type": "mcq",
-              "prompt": "What is a CNAME record used for?",
+              "prompt": "What problem does NAT solve?",
               "choices": [
-                "Mapping a name directly to an IPv4 address",
-                "Aliasing one name to another canonical name, which is then resolved",
-                "Delegating a subdomain to other name servers",
-                "Reverse-resolving an IP address to a hostname"
+                "It lets many devices on a home network share a single public internet address",
+                "It makes a slow internet connection faster",
+                "It stores copies of websites so they load instantly",
+                "It assigns each device a brand-new public address from the internet"
               ],
-              "answerIndex": 1,
-              "explanation": "A CNAME makes a name an alias of another (canonical) name; the resolver then looks up that target. A maps to an IP, NS delegates, PTR does reverse."
+              "answerIndex": 0,
+              "explanation": "Homes typically get just one public address, but have many devices. NAT shares that one public address among them all by translating addresses at the router. It is not about speed or caching, and it specifically avoids needing a public address per device — that scarcity is why NAT exists.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/nat-dhcp-dns-2.svg"
             },
             {
-              "id": "nat-dhcp-dns-mcq-stale",
+              "id": "nat-dhcp-dns-nat-002",
               "type": "mcq",
-              "prompt": "You change a site's A record but some users still hit the old server for a while. Most likely cause?",
+              "prompt": "How does NAT let one public address serve many devices?",
               "choices": [
-                "DNSSEC validation failure",
-                "Cached records still alive within their TTL (stale cache)",
-                "The TLD lost its NS delegation",
-                "UDP was blocked forcing TCP"
+                "The router rewrites addresses on the way out and back, so traffic uses the one public address but still reaches the right device",
+                "It puts all the devices to sleep except one at a time",
+                "It gives each device a slice of the day to be online",
+                "It copies each device's data onto every other device"
               ],
-              "answerIndex": 1,
-              "explanation": "Resolvers cache records for the TTL, so until cached copies expire some users get the old answer. Lowering the TTL before a change reduces this window."
+              "answerIndex": 0,
+              "explanation": "NAT works by rewriting (translating) the address fields as packets cross the router: private-to-public going out, and back again returning. All devices can be online at once; they are not taking turns or sleeping. The router's translation is what makes the sharing possible.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/nat-dhcp-dns-2.svg"
             },
             {
-              "id": "nat-dhcp-dns-mcq-iterative-target",
+              "id": "nat-dhcp-dns-nat-003",
               "type": "mcq",
-              "prompt": "During iterative resolution of a .com name, what does a root server typically return?",
+              "prompt": "Which everyday setup is the best analogy for NAT?",
               "choices": [
-                "The final A record for the host",
-                "A referral pointing to the .com TLD name servers",
-                "An NXDOMAIN for the whole query",
-                "The authoritative SOA of the target domain"
+                "One company phone number with a receptionist who routes each call to the right extension",
+                "A one-way street with no turns",
+                "A library where every book has a unique barcode",
+                "A mailbox that only accepts letters, never packages"
               ],
-              "answerIndex": 1,
-              "explanation": "Root servers don't know the final answer; they refer the resolver downward to the appropriate TLD name servers, which then refer to the authoritative servers."
+              "answerIndex": 0,
+              "explanation": "The single public number is the public IP, the extensions are the private devices, and the receptionist routing calls is the router doing NAT. The other examples do not capture 'one shared outside identity, many inside recipients.'",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/nat-dhcp-dns-2.svg"
             },
             {
-              "id": "nat-dhcp-dns-mcq-negcache",
+              "id": "nat-dhcp-dns-nat-004",
               "type": "mcq",
-              "prompt": "Which record controls how long a negative answer (NXDOMAIN) is cached?",
+              "prompt": "When three devices visit the same website at once through one public address, how does the router send each reply back to the correct device?",
               "choices": [
-                "The TXT record",
-                "The SOA record's negative-caching TTL",
-                "The MX record priority",
-                "The PTR record"
+                "It uses port numbers and a mapping table to remember which connection belongs to which device",
+                "It guesses, and the devices ignore replies that are not theirs",
+                "It sends every reply to all three devices",
+                "It asks the website which device should get the reply"
               ],
-              "answerIndex": 1,
-              "explanation": "Negative caching duration is governed by the zone's SOA (its minimum/negative-TTL field), which is why a misconfigured SOA can pin a stale NXDOMAIN."
+              "answerIndex": 0,
+              "explanation": "The router records each connection in a mapping table keyed by port numbers (like extension numbers), so when a reply arrives it knows exactly which inside device to deliver it to. It does not guess, broadcast to everyone, or rely on the website to sort it out.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/nat-dhcp-dns-2.svg"
             },
             {
-              "id": "nat-dhcp-dns-img-resolution",
-              "type": "flashcard",
-              "front": "Study this diagram.",
-              "back": "Review the diagram above.",
-              "image": "https://raw.githubusercontent.com/studyforge/packs/main/networking/images/nat-dhcp-dns-2.svg"
+              "id": "nat-dhcp-dns-nat-005",
+              "type": "mcq",
+              "prompt": "Addresses like 192.168.1.10 are 'private' addresses (from the RFC 1918 ranges). What does that mean?",
+              "choices": [
+                "They are meant for use inside a local network and are not valid out on the public internet",
+                "They are encrypted versions of public addresses",
+                "They can only be used by government networks",
+                "They are faster than public addresses"
+              ],
+              "answerIndex": 0,
+              "explanation": "Private ranges are set aside for use inside homes and offices; the public internet will not route them. That is exactly why NAT is needed — to translate these private addresses into a public one for traffic leaving the network. They are not encrypted, government-only, or faster.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/nat-dhcp-dns-2.svg"
+            },
+            {
+              "id": "nat-dhcp-dns-nat-006",
+              "type": "mcq",
+              "prompt": "Why does a normal connection that a device starts from inside the home work automatically through NAT?",
+              "choices": [
+                "Sending the request out creates a mapping in the router, so the reply knows how to get back in",
+                "The router opens every port to the internet by default",
+                "Outgoing connections skip the router entirely",
+                "The internet remembers your private address"
+              ],
+              "answerIndex": 0,
+              "explanation": "When an inside device initiates a connection, the router records a mapping for it; the matching reply is then let back in and translated to the right device. The router does not leave all ports open, traffic does go through the router, and the internet never sees your private address.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/nat-dhcp-dns-2.svg"
+            },
+            {
+              "id": "nat-dhcp-dns-nat-007",
+              "type": "mcq",
+              "prompt": "You want to run a game server at home that friends on the internet can connect to. By default their connection attempts fail. Why, and what fixes it?",
+              "choices": [
+                "Incoming connections have no mapping yet so the router drops them; a port-forwarding rule tells the router where to send them",
+                "Your internet is too slow; upgrading the plan fixes it",
+                "The game server must be turned off and on again repeatedly",
+                "NAT only works on weekends, so they must wait"
+              ],
+              "answerIndex": 0,
+              "explanation": "A connection starting from outside has no existing mapping, so the router does not know which inside device it is for and drops it. Port forwarding adds a rule pointing incoming traffic on a chosen port to your server. It is not about speed, rebooting, or timing.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/nat-dhcp-dns-5.svg"
+            },
+            {
+              "id": "nat-dhcp-dns-nat-008",
+              "type": "mcq",
+              "prompt": "This common form of NAT is sometimes called PAT (Port Address Translation). Why mention ports in the name?",
+              "choices": [
+                "Because the router also tracks and rewrites port numbers, which is how it keeps many simultaneous connections separate on one address",
+                "Because it only works on physical ports on the back of the router",
+                "Because ports are a kind of password",
+                "Because each device must be plugged into a numbered port"
+              ],
+              "answerIndex": 0,
+              "explanation": "PAT highlights that the router uses port numbers (extension-like tags) to tell apart the many connections sharing one public address. The 'ports' here are network port numbers, not the physical sockets on the router, and they are not passwords.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/nat-dhcp-dns-2.svg"
+            },
+            {
+              "id": "nat-dhcp-dns-nat-009",
+              "type": "mcq",
+              "prompt": "Some internet providers run a second layer of NAT on their own side, called Carrier-Grade NAT (CGNAT). What does that mean for a home user?",
+              "choices": [
+                "Even your 'public' address is shared with other customers, which makes hosting incoming connections from home harder",
+                "Your internet becomes completely private and untraceable",
+                "You automatically get a faster connection",
+                "Your devices stop needing private addresses"
+              ],
+              "answerIndex": 0,
+              "explanation": "With CGNAT the provider shares one public address across many customers (a NAT on top of your home NAT), stretching scarce addresses further. The downside is that running servers reachable from outside gets even harder. It does not make you untraceable, speed things up, or remove the need for private addresses.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/nat-dhcp-dns-2.svg"
+            },
+            {
+              "id": "nat-dhcp-dns-nat-010",
+              "type": "mcq",
+              "prompt": "How does IPv6 reduce the need for NAT?",
+              "choices": [
+                "IPv6 has so many addresses that each device can have its own public one, so sharing a single address is no longer necessary",
+                "IPv6 makes NAT illegal",
+                "IPv6 hides addresses so none are needed",
+                "IPv6 routers cannot translate addresses"
+              ],
+              "answerIndex": 0,
+              "explanation": "NAT exists mainly because public IPv4 addresses are scarce. IPv6's enormous supply means devices can each have a public address, removing the scarcity that forced address sharing. (Firewalls, not NAT, still handle protection.) IPv6 does not outlaw NAT or eliminate addresses.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/nat-dhcp-dns-2.svg"
+            },
+            {
+              "id": "nat-dhcp-dns-nat-011",
+              "type": "mcq",
+              "prompt": "From the internet's point of view, what does a home with ten devices behind NAT look like?",
+              "choices": [
+                "A single public address; the ten private addresses inside are hidden from the outside",
+                "Ten separate public addresses, one per device",
+                "No address at all until a device connects",
+                "A list of every website the home has visited"
+              ],
+              "answerIndex": 0,
+              "explanation": "Outside observers see only the one public address the router presents; the private addresses inside are never exposed on the internet. That is the essence of NAT: many hidden inside, one shown outside. There are not ten public addresses, and the home does have an address.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/nat-dhcp-dns-2.svg"
+            }
+          ]
+        },
+        {
+          "id": "nat-dhcp-dns-nat-dhcp-dns-dns",
+          "title": "DNS: The Internet's Phone Book (Names to Addresses)",
+          "order": 3,
+          "difficulty": 3,
+          "content": "**The everyday picture.** You type `example.com` into a browser, not a string of numbers. But computers find each other using **IP addresses**, not names. Something has to turn the friendly name into the number the machines need. That something is **DNS**, the **Domain Name System** — the internet's phone book.\n\n**Why it exists.** Names are easy for people to remember; addresses are easy for machines to route to. DNS bridges the two: give it a name, and it returns the matching address. Without it, you would have to memorize numbers for every site you visit — as unworkable as memorizing everyone's phone number instead of looking up their name in your contacts.\n\n**An everyday hook.** Looking up `example.com` is just like looking up a friend's name in your phone's contacts to get their number. You remember the name; the phone book stores the number; the lookup connects the two.\n\n**Nobody stores the whole internet — it is organized in layers.** There are far too many names for one list, so DNS is split into a **hierarchy** that hands questions downward:\n\n- the **root** servers sit at the very top and know where to find each top-level ending,\n- the **TLD** servers handle a top-level domain like `.com` or `.org` (TLD = Top-Level Domain) and know who runs each name under it,\n- the **authoritative** server for a specific domain holds that domain's actual answers (the real address for `example.com`).\n\n**How a lookup works (the resolution walk).** Your device does not chase all this itself. It asks a helper called a **resolver** (often run by your provider or set by DHCP). The resolver does the legwork, step by step: it asks a **root** server, which points it to the **.com** servers; it asks **.com**, which points it to **example.com's** authoritative server; it asks that server, which finally returns the address. The resolver hands the answer back to your device — and, importantly, **remembers it** for a while so the next lookup is instant.\n\n**Remembering answers: caching and TTL.** That 'remembering' is called **caching**. Each answer comes with a **TTL** (Time To Live) — a countdown saying how long it may be reused before the resolver should ask again. Caching is why the web feels fast, and why a changed address can take a little while to reach everyone (old answers linger until their TTL runs out).\n\n**Different questions, different records.** DNS stores several kinds of entry, called **records**. The everyday ones: **A** gives the IPv4 address for a name; **AAAA** gives the IPv6 address; **CNAME** is an alias that says 'this name is really that name'; **MX** says which mail server handles a domain's email. A few more you will meet: **NS** lists the servers in charge of a domain, and **TXT** holds free-form text (often used to verify ownership).\n\n**A brief word on trust and privacy.** Because DNS is so central, attackers sometimes try **DNS spoofing** — feeding you a fake answer to send you to the wrong place. Two modern protections exist, and you only need to know they are there: **DNSSEC** adds digital signatures so a resolver can check an answer is genuine, and **DoH/DoT** (DNS over HTTPS / over TLS) encrypt your lookups so others cannot read or tamper with them on the way.\n\n**Recap.** DNS translates names people remember into the IP addresses machines need, using a layered system (root, then TLD, then the domain's authoritative server) that a resolver walks through on your behalf and then caches. Record types like A, AAAA, CNAME, and MX answer different kinds of questions.",
+          "items": [
+            {
+              "id": "nat-dhcp-dns-dns-001",
+              "type": "mcq",
+              "prompt": "What does DNS translate?",
+              "choices": [
+                "A name people remember (like example.com) into the IP address machines need",
+                "An IP address into the name of the company that owns it",
+                "A web page from one language into another",
+                "A password into an encrypted form"
+              ],
+              "answerIndex": 0,
+              "explanation": "DNS is the internet's phone book: you give it a name and it returns the matching IP address, because machines route by address, not by name. It is not a translator of human languages or a password tool. (There is a reverse lookup for IP-to-name, but the everyday job is name-to-address.)",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/nat-dhcp-dns-3.svg"
+            },
+            {
+              "id": "nat-dhcp-dns-dns-002",
+              "type": "mcq",
+              "prompt": "Why does DNS exist at all?",
+              "choices": [
+                "Names are easy for people to remember, but machines need numeric addresses, so DNS connects the two",
+                "It makes websites load in a different order",
+                "It gives every website a password",
+                "It stores the full text of every web page"
+              ],
+              "answerIndex": 0,
+              "explanation": "People remember names; computers route to numbers. DNS bridges that gap by mapping names to addresses, so you never have to memorize the numbers. It does not reorder pages, assign passwords, or store page contents.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/nat-dhcp-dns-3.svg"
+            },
+            {
+              "id": "nat-dhcp-dns-dns-003",
+              "type": "mcq",
+              "prompt": "Which everyday action is the best analogy for a DNS lookup?",
+              "choices": [
+                "Looking up a friend's name in your contacts to get their phone number",
+                "Dialing a number at random to see who answers",
+                "Memorizing a poem word for word",
+                "Sorting your email into folders"
+              ],
+              "answerIndex": 0,
+              "explanation": "You remember a name; the phone book (DNS) returns the number (address). That name-to-number lookup is exactly what DNS does. Random dialing, memorizing, and sorting do not capture the lookup idea.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/nat-dhcp-dns-3.svg"
+            },
+            {
+              "id": "nat-dhcp-dns-dns-004",
+              "type": "mcq",
+              "prompt": "Walk the lookup: when a resolver looks up www.example.com from a cold start, what is the usual order of who it asks?",
+              "choices": [
+                "A root server, then the .com (TLD) server, then example.com's authoritative server",
+                "example.com's server first, then .com, then the root",
+                "Only the root server, which knows every address directly",
+                "Your own computer's hard drive, which stores all addresses"
+              ],
+              "answerIndex": 0,
+              "explanation": "The resolver works top-down: the root points it to .com, .com points it to example.com's authoritative server, and that server gives the address. The root does not know every address — it only refers you downward — and your hard drive does not store the internet's addresses.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/nat-dhcp-dns-3.svg"
+            },
+            {
+              "id": "nat-dhcp-dns-dns-005",
+              "type": "mcq",
+              "prompt": "What is the resolver's role in a DNS lookup?",
+              "choices": [
+                "It does the legwork of asking the chain of servers for you, then returns the answer and remembers it",
+                "It is the single server that stores every name on the internet",
+                "It blocks websites it does not like",
+                "It is the same thing as your web browser"
+              ],
+              "answerIndex": 0,
+              "explanation": "Your device asks a resolver, and the resolver walks the hierarchy (root, TLD, authoritative) on your behalf, then caches the result. No single server stores all names — that is why the hierarchy exists. The resolver is not your browser and is not primarily a blocker.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/nat-dhcp-dns-3.svg"
+            },
+            {
+              "id": "nat-dhcp-dns-dns-006",
+              "type": "mcq",
+              "prompt": "Why is DNS organized as a hierarchy (root, then TLD, then authoritative) instead of one giant list?",
+              "choices": [
+                "There are far too many names for one list, so the work is split and questions are handed downward",
+                "Because the internet was built in alphabetical order",
+                "To make every lookup take exactly the same time",
+                "So that only one company can ever control all names"
+              ],
+              "answerIndex": 0,
+              "explanation": "A single list of every name on earth would be unmanageable and impossible to keep updated. The hierarchy divides responsibility: each level only needs to point one step closer. It is not about alphabetical order, equal timing, or single-company control — in fact it spreads control out.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/nat-dhcp-dns-3.svg"
+            },
+            {
+              "id": "nat-dhcp-dns-dns-007",
+              "type": "mcq",
+              "prompt": "What does an A record hold?",
+              "choices": [
+                "The IPv4 address for a name",
+                "The IPv6 address for a name",
+                "An alias pointing one name to another",
+                "The mail server for a domain"
+              ],
+              "answerIndex": 0,
+              "explanation": "An A record maps a name to its IPv4 address — the most common everyday record. The IPv6 version is AAAA, an alias is a CNAME, and the mail server is given by MX. Keeping these straight is the core of reading DNS.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/nat-dhcp-dns-4.svg"
+            },
+            {
+              "id": "nat-dhcp-dns-dns-008",
+              "type": "mcq",
+              "prompt": "What is a CNAME record for?",
+              "choices": [
+                "It makes one name an alias for another name, which is then looked up",
+                "It maps a name straight to an IPv4 address",
+                "It lists which servers are in charge of a domain",
+                "It stores the domain's email settings"
+              ],
+              "answerIndex": 0,
+              "explanation": "A CNAME says 'this name is really that other name' — the resolver then looks up the target. Mapping straight to an IPv4 address is an A record; listing the responsible servers is NS; email is MX. CNAME is purely an alias.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/nat-dhcp-dns-4.svg"
+            },
+            {
+              "id": "nat-dhcp-dns-dns-009",
+              "type": "mcq",
+              "prompt": "Which record tells the world where to deliver a domain's email?",
+              "choices": [
+                "MX",
+                "A",
+                "CNAME",
+                "TXT"
+              ],
+              "answerIndex": 0,
+              "explanation": "MX (Mail eXchanger) names the mail server that handles a domain's email. A gives an address, CNAME is an alias, and TXT holds free-form text. So MX is the one mail systems look up to find where to send messages.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/nat-dhcp-dns-4.svg"
+            },
+            {
+              "id": "nat-dhcp-dns-dns-010",
+              "type": "mcq",
+              "prompt": "You change your website's address, but for a while some visitors still reach the old one. What is the most likely reason?",
+              "choices": [
+                "Resolvers cached the old answer and will keep using it until its TTL countdown runs out",
+                "DNS permanently refuses to update any record",
+                "The visitors' computers are broken",
+                "The new address was rejected by the root servers"
+              ],
+              "answerIndex": 0,
+              "explanation": "Cached answers stay in use until their TTL expires, so during that window some users still get the old address. Lowering the TTL ahead of a change shortens this delay. DNS does update; the visitors' machines are fine; and root servers do not approve individual addresses.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/nat-dhcp-dns-3.svg"
+            },
+            {
+              "id": "nat-dhcp-dns-dns-011",
+              "type": "mcq",
+              "prompt": "What does the TTL (Time To Live) on a DNS answer control?",
+              "choices": [
+                "How long a resolver may reuse the cached answer before asking again",
+                "How fast the website's pages load",
+                "How many devices may visit the website",
+                "How long the domain name is registered for"
+              ],
+              "answerIndex": 0,
+              "explanation": "TTL is a countdown for caching: it tells resolvers how long they may keep reusing an answer before checking for a fresh one. It is not about page speed, visitor limits, or domain registration length.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/nat-dhcp-dns-3.svg"
+            },
+            {
+              "id": "nat-dhcp-dns-dns-012",
+              "type": "mcq",
+              "prompt": "During the lookup, what does a root server typically return for a .com name?",
+              "choices": [
+                "A pointer to the .com (TLD) servers, not the final address",
+                "The final IP address of the website",
+                "An error saying the name does not exist",
+                "The mail server for the domain"
+              ],
+              "answerIndex": 0,
+              "explanation": "Root servers do not store final answers; they refer the resolver to the right TLD servers (here, .com), which in turn refer it to the authoritative server. Expecting the root to hand back the final address misunderstands the layered design.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/nat-dhcp-dns-3.svg"
+            },
+            {
+              "id": "nat-dhcp-dns-dns-013",
+              "type": "mcq",
+              "prompt": "At a beginner level, what is the difference between DNSSEC and DoH/DoT?",
+              "choices": [
+                "DNSSEC checks that an answer is genuine; DoH/DoT encrypt the lookup so others cannot read or tamper with it",
+                "They are two names for the exact same thing",
+                "DNSSEC speeds up lookups; DoH/DoT slows them down on purpose",
+                "DNSSEC stores web pages; DoH/DoT stores passwords"
+              ],
+              "answerIndex": 0,
+              "explanation": "DNSSEC is about authenticity (digital signatures prove an answer was not faked), while DoH/DoT is about privacy (encrypting the query in transit). They tackle different problems and can be used together. They are not identical, and neither stores pages or passwords.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/nat-dhcp-dns-3.svg"
             }
           ]
         }
