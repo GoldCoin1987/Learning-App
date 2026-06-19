@@ -4,387 +4,131 @@
   "order": 14,
   "lessons": [
     {
-      "id": "containers-lesson-not-a-vm",
-      "title": "A Container Is Not a VM",
+      "id": "containers-what-is-a-container",
+      "title": "What Is a Container?",
       "order": 1,
       "difficulty": 1,
-      "content": "The single most important mental correction: **a container is not a lightweight virtual machine.** A VM runs its own *guest kernel* on top of a hypervisor that virtualizes hardware; you can boot Windows on a Linux host because the guest brings its own kernel. A container brings *no kernel at all*. Every container on a host shares the **one host kernel**; what differs is each container's *view* of that kernel.\n\nSo what actually isolates a container? Three kernel features you already half-know from earlier modules:\n\n- **Namespaces** give a process its own view of a resource class (PIDs, mounts, network, hostname, IPC, users). Inside, it sees PID 1 and its own `/`; outside, it is just a normal process.\n- **cgroups v2** *limit and account* resources — CPU shares, a memory ceiling, IO and PID caps.\n- A **layered (union) filesystem** (overlayfs) supplies the root filesystem cheaply by stacking read-only image layers under a thin writable layer.\n\nMemorize the one-line definition you will be tested on:\n\n> **A container = namespaces + cgroups + a layered filesystem over a shared kernel.**\n\nConsequences fall out immediately. A Linux container cannot run a Windows kernel workload — there is no guest kernel. A kernel bug or `sysctl` is *shared* across all containers, so isolation is weaker than a VM's. Boot is near-instant because nothing boots: the runtime just `clone()`s a process into fresh namespaces and `exec`s your binary.\n\n```bash\n# Same kernel, host and container:\nuname -r            # 6.8.0-host on the host\ndocker run --rm alpine uname -r   # 6.8.0-host (identical!)\n```",
+      "content": "**Hook.** Have you ever heard a programmer say \"but it works on MY computer!\" when an app breaks on someone else's machine? Containers were invented to make that complaint disappear.\n\n**Build.** A **container** packages an app together with *everything it needs to run* -- the program itself, the code libraries it depends on, configuration files, even the right versions of those pieces -- into one neat, portable bundle. Think of a real **shipping container**: whatever you pack inside, the sealed box moves the same way onto a truck, a train, or a ship. A software container does the same for an app: because the bundle carries its own dependencies, it runs the *same way* on your laptop, a teammate's PC, or a server in the cloud.\n\nWhy does \"works on my machine\" happen at all? Usually one computer has a slightly different version of some library or setting than another, so the app behaves differently. A container freezes all of that *inside the bundle*, so the surroundings stop mattering. The popular tools for building and running containers are **Docker** and **Podman** -- we will meet both.\n\n**Recap.** A container is a portable bundle of an app plus everything it needs, so it runs identically anywhere -- the cure for \"it works on my machine.\"",
       "items": [
-        {
-          "id": "containers-fc-not-vm",
-          "type": "flashcard",
-          "front": "How does a container differ from a virtual machine at the kernel level?",
-          "back": "A VM runs its own guest kernel on a hypervisor that virtualizes hardware. A container has no kernel of its own — all containers share the single host kernel and are isolated only by namespaces, cgroups, and a layered filesystem.",
-          "hint": "Count the kernels."
-        },
-        {
-          "id": "containers-fc-definition",
-          "type": "flashcard",
-          "front": "Give the one-line definition of a container.",
-          "back": "A container = namespaces + cgroups + a layered filesystem, all running over a single shared host kernel.",
-          "hint": "Three primitives + one shared thing."
-        },
-        {
-          "id": "containers-fc-three-roles",
-          "type": "flashcard",
-          "front": "What is each primitive's job: namespaces, cgroups, overlayfs?",
-          "back": "Namespaces isolate the *view* of a resource (PID, mount, net, etc.). cgroups *limit and account* resources (CPU, memory, IO, PIDs). overlayfs supplies the root filesystem by layering read-only image layers under a writable layer.",
-          "hint": "Isolate / limit / store."
-        },
-        {
-          "id": "containers-fc-why-fast",
-          "type": "flashcard",
-          "front": "Why does a container start in milliseconds while a VM takes seconds?",
-          "back": "Nothing boots. There is no guest kernel or firmware to initialize — the runtime just clones a process into new namespaces and execs the entrypoint binary on the already-running host kernel.",
-          "hint": "What does a VM do that a container skips?"
-        },
-        {
-          "id": "containers-mcq-shared-kernel",
-          "type": "mcq",
-          "prompt": "Why can you NOT run a genuine Windows application inside a standard Linux container on a Linux host?",
-          "choices": [
-            "Containers cannot allocate enough memory for Windows",
-            "The container shares the host's Linux kernel and has no Windows kernel of its own",
-            "Docker blocks non-Linux binaries by policy",
-            "Windows binaries are too large for overlayfs layers"
-          ],
-          "answerIndex": 1,
-          "explanation": "A container shares the host kernel rather than booting its own. A Windows binary needs the Windows kernel ABI, which a Linux host kernel does not provide — so it cannot run without an actual VM/guest kernel."
-        },
-        {
-          "id": "containers-mcq-isolation-strength",
-          "type": "mcq",
-          "prompt": "Compared with a VM, container isolation is generally considered:",
-          "choices": [
-            "Stronger, because each container has its own kernel",
-            "Identical, because both use hardware virtualization",
-            "Weaker, because all containers share one kernel and a kernel exploit crosses the boundary",
-            "Irrelevant, since containers have no security boundary at all"
-          ],
-          "answerIndex": 2,
-          "explanation": "Sharing one kernel means a kernel-level vulnerability or a misconfigured capability can escape a container, so the isolation boundary is thinner than a VM's hardware-virtualized one."
-        },
-        {
-          "id": "containers-mcq-uname",
-          "type": "mcq",
-          "prompt": "On a host running kernel 6.8.0-host, what does `docker run --rm alpine uname -r` print?",
-          "choices": [
-            "The Alpine distribution's own kernel version",
-            "6.8.0-host — the host kernel, because it is shared",
-            "An error, because Alpine ships no kernel",
-            "The Docker daemon's internal version string"
-          ],
-          "answerIndex": 1,
-          "explanation": "`uname -r` reports the running kernel. Since the container shares the host kernel, it reports the host's version, not anything from the Alpine image (which contains no kernel)."
-        },
-        {
-          "id": "containers-mcq-namespace-view",
-          "type": "mcq",
-          "prompt": "A process inside a container sees itself as PID 1. From the host's perspective it is:",
-          "choices": [
-            "Also PID 1 — there is only one PID 1 per machine",
-            "Invisible to the host entirely",
-            "An ordinary process with some other host PID, viewed through a separate PID namespace",
-            "Running inside a second kernel"
-          ],
-          "answerIndex": 2,
-          "explanation": "A PID namespace remaps PIDs: the container's PID 1 is just a normal host process with a different host-side PID. Namespaces change the *view*, not the underlying single kernel."
-        }
+        {"id":"containers-what-001","type":"mcq","prompt":"In plain terms, what is a container?","choices":["A portable bundle of an app plus everything it needs to run","A faster type of hard drive","A programming language for the web","A backup copy of your files"],"answerIndex":0,"explanation":"A container packages the app together with its libraries, files, and the right versions, so the whole thing travels as one portable unit. It is not storage hardware or a language.","image":"https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/containers-2.svg"},
+        {"id":"containers-what-002","type":"mcq","prompt":"What problem were containers mainly designed to solve?","choices":["Making screens brighter","The \"it works on my machine\" problem, where an app behaves differently on different computers","Typing faster","Reducing the price of laptops"],"answerIndex":1,"explanation":"By bundling the app with its dependencies, a container makes the surrounding machine stop mattering, so the app runs the same everywhere. The other options are unrelated to containers."},
+        {"id":"containers-what-003","type":"mcq","prompt":"Why might an app run fine on one computer but break on another, without containers?","choices":["The screens are different sizes","The machines may have different versions of libraries or settings the app depends on","One computer is newer","The keyboard layout differs"],"answerIndex":1,"explanation":"Apps depend on specific libraries and configuration; small differences between machines cause different behavior. A container locks those dependencies inside the bundle so they match everywhere."},
+        {"id":"containers-what-004","type":"mcq","prompt":"The \"shipping container\" analogy fits software containers because a shipping container:","choices":["Is always painted blue","Holds its contents in one sealed box that moves the same way anywhere","Can only carry food","Floats on water"],"answerIndex":1,"explanation":"Just as a sealed shipping container moves identically by truck, train, or ship, a software container carries its app and dependencies so it runs the same on any machine. Color and contents are beside the point."},
+        {"id":"containers-what-005","type":"mcq","prompt":"Which of these does a container typically include in its bundle?","choices":["Only the app's source code, nothing else","The app plus the libraries, files, and versions it needs to run","The entire internet","The user's personal photos"],"answerIndex":1,"explanation":"The whole point is to bundle the app together with its dependencies (libraries, files, correct versions). Shipping only the source code would leave the \"works on my machine\" problem unsolved."},
+        {"id":"containers-what-006","type":"mcq","prompt":"Which two tools are the popular ones for building and running containers?","choices":["Word and Excel","Docker and Podman","Chrome and Firefox","Photoshop and GIMP"],"answerIndex":1,"explanation":"Docker and Podman are the well-known container tools. The others are office, browser, or image-editing programs, not container engines."},
+        {"id":"containers-what-007","type":"mcq","prompt":"If a container runs correctly on your laptop, what can you reasonably expect when you run the same container on a cloud server?","choices":["It should behave the same way, because it carries its own dependencies","It will behave randomly","It must be completely rewritten first","It will only work at night"],"answerIndex":0,"explanation":"Carrying its dependencies is exactly what makes a container portable: the same bundle behaves the same way across machines. That predictability is the main benefit."},
+        {"id":"containers-what-008","type":"mcq","prompt":"\"Portable\" in the context of containers most nearly means:","choices":["Small enough to fit in a pocket","Able to run the same way across different computers","Battery powered","Easy to delete"],"answerIndex":1,"explanation":"Portability here means the container runs consistently on many different machines, not anything about physical size or power. That consistency is what teams rely on."},
+        {"id":"containers-what-009","type":"mcq","prompt":"A teammate cannot get your app working after lots of setup steps. How does a container help?","choices":["It emails them instructions","It bundles the app with its setup so they just run it -- no fragile manual steps","It makes their computer faster","It hides the error messages"],"answerIndex":1,"explanation":"Because the dependencies and setup are baked into the container, the teammate runs one bundle instead of reproducing many manual steps that are easy to get wrong."}
       ]
     },
     {
-      "id": "containers-lesson-primitives",
-      "title": "The Primitives: Namespaces, cgroups, Capabilities, Seccomp, overlayfs",
+      "id": "containers-vs-vm",
+      "title": "Container vs Virtual Machine",
       "order": 2,
-      "difficulty": 2,
-      "content": "Now go beneath the runtime. Containers are assembled from syscalls (Module 7), so you can build one by hand.\n\n**Namespaces** (created via `clone()`/`unshare()`), one per isolated resource class:\n- **PID** — own process-number space; first process becomes PID 1.\n- **mount** — own filesystem mount tree.\n- **net** — own interfaces, routes, ports (containers talk via veth pairs).\n- **UTS** — own hostname/domainname.\n- **IPC** — own System V IPC / POSIX message queues.\n- **user** — own UID/GID mapping; the basis of *rootless* containers (root inside maps to an unprivileged host UID).\n- Plus **cgroup** and **time** namespaces.\n\n**cgroups v2** form a single unified hierarchy under `/sys/fs/cgroup`. Controllers cap and meter `cpu`, `memory`, `io`, and `pids`. This is what enforces `docker run -m 256m`.\n\n**capabilities** split root's power into ~40 bits (`CAP_NET_RAW`, `CAP_SYS_ADMIN`, ...); runtimes drop most by default. **seccomp** filters which syscalls a process may make (the default Docker profile blocks ~44 dangerous calls). **overlayfs** unions read-only `lowerdir` image layers with a writable `upperdir` so copies are cheap and copy-on-write.\n\n```bash\n# Make a new PID + mount namespace; your shell becomes PID 1:\nsudo unshare --pid --fork --mount-proc bash\nps -ef        # only this shell + ps; you are PID 1\n\n# Inspect a running container's memory ceiling (cgroup v2):\ncat /sys/fs/cgroup/.../memory.max\n```\n\nThat is the whole trick: `unshare`/`clone` for namespaces, write a cgroup file for limits, `pivot_root` onto an overlay mount, drop capabilities, apply a seccomp filter, `exec` the app.",
+      "difficulty": 1,
+      "content": "**Hook.** People often think a container is just a small virtual machine. That is the single most useful thing to get straight -- and it is wrong.\n\n**Build.** Every computer has one **kernel**: the core part of the operating system that talks to the hardware (the CPU, memory, and disk). A **virtual machine (VM)** pretends to be a whole separate computer: it runs its *own* full operating system, with its *own* kernel, on top of the real machine. That is powerful but heavy -- like renting an entire separate kitchen just to make one sandwich. It takes lots of memory and can take a minute to \"boot up.\"\n\nA **container** is different. It does **not** bring its own kernel or its own operating system. Instead, all the containers on a machine **share the host's single kernel**, and the container only wraps up the app's own *userspace* -- its program and files. That makes a container much **lighter** and able to start almost **instantly**, because nothing has to boot. Compare it to a sealed **lunchbox** you carry into a kitchen that already exists, instead of renting a whole new kitchen. The trade-off: because they share one kernel, containers are isolated a little less strongly than VMs.\n\n**Recap.** A VM carries a whole operating system and its own kernel (heavy, slow to start); a container shares the host's kernel and packages only the app (lightweight, instant). A container is *not* a VM.",
       "items": [
-        {
-          "id": "containers-fc-ns-list",
-          "type": "flashcard",
-          "front": "Name the main Linux namespace types and what each isolates.",
-          "back": "PID (process numbers), mount (filesystem tree), net (interfaces/ports), UTS (hostname), IPC (System V/POSIX IPC), user (UID/GID mapping), plus cgroup and time. Each isolates one resource class' view.",
-          "hint": "PID, mount, net, UTS, IPC, user (+cgroup, time)."
-        },
-        {
-          "id": "containers-fc-cgroups-job",
-          "type": "flashcard",
-          "front": "What do cgroups v2 do, and where do they live?",
-          "back": "cgroups v2 limit and account resource usage (cpu, memory, io, pids controllers) in a single unified hierarchy under /sys/fs/cgroup. They enforce limits like `docker run -m 256m`.",
-          "hint": "Limit + account; /sys/fs/cgroup."
-        },
-        {
-          "id": "containers-fc-user-ns-rootless",
-          "type": "flashcard",
-          "front": "How does the user namespace enable rootless containers?",
-          "back": "A user namespace maps UIDs/GIDs: UID 0 (root) *inside* the container maps to an unprivileged UID on the host. The process feels like root within its namespace but holds no real host privileges.",
-          "hint": "Root inside maps to non-root outside."
-        },
-        {
-          "id": "containers-fc-cap-seccomp",
-          "type": "flashcard",
-          "front": "What is the difference between capabilities and seccomp?",
-          "back": "Capabilities split root's authority into ~40 fine-grained bits (e.g. CAP_NET_RAW) that can be granted/dropped. seccomp filters which *syscalls* a process is allowed to invoke. They are complementary defense layers.",
-          "hint": "Which privileges vs which syscalls."
-        },
-        {
-          "id": "containers-fc-overlayfs",
-          "type": "flashcard",
-          "front": "How does overlayfs provide a container's root filesystem?",
-          "back": "It unions read-only image layers (lowerdir) beneath a thin writable layer (upperdir). Reads fall through to lower layers; writes go to upperdir via copy-on-write, so containers share layers and start cheaply.",
-          "hint": "lowerdir (RO) + upperdir (RW), copy-on-write."
-        },
-        {
-          "id": "containers-mcq-unshare-pid",
-          "type": "mcq",
-          "prompt": "What does `sudo unshare --pid --fork --mount-proc bash` demonstrate?",
-          "choices": [
-            "It boots a tiny virtual machine with its own kernel",
-            "It creates a new PID namespace so the shell becomes PID 1 and `ps` shows only that namespace's processes",
-            "It permanently changes the host's PID numbering",
-            "It mounts an overlay filesystem for image layers"
-          ],
-          "answerIndex": 1,
-          "explanation": "`unshare --pid --fork` creates a new PID namespace; `--mount-proc` mounts a fresh /proc reflecting it. The forked bash is PID 1 inside and sees only namespace-local processes — a hand-built piece of a container."
-        },
-        {
-          "id": "containers-mcq-mem-limit",
-          "type": "mcq",
-          "prompt": "Which primitive actually enforces `docker run -m 256m` (a 256 MB memory cap)?",
-          "choices": [
-            "The mount namespace",
-            "seccomp syscall filtering",
-            "The cgroup v2 memory controller (memory.max)",
-            "overlayfs copy-on-write"
-          ],
-          "answerIndex": 2,
-          "explanation": "Resource limits are cgroups, not namespaces. The memory controller writes the ceiling to memory.max; the kernel then refuses allocations / OOM-kills the cgroup when exceeded."
-        },
-        {
-          "id": "containers-mcq-syscall-basis",
-          "type": "mcq",
-          "prompt": "At the syscall level, which call creates the new namespaces that make a container?",
-          "choices": [
-            "open() / read()",
-            "clone() (or unshare()) with namespace flags such as CLONE_NEWPID",
-            "mmap() with MAP_SHARED",
-            "ptrace()"
-          ],
-          "answerIndex": 1,
-          "explanation": "Namespaces are created by passing CLONE_NEW* flags to clone() (for a new process) or unshare() (for the current one). This ties containers directly back to the process/syscall model of Module 7."
-        },
-        {
-          "id": "containers-mcq-default-caps",
-          "type": "mcq",
-          "prompt": "By default, a Docker container's process runs with:",
-          "choices": [
-            "Every Linux capability, identical to host root",
-            "A reduced capability set with dangerous ones dropped, plus a seccomp profile blocking risky syscalls",
-            "No capabilities and no syscalls at all",
-            "Capabilities chosen randomly per run"
-          ],
-          "answerIndex": 1,
-          "explanation": "Runtimes harden by default: they drop most capabilities and apply a seccomp allowlist/denylist (Docker blocks ~44 syscalls). You can add back specific caps with --cap-add when truly needed."
-        }
+        {"id":"containers-vsvm-001","type":"mcq","prompt":"What is the KEY difference between a container and a virtual machine?","choices":["A container shares the host's single kernel; a VM runs its own full operating system with its own kernel","A container is just a VM with a different name","A VM is always faster than a container","A container can only run on Apple computers"],"answerIndex":0,"explanation":"This is the central idea: a VM brings an entire OS plus its own kernel, while containers share the one host kernel and wrap only the app. They are not the same thing, and VMs are generally heavier, not faster to start.","image":"https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/containers-1.svg"},
+        {"id":"containers-vsvm-002","type":"mcq","prompt":"What is a kernel?","choices":["The core part of the operating system that talks to the hardware","A type of container image","A programming language","The screen of a computer"],"answerIndex":0,"explanation":"The kernel is the central piece of the OS managing CPU, memory, and devices. Containers share the host's one kernel rather than each carrying their own."},
+        {"id":"containers-vsvm-003","type":"mcq","prompt":"Why does a container usually start almost instantly while a VM can take much longer?","choices":["Containers run on faster hardware","A container has no separate operating system to boot -- it just starts the app on the already-running host kernel","VMs are deliberately slowed down","Containers skip running the app"],"answerIndex":1,"explanation":"A VM must boot a whole guest OS and kernel; a container reuses the host kernel that is already running, so there is nothing to boot -- it simply launches the app."},
+        {"id":"containers-vsvm-004","type":"mcq","prompt":"The \"sealed lunchbox vs renting a whole separate kitchen\" analogy maps to:","choices":["Lunchbox = VM, kitchen = container","Lunchbox = container (lightweight, uses the existing kitchen); separate kitchen = VM (a whole new setup)","Both mean the same thing","Neither relates to containers"],"answerIndex":1,"explanation":"A container is the lunchbox you bring into an existing kitchen (the shared kernel), while a VM is like renting an entire separate kitchen (its own full OS). That is why containers are lighter."},
+        {"id":"containers-vsvm-005","type":"mcq","prompt":"Roughly how many kernels run when you start ten containers on one Linux host?","choices":["Ten -- one per container","One -- the host kernel, shared by all of them","Eleven","Zero"],"answerIndex":1,"explanation":"All containers share the single host kernel, so there is just one kernel no matter how many containers run. Ten separate kernels would describe ten VMs instead."},
+        {"id":"containers-vsvm-006","type":"mcq","prompt":"Compared with a virtual machine, a container is generally:","choices":["Heavier and slower to start","Lighter and faster to start, because it shares the host kernel","Exactly the same weight","Unable to run real apps"],"answerIndex":1,"explanation":"Sharing the host kernel and skipping a full OS makes containers lighter on memory and near-instant to start, which is a major reason they are popular."},
+        {"id":"containers-vsvm-007","type":"mcq","prompt":"What does a container actually isolate, if not a whole operating system?","choices":["Just the app's own userspace -- its program and files","The hardware itself","The electricity supply","Nothing at all"],"answerIndex":0,"explanation":"A container wraps the app's userspace (its process and files) while sharing the kernel. It does not virtualize hardware the way a VM does, and it does provide real isolation."},
+        {"id":"containers-vsvm-008","type":"mcq","prompt":"One trade-off of containers sharing a single kernel is that:","choices":["They can never be deleted","Their isolation is a bit weaker than a VM's separate-OS isolation","They cannot use the network","They must run as a VM first"],"answerIndex":1,"explanation":"Because everything shares one kernel, the boundary between containers is thinner than between VMs, so isolation is somewhat weaker. This is the cost of being lightweight."},
+        {"id":"containers-vsvm-009","type":"mcq","prompt":"\"A container is basically a lightweight virtual machine.\" This statement is:","choices":["Correct in every way","A common misconception -- containers share the host kernel and don't run their own OS","True only on Windows","True only for Podman"],"answerIndex":1,"explanation":"It is the classic beginner misconception. The defining difference is that containers share the host kernel and package only the app, rather than running a full guest OS like a VM."}
       ]
     },
     {
-      "id": "containers-lesson-docker",
-      "title": "Docker: Images, Layers, Dockerfiles, Networking & Compose",
+      "id": "containers-images-and-registries",
+      "title": "Images vs Containers (and Registries)",
       "order": 3,
-      "difficulty": 3,
-      "content": "**Image vs container:** an *image* is an immutable, layered, read-only template (identified by a tag like `nginx:1.27` and an immutable `sha256:` digest). A *container* is a running (or stopped) instance — the image plus a writable overlay layer and a process. One image, many containers.\n\n**Layers & cache:** each Dockerfile instruction that changes the filesystem (`RUN`, `COPY`, `ADD`) creates a layer. Docker caches layers and reuses them if the instruction and its inputs are unchanged. So **order matters**: copy dependency manifests and install deps *before* copying source, or every code edit busts the dependency cache.\n\n```dockerfile\n# Multi-stage: heavy builder, tiny runtime\nFROM golang:1.22 AS build\nWORKDIR /src\nCOPY go.mod go.sum ./\nRUN go mod download            # cached unless deps change\nCOPY . .\nRUN CGO_ENABLED=0 go build -o /app ./cmd/server\n\nFROM gcr.io/distroless/static:nonroot   # minimal, no shell\nCOPY --from=build /app /app\nUSER nonroot:nonroot           # never run as root\nEXPOSE 8080\nENTRYPOINT [\"/app\"]            # the fixed executable\nCMD [\"--port=8080\"]            # default args, overridable\n```\n\n`ENTRYPOINT` is the command that always runs; `CMD` supplies default arguments (or a default command) that the user can override at `docker run`. **Multi-stage** keeps compilers out of the shipped image.\n\n**Volumes vs bind mounts:** a named *volume* is Docker-managed persistent storage; a *bind mount* maps a host path straight in. **Networking:** `bridge` (default, private network + `-p 8080:80` port mapping), `host` (shares host netns, no isolation), `none` (no network). **Compose** declares a multi-container app in YAML:\n\n```bash\ndocker compose up -d        # bring up app + db together\n```",
+      "difficulty": 1,
+      "content": "**Hook.** A recipe is not the same as a cooked meal. Keeping that difference in mind makes containers click.\n\n**Build.** An **image** is the saved, read-only package -- the *recipe* or the app *installer*. It sits on disk and does nothing by itself. A **container** is what you get when you *run* an image: the recipe actually being cooked, a live program doing work. The relationship is one-way and reusable: from a single image you can start **many** containers, just as one recipe can cook many identical meals.\n\nWhere do images come from? A **registry** is an online library of ready-made images. The most famous is **Docker Hub**. You **pull** (download) an image such as `nginx` (a popular web server) from a registry, then **run** it to create a container. Each image has a **tag** that picks a version, written `name:tag`, for example `nginx:1.27`.\n\n```bash\ndocker pull nginx:1.27       # download the image from a registry\ndocker run nginx:1.27        # start a container from that image\ndocker ps                    # list the containers currently running\n```\n\n**Recap.** An image is the saved template (a recipe); a container is that image running (the meal). You pull images from a registry by `name:tag`, and one image can spawn many containers.",
       "items": [
-        {
-          "id": "containers-fc-image-vs-container",
-          "type": "flashcard",
-          "front": "What is the difference between a Docker image and a container?",
-          "back": "An image is an immutable, layered, read-only template (tag + sha256 digest). A container is a runnable instance of an image: the image's layers plus a writable overlay layer and a running process. One image -> many containers.",
-          "hint": "Template vs instance."
-        },
-        {
-          "id": "containers-fc-layer-cache",
-          "type": "flashcard",
-          "front": "Why should you `COPY` dependency manifests and install dependencies before copying application source?",
-          "back": "Each instruction is a cached layer. Copying source first makes any code change invalidate the cache for every later layer — including dependency install. Installing deps first lets that expensive layer stay cached across code edits.",
-          "hint": "Cache invalidation and instruction order."
-        },
-        {
-          "id": "containers-fc-entrypoint-cmd",
-          "type": "flashcard",
-          "front": "ENTRYPOINT vs CMD in a Dockerfile?",
-          "back": "ENTRYPOINT is the executable that always runs. CMD supplies default arguments (or a default command) appended to ENTRYPOINT, and is easily overridden by args passed to `docker run`. Common pattern: ENTRYPOINT = the binary, CMD = default flags.",
-          "hint": "Fixed program vs overridable default args."
-        },
-        {
-          "id": "containers-fc-multistage",
-          "type": "flashcard",
-          "front": "What problem do multi-stage builds solve?",
-          "back": "They let a heavy build stage (compilers, dev headers, full toolchain) produce an artifact that is COPY --from into a tiny final stage. The shipped image contains only the runtime artifact, shrinking size and attack surface.",
-          "hint": "Build big, ship small."
-        },
-        {
-          "id": "containers-fc-volume-vs-bind",
-          "type": "flashcard",
-          "front": "Volume vs bind mount?",
-          "back": "A named volume is Docker-managed storage (lives in Docker's area, portable, good for persistent data). A bind mount maps a specific host directory into the container (good for dev / host config), tying the container to the host's filesystem layout.",
-          "hint": "Docker-managed vs explicit host path."
-        },
-        {
-          "id": "containers-mcq-port-mapping",
-          "type": "mcq",
-          "prompt": "On the default bridge network, what does `-p 8080:80` do in `docker run -p 8080:80 nginx`?",
-          "choices": [
-            "Maps host port 8080 to container port 80",
-            "Maps container port 8080 to host port 80",
-            "Opens ports 80 through 8080 inside the container",
-            "Disables networking for the container"
-          ],
-          "answerIndex": 0,
-          "explanation": "The format is host:container. Traffic to the host's 8080 is forwarded to port 80 inside the container. With host networking there is no mapping — the container uses host ports directly."
-        },
-        {
-          "id": "containers-mcq-host-network",
-          "type": "mcq",
-          "prompt": "Which network mode shares the host's network namespace, giving the container no network isolation?",
-          "choices": [
-            "bridge",
-            "none",
-            "host",
-            "overlay"
-          ],
-          "answerIndex": 2,
-          "explanation": "`--network host` puts the container in the host's net namespace: it sees host interfaces and binds host ports directly with no NAT or port mapping. `bridge` isolates, `none` removes networking."
-        },
-        {
-          "id": "containers-mcq-cmd-override",
-          "type": "mcq",
-          "prompt": "Given `ENTRYPOINT [\"/app\"]` and `CMD [\"--port=8080\"]`, what runs for `docker run img --port=9090`?",
-          "choices": [
-            "/app --port=8080 (CMD always wins)",
-            "/app --port=9090 (the run args replace CMD, appended to ENTRYPOINT)",
-            "--port=9090 only, ignoring ENTRYPOINT",
-            "An error, because you cannot override CMD"
-          ],
-          "answerIndex": 1,
-          "explanation": "Arguments after the image name replace CMD and are appended to ENTRYPOINT. So ENTRYPOINT /app stays fixed and the args become --port=9090, overriding the default."
-        },
-        {
-          "id": "containers-mcq-compose",
-          "type": "mcq",
-          "prompt": "What is the primary purpose of `docker compose`?",
-          "choices": [
-            "To build a single image faster",
-            "To declare and run a multi-container application (e.g. app + database) from one YAML file",
-            "To replace the Linux kernel's namespaces",
-            "To scan images for vulnerabilities"
-          ],
-          "answerIndex": 1,
-          "explanation": "Compose describes multiple services, their networks, and volumes declaratively in YAML so `docker compose up` brings the whole app stack up together. It is single-host orchestration; Kubernetes handles multi-host scale."
-        }
+        {"id":"containers-img-001","type":"mcq","prompt":"What is the difference between an image and a container?","choices":["An image is the saved, read-only template; a container is that image actually running","They are two words for the same thing","An image runs; a container just sits on disk","A container is always smaller than an image"],"answerIndex":0,"explanation":"The image is the static package (the recipe); running it produces a container (the meal being cooked). The image does nothing on its own -- the container is the live process.","image":"https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/containers-3.svg"},
+        {"id":"containers-img-002","type":"mcq","prompt":"Using the cooking analogy, an image is like the ___ and a container is like the ___.","choices":["meal ... recipe","recipe ... cooked meal","plate ... fork","oven ... kitchen"],"answerIndex":1,"explanation":"An image is the recipe (a saved set of instructions and ingredients); a container is the meal you cook from it. One recipe can make many meals, just as one image starts many containers."},
+        {"id":"containers-img-003","type":"mcq","prompt":"What is a registry?","choices":["A list of running containers on your machine","An online library you pull ready-made images from","A part of the kernel","A type of network cable"],"answerIndex":1,"explanation":"A registry (such as Docker Hub) stores images that anyone can pull. It is not a process list -- that is what `docker ps` shows -- nor part of the kernel."},
+        {"id":"containers-img-004","type":"mcq","prompt":"In the image name `nginx:1.27`, what is the `1.27` part?","choices":["The number of containers allowed","A tag that selects a specific version of the image","The price of the image","The amount of memory it uses"],"answerIndex":1,"explanation":"After the colon comes the tag, which picks a particular version of the image. It has nothing to do with container limits, price, or memory."},
+        {"id":"containers-img-005","type":"mcq","prompt":"How many containers can you start from a single image?","choices":["Exactly one, ever","Many -- one image can spawn many independent containers","Only as many as the image's version number","Zero; images cannot be run"],"answerIndex":1,"explanation":"Images are reusable templates, so one image can launch many separate containers, like cooking many meals from one recipe. They certainly can be run -- that is their purpose."},
+        {"id":"containers-img-006","type":"mcq","prompt":"What does `docker pull nginx:1.27` do?","choices":["Deletes the nginx image","Downloads the nginx image (version 1.27) from a registry","Starts ten containers","Edits the Dockerfile"],"answerIndex":1,"explanation":"`pull` downloads the named image and tag from a registry to your machine. Running it later (`docker run`) is the separate step that creates a container."},
+        {"id":"containers-img-007","type":"mcq","prompt":"Why is an image described as \"read-only\"?","choices":["You can only view it on a screen","It is a fixed template that isn't changed when you run it; the running container holds the changes","It cannot be downloaded","It deletes itself after use"],"answerIndex":1,"explanation":"The image stays unchanged as a stable template; any changes happen in the running container, not the image. That is what lets one image reliably produce many identical containers."},
+        {"id":"containers-img-008","type":"mcq","prompt":"Which command lists the containers currently running?","choices":["docker ps","docker delete","docker paint","docker sleep"],"answerIndex":0,"explanation":"`docker ps` shows running containers. The others are not real container-listing commands."},
+        {"id":"containers-img-009","type":"mcq","prompt":"What is the usual order of steps to get a web server running from a registry?","choices":["Run the container, then invent an image","Pull the image from the registry, then run it to start a container","Delete an image, then pull it","Start a VM, then a kitchen"],"answerIndex":1,"explanation":"First you pull (download) the image, then you run it to create a container. You cannot run an image you have not obtained, and you do not need a VM for this."}
       ]
     },
     {
-      "id": "containers-lesson-podman-bestpractice",
-      "title": "Podman, OCI, Best Practices & the Kubernetes Horizon",
+      "id": "containers-using-docker-run",
+      "title": "Using Containers: docker run, Ports & Volumes",
       "order": 4,
-      "difficulty": 3,
-      "content": "**Podman** is a Docker-CLI-compatible engine with a different architecture. Docker uses a long-running **daemon** (`dockerd`) running as root that owns all containers — a single privileged process and a security/availability concern. Podman is **daemonless**: it `fork`/`exec`s each container as a direct child process, so there is no central root daemon. Combined with **user namespaces**, this makes **rootless** containers natural — an ordinary user runs containers where in-container root maps to their unprivileged host UID. Most commands are aliases: `alias docker=podman` usually just works.\n\n```bash\npodman run -d --name web -p 8080:80 nginx        # rootless, no daemon\n# Ship it as a real systemd service via Quadlet:\n# /etc/containers/systemd/web.container  -> generates web.service\nsystemctl --user start web.service\n```\n\n**Quadlet** lets you describe a container in a `.container` unit file; systemd generates and supervises a proper service — the modern replacement for the old `podman generate systemd`.\n\n**OCI** (Open Container Initiative) standardizes the *image format* and *runtime* (`runc`/`crun`), so images built by Docker run under Podman and vice versa — they are interchangeable.\n\n**Best practices** (the ones interviewers probe):\n- **Minimal base image** — `distroless`, `alpine`, or scratch: smaller, fewer CVEs, smaller attack surface.\n- **Run as non-root** — add a `USER` directive; never default to root.\n- **No baked secrets** — secrets in `ENV`/layers persist in the image history; inject at runtime (env, mounts, secret stores).\n- Pin by digest, scan images, keep layers few.\n\n**Kubernetes horizon:** a single host runs containers fine, but production scale (scheduling across many nodes, self-healing, rolling updates, service discovery) is **Kubernetes** — it orchestrates OCI containers across a cluster. Know that it exists and consumes these same images; deep K8s is its own topic.",
+      "difficulty": 2,
+      "content": "**Hook.** You have an image. How do you actually start it, reach it from your web browser, and keep its data from vanishing? Three small ideas: run, ports, and volumes.\n\n**Build.** The workhorse command is **`docker run`**. Give it an image name and it starts a container from that image. Handy flags: `-d` runs it in the background (\"detached\"), and `--name` gives it a friendly name.\n\nA container is isolated, so by default the outside world cannot reach a server inside it. **Port mapping** opens a door. The flag `-p 8080:80` means \"connect **host** port 8080 to **container** port 80\" (the order is always *host:container*). Now visiting `localhost:8080` in your browser reaches the app listening on port 80 inside.\n\nWhen a container is deleted, anything it wrote inside disappears. To keep data, use a **volume**: storage that lives *outside* the container and is mounted into it. The flag `-v mydata:/data` attaches a volume named `mydata` to the folder `/data` inside, so the files survive even if you delete and recreate the container.\n\n```bash\ndocker run -d --name web -p 8080:80 -v mydata:/data nginx\ndocker logs web      # see the container's output\ndocker stop web      # stop it when finished\n```\n\n**Recap.** `docker run` starts a container; `-p host:container` maps a port so you can reach the app; `-v` attaches a volume so data outlives the container.",
       "items": [
-        {
-          "id": "containers-fc-daemonless",
-          "type": "flashcard",
-          "front": "How does Podman's architecture differ from Docker's?",
-          "back": "Docker uses a long-running root daemon (dockerd) that owns all containers. Podman is daemonless: it fork/execs each container as a direct child process. No central privileged daemon, which improves security and avoids a single point of failure.",
-          "hint": "Daemon vs fork/exec."
-        },
-        {
-          "id": "containers-fc-rootless",
-          "type": "flashcard",
-          "front": "What makes Podman rootless containers possible, and why is it safer?",
-          "back": "User namespaces map in-container root (UID 0) to the invoking user's unprivileged host UID. An ordinary user runs containers with no real host root, so a container escape yields only that user's privileges, not host root.",
-          "hint": "User namespace UID mapping."
-        },
-        {
-          "id": "containers-fc-quadlet",
-          "type": "flashcard",
-          "front": "What is Quadlet?",
-          "back": "Quadlet lets you declare a Podman container in a systemd .container unit file; systemd generates and supervises the corresponding .service. It is the modern, declarative way to run containers under systemd (replacing `podman generate systemd`).",
-          "hint": ".container -> systemd .service."
-        },
-        {
-          "id": "containers-fc-oci",
-          "type": "flashcard",
-          "front": "What does the OCI standardize, and why does it matter?",
-          "back": "The Open Container Initiative standardizes the container image format and the runtime spec (implemented by runc/crun). Because of OCI, an image built with Docker runs under Podman/Kubernetes and vice versa — tools are interchangeable.",
-          "hint": "Image format + runtime spec = interoperability."
-        },
-        {
-          "id": "containers-fc-no-secrets",
-          "type": "flashcard",
-          "front": "Why must you never bake secrets into an image with ENV or COPY?",
-          "back": "Image layers are immutable and inspectable: anything in ENV or a COPYed file persists in the image history and is readable by anyone who pulls it, even if a later layer 'removes' it. Inject secrets at runtime (env, mounts, secret stores) instead.",
-          "hint": "Layers are permanent and inspectable."
-        },
-        {
-          "id": "containers-mcq-docker-podman-compat",
-          "type": "mcq",
-          "prompt": "Why does an image built by `docker build` run unchanged under Podman?",
-          "choices": [
-            "Podman secretly bundles the Docker daemon",
-            "Both produce and consume OCI-compliant images and use an OCI runtime (runc/crun)",
-            "Podman recompiles the image at first run",
-            "It does not — images must be rebuilt for each engine"
-          ],
-          "answerIndex": 1,
-          "explanation": "The OCI image and runtime specs make images portable across engines. Docker and Podman both emit/consume OCI images, so the same image runs under either without modification."
-        },
-        {
-          "id": "containers-mcq-minimal-base",
-          "type": "mcq",
-          "prompt": "What is the main security benefit of a minimal base image like distroless or scratch?",
-          "choices": [
-            "It runs the container with a newer kernel",
-            "Fewer packages mean fewer CVEs and a smaller attack surface (often no shell to exploit)",
-            "It automatically runs the process as root",
-            "It disables namespaces for speed"
-          ],
-          "answerIndex": 1,
-          "explanation": "Minimal images strip out unneeded packages, package managers, and often the shell. Less software means fewer vulnerabilities and less for an attacker to use after a compromise."
-        },
-        {
-          "id": "containers-mcq-nonroot",
-          "type": "mcq",
-          "prompt": "A Dockerfile ends without a USER directive. What is the practical risk?",
-          "choices": [
-            "The image will not build",
-            "The process runs as root inside the container, widening impact if the container is compromised",
-            "The container cannot open any network ports",
-            "overlayfs will be disabled"
-          ],
-          "answerIndex": 1,
-          "explanation": "Without USER, the default is root. A compromised root process plus any misconfigured capability or shared mount is far more dangerous than an unprivileged one. Add a non-root USER as a best practice."
-        },
-        {
-          "id": "containers-mcq-k8s",
-          "type": "mcq",
-          "prompt": "When does a team typically reach for Kubernetes rather than plain Docker/Podman + compose?",
-          "choices": [
-            "To build images more quickly",
-            "To scale and self-heal containerized workloads across many nodes with scheduling, rolling updates, and service discovery",
-            "To replace the Linux kernel namespaces",
-            "Only for single-container hobby projects"
-          ],
-          "answerIndex": 1,
-          "explanation": "Compose is single-host. Kubernetes orchestrates the same OCI containers across a cluster: scheduling onto nodes, restarting failed pods, rolling updates, and service discovery — the production scale-out endpoint."
-        },
-        {
-          "id": "containers-img-vm-vs-container",
-          "type": "flashcard",
-          "front": "Study this diagram.",
-          "back": "Side-by-side stacks: VMs run multiple guest kernels over a hypervisor; containers share one host kernel, isolated by namespaces, cgroups, seccomp, capabilities, and overlayfs.",
-          "image": "https://raw.githubusercontent.com/StudyForge/packs/main/linux-systems/images/containers-1.svg"
-        }
+        {"id":"containers-run-001","type":"mcq","prompt":"What does `docker run nginx` do?","choices":["Deletes the nginx image","Starts a new container from the nginx image","Edits a Dockerfile","Lists running containers"],"answerIndex":1,"explanation":"`docker run` launches a container from the named image. Listing containers is `docker ps`, and running does not delete or edit anything.","image":"https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/containers-4.svg"},
+        {"id":"containers-run-002","type":"mcq","prompt":"In `docker run -p 8080:80 nginx`, what does `-p 8080:80` do?","choices":["Maps host port 8080 to container port 80","Maps container port 8080 to host port 80","Opens ports 80 through 8080","Limits the container to 80 MB of memory"],"answerIndex":0,"explanation":"The format is host:container, so traffic to the host's port 8080 is forwarded to port 80 inside the container. It is not a range, and it has nothing to do with memory.","image":"https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/containers-4.svg"},
+        {"id":"containers-run-003","type":"mcq","prompt":"Why do you usually need port mapping to reach a web app inside a container?","choices":["Containers cannot use networks at all","A container is isolated, so by default the outside world can't reach a server inside it","The browser is too slow otherwise","Ports cost extra money"],"answerIndex":1,"explanation":"Isolation means the container's ports aren't exposed by default; `-p` opens a door from a host port to a container port. Containers can use networks -- mapping just connects them to the host."},
+        {"id":"containers-run-004","type":"mcq","prompt":"What is a volume used for?","choices":["Making the container louder","Keeping data that should survive even if the container is deleted","Speeding up the CPU","Choosing the image version"],"answerIndex":1,"explanation":"A volume is storage outside the container, mounted in, so data persists across container deletion and recreation. Version selection is done with a tag, not a volume."},
+        {"id":"containers-run-005","type":"mcq","prompt":"By default, what happens to files a container wrote inside itself when you delete that container?","choices":["They are emailed to you","They disappear along with the container","They move to the registry","They become a new image automatically"],"answerIndex":1,"explanation":"Without a volume, in-container changes vanish when the container is removed. That is exactly why volumes exist -- to keep important data outside the container."},
+        {"id":"containers-run-006","type":"mcq","prompt":"What does the `-d` flag in `docker run -d nginx` do?","choices":["Deletes the container after one second","Runs the container in the background (detached)","Downloads a new image","Disables the network"],"answerIndex":1,"explanation":"`-d` runs the container detached, in the background, so your terminal is free. It does not delete the container or disable networking."},
+        {"id":"containers-run-007","type":"mcq","prompt":"You ran `docker run -p 3000:80 nginx`. Which browser address reaches the app?","choices":["localhost:80","localhost:3000","localhost:8080","It cannot be reached"],"answerIndex":1,"explanation":"The host side of the mapping is 3000, so you connect to localhost:3000, and traffic is forwarded to port 80 inside. The host number is the one you type in the browser."},
+        {"id":"containers-run-008","type":"mcq","prompt":"In `-v mydata:/data`, what does `/data` refer to?","choices":["A website address","The folder inside the container where the volume is attached","The host's password","The image's version"],"answerIndex":1,"explanation":"`/data` is the path inside the container where the named volume `mydata` is mounted, so writes there land in the persistent volume rather than the throwaway container."},
+        {"id":"containers-run-009","type":"mcq","prompt":"Which command shows the output (logs) a running container has produced?","choices":["docker logs","docker erase","docker paint","docker pull"],"answerIndex":0,"explanation":"`docker logs <name>` prints the container's output, which is the usual way to see what it is doing. `docker pull` downloads images; the others are not real commands."}
+      ]
+    },
+    {
+      "id": "containers-dockerfile",
+      "title": "Writing a Dockerfile: FROM, RUN, COPY, CMD & Layers",
+      "order": 5,
+      "difficulty": 2,
+      "content": "**Hook.** Where do images come from in the first place? You write a short recipe file called a **Dockerfile**, and Docker bakes it into an image.\n\n**Build.** A Dockerfile is a plain text file of instructions, read top to bottom. The main ones:\n\n- **`FROM`** -- the starting point, a *base image* to build on (e.g. `FROM python:3.12` gives you Python already installed).\n- **`COPY`** -- copy files from your project into the image (e.g. your code).\n- **`RUN`** -- run a command while building, such as installing packages. Its result is baked into the image.\n- **`CMD`** -- the default command to run when a container starts. (`ENTRYPOINT` is a close cousin that sets the fixed program to run; `CMD` often supplies its default arguments.)\n\nEach instruction adds a **layer** -- a stacked slice of the image. Docker is smart: it **caches** layers and reuses any whose inputs have not changed (the **build cache**). So **order matters**: copy your dependency list and install packages *before* copying your source code. Then editing your code only rebuilds the small last layer, not the slow \"install everything\" layer.\n\n```dockerfile\nFROM python:3.12\nWORKDIR /app\nCOPY requirements.txt .\nRUN pip install -r requirements.txt\nCOPY . .\nCMD [\"python\", \"app.py\"]\n```\n\nBuild it with `docker build -t myapp .` (the `-t` names the image; the `.` is the folder to build from).\n\n**Recap.** A Dockerfile lists steps -- `FROM`, `COPY`, `RUN`, `CMD` -- and each step adds a cached layer. Put slow, rarely-changing steps first so the build cache saves you time.",
+      "items": [
+        {"id":"containers-dockerfile-001","type":"mcq","prompt":"What is a Dockerfile?","choices":["A running container","A text file of instructions used to build an image","A registry of images","A type of volume"],"answerIndex":1,"explanation":"A Dockerfile is the recipe: a list of build steps Docker follows to bake an image. It is not the running container or the registry.","image":"https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/containers-5.svg"},
+        {"id":"containers-dockerfile-002","type":"mcq","prompt":"What does the `FROM` instruction do?","choices":["Deletes the previous image","Sets the base image to build on top of","Runs the app","Maps a port"],"answerIndex":1,"explanation":"`FROM` chooses the starting base image (for example `python:3.12`), giving you a foundation to add to. Port mapping and running the app are separate concerns.","image":"https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/containers-5.svg"},
+        {"id":"containers-dockerfile-003","type":"mcq","prompt":"Which instruction copies files from your project into the image?","choices":["COPY","FROM","CMD","STOP"],"answerIndex":0,"explanation":"`COPY` brings files (like your source code) from the build folder into the image. `FROM` sets the base, `CMD` sets the default run command, and `STOP` is not a Dockerfile instruction."},
+        {"id":"containers-dockerfile-004","type":"mcq","prompt":"What does `RUN` do in a Dockerfile?","choices":["Starts the container for users","Runs a command during the build (e.g. installing packages), baking the result into the image","Maps a volume","Pulls an image from a registry"],"answerIndex":1,"explanation":"`RUN` executes a command at build time and saves the result as a layer. The command that runs when a container later starts is set by `CMD`/`ENTRYPOINT`, not `RUN`."},
+        {"id":"containers-dockerfile-005","type":"mcq","prompt":"What does `CMD` specify?","choices":["The base image","The default command to run when a container starts","The registry URL","The host port"],"answerIndex":1,"explanation":"`CMD` sets the default command executed when the container launches (e.g. `python app.py`). The base image is `FROM`, and ports are handled at run time with `-p`."},
+        {"id":"containers-dockerfile-006","type":"mcq","prompt":"What is a layer in a container image?","choices":["A stacked slice added by an instruction, which Docker can cache and reuse","A physical disk","A type of network","The container's password"],"answerIndex":0,"explanation":"Each instruction adds a layer; Docker caches layers and reuses unchanged ones to speed up rebuilds. Layers are a software concept, not hardware or networking."},
+        {"id":"containers-dockerfile-007","type":"mcq","prompt":"Why copy your dependency list and install packages BEFORE copying your source code?","choices":["It looks neater","So editing your code doesn't bust the cache for the slow package-install layer","It is required or the build fails","To make the image larger"],"answerIndex":1,"explanation":"Docker reuses cached layers whose inputs are unchanged. If code is copied first, every code edit invalidates the later install layer; installing deps first keeps that expensive layer cached across code changes."},
+        {"id":"containers-dockerfile-008","type":"mcq","prompt":"What does `docker build -t myapp .` do?","choices":["Runs a container named myapp","Builds an image named myapp from the Dockerfile in the current folder","Deletes the myapp image","Pushes myapp to a registry"],"answerIndex":1,"explanation":"`docker build` reads the Dockerfile and produces an image; `-t myapp` names it and `.` is the build folder. Running, deleting, and pushing are different commands."},
+        {"id":"containers-dockerfile-009","type":"mcq","prompt":"How is the relationship between ENTRYPOINT and CMD best summarized for a beginner?","choices":["They do the exact same thing and cannot be combined","ENTRYPOINT sets the fixed program to run; CMD often supplies its default arguments","CMD sets the base image; ENTRYPOINT maps ports","Neither has anything to do with starting the container"],"answerIndex":1,"explanation":"A common pattern is ENTRYPOINT = the program that always runs, with CMD providing default arguments that a user can override at run time. Both relate to what runs when the container starts."},
+        {"id":"containers-dockerfile-010","type":"mcq","prompt":"The \"build cache\" mainly helps by:","choices":["Making containers run as root","Reusing unchanged layers so rebuilds are faster","Encrypting the image","Adding more ports automatically"],"answerIndex":1,"explanation":"The build cache reuses layers whose inputs haven't changed, so you don't redo slow steps each build. It is purely a speed feature, not about security or ports."}
+      ]
+    },
+    {
+      "id": "containers-namespaces-cgroups",
+      "title": "Under the Hood: Namespaces & cgroups",
+      "order": 6,
+      "difficulty": 3,
+      "content": "**Hook.** A container felt almost magical -- a lightweight box around an app. The magic is really just two features built into the Linux kernel.\n\n**Build.** Remember that a container shares the host kernel and is just an ordinary process. So how does that process get its own private \"world\" and stay within limits? Two kernel tools, working together.\n\n**Namespaces** provide **isolation** -- they control what a process can *see*. Linux can give a process its own private view of several things: its own list of running processes, its own filesystem, its own network, its own hostname. Inside its namespaces, the app looks like it has the machine to itself, even though other containers are running right beside it. (Picture office cubicles: everyone shares one building, but each person sees only their own desk.)\n\n**cgroups** (\"control groups\") provide **limits** -- they control how much a process can *use*. A cgroup can cap CPU time and set a memory ceiling, so one container cannot hog the whole machine. This is what enforces a flag like `docker run -m 256m` (limit to 256 MB of memory).\n\nSo the one-line truth: a container is just a normal process wrapped by **namespaces (what it can see)** and **cgroups (how much it can use)** -- all on the shared host kernel. No second operating system is involved.\n\n**Recap.** Namespaces = isolation (a private view); cgroups = resource limits (a usage cap). Together they turn an ordinary process into a container.",
+      "items": [
+        {"id":"containers-prim-001","type":"mcq","prompt":"What do namespaces provide for a container?","choices":["Isolation -- a private view of things like processes, files, and the network","A memory limit","A faster CPU","An online image library"],"answerIndex":0,"explanation":"Namespaces isolate what a process can see, giving it its own view of processes, filesystem, network, and hostname. Capping resources is the job of cgroups, not namespaces.","image":"https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/containers-6.svg"},
+        {"id":"containers-prim-002","type":"mcq","prompt":"What do cgroups (control groups) provide?","choices":["A private network view","Resource limits -- caps on how much CPU and memory a process may use","A registry of images","The Dockerfile syntax"],"answerIndex":1,"explanation":"cgroups limit and account resource usage (CPU, memory, and more), so one container cannot starve the others. Providing a private view is what namespaces do instead.","image":"https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/containers-6.svg"},
+        {"id":"containers-prim-003","type":"mcq","prompt":"The simplest summary of a container is:","choices":["A small virtual machine with its own kernel","An ordinary process wrapped by namespaces (isolation) and cgroups (limits) on the shared host kernel","A backup file","A web browser"],"answerIndex":1,"explanation":"That one-liner captures it: a normal process plus namespaces for isolation and cgroups for limits, all on the host kernel. It is explicitly not a VM with its own kernel."},
+        {"id":"containers-prim-004","type":"mcq","prompt":"\"Isolation\" in a container most nearly means:","choices":["The container is encrypted","The process gets its own private view, as if it had the machine to itself","The container runs without electricity","The app is deleted"],"answerIndex":1,"explanation":"Isolation here means the process sees its own processes, files, and network, unaware of its neighbors. That private view is exactly what namespaces create."},
+        {"id":"containers-prim-005","type":"mcq","prompt":"Which kernel feature enforces a memory cap like `docker run -m 256m`?","choices":["Namespaces","cgroups","The registry","The Dockerfile"],"answerIndex":1,"explanation":"Resource limits are a cgroups feature: a cgroup sets the memory ceiling and the kernel enforces it. Namespaces only change what is visible, not how much can be used."},
+        {"id":"containers-prim-006","type":"mcq","prompt":"The \"office cubicles in one building\" analogy illustrates which idea?","choices":["cgroups limiting memory","Namespaces giving each process its own private view while sharing one machine","Pulling images from a registry","Building layers in a Dockerfile"],"answerIndex":1,"explanation":"Everyone shares one building (the host kernel) but sees only their own desk -- that is namespace isolation. Limiting how much each person can use would be the cgroups idea."},
+        {"id":"containers-prim-007","type":"mcq","prompt":"Do namespaces and cgroups require the container to run a second operating system?","choices":["Yes, each container boots its own OS","No -- they are features of the one shared host kernel; no second OS is involved","Only on weekends","Only for Podman"],"answerIndex":1,"explanation":"Both are built into the single host kernel that all containers share, which is why containers stay lightweight. Running a second OS would make it a VM, not a container."},
+        {"id":"containers-prim-008","type":"mcq","prompt":"If you wanted to stop one container from using all the host's CPU, which primitive handles that?","choices":["Namespaces","cgroups","The registry","Port mapping"],"answerIndex":1,"explanation":"cgroups cap resource usage such as CPU time, preventing one container from monopolizing the machine. Namespaces and port mapping deal with visibility and networking, not usage caps."},
+        {"id":"containers-prim-009","type":"mcq","prompt":"Two containers run side by side. Why does each one seem to have its own separate set of running processes?","choices":["Because each has its own kernel","Because a namespace gives each its own private process view","Because they take turns every second","Because cgroups hide the processes"],"answerIndex":1,"explanation":"A process (PID) namespace gives each container its own view of running processes. They still share one kernel, and it is namespaces -- not cgroups -- that control visibility."}
+      ]
+    },
+    {
+      "id": "containers-podman-bestpractice-k8s",
+      "title": "Podman, Best Practices & a Glimpse of Kubernetes",
+      "order": 7,
+      "difficulty": 3,
+      "content": "**Hook.** Docker is the most famous container tool, but it is not the only one -- and a few simple habits make your containers much safer.\n\n**Build.** **Podman** is an alternative to Docker that uses almost the same commands, so much that `alias docker=podman` often just works. The big difference is its design. Docker runs a single always-on background service called a **daemon** (`dockerd`) that runs as the powerful **root** user and owns every container. Podman is **daemonless**: there is no central background service -- it simply starts each container as a direct child of your command. This makes Podman naturally **rootless**: an ordinary user can run containers without root powers, and \"root\" *inside* the container maps to your ordinary unprivileged user *outside*. If a rootless container is broken into, the attacker only gets your limited account, not the whole machine.\n\n```bash\npodman run -d -p 8080:80 nginx     # same idea as docker, no daemon needed\n```\n\nA few **best practices** worth knowing:\n\n- **Use a small base image** (like a slim or minimal image). Less software inside means fewer security holes and a smaller download.\n- **Don't run as root inside the container.** Add a non-root user so a break-in does less damage.\n\n**The horizon -- Kubernetes.** When you need to run many containers across many machines, automatically restarting and scaling them, teams use **Kubernetes** -- a system that orchestrates containers across a whole cluster. You do not need it to start out; just know it exists as the next step up.\n\n**Recap.** Podman is a daemonless, rootless alternative to Docker with the same commands. Prefer small base images and a non-root user. Kubernetes is where containers go to scale across many machines.",
+      "items": [
+        {"id":"containers-podman-001","type":"mcq","prompt":"What is the main architectural difference between Podman and Docker?","choices":["Podman can only run one container","Podman is daemonless -- it starts each container directly, with no always-on root background service","Podman uses completely different commands you must relearn","Podman cannot map ports"],"answerIndex":1,"explanation":"Docker relies on a long-running root daemon; Podman skips it and launches containers as direct child processes. Its commands are intentionally Docker-compatible, and it supports ports normally.","image":"https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/containers-7.svg"},
+        {"id":"containers-podman-002","type":"mcq","prompt":"What does \"rootless\" mean for a container?","choices":["The container has no files","An ordinary, unprivileged user can run it; root inside maps to that limited user outside","It runs without any user account","It cannot access the network"],"answerIndex":1,"explanation":"Rootless means a normal user runs containers without host root powers; in-container root maps to their unprivileged account. It still has files and can use the network.","image":"https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/containers-7.svg"},
+        {"id":"containers-podman-003","type":"mcq","prompt":"Why is rootless generally safer?","choices":["It makes containers start faster","If a container is broken into, the attacker only gets the limited user account, not the whole machine","It encrypts every file automatically","It prevents all bugs"],"answerIndex":1,"explanation":"Without host root, a container escape yields only the unprivileged user's access rather than full control of the host. It is about limiting damage, not speed or magic bug prevention."},
+        {"id":"containers-podman-004","type":"mcq","prompt":"What is a daemon, in the Docker sense?","choices":["A long-running background service that manages containers","A type of image","A network cable","A Dockerfile instruction"],"answerIndex":0,"explanation":"Docker's daemon (`dockerd`) is an always-on background service, running as root, that owns and manages containers. Podman avoids having one. It is not an image or a cable."},
+        {"id":"containers-podman-005","type":"mcq","prompt":"Why prefer a small (minimal) base image?","choices":["It looks more professional","Less software inside means fewer security holes and a smaller download","It forces the container to run as root","It disables namespaces"],"answerIndex":1,"explanation":"A minimal base ships fewer packages, shrinking both the attack surface (fewer vulnerabilities) and the image size. It does not change the user or the kernel features used."},
+        {"id":"containers-podman-006","type":"mcq","prompt":"Why is running as a non-root user inside a container a best practice?","choices":["Root cannot start programs","If the container is compromised, a non-root process limits the damage an attacker can do","Non-root containers run faster","It is required for the image to build"],"answerIndex":1,"explanation":"Least privilege: a compromised root process inside a container is far more dangerous than an unprivileged one, so adding a non-root user reduces risk. It is not about speed or a build requirement."},
+        {"id":"containers-podman-007","type":"mcq","prompt":"What is Kubernetes, in one line?","choices":["A text editor for Dockerfiles","A system that runs and orchestrates many containers across many machines, restarting and scaling them","A replacement for the Linux kernel","A registry like Docker Hub"],"answerIndex":1,"explanation":"Kubernetes orchestrates containers across a cluster, handling scheduling, restarts, and scaling. It is not an editor, a kernel, or an image registry."},
+        {"id":"containers-podman-008","type":"mcq","prompt":"When would a team typically reach for Kubernetes?","choices":["To start a single container on one laptop","When they need to run and scale many containers across many machines automatically","To write a Dockerfile","To pull one image from a registry"],"answerIndex":1,"explanation":"Kubernetes shines at scale -- many containers across many nodes with automatic restarts and scaling. For a single container on one machine, plain Docker or Podman is enough."},
+        {"id":"containers-podman-009","type":"mcq","prompt":"Roughly how different are everyday Podman commands from Docker commands?","choices":["Totally different; nothing carries over","Very similar -- often `alias docker=podman` just works","Podman has no commands at all","Podman only accepts commands in binary"],"answerIndex":1,"explanation":"Podman deliberately mirrors Docker's command-line interface, so most commands are interchangeable and an alias commonly suffices. You do not have to relearn everything."},
+        {"id":"containers-podman-010","type":"mcq","prompt":"You start one small web service on a single server. Do you need Kubernetes?","choices":["Yes, always","No -- plain Docker or Podman is plenty; Kubernetes is for scaling across many machines","Only if you use a volume","Only if you write a Dockerfile"],"answerIndex":1,"explanation":"A single service on one machine runs fine with Docker or Podman alone. Kubernetes adds value when you must orchestrate many containers across a cluster, which is overkill here."}
       ]
     }
   ]
