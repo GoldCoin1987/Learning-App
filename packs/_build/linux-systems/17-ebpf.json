@@ -8,266 +8,760 @@
       "title": "What eBPF Is",
       "order": 1,
       "difficulty": 1,
-      "content": "The one-line definition to memorize: **eBPF is a safe, verified, JIT-compiled virtual machine inside the Linux kernel that runs small sandboxed programs attached to kernel hooks — without writing a kernel module or rebooting.**\n\nBefore eBPF, changing kernel behavior or instrumenting it deeply meant patching the kernel, loading a `.ko` module (Module 9), or rebooting — all risky on a production box. eBPF flips that: you write a tiny program, the kernel **verifies** it is safe, JIT-compiles it to native instructions, and attaches it to a **hook**. When that hook fires (a syscall entry, a function call, a packet arriving), your program runs in the kernel at near-native speed, then is removed cleanly when you detach it.\n\nThe hooks are the key idea. Your program can attach to:\n\n- **kprobes / kretprobes** — entry/return of (almost) any kernel function\n- **uprobes** — functions inside a userspace binary\n- **tracepoints** — stable, named instrumentation points the kernel exposes\n- **XDP / tc** — the network packet path, before or in the stack\n- **LSM** — Linux Security Module hooks for policy decisions\n\nResults flow back to userspace through **maps** (shared key/value tables) or ring buffers, so a userspace tool can read counts, histograms, or events live.\n\n```bash\n# Is bpftrace present and which probe types exist?\nbpftrace --version\nbpftrace -l 'tracepoint:syscalls:*' | head\n```\n\nThink of it as a controlled, sandboxed plugin system for the running kernel: dynamic, removable, and safe enough to run on production.",
+      "content": "**Hook.** Imagine you want to put a tiny sensor on a car's engine to see what it is doing - but without stopping the car or taking the engine apart. That is what **eBPF** lets you do to the Linux **kernel**. (The kernel is the core program that runs the whole operating system: it manages memory, files, processes, and the network.)\n\n**Build.** Normally, you cannot add new behavior to the kernel without writing a risky **kernel module** - a chunk of code with full power over the machine - and often rebooting. One mistake and the whole computer can crash. eBPF flips this around. eBPF lets you load a **small, sandboxed program** into the *running* kernel. \"Sandboxed\" means fenced in: it can watch and measure, but it cannot wander off and break things. You attach this little program to an **event** - something the kernel does, like \"a file was opened\" or \"a network packet arrived.\" When that event happens, your program runs for a moment, records what it saw, and stops. The data then flows out to a normal tool you can read. No new module is compiled into the kernel, and no reboot is needed - and it runs so fast you barely notice.\n\n**Recap.** eBPF = small, safe, fenced-in programs that run *inside* the live kernel, attached to events, to observe what is happening. No risky module, no reboot. The questions below check that one core picture.",
       "items": [
-        {
-          "id": "ebpf-1-fc-1",
-          "type": "flashcard",
-          "front": "Give the one-line definition of eBPF.",
-          "back": "A safe, verified, JIT-compiled virtual machine inside the Linux kernel that runs small sandboxed programs attached to kernel hooks — without writing a kernel module or rebooting.",
-          "hint": "Safe + verified + JIT VM + in the kernel + no module/reboot.",
-          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/ebpf-1.svg"
-        },
-        {
-          "id": "ebpf-1-fc-2",
-          "type": "flashcard",
-          "front": "Name five kinds of hooks an eBPF program can attach to.",
-          "back": "kprobes/kretprobes (kernel function entry/return), uprobes (userspace function entry/return), tracepoints (stable named kernel instrumentation points), XDP/tc (network packet path), and LSM (security policy hooks).",
-          "hint": "Two are kernel functions, one is userspace functions, two are networking, one is security."
-        },
-        {
-          "id": "ebpf-1-fc-3",
-          "type": "flashcard",
-          "front": "How does data get from an eBPF program in the kernel back to a userspace tool?",
-          "back": "Through eBPF maps (shared key/value data structures, e.g. hashes and histograms) and ring/perf buffers for streaming events. Userspace reads them to display counts, histograms, or per-event data.",
-          "hint": "Shared tables and a streaming buffer."
-        },
-        {
-          "id": "ebpf-1-fc-4",
-          "type": "flashcard",
-          "front": "What did instrumenting the kernel deeply require before eBPF, and what does eBPF replace it with?",
-          "back": "Previously: patching the kernel source, loading a custom .ko module, or rebooting — all risky in production. eBPF replaces this with a small program the kernel verifies and JIT-compiles, attaches to a hook, and removes cleanly on detach.",
-          "hint": "Module 9's .ko is the thing eBPF lets you avoid."
-        },
         {
           "id": "ebpf-1-mcq-1",
           "type": "mcq",
-          "prompt": "Which statement best captures what eBPF is?",
+          "prompt": "In one sentence, what is eBPF?",
           "choices": [
-            "A userspace daemon that polls /proc and aggregates statistics",
-            "A safe, verified VM in the kernel running sandboxed programs on hooks, with no module or reboot",
-            "A patched kernel build with extra tracing compiled in",
-            "A replacement C library that wraps every syscall"
+            "A new programming language that replaces C for writing apps",
+            "A way to run small, safe, sandboxed programs inside the running Linux kernel, attached to events",
+            "A faster hard drive format for Linux servers",
+            "A website where you download Linux updates"
           ],
           "answerIndex": 1,
-          "explanation": "eBPF runs verified, sandboxed programs inside the kernel attached to hooks, JIT-compiled to native code — no kernel module and no reboot. It is not a userspace poller, a custom kernel build, or a libc wrapper."
+          "explanation": "eBPF lets you load small, fenced-in (sandboxed) programs into the live kernel and attach them to events to observe what is happening. It is not a general app language, a disk format, or a download site.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/ebpf-1.svg"
         },
         {
           "id": "ebpf-1-mcq-2",
           "type": "mcq",
-          "prompt": "You want to fire an eBPF program whenever any process enters a syscall. Which hook type is most appropriate?",
+          "prompt": "What does it mean that an eBPF program is \"sandboxed\"?",
           "choices": [
-            "uprobe on glibc",
-            "XDP on the network interface",
-            "A tracepoint such as raw_syscalls:sys_enter",
-            "An LSM hook"
+            "It is written only for video games",
+            "It is fenced in - it can watch and measure but cannot freely break things",
+            "It runs only on weekends",
+            "It must be stored in a folder called sandbox"
           ],
-          "answerIndex": 2,
-          "explanation": "Syscall entry/exit is exposed by stable tracepoints (e.g. raw_syscalls:sys_enter). uprobes trace userspace functions, XDP is the packet path, and LSM is for security policy decisions."
+          "answerIndex": 1,
+          "explanation": "Sandboxed means the program is restricted: it can observe and measure, but it cannot wander off and damage the system. That restriction is exactly what makes it safe to run inside the kernel."
         },
         {
           "id": "ebpf-1-mcq-3",
           "type": "mcq",
-          "prompt": "Which hook attaches an eBPF program to a function inside a userspace binary?",
+          "prompt": "Where does an eBPF program actually run?",
           "choices": [
-            "kprobe",
-            "uprobe",
-            "tracepoint",
-            "tc"
+            "On a separate computer in the cloud",
+            "Inside the running Linux kernel",
+            "Only inside a web browser",
+            "On the hard drive, never in memory"
           ],
           "answerIndex": 1,
-          "explanation": "uprobes (and uretprobes) attach to userspace functions. kprobes target kernel functions, tracepoints are kernel-defined points, and tc is on the network traffic-control path."
+          "explanation": "An eBPF program runs inside the live kernel itself, which is why it can see kernel events directly. It is not in the cloud, a browser, or sitting idle on disk."
         },
         {
           "id": "ebpf-1-mcq-4",
           "type": "mcq",
-          "prompt": "Why is eBPF considered production-safe in a way that loading a custom kernel module is not?",
+          "prompt": "What kicks off ('triggers') an eBPF program to run?",
           "choices": [
-            "eBPF programs run in userspace, so a crash cannot affect the kernel",
-            "The kernel verifier statically checks the program is bounded and safe before it runs, and it can be detached cleanly without a reboot",
-            "eBPF programs are written in Python, which cannot crash",
-            "eBPF disables the program if the CPU exceeds 50% usage"
+            "A monthly timer set by Microsoft",
+            "An event in the kernel, such as a file being opened or a packet arriving",
+            "Clicking an icon on the desktop",
+            "Plugging in a USB mouse, and nothing else"
           ],
           "answerIndex": 1,
-          "explanation": "The verifier proves safety properties (bounded loops, valid memory access, termination) before the program loads, and programs detach cleanly. A buggy .ko module runs with full kernel privilege and can panic the box. eBPF programs do run in the kernel, just sandboxed."
+          "explanation": "You attach an eBPF program to a kernel event; when that event occurs, the program runs briefly. It is event-driven, not tied to a desktop click or a fixed monthly schedule."
+        },
+        {
+          "id": "ebpf-1-mcq-5",
+          "type": "mcq",
+          "prompt": "Which everyday picture best matches what eBPF does?",
+          "choices": [
+            "Rebuilding the car's engine from scratch every morning",
+            "Putting a tiny sensor on the engine while the car keeps driving",
+            "Parking the car and never using it",
+            "Repainting the outside of the car"
+          ],
+          "answerIndex": 1,
+          "explanation": "eBPF is like adding a small sensor to a running engine without stopping the car - it observes the live system. Rebuilding, parking, or repainting do not capture 'watch it safely while it runs.'"
+        },
+        {
+          "id": "ebpf-1-mcq-6",
+          "type": "mcq",
+          "prompt": "After an eBPF program runs at an event, what happens to the information it collected?",
+          "choices": [
+            "It is thrown away and can never be seen",
+            "It flows out to a normal tool in userspace that you can read",
+            "It is emailed to Linus Torvalds",
+            "It is printed on paper by the kernel"
+          ],
+          "answerIndex": 1,
+          "explanation": "The data the program gathers (counts, timings, events) is passed out to an ordinary userspace tool that displays it. It is not discarded, emailed, or printed."
+        },
+        {
+          "id": "ebpf-1-mcq-7",
+          "type": "mcq",
+          "prompt": "Which of these is NOT something eBPF requires you to do?",
+          "choices": [
+            "Attach a program to an event",
+            "Reboot the machine to load your program",
+            "Keep the program small",
+            "Let the program run for only a moment per event"
+          ],
+          "answerIndex": 1,
+          "explanation": "A major point of eBPF is that you do NOT need to reboot - the program loads into the live kernel. Attaching to events, staying small, and running briefly per event are all normal parts of how eBPF works."
+        },
+        {
+          "id": "ebpf-1-mcq-8",
+          "type": "mcq",
+          "prompt": "You learned about reading /proc and tracing syscalls in earlier modules. How does eBPF relate to those?",
+          "choices": [
+            "It is unrelated to observing the system",
+            "It is another way to observe what the system is doing - but live, in the kernel, with very little slowdown",
+            "It replaces the entire Linux kernel",
+            "It only works on Windows, not Linux"
+          ],
+          "answerIndex": 1,
+          "explanation": "eBPF is a modern way to observe the same kinds of activity you saw via /proc and syscall tracing, but it watches events live inside the kernel with very low overhead. It does not replace the kernel and is a Linux technology."
+        },
+        {
+          "id": "ebpf-1-mcq-9",
+          "type": "mcq",
+          "prompt": "Why is 'no reboot needed' such a useful feature of eBPF?",
+          "choices": [
+            "Reboots make the screen brighter",
+            "You can start observing a running, busy system right now without disrupting it",
+            "Rebooting deletes all your files, so avoiding it saves data",
+            "It is not actually useful"
+          ],
+          "answerIndex": 1,
+          "explanation": "Because eBPF loads into the live kernel, you can begin watching a production system immediately without the disruption of restarting it. (A normal reboot does not delete your files; that is not the reason.)"
         }
       ]
     },
     {
       "id": "ebpf-2",
-      "title": "The Verifier, the Ecosystem, and bpftrace",
+      "title": "Why eBPF Is a Big Deal",
       "order": 2,
-      "difficulty": 2,
-      "content": "What makes \"run arbitrary code in the kernel\" actually safe is the **verifier**. When you load an eBPF program, the verifier statically analyzes every possible execution path and rejects the program unless it can prove it is bounded and safe: no unbounded loops (it must provably terminate), no out-of-bounds or arbitrary memory access, no reading uninitialized data, no dereferencing untrusted pointers. Only programs that pass are JIT-compiled and attached. This is why a buggy eBPF program gets *rejected at load time* instead of panicking your kernel — the trade-off for that safety is that you cannot do everything you could in a real module.\n\nYou rarely write raw eBPF bytecode. The **ecosystem** sits on top:\n\n- **bpftrace** — a high-level, awk-like language for one-liners and short scripts. The most accessible entry point; think *the awk of the kernel*.\n- **bcc** (BPF Compiler Collection) — a Python/C++ framework and a large set of ready-made tools (`execsnoop`, `opensnoop`, `biolatency`, ...).\n- **libbpf + CO-RE** — *Compile Once, Run Everywhere*: compile a program against BTF type info once and run the same binary across kernel versions without recompiling per host.\n\nbpftrace's model mirrors awk: `probe { action }`, with maps written as `@name`.\n\n```bash\n# Count syscalls per process name\nbpftrace -e 'tracepoint:raw_syscalls:sys_enter { @[comm] = count(); }'\n\n# Every file opened, system-wide\nbpftrace -e 'tracepoint:syscalls:sys_enter_openat { printf(\"%s %s\\n\", comm, str(args->filename)); }'\n```\n\nbpftrace answers ad-hoc questions interactively; bcc ships polished, reusable tools.",
+      "difficulty": 1,
+      "content": "**Hook.** Suppose a server is acting slow and you need to look inside *right now*, while real users depend on it. The old, scary option was to write a kernel module and maybe reboot - on a live machine that is the kind of thing that gets people paged at 3 a.m. eBPF is a big deal because it removed that fear.\n\n**Build.** Let's compare the two ways to add behavior to the kernel. A **kernel module** is code with full kernel power: a single bug can panic (crash) the entire machine, and loading or updating it often means a reboot. Nobody checks it for safety first - you are trusted completely. eBPF is the opposite: you write a *small* program, a built-in safety checker (the **verifier**, covered next lesson) must approve it before it runs, it loads into the *live* kernel with no reboot, and you can remove it cleanly when you are done. Because of all that, eBPF is considered safe enough to run on busy production systems. This is why it has **transformed** three areas of Linux: **observability** (measuring what the system is doing), **networking** (handling packets), and **security** (spotting bad behavior). Things that once needed risky kernel surgery are now a safe, removable add-on.\n\n**Recap.** The big deal: eBPF gives you the power to extend and watch the kernel *safely and live*, instead of the old risky 'write a module and reboot' approach. That safety is what made it spread everywhere.",
       "items": [
-        {
-          "id": "ebpf-2-fc-1",
-          "type": "flashcard",
-          "front": "What does the eBPF verifier do, and what happens to a program that fails it?",
-          "back": "It statically analyzes all execution paths to prove the program is safe and bounded — provable termination (no unbounded loops), only valid/in-bounds memory access, no uninitialized reads. A program that fails is rejected at load time and never runs, rather than risking a kernel panic.",
-          "hint": "Static proof of safety; failure means rejection, not a crash."
-        },
-        {
-          "id": "ebpf-2-fc-2",
-          "type": "flashcard",
-          "front": "Why is bpftrace called \"the awk of the kernel\"?",
-          "back": "It uses an awk-like 'probe { action }' model with associative arrays written as @maps, letting you write powerful one-liners and short scripts to instrument the kernel. It is the most accessible entry point into eBPF.",
-          "hint": "Pattern/probe + action, associative arrays, one-liners."
-        },
-        {
-          "id": "ebpf-2-fc-3",
-          "type": "flashcard",
-          "front": "What does CO-RE (Compile Once, Run Everywhere) solve?",
-          "back": "It lets a single compiled eBPF program (built with libbpf against BTF type information) run across different kernel versions without recompiling on each host, by relocating struct field offsets at load time. It removes the old need to ship a compiler and kernel headers everywhere.",
-          "hint": "One compiled binary, many kernels, thanks to BTF."
-        },
-        {
-          "id": "ebpf-2-fc-4",
-          "type": "flashcard",
-          "front": "Contrast bpftrace and bcc in one sentence each.",
-          "back": "bpftrace is a high-level awk-like language for ad-hoc one-liners and short scripts you write interactively. bcc is a Python/C++ framework plus a large collection of polished, ready-made tools (execsnoop, opensnoop, biolatency, etc.).",
-          "hint": "One is a language for quick questions; the other is a toolbox/framework."
-        },
         {
           "id": "ebpf-2-mcq-1",
           "type": "mcq",
-          "prompt": "An eBPF program contains a loop whose bound the verifier cannot prove. What happens?",
+          "prompt": "What is the single most important thing that makes eBPF special compared with writing a traditional kernel module?",
           "choices": [
-            "It loads but is throttled to one iteration per second",
-            "It is rejected at load time and never attaches",
-            "It loads and the kernel kills it if it runs too long",
-            "It silently runs in userspace instead"
+            "eBPF programs are written in a prettier font",
+            "An eBPF program is small and must be checked for safety before it runs, and it loads live without a reboot",
+            "Kernel modules can only be written on Mac computers",
+            "eBPF programs are always larger and slower than modules"
           ],
           "answerIndex": 1,
-          "explanation": "The verifier requires provable termination. If it cannot bound the loop, it rejects the program at load time — it never attaches or runs. This rejection is exactly what keeps eBPF production-safe."
+          "explanation": "The key difference is safety and convenience: eBPF programs are small, must pass a safety check before running, and load into the live kernel with no reboot. A kernel module gets full power with no safety check and often needs a reboot. Fonts and Mac computers are irrelevant, and eBPF is not slower.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/ebpf-2.svg"
         },
         {
           "id": "ebpf-2-mcq-2",
           "type": "mcq",
-          "prompt": "Which bpftrace one-liner counts syscalls grouped by process name?",
+          "prompt": "What can happen if a traditional kernel module has a bug?",
           "choices": [
-            "bpftrace -e 'kprobe:do_nanosleep { @ = count(); }'",
-            "bpftrace -e 'tracepoint:raw_syscalls:sys_enter { @[comm] = count(); }'",
-            "bpftrace -e 'uprobe:/bin/ls:main { printf(\"hi\"); }'",
-            "bpftrace -e 'tracepoint:syscalls:sys_exit_openat { @ = hist(retval); }'"
+            "Nothing - modules cannot affect the system",
+            "It can crash (panic) the entire machine",
+            "It only changes the desktop wallpaper",
+            "It makes the keyboard type in uppercase"
           ],
           "answerIndex": 1,
-          "explanation": "Attaching to the raw_syscalls:sys_enter tracepoint and keying the map by comm (the process name) gives per-process syscall counts. The others count a single function, trace ls's main, or build a histogram of openat return values."
+          "explanation": "A kernel module runs with full kernel power, so a bug can take down the whole machine. That risk is exactly why eBPF's checked, sandboxed approach is so valued."
         },
         {
           "id": "ebpf-2-mcq-3",
           "type": "mcq",
-          "prompt": "You need a polished, ready-to-run tool to watch every process exec across the system. Best first reach?",
+          "prompt": "Why is eBPF considered safe enough to run on a busy production server?",
           "choices": [
-            "Write raw eBPF bytecode by hand",
-            "The bcc tool execsnoop",
-            "Recompile the kernel with audit enabled",
-            "strace -f on PID 1"
+            "Because it runs in userspace where crashes do not matter",
+            "Because its programs are checked for safety before loading and can be removed cleanly, with no reboot",
+            "Because it only runs when no users are connected",
+            "Because it disables the network while it runs"
           ],
           "answerIndex": 1,
-          "explanation": "bcc ships execsnoop, a maintained tool that prints every new exec() system-wide. Hand-writing bytecode is unnecessary, recompiling the kernel is overkill, and strace on PID 1 will not see arbitrary new processes."
+          "explanation": "eBPF programs must pass a safety check, load live, and detach cleanly, so they are trusted on production systems. (They run inside the kernel, not userspace, and they do not require an empty system or a disabled network.)"
         },
         {
           "id": "ebpf-2-mcq-4",
           "type": "mcq",
-          "prompt": "In bpftrace, what does the @ prefix (e.g. @[comm]) denote?",
+          "prompt": "The lesson says eBPF transformed three areas of Linux. Which three?",
           "choices": [
-            "A comment",
-            "A pointer dereference",
-            "A map (associative array) that aggregates data, like an awk array",
-            "A command-line argument"
+            "Gaming, music, and video editing",
+            "Observability, networking, and security",
+            "Printing, scanning, and faxing",
+            "Spreadsheets, email, and calendars"
           ],
-          "answerIndex": 2,
-          "explanation": "@name denotes a bpftrace map — an associative array used to aggregate values (counts, histograms) keyed by something like comm. It is the direct analog of an awk associative array."
+          "answerIndex": 1,
+          "explanation": "eBPF reshaped observability (measuring the system), networking (handling packets), and security (spotting bad behavior). The other lists are ordinary desktop tasks, not what eBPF changed."
+        },
+        {
+          "id": "ebpf-2-mcq-5",
+          "type": "mcq",
+          "prompt": "In this comparison, who or what checks a traditional kernel module for safety before it loads?",
+          "choices": [
+            "A built-in verifier checks it line by line",
+            "Nobody - you are trusted completely, which is the risk",
+            "The web browser scans it",
+            "The printer driver approves it"
+          ],
+          "answerIndex": 1,
+          "explanation": "A traditional module gets no automatic safety check; it is fully trusted, which is why a bug is so dangerous. The automatic safety check (the verifier) is an eBPF feature, not a module feature."
+        },
+        {
+          "id": "ebpf-2-mcq-6",
+          "type": "mcq",
+          "prompt": "Why was the old 'write a kernel module and reboot' approach risky on a live system?",
+          "choices": [
+            "Rebooting is illegal in most countries",
+            "A reboot disrupts real users, and a buggy module could crash the whole machine",
+            "Modules can only be loaded once per year",
+            "It costs money each time you reboot"
+          ],
+          "answerIndex": 1,
+          "explanation": "On a production box, a reboot interrupts users and a faulty module can panic the machine - a costly, disruptive risk. The other options are simply not true."
+        },
+        {
+          "id": "ebpf-2-mcq-7",
+          "type": "mcq",
+          "prompt": "An engineer says: 'With eBPF I can start watching this live server safely and stop again without disrupting it.' Is this a fair description?",
+          "choices": [
+            "No, eBPF always requires a reboot",
+            "Yes - loading and removing eBPF programs is live and clean, which is the whole point",
+            "No, eBPF can only be used on a powered-off machine",
+            "Yes, but only because it deletes the server's logs first"
+          ],
+          "answerIndex": 1,
+          "explanation": "That is exactly eBPF's appeal: you attach and detach safely on a running system. It does not need a reboot, a powered-off machine, or any log deletion."
+        },
+        {
+          "id": "ebpf-2-mcq-8",
+          "type": "mcq",
+          "prompt": "Before eBPF, getting this kind of deep, live insight into the kernel usually required what?",
+          "choices": [
+            "Just clicking a button in a normal app",
+            "Risky kernel surgery - custom modules or kernel patches, often with a reboot",
+            "Nothing; it was always easy and safe",
+            "Buying a second computer"
+          ],
+          "answerIndex": 1,
+          "explanation": "Previously, deep kernel insight meant risky custom modules or patches and often a reboot. eBPF replaced that with a safe, removable add-on. It was never as simple as a button click before."
+        },
+        {
+          "id": "ebpf-2-mcq-9",
+          "type": "mcq",
+          "prompt": "Which statement best captures 'why eBPF is a big deal'?",
+          "choices": [
+            "It made Linux boot faster",
+            "It let people safely extend and observe the live kernel, so risky tasks became safe, removable add-ons",
+            "It replaced the need for a hard drive",
+            "It made all programs run in a browser"
+          ],
+          "answerIndex": 1,
+          "explanation": "The big deal is safe, live extension and observation of the kernel - turning once-risky work into safe add-ons. It is not about boot speed, hard drives, or browsers."
         }
       ]
     },
     {
       "id": "ebpf-3",
-      "title": "Why It Matters: Tracing, Networking, Security, and Scope",
+      "title": "The Verifier: How It Stays Safe",
       "order": 3,
-      "difficulty": 3,
-      "content": "eBPF reshaped three domains, all building on earlier modules.\n\n**Performance tracing** improves on the `/proc`-based tools (Module 8: `vmstat`, `iostat`, `free`) and on `strace` (Module 7). Those tools either sample coarse counters or, like `strace`, intercept every syscall via ptrace — which can slow a target by an order of magnitude, making it unsafe under production load. eBPF instead aggregates *in the kernel* and ships only summaries up, so you get a per-syscall latency histogram or per-process counts with negligible overhead.\n\n```bash\n# In-kernel latency histogram of read() (no per-event userspace cost)\nbpftrace -e 'tracepoint:syscalls:sys_enter_read { @t[tid] = nsecs; }\n  tracepoint:syscalls:sys_exit_read /@t[tid]/ { @us = hist((nsecs - @t[tid]) / 1000); delete(@t[tid]); }'\n```\n\n**Networking**: at the **XDP** hook a program runs the instant a packet hits the driver — before the kernel allocates an sk_buff — enabling line-rate filtering, load-balancing, and DDoS drop. **Cilium** uses this for Kubernetes networking/policy; it is the container-networking story (Modules 14/16) done in eBPF instead of iptables.\n\n**Security observability**: **Falco** and **Tetragon** watch syscalls and kernel events via eBPF to flag or block suspicious behavior (a shell spawned in a container, an unexpected file open) with full context and low overhead.\n\n**Honest scope**: this is an *intro*. The goal is to explain eBPF as \"safe sandboxed programs in the kernel without a module or reboot,\" know the ecosystem, and run a few canned bpftrace/bcc tools to answer a real question. Writing production eBPF programs end-to-end is a genuine specialty — a next step, not this lesson.",
+      "difficulty": 2,
+      "content": "**Hook.** If you could run *any* code inside the kernel, one careless loop or bad memory access could freeze or crash the machine. So how does eBPF let strangers' programs run in the kernel and stay safe? The answer is a gatekeeper called the **verifier**.\n\n**Build.** The verifier is a **safety checker** built into the kernel. Before your eBPF program is allowed to run, the verifier inspects it and tries to *prove* it is safe. It checks things like: Does the program always finish, with no endless loops? (A program stuck forever inside the kernel would be a disaster.) Does it only touch memory it is allowed to touch, never reaching into random places? Does it avoid reading uninitialized 'junk' data? If the program passes every check, it is accepted, turned into fast machine code (this step is called **JIT**, for just-in-time compilation - translating it into the CPU's native instructions so it runs at full speed), and attached to its event. If it fails *any* check, it is **rejected right then**, at load time, and never runs at all. That is the magic: an unsafe eBPF program is turned away at the door, so it can never crash the running kernel. The trade-off is that you cannot do absolutely everything you could in a full kernel module - the price of that safety.\n\n**Recap.** The verifier proves an eBPF program is safe (it finishes, stays in bounds, no junk reads) *before* it runs; anything unsafe is rejected, not crashed. This is why eBPF is trusted in the kernel.",
       "items": [
-        {
-          "id": "ebpf-3-fc-1",
-          "type": "flashcard",
-          "front": "Why can eBPF tracing run safely under production load when strace often cannot?",
-          "back": "strace uses ptrace to intercept every syscall, context-switching to userspace per event and slowing the target dramatically. eBPF aggregates in the kernel (e.g. building a histogram in a map) and ships only summaries to userspace, so overhead is negligible.",
-          "hint": "Per-event ptrace cost vs in-kernel aggregation."
-        },
-        {
-          "id": "ebpf-3-fc-2",
-          "type": "flashcard",
-          "front": "What makes the XDP hook special for networking, and what real project uses it?",
-          "back": "XDP runs an eBPF program the moment a packet arrives at the driver — before an sk_buff is allocated and before the normal network stack — enabling line-rate filtering, load balancing, and DDoS drop. Cilium uses eBPF/XDP for Kubernetes networking and policy in place of iptables.",
-          "hint": "Earliest possible point in the packet path; Cilium."
-        },
-        {
-          "id": "ebpf-3-fc-3",
-          "type": "flashcard",
-          "front": "Name two eBPF-based security observability tools and what they do.",
-          "back": "Falco and Tetragon watch syscalls and kernel events via eBPF to detect (and, for Tetragon, enforce against) suspicious runtime behavior — e.g. a shell spawned inside a container or an unexpected file access — with rich context and low overhead.",
-          "hint": "Runtime security monitoring on kernel events."
-        },
-        {
-          "id": "ebpf-3-fc-4",
-          "type": "flashcard",
-          "front": "What is the honest scope of an eBPF intro — what should you be able to do?",
-          "back": "Explain eBPF as 'safe sandboxed programs in the kernel without a module or reboot,' know the ecosystem (bpftrace, bcc, libbpf/CO-RE) and its three big domains (tracing, networking, security), and run a few canned bpftrace/bcc one-liners to answer a real question. Writing production eBPF end-to-end is a specialty beyond the intro.",
-          "hint": "Understand + run canned tools; deep authoring is a later specialty."
-        },
         {
           "id": "ebpf-3-mcq-1",
           "type": "mcq",
-          "prompt": "Why does an eBPF latency histogram of read() impose far less overhead than computing the same with strace?",
+          "prompt": "What is the eBPF verifier for?",
           "choices": [
-            "eBPF skips most read() calls to save time",
-            "eBPF aggregates the timing into an in-kernel map and only the summary crosses to userspace, avoiding a per-event userspace round trip",
-            "strace runs in the kernel and eBPF runs in userspace",
-            "eBPF disables timestamps, so it does less work"
+            "To make the program run faster after it loads",
+            "To check an eBPF program is safe BEFORE it is allowed to run, and reject it if not",
+            "To translate the program into Spanish",
+            "To back up the program to disk"
           ],
           "answerIndex": 1,
-          "explanation": "eBPF builds the histogram inside the kernel and exports only the aggregate. strace (ptrace) stops the target and switches to userspace on every syscall, which is the expensive part. eBPF does not skip events or drop timing accuracy."
+          "explanation": "The verifier is the safety gatekeeper: it inspects the program before it runs and refuses anything it cannot prove safe. Speeding the program up is the separate JIT step; the verifier's job is the safety check.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/ebpf-3.svg"
         },
         {
           "id": "ebpf-3-mcq-2",
           "type": "mcq",
-          "prompt": "Cilium implements Kubernetes networking and policy primarily using which mechanism?",
+          "prompt": "An eBPF program contains a loop that the verifier cannot prove will ever stop. What happens?",
           "choices": [
-            "iptables rules generated per pod",
-            "eBPF programs on hooks like XDP/tc",
-            "A userspace proxy intercepting all traffic",
-            "Kernel modules loaded per node"
+            "It loads and the kernel hopes for the best",
+            "It is rejected at load time and never runs",
+            "It runs but only on Tuesdays",
+            "It is automatically rewritten to remove the loop"
           ],
           "answerIndex": 1,
-          "explanation": "Cilium uses eBPF on the packet path (XDP/tc) for routing, load balancing, and policy, replacing the older per-pod iptables approach. It is not a userspace proxy or a loadable .ko module."
+          "explanation": "If the verifier cannot prove the program finishes, it rejects it before it ever runs - a program stuck forever in the kernel could hang the machine. It does not load it anyway or silently rewrite it."
         },
         {
           "id": "ebpf-3-mcq-3",
           "type": "mcq",
-          "prompt": "Which describes the appropriate takeaway from this INTRO module?",
+          "prompt": "Which of these is something the verifier checks?",
           "choices": [
-            "You should be able to author and ship a production CO-RE networking program",
-            "You should be able to explain eBPF in one line, know its ecosystem and uses, and run canned bpftrace/bcc tools",
-            "You should replace all /proc tools with hand-written eBPF",
-            "You should compile a custom kernel to enable eBPF"
+            "That the program has a nice name",
+            "That the program only touches memory it is allowed to touch",
+            "That the author has a paid license",
+            "That the program is at least 1000 lines long"
           ],
           "answerIndex": 1,
-          "explanation": "The honest intro scope is conceptual fluency plus running ready-made tools to answer a real question. Authoring production programs is a specialty; you do not replace all of /proc, and modern kernels already ship eBPF support."
+          "explanation": "The verifier confirms the program stays within memory it is permitted to access (among other safety properties). Names, licenses, and length are not safety checks."
         },
         {
           "id": "ebpf-3-mcq-4",
           "type": "mcq",
-          "prompt": "How does eBPF relate to the kernel module from Module 9?",
+          "prompt": "What does the verifier do with a program it finds unsafe?",
           "choices": [
-            "eBPF is just a kind of kernel module with a different file extension",
-            "eBPF is the thing that lets you avoid writing a kernel module for observability/networking/security tasks",
-            "eBPF requires a kernel module to be loaded first",
-            "eBPF and kernel modules are unrelated"
+            "Runs it anyway but logs a warning",
+            "Rejects it at load time so it never runs",
+            "Runs it at half speed",
+            "Moves it to userspace and runs it there"
           ],
           "answerIndex": 1,
-          "explanation": "A key framing: eBPF lets you instrument and extend the kernel for tracing, networking, and security WITHOUT writing or loading a .ko module and without rebooting. It is the safe, dynamic alternative to the module approach for these tasks."
+          "explanation": "Unsafe programs are turned away at load time and never execute - that is precisely what keeps the kernel from crashing. It is not run with a warning, slowed down, or relocated."
+        },
+        {
+          "id": "ebpf-3-mcq-5",
+          "type": "mcq",
+          "prompt": "Why does it matter that the verifier acts BEFORE the program runs, rather than after?",
+          "choices": [
+            "It does not matter when it acts",
+            "Catching unsafe code before it runs means it can never crash the live kernel in the first place",
+            "Acting after would be faster",
+            "The kernel can only read programs at night"
+          ],
+          "answerIndex": 1,
+          "explanation": "By proving safety up front, the verifier ensures a bad program never gets a chance to run and crash the kernel. Checking after the fact would defeat the purpose, since the damage could already be done."
+        },
+        {
+          "id": "ebpf-3-mcq-6",
+          "type": "mcq",
+          "prompt": "The lesson mentions JIT (just-in-time compilation). What does that step do?",
+          "choices": [
+            "It checks the program for safety",
+            "It turns the accepted program into the CPU's native machine code so it runs at full speed",
+            "It uploads the program to the internet",
+            "It deletes the program after one use"
+          ],
+          "answerIndex": 1,
+          "explanation": "JIT translates the verified program into fast native machine instructions so it runs at full speed. The safety check is the verifier's separate job; JIT is about speed, not safety, uploading, or deletion."
+        },
+        {
+          "id": "ebpf-3-mcq-7",
+          "type": "mcq",
+          "prompt": "What is the trade-off for the safety the verifier provides?",
+          "choices": [
+            "eBPF programs must be written in binary by hand",
+            "You cannot do absolutely everything you could in a full, unrestricted kernel module",
+            "The kernel runs slower forever after",
+            "You can only run one eBPF program in your whole life"
+          ],
+          "answerIndex": 1,
+          "explanation": "The price of guaranteed safety is reduced freedom: an eBPF program is more limited than an all-powerful kernel module. The verifier does not force hand-written binary, slow the kernel permanently, or cap you at one program."
+        },
+        {
+          "id": "ebpf-3-mcq-8",
+          "type": "mcq",
+          "prompt": "Why is the verifier the reason a buggy eBPF program is safer than a buggy kernel module?",
+          "choices": [
+            "A buggy module is always fine",
+            "The verifier rejects the buggy eBPF program before it runs, while a buggy module loads with full power and can crash the machine",
+            "eBPF programs cannot have bugs",
+            "Modules are checked by the verifier too"
+          ],
+          "answerIndex": 1,
+          "explanation": "The verifier blocks an unsafe eBPF program at load time, so it never runs; a kernel module has no such gate and runs with full privilege, so its bug can panic the system. eBPF programs can still have bugs - the verifier just refuses the unsafe ones."
+        },
+        {
+          "id": "ebpf-3-mcq-9",
+          "type": "mcq",
+          "prompt": "A teammate says: 'The verifier guarantees my eBPF logic is correct and bug-free.' Is that right?",
+          "choices": [
+            "Yes, the verifier proves your program does the right thing",
+            "No - the verifier proves safety (it finishes, stays in bounds), not that your logic gives the answer you intended",
+            "Yes, the verifier writes the program for you",
+            "No, the verifier only checks the file name"
+          ],
+          "answerIndex": 1,
+          "explanation": "The verifier proves safety properties, not correctness of intent - your measurement could still be wrong while being perfectly safe. It does not prove your logic is right, write the code, or merely check a file name."
+        }
+      ]
+    },
+    {
+      "id": "ebpf-4",
+      "title": "Where Programs Attach: Events and Hooks",
+      "order": 4,
+      "difficulty": 2,
+      "content": "**Hook.** An eBPF program is useless until you tell it *when* to run. Where exactly does it plug in? The answer is **hooks** - specific spots in the kernel where your program can wake up the moment something happens.\n\n**Build.** A **hook** is just an attachment point: 'run my program right here, when this occurs.' There are a few families worth knowing by name. For watching the system, the most common are **tracepoints** and **kprobes**. A tracepoint is a stable, pre-named spot the kernel offers on purpose - for example, the moment any program makes a **syscall** (a request to the kernel, like 'open this file'). A **kprobe** is more flexible: it can attach to the start of almost any internal kernel function. (There is also a **uprobe**, which attaches inside a normal userspace program instead of the kernel.) For networking, programs attach to the packet path: **XDP** runs the instant a packet hits the network card - the earliest possible point - and **tc** runs a little later in the network handling. Once attached, how does the data get back to you? The program stores results in a shared table called a **map** (a simple key -> value store, like 'process name -> count'), and your userspace tool reads that map to show counts, timings, or events.\n\n**Recap.** Hooks are *where* eBPF attaches: tracepoints/kprobes for syscalls and kernel functions, XDP/tc for network packets. Results come back through maps. You do not have to memorize them all - just know eBPF hangs off kernel events, and the two big themes are syscalls and networking.",
+      "items": [
+        {
+          "id": "ebpf-4-mcq-1",
+          "type": "mcq",
+          "prompt": "What is a 'hook' in eBPF?",
+          "choices": [
+            "A bug that catches programs",
+            "An attachment point in the kernel where your program runs when a specific thing happens",
+            "A type of network cable",
+            "The name of the verifier"
+          ],
+          "answerIndex": 1,
+          "explanation": "A hook is a spot you attach your program to so it runs when that event occurs. It is not a bug, a cable, or the verifier (which is the separate safety checker).",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/ebpf-4.svg"
+        },
+        {
+          "id": "ebpf-4-mcq-2",
+          "type": "mcq",
+          "prompt": "Which kind of hook is the natural choice for watching syscalls (requests programs make to the kernel)?",
+          "choices": [
+            "XDP on the network card",
+            "A tracepoint, such as the spot where any syscall begins",
+            "A printer hook",
+            "A screensaver hook"
+          ],
+          "answerIndex": 1,
+          "explanation": "Syscall entry is exposed by stable tracepoints, making them the natural place to watch syscalls. XDP is for network packets, and there are no 'printer' or 'screensaver' hooks here."
+        },
+        {
+          "id": "ebpf-4-mcq-3",
+          "type": "mcq",
+          "prompt": "What is special about the XDP hook for networking?",
+          "choices": [
+            "It runs only after the packet has fully left the machine",
+            "It runs the instant a packet arrives at the network card - the earliest point",
+            "It runs once a day",
+            "It can only see packets you send, never ones you receive"
+          ],
+          "answerIndex": 1,
+          "explanation": "XDP fires at the very moment a packet hits the network card, the earliest spot in the path, which is why it is so fast for filtering or dropping packets. It is about incoming packets at arrival, not after they leave or once daily."
+        },
+        {
+          "id": "ebpf-4-mcq-4",
+          "type": "mcq",
+          "prompt": "How does data collected by an eBPF program get back to a tool you can read?",
+          "choices": [
+            "Through a shared table called a map (a key -> value store)",
+            "By being faxed to the printer",
+            "It cannot - the data stays trapped in the kernel forever",
+            "By rebooting the machine to print it"
+          ],
+          "answerIndex": 1,
+          "explanation": "eBPF programs store results in a map, a shared key->value table that userspace tools read. The data is not faxed, trapped, or tied to a reboot."
+        },
+        {
+          "id": "ebpf-4-mcq-5",
+          "type": "mcq",
+          "prompt": "What is a kprobe?",
+          "choices": [
+            "A hook that can attach to the start of almost any internal kernel function",
+            "A tool for measuring CPU temperature",
+            "A type of keyboard",
+            "A hook that only works on Windows"
+          ],
+          "answerIndex": 1,
+          "explanation": "A kprobe is a flexible hook that can attach to the entry of nearly any kernel function. It is not a temperature sensor, a keyboard, or a Windows feature."
+        },
+        {
+          "id": "ebpf-4-mcq-6",
+          "type": "mcq",
+          "prompt": "You want to attach a program inside a normal userspace program, not the kernel. Which hook fits?",
+          "choices": [
+            "XDP",
+            "A uprobe",
+            "A tracepoint in the kernel",
+            "tc"
+          ],
+          "answerIndex": 1,
+          "explanation": "A uprobe attaches inside a userspace program, whereas kprobes and tracepoints target the kernel and XDP/tc are on the network packet path. The 'u' stands for userspace."
+        },
+        {
+          "id": "ebpf-4-mcq-7",
+          "type": "mcq",
+          "prompt": "The lesson says you do not need to memorize every hook. What are the two big themes to remember?",
+          "choices": [
+            "Music and video",
+            "Syscalls (what programs ask the kernel) and networking (packets)",
+            "Email and printing",
+            "Mouse clicks and screensavers"
+          ],
+          "answerIndex": 1,
+          "explanation": "The two main themes are syscalls and networking - watching what programs ask the kernel, and handling packets. The other pairs are unrelated desktop tasks."
+        },
+        {
+          "id": "ebpf-4-mcq-8",
+          "type": "mcq",
+          "prompt": "A map in eBPF is best described as what?",
+          "choices": [
+            "A picture of the world",
+            "A shared key -> value table the kernel program fills and userspace reads",
+            "A list of every Linux command",
+            "The kernel's boot menu"
+          ],
+          "answerIndex": 1,
+          "explanation": "An eBPF map is a shared key->value store (for example, process name -> count) that bridges the kernel program and your userspace tool. It is not a geographic map, a command list, or a boot menu."
+        },
+        {
+          "id": "ebpf-4-mcq-9",
+          "type": "mcq",
+          "prompt": "If you wanted to drop bad packets as fast as physically possible, which hook would you reach for?",
+          "choices": [
+            "A uprobe",
+            "XDP, because it runs the instant the packet hits the card",
+            "A syscall tracepoint",
+            "A kprobe on a file function"
+          ],
+          "answerIndex": 1,
+          "explanation": "XDP runs at the earliest point - right as the packet arrives - so it is the fastest place to drop unwanted packets. Uprobes, syscall tracepoints, and file-function kprobes are not on the early packet path."
+        }
+      ]
+    },
+    {
+      "id": "ebpf-5",
+      "title": "The Ecosystem: bpftrace and bcc Tools",
+      "order": 5,
+      "difficulty": 3,
+      "content": "**Hook.** Good news: you almost never write raw eBPF by hand. A friendly set of tools does the hard part for you, and as a beginner you can get real answers from the easy end of the toolbox today.\n\n**Build.** Think of the ecosystem as a ladder from easy to expert. At the top (easiest) is **bpftrace**. It is a tool for writing very short commands - often a single line - to answer a quick question about the system. People call it 'the one-liner tool of the kernel.' For example, one short bpftrace line can count how many syscalls each program is making. Next down is **bcc** (the BPF Compiler Collection): a toolbox of *ready-made* programs you simply run by name. Two famous ones are **execsnoop** (prints every new program that starts, system-wide) and **opensnoop** (prints every file that gets opened). You do not write any code - you just run the tool and read the output. At the bottom (the expert end) sits **libbpf** with a feature called **CO-RE** ('compile once, run everywhere'): it lets developers build a polished eBPF program once and ship it so it runs across many different kernel versions. That layer is how real products are built - useful to have heard of, but not something a beginner needs to use.\n\n**Recap.** Beginners live at the top of the ladder: run a **bpftrace** one-liner or a **bcc** tool like execsnoop/opensnoop and read the result. libbpf/CO-RE is the specialist layer underneath. Whichever you use, it all becomes a verified eBPF program in the kernel.",
+      "items": [
+        {
+          "id": "ebpf-5-mcq-1",
+          "type": "mcq",
+          "prompt": "Which tool is described as the easiest entry point - 'the one-liner tool of the kernel'?",
+          "choices": [
+            "libbpf",
+            "bpftrace",
+            "CO-RE",
+            "the verifier"
+          ],
+          "answerIndex": 1,
+          "explanation": "bpftrace lets you write short, often single-line commands to ask the kernel a question, which is why it is the friendliest starting point. libbpf/CO-RE is the expert layer, and the verifier is the safety checker.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/ebpf-5.svg"
+        },
+        {
+          "id": "ebpf-5-mcq-2",
+          "type": "mcq",
+          "prompt": "What is bcc (the BPF Compiler Collection)?",
+          "choices": [
+            "A single giant program that replaces Linux",
+            "A toolbox of ready-made eBPF programs you run by name, like execsnoop and opensnoop",
+            "A brand of network card",
+            "A type of file system"
+          ],
+          "answerIndex": 1,
+          "explanation": "bcc is a collection of finished tools you can just run; execsnoop and opensnoop are two well-known examples. It is not a replacement OS, a network card, or a filesystem."
+        },
+        {
+          "id": "ebpf-5-mcq-3",
+          "type": "mcq",
+          "prompt": "What does the bcc tool execsnoop show you?",
+          "choices": [
+            "Every file that is deleted",
+            "Every new program that starts, system-wide",
+            "The current CPU temperature",
+            "A list of installed fonts"
+          ],
+          "answerIndex": 1,
+          "explanation": "execsnoop prints each new program (each exec) as it starts across the whole system. It is about programs starting, not file deletion, temperature, or fonts."
+        },
+        {
+          "id": "ebpf-5-mcq-4",
+          "type": "mcq",
+          "prompt": "What does the bcc tool opensnoop show you?",
+          "choices": [
+            "Every file that gets opened",
+            "Every website you visit",
+            "Every key you press",
+            "The battery level"
+          ],
+          "answerIndex": 1,
+          "explanation": "opensnoop reports each file that is opened on the system - a direct, beginner-friendly way to see file activity. It does not track websites, keystrokes, or battery."
+        },
+        {
+          "id": "ebpf-5-mcq-5",
+          "type": "mcq",
+          "prompt": "Roughly how much eBPF code does a beginner write to use bpftrace or a bcc tool?",
+          "choices": [
+            "Thousands of lines in C",
+            "Very little or none - a short one-liner for bpftrace, or nothing at all for a ready-made bcc tool",
+            "A full operating system",
+            "You must hand-write machine code"
+          ],
+          "answerIndex": 1,
+          "explanation": "The whole point of these tools is that beginners write almost nothing: a short line for bpftrace, or just run a finished bcc tool. You do not write thousands of lines, an OS, or machine code."
+        },
+        {
+          "id": "ebpf-5-mcq-6",
+          "type": "mcq",
+          "prompt": "What does libbpf with CO-RE ('compile once, run everywhere') let developers do?",
+          "choices": [
+            "Run the same program only on the exact computer that built it",
+            "Build a polished eBPF program once and ship it to run across many kernel versions",
+            "Avoid the verifier entirely",
+            "Turn eBPF off permanently"
+          ],
+          "answerIndex": 1,
+          "explanation": "CO-RE lets a developer compile a program once and have it run on many different kernel versions, which is how real products ship. It does not limit you to one machine, skip the verifier, or disable eBPF."
+        },
+        {
+          "id": "ebpf-5-mcq-7",
+          "type": "mcq",
+          "prompt": "On the 'easy to expert' ladder, where should a beginner spend their time?",
+          "choices": [
+            "At the expert end, writing libbpf/CO-RE programs",
+            "At the easy end - running bpftrace one-liners and bcc tools",
+            "Nowhere; beginners cannot use eBPF at all",
+            "Only by editing the verifier's source code"
+          ],
+          "answerIndex": 1,
+          "explanation": "Beginners belong at the easy end: running bpftrace one-liners and ready-made bcc tools to get real answers. The libbpf/CO-RE layer is for specialists, and editing the verifier is not something users do."
+        },
+        {
+          "id": "ebpf-5-mcq-8",
+          "type": "mcq",
+          "prompt": "No matter which tool you use (bpftrace, bcc, or libbpf), what does your request ultimately become?",
+          "choices": [
+            "A printed report",
+            "A verified eBPF program running in the kernel",
+            "A new hard drive partition",
+            "An email to support"
+          ],
+          "answerIndex": 1,
+          "explanation": "All of these tools ultimately produce a verified eBPF program that runs in the kernel - they are just friendlier front ends. The result is not a printout, a partition, or an email."
+        },
+        {
+          "id": "ebpf-5-mcq-9",
+          "type": "mcq",
+          "prompt": "You want a quick, ad-hoc answer to 'which programs make the most syscalls right now?' Best first reach?",
+          "choices": [
+            "Write a full libbpf/CO-RE project from scratch",
+            "A short bpftrace one-liner",
+            "Recompile the Linux kernel",
+            "Buy a new server"
+          ],
+          "answerIndex": 1,
+          "explanation": "A short bpftrace one-liner is built exactly for quick, ad-hoc questions like this. Writing a full libbpf project, recompiling the kernel, or buying hardware are all overkill."
+        }
+      ]
+    },
+    {
+      "id": "ebpf-6",
+      "title": "Real Uses and Honest Scope",
+      "order": 6,
+      "difficulty": 3,
+      "content": "**Hook.** Why has eBPF shown up in so many job postings and conference talks? Because it quietly powers three big areas of modern Linux. Let's see them - and be honest about how far this intro takes you.\n\n**Build.** First, **observability** (measuring what the system is doing). eBPF improves on older tools. The `/proc`-based tools from an earlier module give coarse numbers, and `strace` (which watches every syscall) can slow a program down a lot - too risky on a busy server. eBPF instead does the counting *inside* the kernel and sends out only a small summary, so it can, say, build a histogram of how long file reads take with almost no slowdown. Second, **networking**: using the early XDP hook, eBPF can sort, balance, or drop packets extremely fast. A well-known project called **Cilium** uses eBPF to handle networking and security for containers and Kubernetes. Third, **security**: tools like **Falco** and **Tetragon** watch kernel events to flag (or block) suspicious behavior - for instance, a shell suddenly opening inside a container. **Honest scope:** this is an *intro*. The goal is to explain eBPF in plain words, know the ecosystem and these three uses, and run a canned bpftrace or bcc tool to answer a real question. Writing production eBPF programs end to end is a genuine specialty - a great next step, but not required here.\n\n**Recap.** eBPF powers observability, fast networking (Cilium/XDP), and security (Falco/Tetragon), all by safely watching live kernel events. For this intro: understand it and run a tool; deep eBPF programming is a specialty for later.",
+      "items": [
+        {
+          "id": "ebpf-6-mcq-1",
+          "type": "mcq",
+          "prompt": "Why can eBPF measure things like read times on a busy server when strace often cannot be used there?",
+          "choices": [
+            "eBPF skips most of the work to save time",
+            "eBPF counts inside the kernel and sends out only a small summary, so it adds almost no slowdown",
+            "strace runs in the kernel and eBPF runs in the cloud",
+            "eBPF turns off the program it is measuring"
+          ],
+          "answerIndex": 1,
+          "explanation": "eBPF aggregates in the kernel and exports just a summary, keeping overhead tiny; strace stops the program on every syscall, which is the slow part. eBPF does not skip work, run in the cloud, or pause the target.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/ebpf-6.svg"
+        },
+        {
+          "id": "ebpf-6-mcq-2",
+          "type": "mcq",
+          "prompt": "How does eBPF improve on the older /proc-based tools and strace for observability?",
+          "choices": [
+            "It gives blurrier numbers than /proc",
+            "It can watch detailed live events with very low overhead, instead of coarse counters or the heavy cost of strace",
+            "It can only run when the machine is idle",
+            "It removes the /proc folder entirely"
+          ],
+          "answerIndex": 1,
+          "explanation": "eBPF offers detailed, live measurement at low overhead, beating coarse /proc counters and avoiding strace's heavy per-syscall cost. It is more detailed (not blurrier), needs no idle machine, and does not delete /proc."
+        },
+        {
+          "id": "ebpf-6-mcq-3",
+          "type": "mcq",
+          "prompt": "The project Cilium uses eBPF primarily for what?",
+          "choices": [
+            "Editing photos",
+            "Networking and security for containers and Kubernetes",
+            "Playing audio files",
+            "Formatting hard drives"
+          ],
+          "answerIndex": 1,
+          "explanation": "Cilium applies eBPF to container and Kubernetes networking and security, often using the fast packet hooks. It is not a photo, audio, or disk-formatting tool."
+        },
+        {
+          "id": "ebpf-6-mcq-4",
+          "type": "mcq",
+          "prompt": "Tools like Falco and Tetragon use eBPF for which purpose?",
+          "choices": [
+            "Spotting suspicious behavior by watching kernel events (security)",
+            "Speeding up video games",
+            "Backing up your photos",
+            "Designing web pages"
+          ],
+          "answerIndex": 1,
+          "explanation": "Falco and Tetragon watch kernel events to detect (and sometimes block) suspicious activity, such as a shell opening in a container - that is security observability. The other options are unrelated."
+        },
+        {
+          "id": "ebpf-6-mcq-5",
+          "type": "mcq",
+          "prompt": "What is the honest scope of THIS eBPF intro?",
+          "choices": [
+            "Be able to ship a production networking program by yourself",
+            "Explain eBPF plainly, know its ecosystem and three main uses, and run a canned tool to answer a real question",
+            "Replace every /proc tool with hand-written eBPF",
+            "Recompile a custom kernel to enable eBPF"
+          ],
+          "answerIndex": 1,
+          "explanation": "The intro aims for clear understanding plus the ability to run ready-made tools - not shipping production programs, replacing all of /proc, or recompiling kernels (modern kernels already support eBPF)."
+        },
+        {
+          "id": "ebpf-6-mcq-6",
+          "type": "mcq",
+          "prompt": "Which everyday picture best fits eBPF used for security observability?",
+          "choices": [
+            "A security camera the kernel runs for you, watching for suspicious activity",
+            "A lock that only works once",
+            "A fence with no gate",
+            "A flashlight that never turns on"
+          ],
+          "answerIndex": 1,
+          "explanation": "eBPF security tools act like a built-in camera watching kernel events for suspicious behavior, with full context. The other images do not capture continuous, low-overhead watching."
+        },
+        {
+          "id": "ebpf-6-mcq-7",
+          "type": "mcq",
+          "prompt": "Is writing production eBPF programs end to end expected from this intro module?",
+          "choices": [
+            "Yes, it is required to pass",
+            "No - it is a genuine specialty and a good next step, but not required here",
+            "Yes, and you must do it without any tools",
+            "No, because eBPF programming does not exist"
+          ],
+          "answerIndex": 1,
+          "explanation": "Deep, end-to-end eBPF development is a specialty beyond this intro; the goal here is understanding plus running canned tools. It is real work (it certainly exists), just not required at this stage."
+        },
+        {
+          "id": "ebpf-6-mcq-8",
+          "type": "mcq",
+          "prompt": "What single idea ties together eBPF's use in observability, networking, and security?",
+          "choices": [
+            "They all require rebooting the server",
+            "They all safely watch (or act on) live kernel events with very low overhead",
+            "They all only work on supercomputers",
+            "They all need the machine to be offline"
+          ],
+          "answerIndex": 1,
+          "explanation": "The common thread is safely observing or acting on live kernel events at low overhead - the same core eBPF idea applied three ways. None of them require reboots, supercomputers, or an offline machine."
+        },
+        {
+          "id": "ebpf-6-mcq-9",
+          "type": "mcq",
+          "prompt": "After this intro, which statement is a realistic description of what you can do?",
+          "choices": [
+            "Design a custom kernel scheduler in eBPF",
+            "Explain what eBPF is and why it matters, and run a bpftrace or bcc tool to answer a real question about a running system",
+            "Nothing practical at all",
+            "Only use eBPF on Windows"
+          ],
+          "answerIndex": 1,
+          "explanation": "A realistic outcome is conceptual fluency plus running ready-made tools to learn something real about a live system. Designing kernel schedulers is specialist work, and eBPF is a Linux technology."
         }
       ]
     }
