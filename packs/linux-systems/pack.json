@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "id": "linux-systems",
   "title": "Linux Systems",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "description": "Linux from scratch (beginner rework in progress): 19 sub-topics from the shell through systemd, the kernel, containers, storage, networking, and embedded Linux. Beginner-first readings, code, and diagrams; tiered easy to hard.",
   "requires": [],
   "tags": [
@@ -5837,277 +5837,570 @@
       "order": 10,
       "lessons": [
         {
-          "id": "package-management-package-management-dpkg-apt-basics",
-          "title": "Debian-Family: dpkg, APT, and the .deb",
+          "id": "package-management-package-management-what-is-a-package-manager",
+          "title": "What Is a Package Manager?",
           "order": 1,
           "difficulty": 1,
-          "content": "On Debian and Ubuntu there are **two layers**. `dpkg` is the low-level tool that unpacks and registers a single `.deb` file; it knows nothing about where packages come from and will not fetch dependencies. **APT** (`apt`, `apt-get`, `apt-cache`) is the high-level layer that talks to repositories, resolves dependencies, and then calls `dpkg` to do the actual install.\n\nA `.deb` is just an `ar` archive containing `control.tar` (metadata: name, version, `Depends:`, maintainer scripts) and `data.tar` (the files to install). You can crack one open without installing it:\n\n```bash\nar t mytool.deb              # list members\ndpkg-deb -I mytool.deb       # show control info\ndpkg-deb -c mytool.deb       # list files it would install\n```\n\nDay-to-day commands:\n\n```bash\nsudo apt update              # refresh the package index\nsudo apt install nginx       # resolve deps + install\napt-cache policy nginx       # candidate version + repo source\nsudo dpkg -i mytool.deb      # install a local .deb (no deps!)\nsudo apt install -f          # then fix missing deps\n```\n\nRepositories are configured in `/etc/apt/sources.list` and `/etc/apt/sources.list.d/*.list` (or the newer deb822 `.sources` format). Each line names a mirror URL, a suite (e.g. `bookworm`), and components (`main`, `contrib`). `apt update` downloads the **index** from each; `apt install` then knows what is available. The mental model that matters most: `apt` is online and dependency-aware, `dpkg` is local and dumb. Reach for `dpkg` only when you already have a `.deb` in hand or need to inspect the package database directly.",
+          "content": "**Hook.** On your phone you install apps from an app store: you tap once, and the right program is downloaded and set up for you. On Linux, the everyday way to install software is almost the same idea, but you run it from the command line. The tool that does this is called a **package manager** — think of it as a built-in app store you type commands to.\n\n**Build.** A *package* is just a program bundled up so it is ready to install (its files plus a label saying its name and version). The package manager downloads packages from trusted online collections called **repositories** (or *repos* for short) — central libraries of software that the makers of your Linux system keep up to date. So the package manager fetches packages from repositories, installs them, and can update or remove them later, all for you.\n\nDifferent Linux *families* ship different package managers, but the idea is identical. On **Debian and Ubuntu** (a very common beginner choice) the command is `apt`. Here are the everyday actions:\n\n```bash\nsudo apt update              # refresh the list of what's available\nsudo apt install firefox     # download and install a program\nsudo apt remove firefox      # uninstall a program\napt search editor            # find packages matching a word\n```\n\n`sudo` means \"run this as the administrator,\" which installing software requires. `apt update` does not upgrade your programs — it just refreshes the *catalog* so `apt` knows what exists and which versions. Installing then pulls the program from a repository.\n\n**Recap.** A package manager is a command-line app store. It pulls software (packages) from trusted online repositories and handles installing, updating, and removing it. On Ubuntu that tool is `apt`, and the four actions you will use constantly are update, install, remove, and search.",
           "items": [
             {
-              "id": "package-management-dpkg-apt-basics-fc-001",
-              "type": "flashcard",
-              "front": "What is the division of labor between `dpkg` and `apt`?",
-              "back": "`dpkg` is the low-level engine: it unpacks/configures a single local `.deb` and records it in the package database, but does not fetch dependencies. `apt` is the high-level front end: it talks to repositories, resolves dependencies, downloads packages, then invokes `dpkg` to install them.",
-              "hint": "One is online and dependency-aware; one is local and dumb."
-            },
-            {
-              "id": "package-management-dpkg-apt-basics-fc-002",
-              "type": "flashcard",
-              "front": "A `.deb` file is fundamentally what kind of archive, and what are its two main payload members?",
-              "back": "It is an `ar` archive. The two payloads are `control.tar.*` (metadata: package name, version, `Depends:`, maintainer scripts) and `data.tar.*` (the actual files to be installed onto the filesystem). A `debian-binary` member holds the format version.",
-              "hint": "Same `ar` format used for static libraries; metadata vs. files."
-            },
-            {
-              "id": "package-management-dpkg-apt-basics-fc-003",
-              "type": "flashcard",
-              "front": "After `sudo dpkg -i tool.deb` fails complaining about missing dependencies, what single command repairs it?",
-              "back": "`sudo apt install -f` (or `apt --fix-broken install`). `dpkg` installed the package but cannot fetch deps; `apt -f` reads the broken state, downloads the missing dependencies from the repos, and completes the configuration.",
-              "hint": "Let the online layer clean up after the dumb one."
-            },
-            {
-              "id": "package-management-dpkg-apt-basics-fc-004",
-              "type": "flashcard",
-              "front": "Where are APT repositories configured, and what three things does a sources entry specify?",
-              "back": "In `/etc/apt/sources.list` and `/etc/apt/sources.list.d/*.list` (or deb822 `.sources` files). Each entry specifies the mirror URL, the suite/distribution (e.g. `bookworm`), and the components (e.g. `main contrib non-free`).",
-              "hint": "URL + suite + components."
-            },
-            {
-              "id": "package-management-dpkg-apt-basics-mcq-001",
+              "id": "package-management-what-is-a-package-manager-mcq-001",
               "type": "mcq",
-              "prompt": "You want to see every file a local `tool.deb` would install WITHOUT installing it. Which command?",
+              "prompt": "In one sentence, what is a package manager?",
               "choices": [
-                "dpkg -L tool.deb",
-                "dpkg-deb -c tool.deb",
-                "apt-cache show tool.deb",
-                "dpkg -i --dry-run tool.deb"
+                "A text editor for writing programs",
+                "A command-line tool that installs, updates, and removes software from trusted online repositories",
+                "A file that contains a single program's source code",
+                "A web browser for downloading files by hand"
               ],
               "answerIndex": 1,
-              "explanation": "`dpkg-deb -c` lists the contents of a `.deb` file on disk. `dpkg -L` lists files of an already-INSTALLED package (and takes a package name, not a file). `apt-cache show` reads index metadata, not a local file's file list."
+              "explanation": "A package manager is like an app store you run from the command line: it fetches software from repositories and installs, updates, or removes it for you. It is not an editor, a browser, or a single program's source.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-2.svg"
             },
             {
-              "id": "package-management-dpkg-apt-basics-mcq-002",
+              "id": "package-management-what-is-a-package-manager-mcq-002",
               "type": "mcq",
-              "prompt": "What does `sudo apt update` actually do?",
+              "prompt": "What is a 'repository' in the context of installing Linux software?",
               "choices": [
-                "Upgrades all installed packages to their newest versions",
-                "Refreshes the local copy of the repositories' package indexes",
-                "Installs security patches only",
-                "Rebuilds the dpkg database from /var/lib/dpkg"
+                "A folder of your personal documents",
+                "A trusted online collection of packages that the package manager downloads from",
+                "The name of the install command on Ubuntu",
+                "A backup copy of your hard drive"
               ],
               "answerIndex": 1,
-              "explanation": "`apt update` only re-downloads and verifies the package INDEX from each configured repo, so APT knows what versions exist. Upgrading installed packages is `apt upgrade` / `apt full-upgrade` — a separate step."
+              "explanation": "A repository (repo) is a central, trusted online library of software the package manager pulls from. It is not your documents, a backup, or a command name.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-2.svg"
             },
             {
-              "id": "package-management-dpkg-apt-basics-mcq-003",
+              "id": "package-management-what-is-a-package-manager-mcq-003",
               "type": "mcq",
-              "prompt": "Which tool will fetch and install a package's dependencies automatically?",
+              "prompt": "You are on Ubuntu and want to install software the recommended way. Which command should you use?",
               "choices": [
-                "dpkg -i",
-                "dpkg-deb -x",
-                "apt install",
-                "ar x"
+                "sudo apt install <program>",
+                "download a random .exe from a website and double-click it",
+                "make install",
+                "git clone the program"
               ],
-              "answerIndex": 2,
-              "explanation": "Only `apt install` resolves and downloads dependencies from repositories. `dpkg -i` installs one local file without fetching deps; `dpkg-deb -x` and `ar x` merely extract the archive."
+              "answerIndex": 0,
+              "explanation": "On Ubuntu (a Debian-family system) the standard, safe way to install software is `sudo apt install <program>`, which pulls a vetted package from the repositories. `.exe` files are for Windows, `make install` builds from source (advanced), and `git clone` only copies code without installing it.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-2.svg"
             },
             {
-              "id": "package-management-dpkg-apt-basics-mcq-004",
+              "id": "package-management-what-is-a-package-manager-mcq-004",
               "type": "mcq",
-              "prompt": "`apt-cache policy nginx` is most useful for answering which question?",
+              "prompt": "What does 'sudo' at the start of 'sudo apt install firefox' mean?",
               "choices": [
-                "Which files does nginx install?",
-                "Which package owns /usr/sbin/nginx?",
-                "What candidate version is available and from which repo?",
-                "What are nginx's reverse dependencies?"
+                "Run the command silently with no output",
+                "Run the command as the administrator (with the privileges needed to install software)",
+                "Skip the download and use a cached copy",
+                "Search instead of install"
+              ],
+              "answerIndex": 1,
+              "explanation": "`sudo` runs the command with administrator privileges, which is required to install system software. It does not silence output, skip downloads, or change install into search.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-2.svg"
+            },
+            {
+              "id": "package-management-what-is-a-package-manager-mcq-005",
+              "type": "mcq",
+              "prompt": "What does 'sudo apt update' actually do?",
+              "choices": [
+                "Upgrades all your installed programs to the newest version",
+                "Refreshes the local catalog so apt knows what packages and versions are available",
+                "Deletes old packages to free disk space",
+                "Installs the most popular package automatically"
+              ],
+              "answerIndex": 1,
+              "explanation": "`apt update` only refreshes the list (catalog) of available packages and versions from the repositories. Actually upgrading installed programs is a separate command (`apt upgrade`). It does not delete or auto-install anything.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-2.svg"
+            },
+            {
+              "id": "package-management-what-is-a-package-manager-mcq-006",
+              "type": "mcq",
+              "prompt": "Which command removes (uninstalls) a program on Ubuntu?",
+              "choices": [
+                "sudo apt search firefox",
+                "sudo apt update firefox",
+                "sudo apt remove firefox",
+                "sudo apt list firefox"
               ],
               "answerIndex": 2,
-              "explanation": "`apt-cache policy` shows the installed version, the candidate (what would be installed), and the priority-ranked list of repositories/mirrors offering it. It is the go-to tool when you are unsure where a version is coming from."
+              "explanation": "`sudo apt remove firefox` uninstalls the program. `search` finds packages by keyword, `update` refreshes the catalog, and `list` shows package info.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-2.svg"
+            },
+            {
+              "id": "package-management-what-is-a-package-manager-mcq-007",
+              "type": "mcq",
+              "prompt": "You don't know the exact package name for a text editor. Which command helps you find it?",
+              "choices": [
+                "apt search editor",
+                "apt remove editor",
+                "apt update editor",
+                "sudo editor install"
+              ],
+              "answerIndex": 0,
+              "explanation": "`apt search editor` lists packages whose name or description matches the word 'editor', helping you discover the right name. The others remove, refresh the catalog, or are not valid commands.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-2.svg"
+            },
+            {
+              "id": "package-management-what-is-a-package-manager-mcq-008",
+              "type": "mcq",
+              "prompt": "Why is installing through the package manager usually safer than downloading software from a random website?",
+              "choices": [
+                "Because the package manager makes downloads faster",
+                "Because packages come from trusted repositories that are vetted and checked, instead of unknown sources",
+                "Because it installs software without using any disk space",
+                "Because websites cannot host Linux software at all"
+              ],
+              "answerIndex": 1,
+              "explanation": "Repositories are curated and trusted sources, so packages are far less likely to be tampered with than a random download. Speed and disk usage are not the point, and websites certainly can host Linux software (it is just riskier).",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-2.svg"
+            },
+            {
+              "id": "package-management-what-is-a-package-manager-mcq-009",
+              "type": "mcq",
+              "prompt": "A friend says 'just run apt update and your apps will be the newest versions.' Are they right?",
+              "choices": [
+                "Yes, apt update upgrades every installed app",
+                "No, apt update only refreshes the catalog; upgrading installed apps is a separate step",
+                "Yes, but only for apps you installed today",
+                "No, apt update actually removes apps"
+              ],
+              "answerIndex": 1,
+              "explanation": "This is a common beginner mix-up. `apt update` refreshes the list of what is available; it does not change your installed programs. Upgrading them is done separately (with `apt upgrade`).",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-2.svg"
             }
           ]
         },
         {
-          "id": "package-management-package-management-rpm-dnf-pacman-trust",
-          "title": "RPM/dnf, pacman, Signing, and Owning Files",
+          "id": "package-management-package-management-dependencies-and-families",
+          "title": "Dependencies and the Two Main Families",
           "order": 2,
           "difficulty": 2,
-          "content": "The same two-layer idea reappears across families. **Red Hat/Fedora**: `rpm` is the low-level tool, `dnf` (formerly `yum`) is the dependency-resolving front end; repos live in `/etc/yum.repos.d/*.repo`. **Arch**: `pacman` is a single tool that does both, with repos in `/etc/pacman.conf` and the AUR for community builds. Translating between families is mostly vocabulary:\n\n```bash\n# Debian            # RHEL/Fedora          # Arch\napt install pkg     dnf install pkg        pacman -S pkg\napt remove pkg      dnf remove pkg         pacman -R pkg\napt update          dnf check-update       pacman -Sy\ndpkg -L pkg         rpm -ql pkg            pacman -Ql pkg\ndpkg -S /path/file  rpm -qf /path/file     pacman -Qo /path/file\n```\n\nTwo cross-cutting skills matter most in practice. **Which package owns a file?** When a stray binary or config appears, ask the database: `dpkg -S /usr/bin/curl`, `rpm -qf /usr/bin/curl`, or `pacman -Qo`. The inverse — list everything a package installed — is `dpkg -L`, `rpm -ql`, `pacman -Ql`.\n\n**Package signing and trust.** This is the security backbone. Every repo publishes a signed index; your machine holds the repo's public **GPG key**. APT verifies the signature on the `InRelease`/`Release` file, which in turn lists the cryptographic hashes of every package — so a tampered or man-in-the-middle package fails verification. RPM signs each package directly (`rpm --checksig`). The crucial mental model: **you trust a key, not a server.** A compromised mirror cannot forge a validly signed package. Modern Debian keeps third-party keys in `/etc/apt/keyrings/` and references them per-source with `signed-by=`, rather than the deprecated global `apt-key`, so one vendor's key cannot vouch for another's packages.",
+          "content": "**Hook.** Imagine asking a librarian for one book, and they hand you that book plus every other book it refers to, so you actually have everything you need to read it. A package manager does the same for software: when you install one program, it quietly finds and installs the *other* programs that program relies on.\n\n**Build.** Most software is built on top of smaller shared pieces of code. The extra programs a piece of software needs in order to run are called its **dependencies**. For example, a photo editor might depend on an image-handling library and a menu toolkit, and those might in turn depend on something else. Working out this whole chain and installing it in the right order is called **dependency resolution**, and the package manager does it for you automatically. This is the single biggest reason package managers exist: you ask for one thing, and you get a working result instead of a pile of \"missing file\" errors.\n\n```bash\nsudo apt install gimp     # also pulls in everything gimp needs\n```\n\nLinux comes in **families**, and the two you will meet most are:\n\n- **Debian / Ubuntu** family: the command is `apt`, and packages are files ending in **`.deb`**.\n- **Fedora / RHEL** family: the command is `dnf`, and packages are files ending in **`.rpm`**.\n\nThe ideas are identical; mostly only the words change:\n\n```bash\n# Debian / Ubuntu        # Fedora / RHEL\nsudo apt install pkg     sudo dnf install pkg\nsudo apt remove pkg      sudo dnf remove pkg\nsudo apt update          sudo dnf check-update\n```\n\nBoth `apt` and `dnf` resolve dependencies automatically. A `.deb` and a `.rpm` are just two file formats for the same concept: a bundled, installable program with a name, a version, and a list of its dependencies inside.\n\n**Recap.** Dependencies are the other programs your software needs; the package manager resolves and installs them for you. The two big families are Debian/Ubuntu (`apt`, `.deb`) and Fedora/RHEL (`dnf`, `.rpm`) — same concept, different names.",
           "items": [
             {
-              "id": "package-management-rpm-dnf-pacman-trust-fc-001",
-              "type": "flashcard",
-              "front": "Across Debian, RHEL, and Arch, what command answers \"which installed package owns this file?\"",
-              "back": "Debian: `dpkg -S /path/to/file`. RHEL/Fedora: `rpm -qf /path/to/file`. Arch: `pacman -Qo /path/to/file`. All query the local package database to map a file back to its owning package.",
-              "hint": "-S, -qf, -Qo."
-            },
-            {
-              "id": "package-management-rpm-dnf-pacman-trust-fc-002",
-              "type": "flashcard",
-              "front": "What command lists ALL files installed by an already-installed package on each family?",
-              "back": "Debian: `dpkg -L pkg`. RHEL/Fedora: `rpm -ql pkg`. Arch: `pacman -Ql pkg`. This is the inverse of the \"who owns this file?\" query.",
-              "hint": "-L, -ql, -Ql."
-            },
-            {
-              "id": "package-management-rpm-dnf-pacman-trust-fc-003",
-              "type": "flashcard",
-              "front": "In the package-signing security model, what exactly do you trust, and why does that defeat a malicious mirror?",
-              "back": "You trust a maintainer's/repo's GPG public key, not the server hosting the files. The signed index commits to the hash of every package, so any tampered package (even from a compromised mirror or MITM) fails signature/hash verification. A mirror cannot produce a validly signed index without the private key.",
-              "hint": "Trust the key, not the host."
-            },
-            {
-              "id": "package-management-rpm-dnf-pacman-trust-fc-004",
-              "type": "flashcard",
-              "front": "Why is modern APT's `signed-by=` keyring approach safer than the old global `apt-key`?",
-              "back": "With global `apt-key`, any key in the global trust set could vouch for ANY repository. With per-source `signed-by=/etc/apt/keyrings/vendor.gpg`, a given key only authorizes its own repo, so one third party's key cannot silently authenticate packages from another source. It scopes trust.",
-              "hint": "Scoping trust to one repo instead of all."
-            },
-            {
-              "id": "package-management-rpm-dnf-pacman-trust-mcq-001",
+              "id": "package-management-dependencies-and-families-mcq-001",
               "type": "mcq",
-              "prompt": "A mysterious binary `/usr/bin/widget` appears on a Fedora box. Which command tells you which package put it there?",
+              "prompt": "What is a 'dependency'?",
               "choices": [
-                "rpm -ql /usr/bin/widget",
-                "rpm -qf /usr/bin/widget",
-                "dnf list installed widget",
-                "rpm -V widget"
+                "A setting that makes a program run faster",
+                "Another program or library that your software needs in order to work",
+                "The website a package was downloaded from",
+                "A backup copy of a package"
               ],
               "answerIndex": 1,
-              "explanation": "`rpm -qf FILE` (query-file) maps a file path to its owning package. `rpm -ql` is the inverse (list a package's files) and expects a package name. `rpm -V` verifies a package against its recorded metadata.",
+              "explanation": "A dependency is something else (a library or program) that your software relies on to function. It is not a speed setting, a download source, or a backup.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-3.svg"
+            },
+            {
+              "id": "package-management-dependencies-and-families-mcq-002",
+              "type": "mcq",
+              "prompt": "When you run 'sudo apt install gimp', what does the package manager resolve automatically for you?",
+              "choices": [
+                "The screen resolution of your monitor",
+                "All the dependencies gimp needs, downloading and installing them too",
+                "Your internet connection speed",
+                "Which folder to save your photos in"
+              ],
+              "answerIndex": 1,
+              "explanation": "The package manager automatically resolves dependencies: it figures out every other program gimp needs and installs those as well, so gimp actually works. It has nothing to do with screen resolution, connection speed, or your save folders.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-3.svg"
+            },
+            {
+              "id": "package-management-dependencies-and-families-mcq-003",
+              "type": "mcq",
+              "prompt": "The process of working out the full chain of needed packages and installing them in the right order is called what?",
+              "choices": [
+                "Dependency resolution",
+                "Disk formatting",
+                "Compression",
+                "Encryption"
+              ],
+              "answerIndex": 0,
+              "explanation": "Figuring out and installing the whole chain of dependencies is called dependency resolution. Formatting, compression, and encryption are unrelated operations.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-3.svg"
+            },
+            {
+              "id": "package-management-dependencies-and-families-mcq-004",
+              "type": "mcq",
+              "prompt": "On the Debian/Ubuntu family, the install command and package file extension are:",
+              "choices": [
+                "dnf and .rpm",
+                "apt and .deb",
+                "pacman and .pkg",
+                "apt and .rpm"
+              ],
+              "answerIndex": 1,
+              "explanation": "Debian/Ubuntu uses the `apt` command and `.deb` package files. `dnf`/`.rpm` belong to Fedora/RHEL; mixing them up (like apt with .rpm) is a common error.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-4.svg"
+            },
+            {
+              "id": "package-management-dependencies-and-families-mcq-005",
+              "type": "mcq",
+              "prompt": "On the Fedora/RHEL family, which command installs software?",
+              "choices": [
+                "apt install",
+                "dnf install",
+                "deb install",
+                "rpm-get install"
+              ],
+              "answerIndex": 1,
+              "explanation": "Fedora/RHEL uses `dnf install`. `apt` is the Debian/Ubuntu command, and the other two are not real commands.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-4.svg"
+            },
+            {
+              "id": "package-management-dependencies-and-families-mcq-006",
+              "type": "mcq",
+              "prompt": "How are a .deb file and a .rpm file related?",
+              "choices": [
+                "They are completely different things with nothing in common",
+                "They are two file formats for the same idea: a bundled, installable program with its name, version, and dependency list",
+                "A .deb is software but a .rpm is only documentation",
+                "A .rpm is older and can no longer be installed"
+              ],
+              "answerIndex": 1,
+              "explanation": "Both are package files: a program bundled with its metadata (name, version, dependencies). They are just the formats used by different families. Neither is mere documentation, and both are still in active use.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-4.svg"
+            },
+            {
+              "id": "package-management-dependencies-and-families-mcq-007",
+              "type": "mcq",
+              "prompt": "You learned to install software with apt on Ubuntu. You now sit at a Fedora machine. What mostly changes?",
+              "choices": [
+                "Everything is completely different and nothing transfers",
+                "Mostly just the command name: you use dnf instead of apt for the same kinds of actions",
+                "You can no longer install software at all",
+                "You must build every program from source"
+              ],
+              "answerIndex": 1,
+              "explanation": "The concepts (install, remove, update, dependencies, repositories) are the same across families; mostly the command name changes from apt to dnf. You do not lose the ability to install or have to build from source.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-4.svg"
+            },
+            {
+              "id": "package-management-dependencies-and-families-mcq-008",
+              "type": "mcq",
+              "prompt": "Two programs you install both need the same helper library. What does a good package manager do?",
+              "choices": [
+                "Refuses to install the second program",
+                "Installs the shared library once and lets both programs use it",
+                "Installs a separate full copy of the library for each, always",
+                "Asks you to compile the library yourself"
+              ],
+              "answerIndex": 1,
+              "explanation": "Traditional package managers share common dependencies: the helper library is installed once and reused by both programs (see the shared box at the bottom of the dependency tree). It does not refuse the install or force you to compile anything.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-3.svg"
+            },
+            {
+              "id": "package-management-dependencies-and-families-mcq-009",
+              "type": "mcq",
+              "prompt": "Why does automatic dependency resolution matter so much to a beginner?",
+              "choices": [
+                "It makes your screen brighter",
+                "Without it, you would have to find and install each needed piece by hand and would hit 'missing file' errors",
+                "It is only useful for servers, not desktops",
+                "It prevents you from ever updating software"
+              ],
+              "answerIndex": 1,
+              "explanation": "Dependency resolution saves you from manually hunting down every required piece (and the cascade of errors that follows when one is missing). It applies everywhere, helps with updates, and has nothing to do with screen brightness.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-3.svg"
+            }
+          ]
+        },
+        {
+          "id": "package-management-package-management-trust-pinning-and-source",
+          "title": "Trust, Version Pinning, and Building From Source",
+          "order": 3,
+          "difficulty": 3,
+          "content": "**Hook.** If software is being downloaded from the internet and installed with administrator powers, one question matters a lot: how does your computer know the package is genuine and was not swapped out by an attacker? The answer is a digital seal, and understanding it makes you a safer Linux user.\n\n**Build — trust through signing.** Every official repository signs its packages with a secret key, producing a **GPG signature** (think of it as an unforgeable wax seal; GPG just stands for the encryption tool that makes it). Your computer keeps the matching **public key** — the part that can *check* a seal but not create one. Before installing, the package manager verifies the seal against that trusted key. If the seal matches, the package is genuine; if anything was altered, the check fails and the package is refused. The crucial idea: **you trust a key, not a server.** Even a hacked download mirror cannot forge a valid seal without the secret key, so it cannot sneak a tampered package onto your system.\n\n**Build — version pinning.** Normally you want the newest version, but sometimes you need to *freeze* a package at a known-good version (for example, a newer release broke something). Holding a package back is called **version pinning** (or a *hold*):\n\n```bash\nsudo apt-mark hold nginx     # keep nginx at its current version\nsudo apt-mark unhold nginx   # allow it to upgrade again\n```\n\nThe catch: a held package also stops getting *security* fixes, so a forgotten hold quietly becomes a risk. Pin deliberately, and review your holds.\n\n**Build — which package owns a file, and building from source.** The package manager keeps a record of what it installed, so you can ask which package a file belongs to:\n\n```bash\ndpkg -S /usr/bin/curl     # Debian/Ubuntu: which package owns this file?\nrpm -qf /usr/bin/curl     # Fedora/RHEL: the same question\n```\n\nOccasionally no package exists and you must **build from source** — turn the original code into a program yourself, classically `./configure && make && sudo make install`. The downside is that this just copies files in with *no record kept*, so there is no clean uninstall and no dependency tracking. That headache is exactly *why packaging exists*: to track everything for you.\n\n**Recap.** Packages are signed, and you trust the key, not the server, which is why a bad mirror cannot tamper with installs. You can pin a package to freeze its version (but it then misses security fixes), ask which package owns a file, and build from source when needed, accepting that hand-built software is untracked.",
+          "items": [
+            {
+              "id": "package-management-trust-pinning-and-source-mcq-001",
+              "type": "mcq",
+              "prompt": "What is a GPG signature on a package, in plain terms?",
+              "choices": [
+                "A password you must type to install it",
+                "An unforgeable digital seal that proves the package is genuine and unaltered",
+                "The file size of the package",
+                "A list of the package's dependencies"
+              ],
+              "answerIndex": 1,
+              "explanation": "A GPG signature is like a tamper-proof wax seal: it lets your computer confirm the package really came from the trusted source and was not changed. It is not a password, a size, or a dependency list.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-5.svg"
+            },
+            {
+              "id": "package-management-trust-pinning-and-source-mcq-002",
+              "type": "mcq",
+              "prompt": "In package signing, what does your computer use to CHECK a package's seal?",
+              "choices": [
+                "The repository's secret (private) key",
+                "A public key it already trusts, which can verify a seal but not create one",
+                "Your login password",
+                "The package's file name"
+              ],
+              "answerIndex": 1,
+              "explanation": "Your computer holds the public key, which can verify a signature but cannot forge one. The secret/private key stays with the repository. Your password and the file name play no part in the check.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-5.svg"
+            },
+            {
+              "id": "package-management-trust-pinning-and-source-mcq-003",
+              "type": "mcq",
+              "prompt": "Why can a hacked download mirror NOT slip a tampered package onto a correctly set up system?",
+              "choices": [
+                "Because the mirror lacks the secret signing key, so it cannot produce a valid seal that matches the trusted public key",
+                "Because mirrors are never connected to the internet",
+                "Because the package manager refuses to use mirrors at all",
+                "Because tampered packages are automatically larger and get rejected by size"
+              ],
+              "answerIndex": 0,
+              "explanation": "Trust rests on the key, not the server. Without the secret key the mirror cannot forge a valid signature, so a tampered package fails the check. Mirrors are used and are online; size is not what is verified.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-5.svg"
+            },
+            {
+              "id": "package-management-trust-pinning-and-source-mcq-004",
+              "type": "mcq",
+              "prompt": "The phrase 'you trust a key, not a server' means:",
+              "choices": [
+                "You should only download from one specific server forever",
+                "Trust is based on a cryptographic key, so any server (even an untrusted mirror) is fine as long as the signature checks out",
+                "Servers are more trustworthy than keys",
+                "You must enter a key every time you install"
+              ],
+              "answerIndex": 1,
+              "explanation": "Because the signature proves authenticity, the package can come from any mirror and still be trusted once the seal verifies against your key. It does not mean sticking to one server or typing a key each time.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-5.svg"
+            },
+            {
+              "id": "package-management-trust-pinning-and-source-mcq-005",
+              "type": "mcq",
+              "prompt": "What does 'version pinning' (a hold) do?",
+              "choices": [
+                "Deletes all old versions of a package",
+                "Freezes a package at its current version so it will not upgrade",
+                "Forces a package to always use the newest version",
+                "Pins the package icon to your desktop"
+              ],
+              "answerIndex": 1,
+              "explanation": "Pinning/holding freezes a package at its current version (e.g. `apt-mark hold nginx`). It is the opposite of forcing the newest version, and it does not delete versions or touch your desktop.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-5.svg"
+            },
+            {
+              "id": "package-management-trust-pinning-and-source-mcq-006",
+              "type": "mcq",
+              "prompt": "What is the danger of leaving a package pinned (held) and forgetting about it?",
+              "choices": [
+                "It uses too much disk space over time",
+                "It also stops receiving security updates, becoming a silent vulnerability",
+                "It will uninstall itself after a while",
+                "It makes the whole system refuse all updates"
+              ],
+              "answerIndex": 1,
+              "explanation": "A held package is excluded from upgrades, including security fixes, so a forgotten hold quietly leaves a hole. It does not balloon disk usage, uninstall itself, or block updates to other packages.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-5.svg"
+            },
+            {
+              "id": "package-management-trust-pinning-and-source-mcq-007",
+              "type": "mcq",
+              "prompt": "A strange file '/usr/bin/widget' appears and you want to know which installed package put it there. On Ubuntu, which command answers that?",
+              "choices": [
+                "dpkg -S /usr/bin/widget",
+                "apt update widget",
+                "make install widget",
+                "apt search /usr/bin/widget"
+              ],
+              "answerIndex": 0,
+              "explanation": "`dpkg -S <file>` (on Fedora/RHEL it is `rpm -qf <file>`) maps a file back to the package that owns it. `apt update` refreshes the catalog, `make install` builds from source, and `apt search` matches keywords, not file paths.",
               "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-1.svg"
             },
             {
-              "id": "package-management-rpm-dnf-pacman-trust-mcq-002",
+              "id": "package-management-trust-pinning-and-source-mcq-008",
               "type": "mcq",
-              "prompt": "Why can a compromised package mirror NOT slip a backdoored package onto a correctly configured Debian system?",
+              "prompt": "What does 'building from source' mean?",
               "choices": [
-                "Because APT downloads everything over HTTPS only",
-                "Because the signed index commits to each package's hash, and the mirror lacks the private signing key",
-                "Because dpkg refuses to install anything from a mirror",
-                "Because /etc/apt/keyrings encrypts the downloaded packages"
+                "Downloading a ready-made package from a repository",
+                "Turning a program's original code into a runnable program yourself, often with ./configure && make && sudo make install",
+                "Copying a program from another computer",
+                "Renaming a package file"
               ],
               "answerIndex": 1,
-              "explanation": "Trust rests on the GPG signature of the repo index, which lists each package's hash. Without the private key the mirror cannot forge a valid signature, and an altered package won't match the signed hash. HTTPS alone does not provide this (mirrors are often plain HTTP); trust is in the key."
+              "explanation": "Building from source means compiling the original source code into a working program on your machine. Downloading a ready package, copying, or renaming are not the same thing.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-1.svg"
             },
             {
-              "id": "package-management-rpm-dnf-pacman-trust-mcq-003",
+              "id": "package-management-trust-pinning-and-source-mcq-009",
               "type": "mcq",
-              "prompt": "Which mapping correctly translates `apt install pkg` to Arch?",
+              "prompt": "Why is installing software with 'make install' usually worse than using a package?",
               "choices": [
-                "pacman -R pkg",
-                "pacman -Qo pkg",
-                "pacman -S pkg",
-                "pacman -Sy pkg only"
+                "It always installs the wrong version",
+                "It copies files in with no record kept, so there is no clean uninstall and no dependency tracking",
+                "It requires an internet connection and packages do not",
+                "It can only install one program ever"
               ],
-              "answerIndex": 2,
-              "explanation": "`pacman -S pkg` syncs/installs a package (with dependencies) from the configured repos — the analogue of `apt install`. `-R` removes, `-Qo` queries the owner of a file, and `-Sy` alone just refreshes the database."
+              "answerIndex": 1,
+              "explanation": "`make install` just copies files into place with nothing tracking them, so removing it cleanly or managing its dependencies is hard. Solving exactly that bookkeeping problem is why package managers exist.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-1.svg"
             },
             {
-              "id": "package-management-rpm-dnf-pacman-trust-mcq-004",
+              "id": "package-management-trust-pinning-and-source-mcq-010",
               "type": "mcq",
-              "prompt": "On RHEL/Fedora, what is the relationship between `rpm` and `dnf`?",
+              "prompt": "How is the package manager able to tell you which package owns a given file?",
               "choices": [
-                "They are unrelated; dnf is for containers only",
-                "`rpm` resolves dependencies and `dnf` installs single files",
-                "`dnf` resolves dependencies from repos and drives `rpm` for the low-level install",
-                "`dnf` replaced `rpm` entirely and rpm no longer exists"
+                "It guesses based on the file name",
+                "It keeps a record (a database) of every file each package installed",
+                "It re-downloads the whole internet to check",
+                "It cannot; that information is lost after install"
               ],
-              "answerIndex": 2,
-              "explanation": "Just like dpkg/apt on Debian: `rpm` is the low-level package tool, while `dnf` (successor to yum) is the high-level resolver that pulls from repos and ultimately invokes the rpm machinery. Both still exist and have distinct roles."
+              "answerIndex": 1,
+              "explanation": "When it installs a package, the package manager records which files came from it, so it can later map any file back to its owner. It is not guessing, re-downloading, or losing the information.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-1.svg"
             }
           ]
         },
         {
-          "id": "package-management-package-management-source-modern-security",
-          "title": "Source Builds, Flatpak/Snap/Nix, and Security Updates",
-          "order": 3,
+          "id": "package-management-package-management-modern-formats-and-updates",
+          "title": "Modern App Formats, Language Tools, and Staying Updated",
+          "order": 4,
           "difficulty": 3,
-          "content": "Sometimes no package exists, so you build from source. The classic Autotools dance:\n\n```bash\n./configure --prefix=/usr/local   # probe system, generate Makefile\nmake -j$(nproc)                    # compile\nsudo make install                  # copy artifacts into --prefix\n```\n\nThe trap: `make install` scatters files with no database tracking them, so there is no clean uninstall and no dependency bookkeeping. That pain is *why packaging exists*. Prefer `--prefix=/usr/local` (or tools like `checkinstall`/`stow`) to keep hand-built software out of `/usr` where the package manager rules.\n\n**The system-vs-language tension.** Language managers — `pip`/`venv`, `npm`, `cargo` — install into their own ecosystems and ignore the OS database. Mixing `sudo pip install` with apt-managed Python is a classic way to break a system, because both fight over the same `/usr/lib/python*`. The discipline: keep language deps in **virtual environments** / project-local dirs (`venv`, `node_modules`, `~/.cargo`), and let the system manager own the system. This unresolved tension is a major motivation for **containers** (Module 14).\n\n**Modern universal formats** sidestep the conflict by bundling dependencies and sandboxing:\n- **Flatpak** — desktop apps, runtime + sandbox (Flathub), portals for access.\n- **Snap** — Canonical's confined packages with auto-update; uses squashfs.\n- **AppImage** — one self-contained executable file, no install step.\n- **Nix** — purely functional, content-addressed store (`/nix/store`) giving reproducible, atomically rollback-able environments.\n\n**Staying patched.** Apply security updates promptly: `apt upgrade` / `dnf upgrade`, and on Debian/Ubuntu enable `unattended-upgrades` for automatic security patches. Use **version pinning/holds** (`apt-mark hold pkg`, dnf `versionlock`, APT pin priorities) to freeze a known-good version, but audit held packages — a forgotten hold is a lingering vulnerability.",
+          "content": "**Hook.** The classic system package manager (`apt`, `dnf`) is great, but it ties each program to your specific Linux version and its shared libraries. Newer formats take a different approach: bundle everything an app needs into one self-contained unit so it runs the same on any Linux. And separately, the programming world has its own installers. Knowing how these fit together keeps you out of a common beginner trap.\n\n**Build — universal app formats.** These package an app together with its dependencies, so they do not depend on the host system's exact libraries:\n\n- **Flatpak** — desktop apps from a store called Flathub; each app runs in a *sandbox* (a walled-off area limiting what it can touch).\n- **Snap** — Canonical's version, similar idea, with automatic updates.\n- **AppImage** — the simplest: one downloadable file you make executable and run, with *no install step* at all.\n\nThe trade-off: these bundle their own copies of libraries, so they use more disk space, but they are portable across distributions and isolated from the system.\n\n**Build — language package managers and the tension.** Programming languages ship their *own* installers for code libraries: **pip** for Python, **npm** for Node.js (JavaScript), **cargo** for Rust. These are separate from the system package manager and the OS does not track them. The trap: running something like `sudo pip install` system-wide lets a language tool fight the system tool over the same files and can break things. The discipline is to keep language libraries in a per-project space (for Python this is a **virtual environment**, a `venv`) and let the system manager own the system. This is the *system-versus-language tension*.\n\n**Build — staying updated.** Keeping software current is mostly about applying **security updates** promptly:\n\n```bash\nsudo apt upgrade     # install available updates (Debian/Ubuntu)\nsudo dnf upgrade     # the same on Fedora/RHEL\n```\n\nOn Ubuntu you can enable **unattended-upgrades** so security patches install automatically in the background — set-and-forget protection.\n\n**Recap.** Flatpak, Snap, and AppImage bundle an app with its dependencies for portability and isolation, at the cost of size. Language tools (pip, npm, cargo) manage code libraries separately from the system — keep them project-local to avoid conflicts. And the most important habit is applying security updates, ideally automatically.",
           "items": [
             {
-              "id": "package-management-source-modern-security-fc-001",
-              "type": "flashcard",
-              "front": "What is the classic three-step Autotools build-from-source sequence, and what does each step do?",
-              "back": "`./configure` probes the system and generates a Makefile (set install location with `--prefix`); `make` compiles the sources; `sudo make install` copies the built artifacts into the prefix. The downside: nothing records the installed files, so there is no clean uninstall or dependency tracking.",
-              "hint": "configure, make, make install."
-            },
-            {
-              "id": "package-management-source-modern-security-fc-002",
-              "type": "flashcard",
-              "front": "Why is `sudo pip install <pkg>` system-wide considered risky on a modern distro?",
-              "back": "The system Python is managed by apt/dnf. A system-wide pip install writes into the same `/usr/lib/python*` paths, can overwrite or shadow distro-managed files, and creates a state the OS package manager doesn't know about — leading to breakage on upgrades. Use a `venv` / project-local install instead.",
-              "hint": "Two managers fighting over the same files."
-            },
-            {
-              "id": "package-management-source-modern-security-fc-003",
-              "type": "flashcard",
-              "front": "Contrast how Flatpak/Snap/AppImage handle dependencies versus a traditional .deb/.rpm.",
-              "back": "Traditional packages share libraries with the rest of the system and rely on the package manager to resolve dependencies. Flatpak/Snap/AppImage instead BUNDLE their dependencies (and typically run sandboxed/confined), trading larger size and duplicated libs for isolation, portability across distros, and freedom from the host's dependency state.",
-              "hint": "Bundle + sandbox vs. share + resolve."
-            },
-            {
-              "id": "package-management-source-modern-security-fc-004",
-              "type": "flashcard",
-              "front": "What makes Nix's approach to package management reproducible and rollback-friendly?",
-              "back": "Nix installs every build into a content-addressed, immutable store (`/nix/store/<hash>-name`). Because each package and its exact dependency closure has a unique path, multiple versions coexist without conflict, builds are reproducible, and switching/rolling back an environment is just repointing symlinks atomically.",
-              "hint": "Immutable hashed store + atomic profile switches."
-            },
-            {
-              "id": "package-management-source-modern-security-fc-005",
-              "type": "flashcard",
-              "front": "How do you freeze a Debian package at its current version, and what is the maintenance hazard?",
-              "back": "`sudo apt-mark hold <pkg>` (RHEL: dnf `versionlock`; APT also supports pin priorities in `/etc/apt/preferences.d/`). The hazard: a held package is excluded from upgrades including SECURITY updates, so a forgotten hold becomes a silent, lingering vulnerability. Audit holds periodically (`apt-mark showhold`).",
-              "hint": "hold/versionlock — but it also blocks security patches."
-            },
-            {
-              "id": "package-management-source-modern-security-mcq-001",
+              "id": "package-management-modern-formats-and-updates-mcq-001",
               "type": "mcq",
-              "prompt": "What is the main reason `make install` is inferior to using a package for the same software?",
+              "prompt": "What do Flatpak, Snap, and AppImage have in common compared to a traditional .deb or .rpm?",
               "choices": [
-                "It compiles slower than the package build",
-                "It cannot use compiler optimizations",
-                "It leaves untracked files with no clean uninstall or dependency management",
-                "It always installs into /opt"
-              ],
-              "answerIndex": 2,
-              "explanation": "`make install` just copies files into the prefix; no database records them, so removal is manual and error-prone and dependencies aren't tracked. Solving exactly this bookkeeping problem is why package managers exist."
-            },
-            {
-              "id": "package-management-source-modern-security-mcq-002",
-              "type": "mcq",
-              "prompt": "You need a Python data tool for one project without disturbing the apt-managed system Python. Best practice?",
-              "choices": [
-                "sudo pip install into the system site-packages",
-                "Create a venv and pip install into it",
-                "Replace /usr/bin/python3 with a newer build",
-                "apt remove python3 then reinstall via pip"
+                "They contain no actual program, only settings",
+                "They bundle an app together with its dependencies so it runs across different Linux systems",
+                "They only work without an internet connection",
+                "They can only install command-line tools"
               ],
               "answerIndex": 1,
-              "explanation": "A virtual environment (`python -m venv .venv`) isolates the project's packages from the system Python entirely, avoiding the system-vs-language conflict. The other options corrupt or destabilize the OS-managed interpreter."
+              "explanation": "All three bundle the app plus its dependencies, making them portable across distributions and independent of the host's exact libraries. They contain real programs (often graphical) and are not limited to offline or command-line use.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-4.svg"
             },
             {
-              "id": "package-management-source-modern-security-mcq-003",
+              "id": "package-management-modern-formats-and-updates-mcq-002",
               "type": "mcq",
-              "prompt": "Which universal package format is a single self-contained executable file that requires no installation step?",
+              "prompt": "Which format is a single downloadable file that you make executable and run, with no install step?",
               "choices": [
                 "Flatpak",
                 "Snap",
                 "AppImage",
-                "Nix"
+                "apt"
               ],
               "answerIndex": 2,
-              "explanation": "An AppImage bundles the app and its libraries into one executable file you can `chmod +x` and run anywhere. Flatpak and Snap install through their own daemons/runtimes; Nix uses a store under /nix."
+              "explanation": "An AppImage is one self-contained file you can run directly after making it executable. Flatpak and Snap install through their own systems, and apt is the traditional package manager.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-4.svg"
             },
             {
-              "id": "package-management-source-modern-security-mcq-004",
+              "id": "package-management-modern-formats-and-updates-mcq-003",
               "type": "mcq",
-              "prompt": "On Debian/Ubuntu, which mechanism automatically applies security updates without manual intervention?",
+              "prompt": "What is the main trade-off of bundled formats like Flatpak and Snap?",
               "choices": [
-                "apt-mark hold",
-                "unattended-upgrades",
-                "dpkg --configure -a",
-                "apt-cache policy"
+                "They cannot be uninstalled",
+                "They use more disk space because each app carries its own copies of libraries",
+                "They only run on Windows",
+                "They never receive updates"
               ],
               "answerIndex": 1,
-              "explanation": "`unattended-upgrades` is the package/service that periodically installs security (and optionally other) updates automatically. `apt-mark hold` does the opposite (freezes a package); the others inspect or reconfigure state."
+              "explanation": "Because each bundled app ships its own dependencies instead of sharing system libraries, it takes more disk space. They can be uninstalled, run on Linux, and do receive updates.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-4.svg"
+            },
+            {
+              "id": "package-management-modern-formats-and-updates-mcq-004",
+              "type": "mcq",
+              "prompt": "What is a 'sandbox' in the context of a Flatpak or Snap app?",
+              "choices": [
+                "A folder for temporary files",
+                "A walled-off area that limits what the app can access on your system",
+                "The store you download apps from",
+                "A tool for building apps from source"
+              ],
+              "answerIndex": 1,
+              "explanation": "A sandbox isolates the app, restricting what it can touch, which improves security. It is not a temp folder, a store, or a build tool.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-4.svg"
+            },
+            {
+              "id": "package-management-modern-formats-and-updates-mcq-005",
+              "type": "mcq",
+              "prompt": "pip, npm, and cargo are examples of what?",
+              "choices": [
+                "System package managers that replace apt",
+                "Language package managers that install code libraries for Python, Node.js, and Rust",
+                "Universal app formats like Flatpak",
+                "Text editors"
+              ],
+              "answerIndex": 1,
+              "explanation": "pip (Python), npm (Node.js/JavaScript), and cargo (Rust) install libraries for their programming languages. They are separate from the system manager, are not app-bundling formats, and are not editors.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-3.svg"
+            },
+            {
+              "id": "package-management-modern-formats-and-updates-mcq-006",
+              "type": "mcq",
+              "prompt": "Why can running 'sudo pip install' system-wide cause problems?",
+              "choices": [
+                "It is too slow to finish",
+                "A language tool ends up fighting the system package manager over the same files, which can break the system",
+                "pip cannot install anything at all",
+                "It deletes your home folder"
+              ],
+              "answerIndex": 1,
+              "explanation": "Installing language libraries system-wide lets pip and the OS package manager clash over the same files (the system-versus-language tension), risking breakage. It is not about speed, and it does not disable pip or erase your home folder.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-3.svg"
+            },
+            {
+              "id": "package-management-modern-formats-and-updates-mcq-007",
+              "type": "mcq",
+              "prompt": "What is the recommended way to install Python libraries for a single project without disturbing the system?",
+              "choices": [
+                "Use sudo pip install for everything",
+                "Use a virtual environment (venv) so the libraries stay project-local",
+                "Replace the system Python with a new one",
+                "Install them with apt only, never pip"
+              ],
+              "answerIndex": 1,
+              "explanation": "A virtual environment keeps a project's Python libraries isolated from the system Python, avoiding conflicts. Installing system-wide with sudo or replacing the system Python is exactly what causes breakage.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-3.svg"
+            },
+            {
+              "id": "package-management-modern-formats-and-updates-mcq-008",
+              "type": "mcq",
+              "prompt": "On Ubuntu, which command installs available updates for your installed software?",
+              "choices": [
+                "sudo apt search",
+                "sudo apt upgrade",
+                "sudo apt remove",
+                "sudo apt hold"
+              ],
+              "answerIndex": 1,
+              "explanation": "`sudo apt upgrade` installs the available updates (on Fedora/RHEL it is `dnf upgrade`). `search` finds packages, `remove` uninstalls, and `hold`/`apt-mark hold` freezes a version.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-2.svg"
+            },
+            {
+              "id": "package-management-modern-formats-and-updates-mcq-009",
+              "type": "mcq",
+              "prompt": "On Debian/Ubuntu, what does 'unattended-upgrades' do?",
+              "choices": [
+                "Freezes all packages so they never change",
+                "Automatically installs security updates in the background without manual action",
+                "Removes software you have not used recently",
+                "Disables the package manager"
+              ],
+              "answerIndex": 1,
+              "explanation": "unattended-upgrades applies security (and optionally other) updates automatically, so your system stays patched without you remembering to run it. It does not freeze packages, remove unused software, or disable the package manager.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-2.svg"
+            },
+            {
+              "id": "package-management-modern-formats-and-updates-mcq-010",
+              "type": "mcq",
+              "prompt": "Why are security updates considered the most important update habit?",
+              "choices": [
+                "They make programs look nicer",
+                "They fix known weaknesses that attackers could otherwise exploit",
+                "They are the only updates that exist",
+                "They free up disk space"
+              ],
+              "answerIndex": 1,
+              "explanation": "Security updates patch known vulnerabilities, closing holes before they can be exploited, which is why applying them promptly matters most. They are not about appearance, are not the only kind of update, and are not primarily about disk space.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/package-management-5.svg"
             }
           ]
         }
