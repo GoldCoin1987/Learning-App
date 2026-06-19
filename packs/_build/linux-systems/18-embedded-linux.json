@@ -5,353 +5,701 @@
   "lessons": [
     {
       "id": "embedded-linux-lesson-1",
-      "title": "What Makes Embedded Linux Different",
+      "title": "What Is Embedded Linux?",
       "order": 1,
       "difficulty": 1,
-      "content": "Desktop and server Linux assume abundant RAM/flash, a self-describing bus (PCIe/USB enumeration, ACPI tables on x86), and a package manager you run *on the box*. Embedded Linux throws most of that away. You are running on an ARM (or RISC-V) **SoC** with maybe 128 MB-1 GB of RAM and a few GB of flash, bringing up **custom hardware** whose peripherals cannot announce themselves to the kernel.\n\nFour things define the embedded workflow:\n\n- **Constrained resources.** You strip the kernel and userspace down to what the product needs. BusyBox replaces dozens of GNU tools with one multicall binary; you may have no shell at all in production.\n- **Cross-compilation (Module 13).** You build on a fast x86 host *for* the target ARM. The target never compiles its own code, so there is usually **no package manager on the device** — the whole image is built and flashed as a unit.\n- **Custom hardware.** A vendor or you designed the board. Non-discoverable peripherals (I2C sensors, SPI flash, GPIO LEDs) must be described to the kernel via the **device tree**, not probed.\n- **Robust, often read-only rootfs.** A device in the field cannot run `apt upgrade` after a power cut corrupts the filesystem. Embedded images favor a **read-only root** (squashfs) with a small writable overlay, atomic A/B update schemes, and long support lifecycles measured in years.\n\nFor you this is familiar ground inverted: instead of soldering and probing radar boards, you describe that hardware to software and bring it up. Your EE instincts about clocks, buses, and signal integrity transfer directly.",
+      "content": "Here is a surprising fact: the same Linux that runs giant web servers also runs inside tiny everyday gadgets. Your Wi-Fi router, your smart TV, the screen in many cars, and a small hobbyist computer like a **Raspberry Pi** (a credit-card-sized computer) are very often running Linux. When Linux runs on a small device like that, we call it **embedded Linux** - \"embedded\" just means \"built into a device\" rather than sitting on a desk as a general computer.\n\nSo what is different about it? On a normal PC you install a big, general-purpose Linux **distribution** (a \"distro\" is a ready-made Linux bundle, like Ubuntu) that can do almost anything. A small device doesn't need almost anything - it needs to do one job well. So instead of installing a giant distro, engineers build a **small, custom Linux image** that contains only the pieces that one device needs.\n\nAn **image** here means the complete, ready-to-run system packed into a single file that gets loaded onto the device. Think of it like the difference between a fully stocked kitchen (a desktop distro - every tool, just in case) and a small travel kit with only the few utensils one recipe needs (an embedded image).\n\nWhy go to that trouble? Small devices have very little storage and memory, so a smaller image fits and runs better. A custom image also starts faster and has fewer moving parts to break.\n\nRecap: embedded Linux is regular Linux, shrunk down and customized into a small image tailored to a single device - the Linux hiding inside routers, TVs, cars, and a Raspberry Pi.",
       "items": [
-        {
-          "id": "embedded-linux-1-fc-1",
-          "type": "flashcard",
-          "front": "Name the four properties that distinguish embedded Linux from desktop/server Linux.",
-          "back": "Constrained resources (small RAM/flash), cross-compilation on a host for the target, custom non-discoverable hardware, and a robust/read-only rootfs with long support lifecycles. Usually no package manager runs on the device.",
-          "hint": "Think small, built elsewhere, custom board, can't apt-upgrade in the field."
-        },
-        {
-          "id": "embedded-linux-1-fc-2",
-          "type": "flashcard",
-          "front": "Why is there usually no package manager on an embedded target?",
-          "back": "The entire image is cross-compiled on a host and flashed as a unit. The device has no toolchain, limited storage, and needs reproducible/atomic images, so software is added at build time (via Buildroot/Yocto), not installed on-device.",
-          "hint": "It is built elsewhere and flashed whole."
-        },
-        {
-          "id": "embedded-linux-1-fc-3",
-          "type": "flashcard",
-          "front": "What is BusyBox and why is it ubiquitous in embedded Linux?",
-          "back": "BusyBox is a single multicall binary that implements stripped-down versions of many common Unix utilities (sh, ls, cp, init, etc.) selected by the name it is invoked as. It saves enormous space versus shipping full GNU coreutils on a constrained device.",
-          "hint": "One binary, many symlinked tool names."
-        },
-        {
-          "id": "embedded-linux-1-fc-4",
-          "type": "flashcard",
-          "front": "Why do embedded products favor a read-only root filesystem?",
-          "back": "A read-only rootfs (e.g., squashfs) survives sudden power loss without corruption, can be integrity-checked, and prevents field drift. Writable state is confined to a small overlay or separate data partition, often with atomic A/B image updates.",
-          "hint": "Power can be yanked at any instant in the field."
-        },
         {
           "id": "embedded-linux-1-mcq-1",
           "type": "mcq",
-          "prompt": "On an x86 server, the kernel learns about onboard devices largely from ACPI tables provided by firmware. What plays the analogous role on a typical ARM embedded board?",
+          "prompt": "In plain terms, what does \"embedded Linux\" mean?",
           "choices": [
-            "The device tree, a separate data structure describing non-discoverable hardware",
-            "The PCIe configuration space, scanned at boot",
-            "The /etc/fstab file read by systemd",
-            "USB enumeration performed by the boot ROM"
+            "A version of Linux that can only run on supercomputers",
+            "Linux that is built into a device (like a router or TV) as a small, custom system rather than a general desktop install",
+            "A programming language used to write Linux",
+            "A type of Wi-Fi network created by Linux machines"
           ],
-          "answerIndex": 0,
-          "explanation": "Most ARM SoC peripherals are not self-describing and there is no ACPI. The device tree is a separate binary blob (DTB) passed to the kernel that enumerates the hardware so drivers can bind."
+          "answerIndex": 1,
+          "explanation": "\"Embedded\" means built into a device to do a specific job. Embedded Linux is the same Linux kernel, packaged as a small custom image for one device, rather than a big general-purpose desktop distribution."
         },
         {
           "id": "embedded-linux-1-mcq-2",
           "type": "mcq",
-          "prompt": "Which statement about cross-compilation in embedded Linux is correct?",
+          "prompt": "Which of these everyday products is LEAST likely to be quietly running embedded Linux inside it?",
           "choices": [
-            "You compile on the ARM target because only it has the right headers",
-            "You compile on a fast x86 host using a toolchain that emits ARM binaries",
-            "Cross-compilation is only needed for the kernel, not userspace",
-            "It is identical to native compilation but with a -static flag"
+            "A home Wi-Fi router",
+            "A smart TV",
+            "A paper notebook",
+            "A Raspberry Pi"
           ],
-          "answerIndex": 1,
-          "explanation": "Embedded development cross-compiles on a powerful host (x86) using a toolchain (e.g., aarch64-linux-gnu-gcc) that targets the device architecture. The target is too slow/small to build its own image."
+          "answerIndex": 2,
+          "explanation": "Routers, smart TVs, and the Raspberry Pi are all small computers that commonly run Linux. A paper notebook has no computer in it at all, so there is no software running inside it."
         },
         {
           "id": "embedded-linux-1-mcq-3",
           "type": "mcq",
-          "prompt": "A field device loses power mid-write and afterward boots fine with no filesystem corruption. Which design choice most directly enabled this?",
+          "prompt": "Why do engineers build a small, custom Linux image for a device instead of installing a full desktop distribution like Ubuntu?",
           "choices": [
-            "Running fsck on every boot",
-            "A read-only squashfs root with a separate writable overlay/data area",
-            "Using systemd instead of BusyBox init",
-            "Compiling the kernel with -O3"
+            "Because desktop Linux is illegal to use on small devices",
+            "Because small devices have little storage and memory, and only need the few parts required for their one job",
+            "Because custom images cannot connect to the internet",
+            "Because a Raspberry Pi cannot run any version of Ubuntu"
           ],
           "answerIndex": 1,
-          "explanation": "A read-only root cannot be corrupted by an interrupted write. Mutable state is isolated to an overlay or data partition, often combined with journaling or atomic updates, so the core system is always consistent."
+          "explanation": "Small devices are tight on storage and memory and do one focused job. A trimmed, custom image fits the hardware, starts faster, and has fewer parts that could fail. A full desktop distro would be bloated and wasteful here."
         },
         {
-          "id": "embedded-linux-1-fc-5",
-          "type": "flashcard",
-          "front": "How does the 'long support lifecycle' of embedded products affect kernel/toolchain choices?",
-          "back": "Products must be maintained for years (sometimes a decade), so teams pin a long-term-support (LTS) kernel, a fixed toolchain, and reproducible build configs, rather than tracking the latest rolling release the way a desktop might.",
-          "hint": "Defense and industrial gear can't chase the newest release every six months."
+          "id": "embedded-linux-1-mcq-4",
+          "type": "mcq",
+          "prompt": "A Linux \"distribution\" (distro) such as Ubuntu or Fedora is best described as:",
+          "choices": [
+            "A single program for editing photos",
+            "A ready-made bundle of the Linux kernel plus many programs, packaged for general use",
+            "A piece of hardware you plug into a device",
+            "The cable used to connect a board to a PC"
+          ],
+          "answerIndex": 1,
+          "explanation": "A distribution bundles the Linux kernel together with a large collection of programs and tools into a ready-to-install package for general-purpose computers. Embedded projects usually skip the big distro and build a slim custom image instead."
+        },
+        {
+          "id": "embedded-linux-1-mcq-5",
+          "type": "mcq",
+          "prompt": "In embedded Linux, what does an \"image\" refer to?",
+          "choices": [
+            "A photograph stored on the device",
+            "The complete, ready-to-run system packed into a single file that is loaded onto the device",
+            "The device's screen output",
+            "A diagram of the circuit board"
+          ],
+          "answerIndex": 1,
+          "explanation": "An image is the whole system (kernel plus the chosen programs and files) assembled into one file that gets written onto the device's storage. It is not a picture; it is the packaged software the device boots."
+        },
+        {
+          "id": "embedded-linux-1-mcq-6",
+          "type": "mcq",
+          "prompt": "The lesson compares a desktop distro to a fully stocked kitchen and an embedded image to a small travel kit. What idea is that analogy teaching?",
+          "choices": [
+            "Embedded devices cannot cook or do useful work",
+            "An embedded image includes only the few parts the device actually needs, while a desktop distro includes nearly everything just in case",
+            "Desktop Linux is always better than embedded Linux",
+            "Travel kits are more expensive than kitchens"
+          ],
+          "answerIndex": 1,
+          "explanation": "The travel kit holds only what one recipe needs, just as an embedded image holds only what one device needs. The stocked kitchen, like a desktop distro, carries far more than any single task requires."
+        },
+        {
+          "id": "embedded-linux-1-mcq-7",
+          "type": "mcq",
+          "prompt": "Is the Linux inside a Wi-Fi router fundamentally a different operating system from the Linux on a server?",
+          "choices": [
+            "Yes, the router uses a completely unrelated operating system",
+            "No, it is the same Linux underneath, just shrunk down and customized into a small image for that device",
+            "Yes, embedded Linux is not really Linux at all",
+            "No, but only because routers are not real computers"
+          ],
+          "answerIndex": 1,
+          "explanation": "It is the same Linux at its core. The difference is packaging: the router runs a small, tailored image with only what it needs, whereas a server runs a large general-purpose install."
+        },
+        {
+          "id": "embedded-linux-1-mcq-8",
+          "type": "mcq",
+          "prompt": "Which is a real benefit of shipping a smaller, custom Linux image on a device?",
+          "choices": [
+            "It guarantees the device can never be hacked",
+            "It fits the device's limited storage and memory, and tends to start faster with fewer parts to break",
+            "It makes the device run a completely different kernel",
+            "It removes the need for the device to have any storage at all"
+          ],
+          "answerIndex": 1,
+          "explanation": "A trimmed image fits constrained hardware, boots faster, and has a smaller \"surface\" of components that could fail. It does not magically guarantee security, and the device still needs storage to hold the image."
+        },
+        {
+          "id": "embedded-linux-1-img-1",
+          "type": "mcq",
+          "prompt": "Look at the diagram. What is the single clearest difference it shows between a desktop distro and an embedded image?",
+          "choices": [
+            "The desktop distro has no kernel",
+            "The embedded image contains only the few parts the device needs, while the desktop distro carries thousands of general-purpose programs",
+            "The embedded image is for big servers and the distro is for tiny boards",
+            "They are identical in every way"
+          ],
+          "answerIndex": 1,
+          "explanation": "The diagram contrasts a large, do-everything desktop distro with a slim embedded image tailored to one device. Both use the same Linux underneath; the embedded side simply includes only what that one device needs.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/embedded-linux-3.svg"
         }
       ]
     },
     {
       "id": "embedded-linux-lesson-2",
-      "title": "The ARM Boot Chain & U-Boot",
+      "title": "How a Board Boots: the ARM Boot Chain",
       "order": 2,
       "difficulty": 2,
-      "content": "On x86 you learned: UEFI firmware -> GRUB (from the ESP) -> kernel + initramfs -> systemd. The ARM embedded chain looks different at every stage, and there is **no BIOS/UEFI**.\n\n1. **SoC boot ROM.** Masked silicon inside the chip runs first. It reads a fixed boot-source order (eMMC/SD, SPI-NOR, USB, UART) and loads a tiny first-stage loader into on-chip SRAM, because DRAM is not configured yet.\n2. **SPL** (Secondary Program Loader, sometimes `MLO`). A size-limited first stage whose job is to **initialize DRAM and clocks**, then load the full bootloader into RAM.\n3. **U-Boot.** The workhorse. It has an interactive prompt, a persistent **environment** (key=value pairs in flash), and a script variable **`bootcmd`** that runs automatically after a countdown. U-Boot loads the **kernel image and the DTB** (and optionally an initramfs) from MMC, flash, or the network, then jumps into the kernel passing it the DTB pointer.\n4. **Kernel** parses the DTB, brings up drivers, mounts the root filesystem (from the `bootargs`/kernel cmdline), and execs **init** (PID 1) — BusyBox init or systemd — which ends at a serial-console login.\n\nInterrupting U-Boot (hit a key during the countdown) is a core skill:\n\n```bash\n# at the U-Boot prompt\nprintenv bootcmd            # see the auto-boot script\nsetenv bootargs 'console=ttyS0,115200 root=/dev/mmcblk0p2 rw'\nfatload mmc 0:1 0x80008000 Image          # load kernel into RAM\nfatload mmc 0:1 0x84000000 board.dtb      # load device tree\nbooti 0x80008000 - 0x84000000             # boot kernel, no initrd, with DTB\nsaveenv                                   # persist changes to flash\n```\n\nFor development, U-Boot can pull the kernel over **TFTP** and mount root over **NFS**, so you reflash nothing while iterating.",
+      "content": "When you press power on a small Linux board, getting to a working system is a **relay race**: several small programs run one after another, each waking up the next and handing over the baton. This sequence is called the **boot chain**. Most of these boards use **ARM** chips - a family of processors common in phones and small devices - so people call it the ARM boot chain.\n\nHere are the stages, in order:\n\n1. **Boot ROM.** A tiny piece of code permanently baked into the chip at the factory. It runs first, the instant power arrives. Its only job is to find and load the next stage.\n2. **U-Boot.** This is the **bootloader** - a small program whose job is to find the Linux kernel, load it into memory, and start it. (You may meet a tiny helper before it, often called the SPL, whose only task is to switch on the memory chips so U-Boot has room to run; for now, just picture \"a loader that starts the kernel.\")\n3. **Kernel + device tree.** The Linux **kernel** is the core of Linux - the part that actually controls the hardware. Alongside it, U-Boot hands over a small file called the **device tree** that lists what hardware is on this board (the next lesson explains this in depth).\n4. **init.** Once Linux is running, it starts the very first program, called **init**. init launches the services the device needs and finally gives you a **login** prompt.\n\nHow is this different from a normal PC? A PC's first stage is built-in firmware called **BIOS/UEFI**, not a boot ROM plus U-Boot. And a PC can automatically detect its own hardware, so it needs no device tree. A small board cannot auto-detect its parts - which is exactly why the device tree exists.\n\nRecap: power on, then Boot ROM, then U-Boot loads the kernel, the kernel reads the device tree and starts init, and you reach a login. Each runner hands the baton to the next.",
       "items": [
-        {
-          "id": "embedded-linux-2-fc-1",
-          "type": "flashcard",
-          "front": "List the full ARM embedded boot chain in order.",
-          "back": "SoC boot ROM -> SPL (MLO) -> U-Boot -> kernel + DTB -> init (PID 1). The boot ROM is on-chip silicon; SPL sets up DRAM/clocks; U-Boot loads kernel+DTB; the kernel mounts root and execs init.",
-          "hint": "Five stages, starting inside the chip and ending at a login prompt."
-        },
-        {
-          "id": "embedded-linux-2-fc-2",
-          "type": "flashcard",
-          "front": "What is the SPL's primary job, and why can't U-Boot do it directly?",
-          "back": "SPL initializes DRAM controllers and clocks and then loads the full U-Boot into RAM. The boot ROM can only load a tiny image into on-chip SRAM before DRAM exists, so a small first stage must configure memory before the larger U-Boot can run.",
-          "hint": "DRAM isn't usable yet when the boot ROM runs."
-        },
-        {
-          "id": "embedded-linux-2-fc-3",
-          "type": "flashcard",
-          "front": "What are U-Boot's environment and bootcmd?",
-          "back": "The environment is a persistent set of key=value variables stored in flash (edited with setenv/saveenv). bootcmd is the variable holding the script U-Boot runs automatically after the boot-delay countdown, typically loading and booting the kernel + DTB.",
-          "hint": "printenv shows them; bootcmd auto-runs."
-        },
-        {
-          "id": "embedded-linux-2-fc-4",
-          "type": "flashcard",
-          "front": "In development, how can U-Boot avoid reflashing the device on every kernel change?",
-          "back": "U-Boot can fetch the kernel and DTB over TFTP into RAM, and the kernel can mount its root filesystem over NFS (root=/dev/nfs with nfsroot= in bootargs). You rebuild on the host and reboot; nothing is written to the device's flash.",
-          "hint": "Network boot: TFTP for the kernel, NFS for root."
-        },
         {
           "id": "embedded-linux-2-mcq-1",
           "type": "mcq",
-          "prompt": "Which is the single biggest structural difference between the ARM embedded boot chain and the x86/UEFI chain?",
+          "prompt": "What is the \"boot chain\" of a Linux board?",
           "choices": [
-            "ARM uses GRUB while x86 uses U-Boot",
-            "There is no BIOS/UEFI; an on-chip boot ROM plus SPL bootstraps U-Boot, and a device tree replaces ACPI hardware self-description",
-            "x86 has no kernel command line",
-            "ARM cannot load an initramfs"
+            "A physical chain that locks the board to a desk",
+            "The ordered sequence of small programs that each start the next, from power-on up to a running system",
+            "The power cable that supplies the board",
+            "A list of users allowed to log in"
           ],
           "answerIndex": 1,
-          "explanation": "ARM SoCs boot from masked on-chip ROM, not UEFI firmware, and chain through SPL to U-Boot. They lack ACPI, so the device tree describes the hardware. The first three options are factually wrong."
+          "explanation": "The boot chain is the relay of programs that run in order after power-on - boot ROM, then the bootloader, then the kernel, then init - each handing off to the next until you have a usable system."
         },
         {
           "id": "embedded-linux-2-mcq-2",
           "type": "mcq",
-          "prompt": "At the U-Boot prompt you run printenv and want the kernel to use a serial console and an SD root partition. Which variable do you set?",
+          "prompt": "What is the correct order of the ARM boot chain described in the lesson?",
           "choices": [
-            "bootcmd, because it holds the kernel command line",
-            "bootargs, which becomes the kernel command line passed at boot",
-            "loadaddr, which sets the console device",
-            "fdtaddr, which selects the root filesystem"
+            "Kernel, then U-Boot, then boot ROM, then init",
+            "Boot ROM, then U-Boot, then kernel + device tree, then init",
+            "init, then kernel, then boot ROM, then U-Boot",
+            "U-Boot, then boot ROM, then init, then kernel"
           ],
           "answerIndex": 1,
-          "explanation": "bootargs is passed to the kernel as its command line (console=, root=, etc.). bootcmd is the U-Boot script that boots; loadaddr/fdtaddr are RAM load addresses for the kernel and DTB."
+          "explanation": "Power arrives and the on-chip boot ROM runs first, it loads U-Boot, U-Boot loads the kernel (with its device tree), and the kernel starts init. Each stage hands off to the next in that order."
         },
         {
           "id": "embedded-linux-2-mcq-3",
           "type": "mcq",
-          "prompt": "After U-Boot loads the kernel and DTB and jumps into the kernel, what is the last handoff before userspace begins?",
+          "prompt": "What runs first the instant the board gets power, and where does it live?",
           "choices": [
-            "The kernel calls saveenv to persist the environment",
-            "The kernel parses the DTB, mounts the root filesystem, and execs init as PID 1",
-            "U-Boot mounts the root filesystem and starts systemd",
-            "The boot ROM re-runs to verify the image"
+            "U-Boot, stored on the SD card",
+            "The boot ROM, a tiny program baked into the chip itself at the factory",
+            "The Linux kernel, loaded from the internet",
+            "init, the first user program"
           ],
           "answerIndex": 1,
-          "explanation": "The kernel uses the DTB to bring up drivers, mounts root per the cmdline, then execs /sbin/init (or init= override) as PID 1 — the kernel-to-userspace handoff. U-Boot is long gone by then."
+          "explanation": "The boot ROM is permanent code inside the chip. Because it is always there and always runs first, it can reliably start the boot process and load the next stage."
+        },
+        {
+          "id": "embedded-linux-2-mcq-4",
+          "type": "mcq",
+          "prompt": "What is the main job of U-Boot, the bootloader?",
+          "choices": [
+            "To edit photos on the device",
+            "To find the Linux kernel, load it into memory, and start it",
+            "To permanently store all the user's files",
+            "To detect the hardware so Linux never needs a device tree"
+          ],
+          "answerIndex": 1,
+          "explanation": "A bootloader's purpose is to locate the kernel, place it in memory, and hand control to it. U-Boot does exactly that, and also passes along the device tree so the kernel knows what hardware to expect."
+        },
+        {
+          "id": "embedded-linux-2-mcq-5",
+          "type": "mcq",
+          "prompt": "In one sentence, what is the Linux \"kernel\"?",
+          "choices": [
+            "The outer plastic case of the device",
+            "The core of Linux - the part that actually controls the hardware and runs programs",
+            "A single app for browsing the web",
+            "The login screen shown to the user"
+          ],
+          "answerIndex": 1,
+          "explanation": "The kernel is the central piece of Linux that manages the hardware and lets programs run. The bootloader's whole purpose is to get this kernel loaded and started."
+        },
+        {
+          "id": "embedded-linux-2-mcq-6",
+          "type": "mcq",
+          "prompt": "After Linux starts, what does \"init\" do?",
+          "choices": [
+            "It powers the board off",
+            "It is the first program Linux runs; it starts the device's services and brings up a login prompt",
+            "It loads the kernel into memory",
+            "It is the factory code baked into the chip"
+          ],
+          "answerIndex": 1,
+          "explanation": "init is the first program the kernel launches once it is running. It starts the needed background services and ends at a login prompt - the visible sign that boot finished."
+        },
+        {
+          "id": "embedded-linux-2-mcq-7",
+          "type": "mcq",
+          "prompt": "How does a board's boot start differently from a normal PC's?",
+          "choices": [
+            "A PC has no operating system at all",
+            "A PC's first stage is built-in firmware called BIOS/UEFI, instead of a boot ROM plus U-Boot",
+            "A PC never loads a kernel",
+            "A board cannot be powered on"
+          ],
+          "answerIndex": 1,
+          "explanation": "On a PC, the first code to run is firmware (BIOS or UEFI) built into the motherboard. A small board instead starts from an on-chip boot ROM that chains to U-Boot. Both ultimately load a Linux kernel."
+        },
+        {
+          "id": "embedded-linux-2-mcq-8",
+          "type": "mcq",
+          "prompt": "Why does a small board need a device tree while a normal PC does not?",
+          "choices": [
+            "A PC has no hardware to describe",
+            "A PC can automatically detect its own hardware, but a small board cannot, so the board needs a file describing its parts",
+            "A device tree is only used for drawing graphics",
+            "Boards are faster than PCs and skip the step"
+          ],
+          "answerIndex": 1,
+          "explanation": "PCs use standards that let them discover attached hardware on their own. A small custom board's parts are silent and cannot announce themselves, so a device tree file tells the kernel what is present."
+        },
+        {
+          "id": "embedded-linux-2-mcq-9",
+          "type": "mcq",
+          "prompt": "The lesson calls booting a \"relay race.\" What is that analogy highlighting?",
+          "choices": [
+            "That booting is a competition between devices",
+            "That several small programs run one after another, each starting (handing the baton to) the next",
+            "That the kernel runs all the stages at the same time",
+            "That booting only works if the device is moving"
+          ],
+          "answerIndex": 1,
+          "explanation": "Like runners passing a baton, each boot stage does its part and then hands control to the next stage. No single program does everything; they cooperate in sequence."
         },
         {
           "id": "embedded-linux-2-img-1",
-          "type": "flashcard",
-          "front": "The ARM embedded boot chain stage by stage: on-chip boot ROM -> SPL (DRAM/clock init) -> U-Boot (env, bootcmd, load kernel+DTB) -> kernel + DTB -> init, contrasted with the x86/UEFI path.",
-          "back": "Review the diagram above.",
-          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/embedded-linux-1.svg"
+          "type": "mcq",
+          "prompt": "In the boot-chain diagram, which handoff is shown happening just before you reach a usable login?",
+          "choices": [
+            "Boot ROM hands directly to init, skipping everything",
+            "The kernel (with the device tree) starts init, which then brings up the login",
+            "init starts U-Boot",
+            "The login starts the boot ROM"
+          ],
+          "answerIndex": 1,
+          "explanation": "The diagram shows the chain ending with the kernel handing off to init, which launches services and presents the login. The boot ROM and U-Boot are earlier stages, already finished by then.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/embedded-linux-4.svg"
         }
       ]
     },
     {
       "id": "embedded-linux-lesson-3",
-      "title": "The Device Tree: Describing Hardware to the Kernel",
+      "title": "The Device Tree: Telling Linux What Hardware Exists",
       "order": 3,
       "difficulty": 3,
-      "content": "The **device tree (DT)** exists to solve one problem: most SoC peripherals are **not discoverable**. A USB or PCIe device can announce its vendor/product IDs, but an I2C temperature sensor wired to pins on your custom board cannot. Rather than hardcode every board into the kernel (the bad old ARM 'board files' era), Linux passes the kernel a **device tree blob (DTB)** describing the hardware as a tree of **nodes** and **properties**.\n\nYou write **`.dts`** source (and shared **`.dtsi`** include files for the SoC, included by board files) and compile it with the device-tree compiler **`dtc`** into a `.dtb`:\n\n```dts\n/dts-v1/;\n#include \"my-soc.dtsi\"\n\n&i2c1 {\n    status = \"okay\";\n    bmp280@76 {\n        compatible = \"bosch,bmp280\";\n        reg = <0x76>;        /* I2C address */\n    };\n};\n```\n\nThe load-bearing property is **`compatible`**. The kernel matches a node's `compatible` string against each driver's `of_device_id` table; on a match the driver's `probe()` runs and binds to that node (this is exactly the platform/OF device model from Module 9). **A typo in the `compatible` string means no match, no probe, and a silent non-working peripheral** — the single most common DT bug.\n\n```bash\ndtc -I dts -O dtb -o board.dtb board.dts   # compile source to blob\ndtc -I dtb -O dts -o out.dts board.dtb     # decompile to inspect\n```\n\n**Device-tree overlays** let you patch the base tree at runtime (e.g., enabling SPI or a GPIO LED on a Raspberry Pi) without recompiling the whole DTB — ideal for experimentation. Cardinal rule: edit the `.dts`, recompile, and redeploy the DTB. Never hand-edit the binary `.dtb`, and never forget to redeploy it after a change.",
+      "content": "On a normal PC, plug in a USB stick and the computer instantly knows what it is - the device announces its name and type. Many parts on a small custom board cannot do that. A simple temperature sensor or an LED wired directly to the chip is **silent**: it has no way to say \"I am here, and I am this kind of part.\"\n\nSo how does Linux learn what is on the board? With a **device tree**. A device tree is simply a **text file that lists the hardware on the board** and tells the kernel where each part is and what it is. Think of it as a parts list, or a seating chart, handed to Linux as it starts up.\n\nYou write this list in a file ending in **.dts** (device tree source - \"source\" means human-readable text you can edit). Each part gets an entry. Here is a shortened example for a temperature sensor:\n\n```\nsensor {\n    compatible = \"bosch,bmp280\";\n    address = 0x76;\n};\n```\n\nThe most important line is **compatible**. It is a name tag that says exactly what kind of part this is. Linux uses that name to pick the matching **driver** - the small piece of software that knows how to operate that specific part. If the name matches a driver, the driver loads and the part works.\n\nThis is also the number-one beginner mistake: a **typo in the compatible name** means Linux finds no matching driver, so the part silently does nothing - no error explosion, it just quietly doesn't work. The fix is always to correct the text, rebuild the device tree, and load it again. (For optional add-on parts, there are small patches called **overlays** that add an entry without rewriting the whole list.)\n\nRecap: a board's parts can't announce themselves, so a device tree text file lists them; the compatible name links each part to its driver, and one typo there is the classic reason a part won't work.",
       "items": [
-        {
-          "id": "embedded-linux-3-fc-1",
-          "type": "flashcard",
-          "front": "Why does the Linux device tree exist?",
-          "back": "To describe non-discoverable hardware (I2C/SPI/GPIO peripherals, memory map, clocks) to the kernel without hardcoding board details into kernel C code. It replaced the unmaintainable per-board 'board file' approach on ARM.",
-          "hint": "Some buses can't enumerate their devices."
-        },
-        {
-          "id": "embedded-linux-3-fc-2",
-          "type": "flashcard",
-          "front": "What is the role of the compatible property in a device-tree node?",
-          "back": "compatible is a string (or list) the kernel matches against each driver's of_device_id table. On a match, the driver's probe() is called and it binds to that node. It is the link between hardware description and driver code.",
-          "hint": "It's how a DT node finds its driver."
-        },
-        {
-          "id": "embedded-linux-3-fc-3",
-          "type": "flashcard",
-          "front": "What is the difference between .dts, .dtsi, and .dtb?",
-          "back": ".dts is device-tree source for a specific board; .dtsi is a shared include (e.g., the SoC definition) pulled into board files; .dtb is the compiled binary blob handed to the kernel. dtc compiles .dts (+ .dtsi includes) into .dtb.",
-          "hint": "Source, shared-include source, compiled blob."
-        },
-        {
-          "id": "embedded-linux-3-fc-4",
-          "type": "flashcard",
-          "front": "What is a device-tree overlay and when is it useful?",
-          "back": "An overlay is a fragment that patches the base device tree (adding/enabling nodes) without recompiling the full DTB. Raspberry Pi uses them to enable I2C/SPI/GPIO peripherals at boot. Great for experimentation and optional hardware (HATs/capes).",
-          "hint": "A patch on top of the base tree, often loaded by the bootloader."
-        },
-        {
-          "id": "embedded-linux-3-fc-5",
-          "type": "flashcard",
-          "front": "What are the three cardinal mistakes when working with device trees?",
-          "back": "1) A wrong/typo compatible string so the driver never binds. 2) Editing the binary .dtb instead of the .dts source. 3) Forgetting to recompile (dtc) and redeploy the DTB to the device after changing the source.",
-          "hint": "Wrong string, edit the blob, forget to redeploy."
-        },
         {
           "id": "embedded-linux-3-mcq-1",
           "type": "mcq",
-          "prompt": "You added an I2C sensor node to the device tree, but after boot dmesg shows the driver never ran and /sys has no entry. The driver is built in. What is the most likely cause?",
+          "prompt": "Why does embedded Linux need a device tree at all?",
           "choices": [
-            "The kernel was compiled with the wrong optimization level",
-            "The compatible string in the DT node does not match the driver's of_device_id table",
-            "U-Boot did not run saveenv",
-            "The rootfs is read-only"
+            "Because Linux refuses to boot without drawing a tree on screen",
+            "Because many parts on a small board are silent and cannot announce themselves, so the kernel needs a file describing what hardware is present",
+            "Because the device tree replaces the need for a kernel",
+            "Because it makes the device boot faster than a PC"
           ],
           "answerIndex": 1,
-          "explanation": "Driver binding hinges on the compatible string matching the driver's of_device_id entry. A mismatch (typo, wrong vendor prefix) means no probe() call and a silently absent device — the classic DT bug."
+          "explanation": "This is the core idea: a small board's parts (like an I2C sensor or a wired LED) can't tell the kernel they exist. The device tree is the text file that describes them so the kernel knows what is there and can drive it."
         },
         {
           "id": "embedded-linux-3-mcq-2",
           "type": "mcq",
-          "prompt": "Which command compiles device-tree source into the binary blob the kernel consumes?",
+          "prompt": "In plain words, what IS a device tree?",
           "choices": [
-            "gcc -dtb board.dts",
-            "dtc -I dts -O dtb -o board.dtb board.dts",
-            "make menuconfig board.dts",
-            "objcopy -O dtb board.dts board.dtb"
+            "A physical tree-shaped circuit on the board",
+            "A text file that lists the hardware on the board and tells the kernel what each part is and where it is",
+            "A live video feed of the board",
+            "A list of websites the device may visit"
           ],
           "answerIndex": 1,
-          "explanation": "dtc (device-tree compiler) converts between .dts and .dtb. Here -I dts -O dtb specifies input/output formats. gcc, menuconfig, and objcopy do not compile device trees."
+          "explanation": "A device tree is a description of the board's hardware in a text file - essentially a parts list handed to the kernel at boot. It is not a physical object or a graphic."
         },
         {
           "id": "embedded-linux-3-mcq-3",
           "type": "mcq",
-          "prompt": "What is the cleanest way to enable an optional SPI peripheral on a Raspberry Pi without rebuilding the entire base device tree?",
+          "prompt": "Why can a USB stick on a PC be recognized automatically, while a sensor wired to a small board often cannot?",
           "choices": [
-            "Hand-edit the binary .dtb with a hex editor",
-            "Load a device-tree overlay that patches the base tree at boot",
-            "Recompile the kernel with the device baked in",
-            "Set a U-Boot environment variable"
+            "USB sticks contain their own copy of Linux",
+            "USB devices can announce their name and type, but a simple wired part is silent and has no way to introduce itself",
+            "The board is broken if a sensor is not detected",
+            "PCs do not actually detect USB devices either"
           ],
           "answerIndex": 1,
-          "explanation": "Overlays are designed exactly for this: a small fragment enabling/adding nodes is applied over the base DTB at boot, so optional hardware can be toggled without recompiling the full tree."
+          "explanation": "USB has a built-in way for a device to report what it is. A bare sensor or LED wired to the chip has no such mechanism, so something must describe it - that something is the device tree."
+        },
+        {
+          "id": "embedded-linux-3-mcq-4",
+          "type": "mcq",
+          "prompt": "What does the \"compatible\" line in a device-tree entry do?",
+          "choices": [
+            "It sets the screen brightness",
+            "It is a name tag identifying the kind of part, which Linux uses to pick the matching driver",
+            "It lists the price of the part",
+            "It deletes the part from the system"
+          ],
+          "answerIndex": 1,
+          "explanation": "The compatible string names the part's type. The kernel matches that name to a driver; on a match, the right driver loads and operates the part. It is the link between the hardware description and the software."
+        },
+        {
+          "id": "embedded-linux-3-mcq-5",
+          "type": "mcq",
+          "prompt": "In this context, what is a \"driver\"?",
+          "choices": [
+            "The person who installed the board",
+            "A small piece of software that knows how to operate a specific piece of hardware",
+            "The cable connecting the board to a PC",
+            "The main login screen"
+          ],
+          "answerIndex": 1,
+          "explanation": "A driver is the software that knows the details of one kind of hardware and lets the rest of the system use it. The device tree's compatible name tells Linux which driver to load for each part."
+        },
+        {
+          "id": "embedded-linux-3-mcq-6",
+          "type": "mcq",
+          "prompt": "You added a sensor to the device tree but after boot it does nothing - no error, just silence. The driver for it is present. What is the most likely cause?",
+          "choices": [
+            "The board ran out of electricity",
+            "The compatible name has a typo, so Linux finds no matching driver and the part quietly does nothing",
+            "The kernel is too new to boot",
+            "The login prompt is disabled"
+          ],
+          "answerIndex": 1,
+          "explanation": "This is the classic device-tree bug. If the compatible name does not exactly match what the driver expects, no driver binds and the part stays silent. The fix is to correct the text, rebuild the device tree, and load it again."
+        },
+        {
+          "id": "embedded-linux-3-mcq-7",
+          "type": "mcq",
+          "prompt": "What does the \".dts\" file ending tell you about the device tree?",
+          "choices": [
+            "It is already in the final binary form the kernel reads",
+            "It is the human-readable source text you can open and edit",
+            "It is a damaged file that cannot be used",
+            "It is a photograph of the board"
+          ],
+          "answerIndex": 1,
+          "explanation": "\".dts\" means device tree source - the editable text version. You change the .dts, then rebuild it into the form the kernel actually consumes."
+        },
+        {
+          "id": "embedded-linux-3-mcq-8",
+          "type": "mcq",
+          "prompt": "What is a device-tree \"overlay\" useful for?",
+          "choices": [
+            "Making the screen background transparent",
+            "Adding an entry for an optional add-on part without rewriting the whole device tree",
+            "Permanently deleting the kernel",
+            "Encrypting the user's files"
+          ],
+          "answerIndex": 1,
+          "explanation": "An overlay is a small patch that adds or enables a part on top of the base device tree. It is handy for optional hardware (like a sensor you sometimes attach) because you don't have to rebuild the entire list."
+        },
+        {
+          "id": "embedded-linux-3-mcq-9",
+          "type": "mcq",
+          "prompt": "After editing the device tree source to fix a part, what must you do for the change to take effect?",
+          "choices": [
+            "Nothing; the kernel re-reads the source text live while running",
+            "Rebuild the device tree from the corrected source and load the new version on the board",
+            "Buy a new board",
+            "Delete the driver entirely"
+          ],
+          "answerIndex": 1,
+          "explanation": "The kernel reads the built device tree at boot, not the source text live. So after editing the .dts you must rebuild it and deploy the new version, then reboot, for the change to apply."
         },
         {
           "id": "embedded-linux-3-img-1",
-          "type": "flashcard",
-          "front": "Device-tree binding: a node's compatible string ('bosch,bmp280') is matched against a driver's of_device_id table; on a match the driver's probe() runs and binds. A typo on either side means the driver never probes.",
-          "back": "Review the diagram above.",
-          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/embedded-linux-2.svg"
+          "type": "mcq",
+          "prompt": "In the device-tree diagram, what links a silent part on the board to the right driver in Linux?",
+          "choices": [
+            "Its color",
+            "Its \"compatible\" name, which Linux matches to a driver",
+            "The length of the wires",
+            "The board's serial number"
+          ],
+          "answerIndex": 1,
+          "explanation": "The diagram shows each part described by an entry whose compatible name is the matching key. Linux reads that name and loads the corresponding driver; a typo in the name breaks the match.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/embedded-linux-5.svg"
         }
       ]
     },
     {
       "id": "embedded-linux-lesson-4",
-      "title": "Buildroot vs Yocto, BSPs, Filesystems & Booting an SBC",
+      "title": "Build Tools: Buildroot vs Yocto (and the BSP)",
       "order": 4,
       "difficulty": 4,
-      "content": "A **Board Support Package (BSP)** is the vendor-supplied bundle that makes a specific board boot: the bootloader (SPL+U-Boot), a kernel with the right drivers, and the board's device tree. You build a root filesystem on top of the BSP using one of two dominant systems.\n\n**Buildroot** is the simpler one: a big **Kconfig**/Makefile system (`make menuconfig`) that cross-compiles a toolchain, kernel, and a minimal rootfs into a single flashable image. It is fast to learn, fast to build, and ideal for small, fixed images — the recommended starting point.\n\n```bash\nmake raspberrypi3_defconfig   # start from a board defconfig\nmake menuconfig               # tweak packages\nmake -j$(nproc)               # produces output/images/sdcard.img\n```\n\n**Yocto / OpenEmbedded** is the industry standard for products. It is heavier and built around **layers** (`bblayers.conf`), **recipes** (`.bb` files describing how to fetch/build each component), the **BitBake** task engine, machine configs, and `local.conf`. It generates SDKs, handles licensing/SBOM, and scales to large product lines — at the cost of a steep learning curve and long first builds.\n\n**Rule of thumb:** Buildroot for simplicity and small/fixed images; Yocto when you need recipes, layering, package feeds, SBOM, and production-grade maintainability across many boards.\n\nEmbedded **filesystems** match the storage: **squashfs** (compressed, read-only root), **UBIFS/JFFS2** (for raw NAND/NOR flash with wear-leveling), and an **overlay** (overlayfs/tmpfs) for a writable layer over read-only base. The kernel itself is configured via `make menuconfig` from a **defconfig**, then you build the kernel image, **modules**, and **DTB**.\n\nFinally, you boot a real **SBC**. Flash the image to an SD card and **boot it**:\n\n```bash\nlsblk                                   # CONFIRM the device first!\nsudo dd if=output/images/sdcard.img of=/dev/sdX bs=4M conv=fsync status=progress\n```\n\nA wrong `of=` here can wipe your laptop disk — always check `lsblk` first. The **Raspberry Pi** is the most accessible board; the **BeagleBone Black** exposes **PRUs** (programmable real-time units), which are compelling for deterministic, radar-like real-time I/O alongside Linux.",
+      "content": "We've said an embedded device runs a small, custom image. But who actually assembles that image? You don't hand-pick thousands of files yourself. Instead you use a **build system** - a tool that takes your choices and automatically **cross-compiles** and assembles everything into one finished image. (\"Cross-compile\" means build the software on your fast PC but produce programs that run on the board's different chip - covered in the earlier build sub-topic.)\n\nFirst, a head start: a **BSP** (Board Support Package) is a ready-made bundle from the board's maker that gets that specific board to boot - it includes the bootloader, a kernel with the right drivers, and the board's device tree. You build your custom image on top of the BSP rather than from nothing.\n\nThere are two popular build systems, and the key is knowing which to reach for.\n\n**Buildroot** is the simple one. You pick what you want from a menu of checkboxes, press build, and it produces one small image. It is quick to learn and quick to build, and it is ideal for a single, fixed device. Think of it as a friendly build-your-own kit. For most beginners and small projects, this is the right starting point.\n\n**Yocto** (also called OpenEmbedded) is the industrial one. It is built from **recipes** (each recipe is a small instruction file describing how to build one component) and **layers** (stacks of recipes you can reuse and combine). It is far more powerful and flexible, and it scales to large product families maintained for years - but it is heavier, harder to learn, and slower to build. Think of it as a full factory production line.\n\n**When to use which?** Choose Buildroot when you want something simple and fast for one fixed image. Choose Yocto when you need to scale across many products, reuse lots of components, and maintain them over a long lifetime.\n\nRecap: a build system assembles your image for you; a BSP gives you a working starting point for the board; Buildroot is simple and great to start with, while Yocto is the heavier industrial choice for big, long-lived products.",
       "items": [
-        {
-          "id": "embedded-linux-4-fc-1",
-          "type": "flashcard",
-          "front": "What is a Board Support Package (BSP)?",
-          "back": "The vendor-supplied bundle that boots a specific board: the bootloader (SPL + U-Boot), a kernel with the board's drivers, and its device tree. Build systems layer a root filesystem on top of the BSP.",
-          "hint": "Bootloader + kernel + drivers + device tree for one board."
-        },
-        {
-          "id": "embedded-linux-4-fc-2",
-          "type": "flashcard",
-          "front": "Contrast Buildroot and Yocto/OpenEmbedded.",
-          "back": "Buildroot: Kconfig/Makefile based, simple, fast, great for small/fixed images and learning. Yocto/OE: layers + recipes (.bb) + BitBake, machine configs, SDK and SBOM generation; heavier and slower but the production standard scaling across many boards. Pick Buildroot for simplicity, Yocto for maintainable products.",
-          "hint": "Simple menuconfig image vs layered recipe-based product system."
-        },
-        {
-          "id": "embedded-linux-4-fc-3",
-          "type": "flashcard",
-          "front": "Name Yocto's core building blocks.",
-          "back": "Layers (bblayers.conf) group recipes; recipes (.bb files) describe how to fetch and build each component; BitBake is the task scheduler/build engine; machine configs and local.conf select the target and settings. It can also generate an SDK and license/SBOM data.",
-          "hint": "Layers, recipes, BitBake, machine config."
-        },
-        {
-          "id": "embedded-linux-4-fc-4",
-          "type": "flashcard",
-          "front": "Match the embedded filesystem to its use: squashfs, UBIFS/JFFS2, overlayfs.",
-          "back": "squashfs: compressed read-only root. UBIFS/JFFS2: filesystems for raw NAND/NOR flash with wear-leveling. overlayfs (over tmpfs or a data partition): a writable layer stacked on a read-only base so the system can be modified at runtime without making root writable.",
-          "hint": "Read-only root, raw-flash FS, writable layer."
-        },
-        {
-          "id": "embedded-linux-4-fc-5",
-          "type": "flashcard",
-          "front": "What three kernel build outputs do you typically produce for an SBC, and how do you start the config?",
-          "back": "The kernel image (zImage/Image), the loadable modules, and the DTB(s). You start from a board defconfig (make <board>_defconfig) and adjust with make menuconfig, then build all three for the target architecture.",
-          "hint": "Image, modules, DTB — start from a defconfig."
-        },
         {
           "id": "embedded-linux-4-mcq-1",
           "type": "mcq",
-          "prompt": "A small team needs a minimal, fixed Linux image for one Raspberry Pi product and wants to be productive quickly. Which build system fits best, and why?",
+          "prompt": "What is a \"build system\" like Buildroot or Yocto for?",
           "choices": [
-            "Yocto, because BitBake recipes are required for any SD image",
-            "Buildroot, because its Kconfig/Makefile flow is simpler and fast for small fixed images",
-            "Yocto, because Buildroot cannot cross-compile a kernel",
-            "Neither; you must hand-assemble the rootfs with debootstrap"
+            "It is the screen that displays the device's output",
+            "It is a tool that automatically assembles and cross-compiles all the pieces into one finished image",
+            "It is the chip inside the board",
+            "It is a website where you buy boards"
           ],
           "answerIndex": 1,
-          "explanation": "Buildroot's menuconfig-driven flow produces a flashable image quickly and is ideal for small, fixed images. Yocto's power (layers, recipes, SBOM) is overkill here and slower to learn. Buildroot fully cross-compiles the kernel."
+          "explanation": "A build system takes your choices and does the heavy lifting: fetching, cross-compiling, and packing everything into a single image you can put on the device. You don't assemble thousands of files by hand."
         },
         {
           "id": "embedded-linux-4-mcq-2",
           "type": "mcq",
-          "prompt": "Why is squashfs combined with an overlay a popular rootfs scheme for shipping devices?",
+          "prompt": "A small team needs a minimal, fixed Linux image for one Raspberry Pi product and wants to be productive quickly. Which build system fits best, and why?",
           "choices": [
-            "squashfs is faster to write than ext4",
-            "The compressed read-only base resists corruption and saves flash, while the overlay supplies needed writability",
-            "It removes the need for a device tree",
-            "It lets the device run a package manager safely"
+            "Yocto, because it is the only tool that can build any image",
+            "Buildroot, because its menu-based flow is simple and fast for a single, fixed image",
+            "Yocto, because Buildroot cannot build a kernel",
+            "Neither; you must assemble every file by hand"
           ],
           "answerIndex": 1,
-          "explanation": "squashfs is compressed and read-only (corruption-resistant, space-saving); an overlay (over tmpfs or a data partition) provides the small amount of runtime writability needed without exposing the base to corruption."
+          "explanation": "Buildroot's checkbox-menu approach gets a small fixed image built quickly and is easy to learn - ideal here. Yocto's extra power (recipes and layers) is overkill for one simple product and slower to get going."
         },
         {
           "id": "embedded-linux-4-mcq-3",
           "type": "mcq",
-          "prompt": "Which command is correct and safe for writing a built SD-card image to a card, and what is the critical precaution?",
+          "prompt": "A company is launching a whole family of products across many different boards, to be maintained and updated for years. Which build system is the better fit, and why?",
           "choices": [
-            "sudo dd if=sdcard.img of=/dev/sdX bs=4M conv=fsync — first confirm /dev/sdX with lsblk",
-            "sudo dd if=/dev/sdX of=sdcard.img bs=4M — the direction does not matter",
-            "cp sdcard.img /dev/sdX — dd is never needed",
-            "sudo mkfs.ext4 /dev/sdX then copy files — dd corrupts images"
+            "Buildroot, because long-lived products must avoid menus",
+            "Yocto, because its recipes and layers are built to reuse components and scale across many products over a long lifetime",
+            "Buildroot, because Yocto cannot support more than one board",
+            "Neither; large products cannot use a build system"
           ],
-          "answerIndex": 0,
-          "explanation": "dd writes the raw image to the block device; if/of direction matters and a wrong of= can destroy your host disk, so you must verify the target with lsblk first. cp to a raw device won't lay down the partition table/bootloader correctly."
+          "answerIndex": 1,
+          "explanation": "Yocto is the industrial choice: its layered, recipe-based design is made for reusing components and maintaining many products over years. That power is worth its steeper learning curve when you operate at that scale."
         },
         {
           "id": "embedded-linux-4-mcq-4",
           "type": "mcq",
-          "prompt": "Why might an engineer with a radar/real-time background find the BeagleBone Black especially interesting versus a Raspberry Pi?",
+          "prompt": "What is a BSP (Board Support Package)?",
           "choices": [
-            "It runs Windows natively",
-            "It exposes PRUs (programmable real-time units) for deterministic real-time I/O alongside Linux",
-            "It has no device tree, simplifying bring-up",
-            "It cannot run Buildroot or Yocto"
+            "A snack provided with the board",
+            "A ready-made bundle from the board's maker (bootloader, a kernel with the right drivers, and the device tree) that gets that board to boot",
+            "A type of screw used to mount the board",
+            "A password that unlocks the device"
           ],
           "answerIndex": 1,
-          "explanation": "The BeagleBone's PRUs are independent real-time cores for deterministic, low-jitter I/O — attractive for signal/real-time work that Linux's scheduler can't guarantee, which resonates with radar/real-time hardware experience."
+          "explanation": "A BSP is the vendor's starting bundle that makes a specific board boot. You build your custom image on top of it rather than starting from scratch."
+        },
+        {
+          "id": "embedded-linux-4-mcq-5",
+          "type": "mcq",
+          "prompt": "In Yocto, what is a \"recipe\"?",
+          "choices": [
+            "A cooking instruction unrelated to software",
+            "A small instruction file describing how to build one component of the image",
+            "The finished image itself",
+            "The board's serial number"
+          ],
+          "answerIndex": 1,
+          "explanation": "A Yocto recipe is a build instruction for a single piece of software - where to get it and how to build it. Many recipes combine to produce the whole image."
+        },
+        {
+          "id": "embedded-linux-4-mcq-6",
+          "type": "mcq",
+          "prompt": "What are Yocto \"layers\"?",
+          "choices": [
+            "Physical layers of metal on the board",
+            "Stacks of recipes that can be reused and combined to build images",
+            "The login screens shown to different users",
+            "Levels of a video game"
+          ],
+          "answerIndex": 1,
+          "explanation": "Layers group recipes so they can be reused and combined across projects and boards. This layering is a big part of why Yocto scales well to many products."
+        },
+        {
+          "id": "embedded-linux-4-mcq-7",
+          "type": "mcq",
+          "prompt": "What does it mean that the build system \"cross-compiles\" the software?",
+          "choices": [
+            "It builds the software on the board itself because the board is fastest",
+            "It builds on your fast PC but produces programs that run on the board's different chip",
+            "It refuses to build unless two PCs are connected",
+            "It translates the software into a different human language"
+          ],
+          "answerIndex": 1,
+          "explanation": "Cross-compiling means doing the build work on a powerful host (your PC) while targeting the board's processor. The small board is usually too limited to build its own image."
+        },
+        {
+          "id": "embedded-linux-4-mcq-8",
+          "type": "mcq",
+          "prompt": "Which statement best captures the trade-off between Buildroot and Yocto?",
+          "choices": [
+            "Buildroot is powerful but slow; Yocto is simple but weak",
+            "Buildroot is simple and fast but better for one fixed image; Yocto is powerful and scalable but heavier and harder to learn",
+            "They are identical, just with different names",
+            "Buildroot only works on PCs and Yocto only works on phones"
+          ],
+          "answerIndex": 1,
+          "explanation": "The honest summary: Buildroot trades flexibility for simplicity and speed (great for small fixed projects), while Yocto trades ease-of-use for power and scale (great for large, long-lived product lines)."
+        },
+        {
+          "id": "embedded-linux-4-mcq-9",
+          "type": "mcq",
+          "prompt": "Do Buildroot and Yocto build software on the device itself?",
+          "choices": [
+            "Yes, both run entirely on the small board",
+            "No, they run on your PC and cross-compile the image for the board",
+            "Yes, but only Yocto does",
+            "No, neither one builds anything; the board comes pre-built"
+          ],
+          "answerIndex": 1,
+          "explanation": "Both build systems run on a capable host machine and cross-compile the result for the target board, because the board is typically too small and slow to build its own image."
+        },
+        {
+          "id": "embedded-linux-4-img-1",
+          "type": "mcq",
+          "prompt": "The diagram pictures Buildroot as a basic build-your-own kit and Yocto as a full factory line. What point is it making?",
+          "choices": [
+            "Buildroot cannot produce a working image",
+            "Buildroot is the simple, quick choice while Yocto is the powerful, industrial choice for large-scale, long-term work",
+            "Yocto is always the wrong tool",
+            "Both tools are toys, not real software"
+          ],
+          "answerIndex": 1,
+          "explanation": "The kit-versus-factory image captures the trade-off: Buildroot is simple and fast for small jobs; Yocto is heavier but built for scale and long-term maintenance across many products.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/embedded-linux-6.svg"
+        }
+      ]
+    },
+    {
+      "id": "embedded-linux-lesson-5",
+      "title": "The Root Filesystem, and Booting a Real Board",
+      "order": 5,
+      "difficulty": 5,
+      "content": "Your image contains a **root filesystem** - the collection of files and folders Linux needs to run: its programs, settings, and the kernel's helpers. On embedded devices this is usually designed to be **tough**, because a device in the real world can lose power at any second (someone unplugs the router).\n\nThe common trick is a **read-only** root filesystem. \"Read-only\" means nothing can be changed or written to it while the device runs. Why is that good? If you pull the plug mid-write, a writable filesystem can get corrupted; a read-only one cannot, because nothing was being written. A popular read-only format is **squashfs**, which is also **compressed** (squeezed smaller to save precious storage).\n\nBut a device sometimes needs to save a little data - settings, logs. The solution is an **overlay**: a small writable layer stacked on top of the read-only base. The bulk stays safely read-only; only the few files that must change live in the writable overlay. Best of both worlds.\n\nNow the payoff: putting your image on a real board. The board here is an **SBC** (Single-Board Computer - a whole computer on one small board, like a Raspberry Pi). The steps:\n\n1. **Write the image to an SD card.** A built image is usually one .img file; a tool copies it onto the card. Be careful to pick the SD card and not your PC's own disk - choosing the wrong target can erase your computer.\n2. **Put the card in the board and power it on.** The boot chain from the earlier lesson runs.\n3. **Watch it over the serial console.** A small board often has no monitor or keyboard. A **serial console** is a simple text connection over a cable to your PC, so you can see the boot messages and reach the login prompt.\n\nThe most accessible SBC for learning is the **Raspberry Pi**; another well-known open-hardware board is the **BeagleBone**.\n\nRecap: the root filesystem holds everything Linux needs; embedded devices keep it read-only (often compressed squashfs) with a small writable overlay for safety; then you write the image to an SD card, boot the SBC, and watch it come up over a serial console.",
+      "items": [
+        {
+          "id": "embedded-linux-5-mcq-1",
+          "type": "mcq",
+          "prompt": "What is the \"root filesystem\" of an embedded Linux image?",
+          "choices": [
+            "The roots of a plant growing near the board",
+            "The collection of files and folders Linux needs to run - its programs, settings, and helpers",
+            "The single most important user account",
+            "The metal base the board sits on"
+          ],
+          "answerIndex": 1,
+          "explanation": "The root filesystem is the set of files Linux needs to operate: programs, configuration, and support files. It is part of the image you build and put on the device."
+        },
+        {
+          "id": "embedded-linux-5-mcq-2",
+          "type": "mcq",
+          "prompt": "Why do many embedded devices use a read-only root filesystem?",
+          "choices": [
+            "To make the device run faster than any PC",
+            "So that a sudden power loss cannot corrupt it, since nothing is being written to it",
+            "Because Linux cannot read writable filesystems",
+            "To prevent the device from ever booting"
+          ],
+          "answerIndex": 1,
+          "explanation": "A device can be unplugged at any moment. A read-only filesystem has nothing being written, so an abrupt power cut can't corrupt it - exactly the robustness embedded products need."
+        },
+        {
+          "id": "embedded-linux-5-mcq-3",
+          "type": "mcq",
+          "prompt": "What does \"read-only\" mean for a filesystem?",
+          "choices": [
+            "Only the root user is allowed to look at it",
+            "Nothing can be changed or written to it while the device runs; it can only be read",
+            "It can only store text, never programs",
+            "It deletes itself after one read"
+          ],
+          "answerIndex": 1,
+          "explanation": "Read-only means the contents are fixed during operation - they can be read but not modified. That is what makes it safe against corruption from interrupted writes."
+        },
+        {
+          "id": "embedded-linux-5-mcq-4",
+          "type": "mcq",
+          "prompt": "What is squashfs, and why is it popular on embedded devices?",
+          "choices": [
+            "A game pre-installed on Raspberry Pi",
+            "A compressed, read-only filesystem format that resists corruption and saves storage",
+            "A tool that erases SD cards",
+            "The cable used for the serial console"
+          ],
+          "answerIndex": 1,
+          "explanation": "squashfs is read-only (so it resists corruption) and compressed (so it saves limited storage). Both qualities make it a natural fit for the base root filesystem on small devices."
+        },
+        {
+          "id": "embedded-linux-5-mcq-5",
+          "type": "mcq",
+          "prompt": "If the base filesystem is read-only, how does the device still save small bits of data like settings or logs?",
+          "choices": [
+            "It cannot save anything at all",
+            "An overlay - a small writable layer stacked on top of the read-only base - holds the few files that must change",
+            "It rewrites the kernel each time",
+            "It mails the data to the manufacturer"
+          ],
+          "answerIndex": 1,
+          "explanation": "An overlay adds a thin writable layer over the protected read-only base. The bulk stays safe and unchangeable, while just the files that need updating live in the writable overlay."
+        },
+        {
+          "id": "embedded-linux-5-mcq-6",
+          "type": "mcq",
+          "prompt": "What is an SBC?",
+          "choices": [
+            "A Standard Battery Connector",
+            "A Single-Board Computer - a whole computer on one small board, like a Raspberry Pi",
+            "A Secure Boot Code",
+            "A Serial Bus Cable"
+          ],
+          "answerIndex": 1,
+          "explanation": "SBC stands for Single-Board Computer: a complete computer built onto one compact board. The Raspberry Pi is the most common example for learning."
+        },
+        {
+          "id": "embedded-linux-5-mcq-7",
+          "type": "mcq",
+          "prompt": "What is the critical precaution when writing your image file to an SD card?",
+          "choices": [
+            "Make sure the SD card is brand new and empty of stickers",
+            "Be sure you pick the SD card as the target, not your PC's own disk, or you could erase your computer",
+            "Always unplug the monitor first",
+            "Rename the image file to end in .txt"
+          ],
+          "answerIndex": 1,
+          "explanation": "Writing an image overwrites whatever target you choose. If you accidentally pick your computer's own disk instead of the SD card, you can wipe your machine - so double-check the target first."
+        },
+        {
+          "id": "embedded-linux-5-mcq-8",
+          "type": "mcq",
+          "prompt": "What is a \"serial console\" and why is it useful for a small board?",
+          "choices": [
+            "A games console that connects in series",
+            "A simple text connection over a cable to your PC, used to see boot messages and log in when the board has no monitor or keyboard",
+            "A second power supply for the board",
+            "A backup SD card slot"
+          ],
+          "answerIndex": 1,
+          "explanation": "Small boards often have no screen or keyboard. A serial console gives you a plain-text window over a cable so you can watch it boot and reach the login prompt from your PC."
+        },
+        {
+          "id": "embedded-linux-5-mcq-9",
+          "type": "mcq",
+          "prompt": "Which SBC does the lesson call the most accessible one for someone learning embedded Linux?",
+          "choices": [
+            "A full desktop tower PC",
+            "The Raspberry Pi",
+            "A smart TV",
+            "A Wi-Fi router"
+          ],
+          "answerIndex": 1,
+          "explanation": "The Raspberry Pi is widely available, inexpensive, and well-documented, making it the most beginner-friendly board to try building and booting your own image. The BeagleBone is another well-known open-hardware option."
+        },
+        {
+          "id": "embedded-linux-5-mcq-10",
+          "type": "mcq",
+          "prompt": "What is the correct order to get your image running on a real board?",
+          "choices": [
+            "Power on the board first, then build the image, then never use a card",
+            "Write the image to an SD card, put the card in the board and power it on, then watch it boot over the serial console",
+            "Email the image to the board, then watch a monitor",
+            "Plug the serial cable into the SD card directly"
+          ],
+          "answerIndex": 1,
+          "explanation": "First write the built image onto the SD card, then insert it and power the board so the boot chain runs, then observe the boot and log in over the serial console - especially when there's no monitor attached."
+        },
+        {
+          "id": "embedded-linux-5-img-1",
+          "type": "mcq",
+          "prompt": "The diagram traces image to running board. What is the last stage it shows, where you actually see the board boot?",
+          "choices": [
+            "The image file on the PC",
+            "The serial console - a text window on your PC showing boot messages and the login",
+            "The SD card sitting on a desk",
+            "The build system menu"
+          ],
+          "answerIndex": 1,
+          "explanation": "The diagram ends at the serial console: after the image is written to a card and the board boots, the serial console is your text window into the running board when there's no monitor or keyboard.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/embedded-linux-7.svg"
         }
       ]
     }
