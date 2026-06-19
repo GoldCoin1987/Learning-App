@@ -5,277 +5,583 @@
   "lessons": [
     {
       "id": "models-layering-l1",
-      "title": "The Problem Networking Solves",
+      "title": "Why We Split Networking Into Layers",
       "order": 1,
       "difficulty": 1,
-      "content": "Strip away the jargon and networking has one job: move bits between two processes running on different machines, addressed to the right place, reliably *enough*, over media that are shared, imperfect, and lossy. Every protocol you will ever meet is a partial answer to some slice of that sentence.\n\nUnpack the hard parts. \"Different machines\" means you need **addressing** so a sender can name a destination it has never met. \"Shared media\" means many talkers contend for one wire or one slice of spectrum, so you need rules for **access** and a way to mark where one message ends and the next begins (**framing**). \"Imperfect\" means signals attenuate, collide, and flip bits, so you need **error detection** and sometimes retransmission. \"Right process\" means the destination host runs many programs at once, so a host address is not enough; you need a **port** to reach the correct process.\n\nNo single protocol does all of this. Instead the work is split into **layers**, each solving one slice and trusting the layer below to have solved the previous one. The application trusts that a byte stream arrives in order; transport trusts that packets can be forwarded; the network layer trusts that a frame can cross one hop.\n\nFor you this is familiar territory wearing new clothes. Framing a message, recovering a clock, contending for a shared channel, computing a link budget against noise — these are radar and signaling problems. Networking is the same physics with a protocol vocabulary bolted on top, and the layered split is just good engineering: isolate concerns so each can change independently.",
+      "content": "You use the internet every day, but what is actually happening? At its heart, a **network** is just computers sending each other messages. A **message** is any chunk of information — a web page, a chat, a video. Sending it sounds simple, but the job is huge.\n\nThink about everything that must go right for one message to arrive. The sending computer has to **find** the other machine among billions. It has to **pick a path** to reach it, often through many machines in between. Wires and Wi-Fi are imperfect, so some data gets garbled or lost — something must **catch and fix errors**. And the bytes that arrive are meaningless until the receiving program can **make sense** of them.\n\nThat is far too much to solve in one giant tangle. So engineers do what you would do with any big job: break it into smaller jobs. We stack the jobs in **layers**, where each layer handles one job and only talks to the layers directly above and below it — like floors in a building, or stations on an assembly line. The floor below hands work up; this floor does its one task; it hands the result to the floor above.\n\nThe payoff is huge. Because each layer only promises a simple service to its neighbor, one team can rebuild a single layer — say, invent faster Wi-Fi — without redesigning the whole internet. \n\n**Recap:** A network is computers exchanging messages. The work is big, so we split it into layers, each doing one job and trusting its neighbors — which lets any one piece change without breaking the rest.",
       "items": [
-        {
-          "id": "models-layering-l1-fc1",
-          "type": "flashcard",
-          "front": "State the one-sentence problem that networking solves.",
-          "back": "Move bits between processes on different machines, addressed correctly and reliably enough, over imperfect shared media.",
-          "hint": "Think: who, what, how reliably, over what."
-        },
-        {
-          "id": "models-layering-l1-fc2",
-          "type": "flashcard",
-          "front": "Why is a host address (e.g. an IP) not sufficient to deliver data to the right program?",
-          "back": "A host runs many processes at once. You also need a port number so the transport layer can demultiplex to the correct process."
-        },
-        {
-          "id": "models-layering-l1-fc3",
-          "type": "flashcard",
-          "front": "What is the purpose of framing on a shared medium?",
-          "back": "It marks where one message begins and ends so a receiver can separate back-to-back transmissions from a continuous bit stream."
-        },
-        {
-          "id": "models-layering-l1-fc4",
-          "type": "flashcard",
-          "front": "Why split networking into layers at all?",
-          "back": "Separation of concerns: each layer solves one slice of the problem and trusts the layer below, so any layer can change independently of the others.",
-          "hint": "Same reason you modularize any system."
-        },
-        {
-          "id": "models-layering-l1-fc5",
-          "type": "flashcard",
-          "front": "Name three reasons real media force error handling.",
-          "back": "Attenuation/noise flipping bits, collisions on shared media, and corruption in transit — all mean delivery is best-effort, not guaranteed."
-        },
         {
           "id": "models-layering-l1-mc1",
           "type": "mcq",
-          "prompt": "Which concern does a PORT number address?",
+          "prompt": "In the simplest terms, what is a computer network?",
           "choices": [
-            "Finding the physical route across the Internet",
-            "Selecting which process on a host should receive the data",
-            "Detecting bit errors on the wire",
-            "Marking the boundary between two frames"
+            "A single very powerful computer",
+            "Computers sending each other messages",
+            "A type of cable used in offices",
+            "A program that speeds up your screen"
           ],
           "answerIndex": 1,
-          "explanation": "Host addresses (IP) locate the machine; ports demultiplex among the many processes running on that machine."
+          "explanation": "Strip away the jargon and a network is just computers exchanging messages with each other. Everything else (wires, Wi-Fi, programs) exists to make that message exchange work.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-2.svg"
         },
         {
           "id": "models-layering-l1-mc2",
           "type": "mcq",
-          "prompt": "\"Reliably enough\" in the networking problem statement implies that:",
+          "prompt": "Why do we split the work of networking into layers instead of solving it all in one piece?",
           "choices": [
-            "Every layer must guarantee perfect delivery",
-            "Reliability is optional and layered on only where the workload needs it",
-            "The physical layer corrects all errors",
-            "Reliability and addressing are the same concern"
+            "Because computers can only run one program at a time",
+            "Because the job is huge, so we break it into smaller jobs that are each easier to build and change",
+            "Because layers make messages travel faster than light",
+            "Because the law requires exactly seven layers"
           ],
           "answerIndex": 1,
-          "explanation": "The base service is best-effort. Reliability (ordering, retransmission) is added at a higher layer only when an application needs it — which is exactly why UDP can skip it."
+          "explanation": "Layering is just good engineering: a huge job (find the machine, pick a path, fix errors, interpret bytes) is broken into smaller single-purpose jobs. Speed and legal rules have nothing to do with it.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-2.svg"
         },
         {
           "id": "models-layering-l1-mc3",
           "type": "mcq",
-          "prompt": "Why does the text call networking \"the same physics in new clothes\" for someone from a radar/signaling background?",
+          "prompt": "What is the single biggest benefit of building the network in separate layers?",
           "choices": [
-            "Because routing tables are identical to radar scopes",
-            "Because framing, clock recovery, channel contention, and SNR/link budgets are shared underlying concepts",
-            "Because both use the OSI model internally",
-            "Because IP addresses derive from pulse repetition frequency"
+            "Each layer can be changed or improved without redesigning the others",
+            "It removes the need for any wires",
+            "It makes every message exactly the same size",
+            "It lets one computer pretend to be many computers"
+          ],
+          "answerIndex": 0,
+          "explanation": "Because a layer only promises a simple service to its neighbors, you can swap out or upgrade one layer (e.g., invent faster Wi-Fi) without touching the rest of the stack. That independence is the whole point.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-2.svg"
+        },
+        {
+          "id": "models-layering-l1-mc4",
+          "type": "mcq",
+          "prompt": "The lesson compares network layers to floors in a building. What does each 'floor' (layer) talk to?",
+          "choices": [
+            "Every other floor at the same time",
+            "Only the floors directly above and below it",
+            "Only the ground floor",
+            "No other floor — each works completely alone"
           ],
           "answerIndex": 1,
-          "explanation": "The low-level signaling and contention problems are common to both fields; networking adds a protocol vocabulary on top of the same physics."
+          "explanation": "A layer hands work to the layer just above and just below it, like passing things between adjacent floors. It does not reach across to distant layers, which keeps each layer's job simple.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-2.svg"
+        },
+        {
+          "id": "models-layering-l1-mc5",
+          "type": "mcq",
+          "prompt": "Which of these is one of the 'jobs' the lesson says networking must handle?",
+          "choices": [
+            "Charging the computer's battery",
+            "Finding the other machine and picking a path to it",
+            "Painting the screen a brighter color",
+            "Deciding which website is most popular"
+          ],
+          "answerIndex": 1,
+          "explanation": "Locating the destination and choosing a path to reach it is a core part of the networking job. Battery, screen color, and popularity are unrelated to delivering a message.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-2.svg"
+        },
+        {
+          "id": "models-layering-l1-mc6",
+          "type": "mcq",
+          "prompt": "Why does networking need a way to 'catch and fix errors'?",
+          "choices": [
+            "Because users often type the wrong web address",
+            "Because real wires and Wi-Fi are imperfect, so some data gets garbled or lost",
+            "Because computers forget messages after a few seconds",
+            "Because every message must be translated into another language"
+          ],
+          "answerIndex": 1,
+          "explanation": "Physical links are imperfect: signals fade, collide, and flip bits, so data can arrive corrupted or not at all. A layer's job is to detect that and recover, so the message still gets through.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-2.svg"
+        },
+        {
+          "id": "models-layering-l1-mc7",
+          "type": "mcq",
+          "prompt": "An 'assembly line' is used as an analogy for layers because:",
+          "choices": [
+            "Each station does one task and passes the work to the next station",
+            "Every station does the entire job by itself",
+            "The line only works if all stations are identical",
+            "Assembly lines never make mistakes"
+          ],
+          "answerIndex": 0,
+          "explanation": "Like an assembly line, each layer performs one focused task and hands the result onward. That division of labor is exactly how layering tames a big problem.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-2.svg"
+        },
+        {
+          "id": "models-layering-l1-mc8",
+          "type": "mcq",
+          "prompt": "A team invents a brand-new, faster kind of Wi-Fi. Thanks to layering, what can they avoid?",
+          "choices": [
+            "They must rewrite every website on the internet",
+            "They can replace just the lowest 'send over the air' layer without redesigning the whole internet",
+            "They must get permission from every other computer first",
+            "They have to slow down all the other layers to match"
+          ],
+          "answerIndex": 1,
+          "explanation": "Because each layer only promises a simple service to its neighbor, the new Wi-Fi swaps in at the bottom layer and everything above keeps working unchanged. That is the practical reward of separating concerns.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-2.svg"
+        },
+        {
+          "id": "models-layering-l1-mc9",
+          "type": "mcq",
+          "prompt": "Which statement best matches the lesson's view of why the bytes arriving at a computer aren't automatically useful?",
+          "choices": [
+            "Bytes are always useful the moment they arrive",
+            "The receiving program still has to make sense of the raw bytes",
+            "Bytes must be printed on paper before use",
+            "Only the fastest computer can read bytes"
+          ],
+          "answerIndex": 1,
+          "explanation": "Raw bytes are just signals until some layer/program interprets them as a web page, message, or image. 'Making sense of the bytes' is one of the jobs layering assigns to an upper layer.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-2.svg"
         }
       ]
     },
     {
       "id": "models-layering-l2",
-      "title": "Two Models: OSI vs TCP/IP and Why They Disagree",
+      "title": "The Two Models: TCP/IP (4 Layers) and OSI (7 Layers)",
       "order": 2,
       "difficulty": 2,
-      "content": "There are two layering models you must hold at once. The **OSI 7-layer model** is a *teaching taxonomy*: Physical, Data Link, Network, Transport, Session, Presentation, Application (mnemonic, bottom-up: Please Do Not Throw Sausage Pizza Away). The **TCP/IP 4-layer model** is what actually runs: Link, Internet, Transport, Application.\n\nThey do not line up cleanly, and that mismatch is the point. TCP/IP's **Link** layer rolls OSI's Physical + Data Link together. Its **Internet** layer maps to OSI's Network. **Transport** maps directly. The interesting collapse is at the top: OSI's **Session** (5) and **Presentation** (6) layers never materialized as distinct network layers — they evaporated into applications and libraries. Session management, encryption, and data formatting are done inside the app or a library (TLS, JSON, gzip), not by a separate on-the-wire layer. So TCP/IP folds OSI layers 5–7 into one **Application** layer.\n\nThis is why the classic argument that \"TLS is really presentation-layer\" is both true and useless in practice: by OSI's intent TLS does presentation-layer work (it transforms the byte stream into ciphertext), but in the running stack it lives in the application layer as a library above TCP.\n\n**Each layer has a unit — a Protocol Data Unit (PDU).** At the Link layer the PDU is a **frame**; at the Internet/Network layer it is a **packet**; at the Transport layer it is a **segment** (TCP) or **datagram** (UDP); above that you have application **data** or **messages**. Naming the PDU tells you instantly which layer someone is discussing. The takeaway: learn OSI to talk and reason; trust TCP/IP to describe what is on the wire.",
+      "content": "In the last lesson we said the network is built as a stack of layers, each doing one job. Now let's give those layers names. A **model** here just means an agreed-upon list of the layers and what each one does — a shared map so everyone describes the network the same way.\n\nThere are two famous maps. The first is the one the real internet actually uses: the **TCP/IP model**, with **4 layers**. From the bottom up:\n\n- **Link** — send bits over one physical hop (a cable, a Wi-Fi connection).\n- **Internet** — find machines across many hops and pick a path. This is where addresses live.\n- **Transport** — deliver to the right program on the machine and, if asked, fix errors and keep data in order.\n- **Application** — the actual program a person uses, like a web browser or email.\n\nThe second map is a teaching tool called the **OSI model** (Open Systems Interconnection), with **7 layers**, bottom up: **Physical, Data Link, Network, Transport, Session, Presentation, Application**. A common memory phrase is \"Please Do Not Throw Sausage Pizza Away.\" OSI splits the same work into more, finer slices so it is easier to discuss in detail.\n\nThe two maps line up like this: OSI's **Physical + Data Link** together do the job of TCP/IP's **Link**; OSI's **Network** matches **Internet**; **Transport** matches **Transport**; and OSI's top three (**Session, Presentation, Application**) all fold into TCP/IP's single **Application** layer.\n\n**Recap:** TCP/IP's 4 layers (Link, Internet, Transport, Application) are what really runs; OSI's 7 layers are a finer teaching map. Learn both names and how they map.",
       "items": [
-        {
-          "id": "models-layering-l2-fc1",
-          "type": "flashcard",
-          "front": "List the OSI 7 layers bottom-up and a mnemonic.",
-          "back": "Physical, Data Link, Network, Transport, Session, Presentation, Application. Mnemonic: Please Do Not Throw Sausage Pizza Away.",
-          "hint": "Seven layers, P-D-N-T-S-P-A."
-        },
-        {
-          "id": "models-layering-l2-fc2",
-          "type": "flashcard",
-          "front": "List the TCP/IP 4 layers and what each maps to in OSI.",
-          "back": "Link (= OSI Physical + Data Link), Internet (= Network), Transport (= Transport), Application (= Session + Presentation + Application).",
-          "hint": "Four layers; the top one swallows three OSI layers."
-        },
-        {
-          "id": "models-layering-l2-fc3",
-          "type": "flashcard",
-          "front": "What happened to OSI's Session and Presentation layers in the real stack?",
-          "back": "They evaporated into applications and libraries: session handling, encryption (TLS), and formatting (JSON/gzip) happen in the app, not as separate wire layers."
-        },
-        {
-          "id": "models-layering-l2-fc4",
-          "type": "flashcard",
-          "front": "Match each PDU name to its layer: frame, packet, segment/datagram, data.",
-          "back": "Frame = Link/Data Link (L2); Packet = Internet/Network (L3); Segment (TCP) or Datagram (UDP) = Transport (L4); Data/message = Application (L7).",
-          "hint": "Naming the PDU pins the layer.",
-          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-1.svg"
-        },
-        {
-          "id": "models-layering-l2-fc5",
-          "type": "flashcard",
-          "front": "In one line, resolve \"TLS is really presentation-layer.\"",
-          "back": "By OSI intent yes (it transforms/encrypts the byte stream), but in the running stack it lives in the application layer as a library above TCP."
-        },
         {
           "id": "models-layering-l2-mc1",
           "type": "mcq",
-          "prompt": "Which statement best captures why the two models disagree at the top?",
+          "prompt": "In this context, what does a 'model' of the network mean?",
           "choices": [
-            "OSI omits the transport layer entirely",
-            "TCP/IP adds two extra layers above Application",
-            "OSI splits out Session and Presentation, but TCP/IP folds that work into Application/libraries",
-            "TCP/IP separates Physical from Data Link while OSI merges them"
+            "A physical plastic toy of a router",
+            "An agreed list of the layers and what each one does",
+            "The single fastest computer in a network",
+            "A law that bans certain websites"
           ],
-          "answerIndex": 2,
-          "explanation": "OSI's session/presentation responsibilities are handled inside apps and libraries in the real stack, so TCP/IP collapses OSI 5–7 into one Application layer."
+          "answerIndex": 1,
+          "explanation": "A model is just a shared map of the layers and their jobs, so everyone can describe and discuss the network the same way. It is not hardware or a rule.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-1.svg"
         },
         {
           "id": "models-layering-l2-mc2",
           "type": "mcq",
-          "prompt": "A packet capture shows a unit at OSI layer 3. What is the correct PDU name?",
-          "choices": ["Frame", "Packet", "Segment", "Datagram"],
+          "prompt": "How many layers does the TCP/IP model have, and is it the one the real internet uses?",
+          "choices": [
+            "7 layers, and it is only a teaching tool",
+            "4 layers, and yes it is what the real internet uses",
+            "5 layers, and it is used only for Wi-Fi",
+            "4 layers, but it is purely theoretical and unused"
+          ],
           "answerIndex": 1,
-          "explanation": "Layer 3 is the Network/Internet layer; its PDU is the packet. Frame is L2; segment/datagram is L4."
+          "explanation": "TCP/IP has 4 layers (Link, Internet, Transport, Application) and is the model the actual internet protocols were built around. OSI is the 7-layer teaching map.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-1.svg"
         },
         {
           "id": "models-layering-l2-mc3",
           "type": "mcq",
-          "prompt": "Which mapping is INCORRECT?",
+          "prompt": "Put the four TCP/IP layers in order from the BOTTOM (closest to the wire) to the TOP (closest to the user).",
           "choices": [
-            "TCP/IP Link ↔ OSI Physical + Data Link",
-            "TCP/IP Internet ↔ OSI Network",
-            "TCP/IP Transport ↔ OSI Session",
-            "TCP/IP Application ↔ OSI Application + Presentation + Session"
+            "Application, Transport, Internet, Link",
+            "Link, Internet, Transport, Application",
+            "Internet, Link, Application, Transport",
+            "Transport, Application, Link, Internet"
           ],
-          "answerIndex": 2,
-          "explanation": "Transport maps to Transport. Session is one of the OSI layers absorbed into TCP/IP's Application layer."
+          "answerIndex": 1,
+          "explanation": "Bottom to top, TCP/IP is Link (one physical hop), Internet (find machines across hops), Transport (reach the right program, fix errors), Application (the program the user sees).",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-1.svg"
         },
         {
           "id": "models-layering-l2-mc4",
           "type": "mcq",
-          "prompt": "Why prefer TCP/IP over OSI when describing what is actually on the wire?",
+          "prompt": "Which TCP/IP layer's job is to send bits over a single physical hop, such as one cable or one Wi-Fi link?",
           "choices": [
-            "OSI has fewer layers and hides detail",
-            "TCP/IP is the model the running protocols (IP, TCP, Ethernet) were built around",
-            "OSI does not define a network layer",
-            "TCP/IP includes the session and presentation layers explicitly"
+            "Application",
+            "Transport",
+            "Internet",
+            "Link"
+          ],
+          "answerIndex": 3,
+          "explanation": "The Link layer handles getting bits across one direct connection. Internet handles crossing many hops, Transport handles reaching the right program, and Application is the user's program.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-1.svg"
+        },
+        {
+          "id": "models-layering-l2-mc5",
+          "type": "mcq",
+          "prompt": "Which TCP/IP layer is responsible for finding machines across many hops and picking a path between them?",
+          "choices": [
+            "Internet",
+            "Link",
+            "Application",
+            "Transport"
+          ],
+          "answerIndex": 0,
+          "explanation": "The Internet layer locates machines across the wider network and chooses a path; this is where addresses live. The Link layer only covers one hop.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-1.svg"
+        },
+        {
+          "id": "models-layering-l2-mc6",
+          "type": "mcq",
+          "prompt": "How many layers does the OSI model have, and what is its main purpose compared to TCP/IP?",
+          "choices": [
+            "4 layers; it is the real running model",
+            "7 layers; it is a finer teaching map that splits the work into more slices",
+            "3 layers; it replaces TCP/IP entirely",
+            "7 layers; it is only used inside Wi-Fi chips"
           ],
           "answerIndex": 1,
-          "explanation": "The protocols that run the Internet were designed to the TCP/IP model; OSI remains a useful teaching/reasoning vocabulary."
+          "explanation": "OSI has 7 layers and exists mainly as a detailed teaching/discussion map. It slices the same work more finely than the 4-layer TCP/IP model the internet actually runs.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-1.svg"
+        },
+        {
+          "id": "models-layering-l2-mc7",
+          "type": "mcq",
+          "prompt": "List the OSI 7 layers from the bottom up.",
+          "choices": [
+            "Application, Presentation, Session, Transport, Network, Data Link, Physical",
+            "Physical, Data Link, Network, Transport, Session, Presentation, Application",
+            "Link, Internet, Transport, Session, Network, Physical, Application",
+            "Physical, Network, Data Link, Transport, Application, Session, Presentation"
+          ],
+          "answerIndex": 1,
+          "explanation": "Bottom up, OSI is Physical, Data Link, Network, Transport, Session, Presentation, Application — the memory phrase 'Please Do Not Throw Sausage Pizza Away.' Choice A is the same list but top-down.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-1.svg"
+        },
+        {
+          "id": "models-layering-l2-mc8",
+          "type": "mcq",
+          "prompt": "In the mapping between the two models, which OSI layers combine to do the job of TCP/IP's single Link layer?",
+          "choices": [
+            "Session and Presentation",
+            "Physical and Data Link",
+            "Network and Transport",
+            "Transport and Application"
+          ],
+          "answerIndex": 1,
+          "explanation": "TCP/IP's Link layer rolls OSI's two lowest layers — Physical and Data Link — into one. OSI's Network maps to Internet, and Transport maps to Transport.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-1.svg"
+        },
+        {
+          "id": "models-layering-l2-mc9",
+          "type": "mcq",
+          "prompt": "OSI's top three layers (Session, Presentation, Application) correspond to which single TCP/IP layer?",
+          "choices": [
+            "The Link layer",
+            "The Internet layer",
+            "The Transport layer",
+            "The Application layer"
+          ],
+          "answerIndex": 3,
+          "explanation": "TCP/IP folds OSI's Session, Presentation, and Application into one Application layer, because in real systems that work is done inside the program and its libraries rather than as separate network layers.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-1.svg"
+        },
+        {
+          "id": "models-layering-l2-mc10",
+          "type": "mcq",
+          "prompt": "A friend says 'just memorize OSI's 7 layers and ignore TCP/IP.' What is the best correction?",
+          "choices": [
+            "Correct — TCP/IP is fake and never used",
+            "Learn both: TCP/IP's 4 layers are what actually runs, while OSI's 7 are a finer map for discussing details",
+            "Correct — OSI is what the internet runs on",
+            "Ignore both; layers are not a real idea"
+          ],
+          "answerIndex": 1,
+          "explanation": "Both maps are useful. TCP/IP describes what genuinely runs on the wire; OSI gives a more detailed vocabulary for talking about the same work. Knowing how they line up is the goal.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-1.svg"
         }
       ]
     },
     {
       "id": "models-layering-l3",
-      "title": "Encapsulation, the End-to-End Principle & Mapping Protocols",
+      "title": "Encapsulation: Wrapping the Message in Envelopes",
       "order": 3,
-      "difficulty": 3,
-      "content": "**Encapsulation** is the mechanism that makes layering real on the wire. As data descends the stack, each layer wraps the unit it receives in its own header (and sometimes a trailer) — envelopes inside envelopes. Application data gets a TCP header to become a **segment**; that segment gets an IP header to become a **packet**; that packet gets an Ethernet header and FCS trailer to become a **frame** put on the wire. On receipt the destination performs **decapsulation**: each layer strips its own header, reads its fields, and hands the payload up. Crucially, a layer never inspects the layers above it — to Ethernet, an entire IP packet is just opaque payload. This is exactly the nested framing you saw in radar pulse trains: a structure wrapping a structure wrapping a structure.\n\nThe **end-to-end principle** explains where intelligence belongs: functions like reliability, ordering, and encryption are best implemented at the communicating endpoints, not in the network's middle. The network's job is to forward best-effort; the hosts add guarantees. This is why TCP reliability lives on your machine, not in routers, and it is the design choice that let the Internet scale with a dumb, fast core and smart edges.\n\n**Standards bodies** decide what the envelopes look like. The **IETF** publishes **RFCs** governing IP, TCP, DNS, QUIC, TLS — the Internet/Transport/Application layers. **IEEE 802** owns the LAN/link layer: 802.3 (Ethernet), 802.11 (WiFi), 802.1Q (VLANs). The **ITU** handles telecom/physical-layer and carrier standards.\n\nFinally, the payoff skill: hand me a protocol and I name its layer. **ARP** sits at the L2/L3 boundary (resolves IP→MAC). **BGP** is application-layer in mechanics (runs over TCP/179) but does L3 routing. **QUIC** is transport, riding on UDP. **802.11** is link/physical. **DHCP** is application-layer, over UDP. Layer placement tells you where to look when it breaks.",
+      "difficulty": 2,
+      "content": "We now have names for the layers. But how does a layer actually 'do its job' on a real message? The answer is **encapsulation**, which is a long word for a simple idea: each layer wraps the data in its own little envelope before passing it down.\n\nPicture mailing a letter. You write the **letter** (the message). You slip it into an **envelope** and write an address on the outside. The post office drops your envelope into a **mailbag**, and the mailbag goes on a **truck** with its own route. At every step the message gets wrapped in one more layer, and each handler reads only its own label. The truck driver never opens your envelope; the mail sorter never reads your letter.\n\nNetworks do exactly this. The extra information a layer writes on its 'envelope' is called a **header** — a small block of data added to the front. As your message goes **down** the stack, each layer adds its header:\n\n- The Transport layer adds its header. The result is called a **segment**.\n- The Internet layer wraps that and adds its header. Now it is a **packet**.\n- The Link layer wraps that and adds its header. Now it is a **frame**, ready for the wire.\n\nThese names — **frame, packet, segment**, and the plain **data** at the top — are the official terms for 'the chunk at this layer.' Naming the chunk instantly tells you which layer someone means. A key rule: a lower layer never peeks inside the envelope it is carrying; to the Link layer, the whole packet inside is just cargo.\n\n**Recap:** Encapsulation means each layer wraps the message in its own header on the way down (data → segment → packet → frame) and unwraps it on the way up.",
       "items": [
-        {
-          "id": "models-layering-l3-fc1",
-          "type": "flashcard",
-          "front": "Define encapsulation and decapsulation in one line each.",
-          "back": "Encapsulation: each descending layer wraps the unit in its own header/trailer. Decapsulation: each ascending layer strips its own header and hands the payload up.",
-          "hint": "Envelopes inside envelopes, going down then up."
-        },
-        {
-          "id": "models-layering-l3-fc2",
-          "type": "flashcard",
-          "front": "Trace the headers added to application data as it descends to the wire.",
-          "back": "App data + TCP header = segment; + IP header = packet; + Ethernet header & FCS trailer = frame on the wire.",
-          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-1.svg"
-        },
-        {
-          "id": "models-layering-l3-fc3",
-          "type": "flashcard",
-          "front": "State the end-to-end principle and one consequence.",
-          "back": "Intelligence (reliability, ordering, encryption) belongs at the endpoints, not in the network core. Consequence: TCP reliability runs on hosts, letting the core stay dumb, fast, and scalable."
-        },
-        {
-          "id": "models-layering-l3-fc4",
-          "type": "flashcard",
-          "front": "Which standards body owns: IP/TCP/QUIC, Ethernet/WiFi/VLANs, and carrier/telecom PHY?",
-          "back": "IETF (RFCs) for IP/TCP/QUIC/DNS/TLS; IEEE 802 for Ethernet (802.3), WiFi (802.11), VLANs (802.1Q); ITU for telecom/carrier physical standards."
-        },
-        {
-          "id": "models-layering-l3-fc5",
-          "type": "flashcard",
-          "front": "At what layer does ARP operate, and what does it do?",
-          "back": "ARP sits at the L2/L3 boundary: given an IP (L3) it resolves the MAC (L2) needed to build the frame."
-        },
         {
           "id": "models-layering-l3-mc1",
           "type": "mcq",
-          "prompt": "QUIC is best classified as which layer, and on what does it ride?",
+          "prompt": "What does 'encapsulation' mean in networking?",
           "choices": [
-            "Network layer, riding on IP directly",
-            "Transport layer, riding on UDP",
-            "Application layer, riding on TCP",
-            "Link layer, riding on Ethernet"
+            "Deleting parts of the message to make it smaller",
+            "Each layer wrapping the data in its own envelope (header) before passing it on",
+            "Encrypting the message so no one can read it",
+            "Sending the same message many times for safety"
           ],
           "answerIndex": 1,
-          "explanation": "QUIC is a transport protocol providing reliability, streams, and TLS 1.3, implemented in user space over UDP."
+          "explanation": "Encapsulation is the wrapping process: every layer adds its own header around the data it receives, like envelopes inside envelopes. It is not deletion, encryption, or repetition.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-3.svg"
         },
         {
           "id": "models-layering-l3-mc2",
           "type": "mcq",
-          "prompt": "BGP is unusual because it:",
+          "prompt": "In the mailing-a-letter analogy, what plays the role of a layer's 'header'?",
           "choices": [
-            "Runs directly on the physical layer",
-            "Performs L3 routing but runs as an application over TCP port 179",
-            "Is a link-layer protocol like ARP",
-            "Replaces IP entirely"
+            "The words written inside the letter itself",
+            "The address/label written on the outside of each wrapping",
+            "The weight of the envelope",
+            "The color of the mailbag"
           ],
           "answerIndex": 1,
-          "explanation": "BGP's job is network-layer routing between autonomous systems, but mechanically it is carried as an application over a TCP connection (port 179)."
+          "explanation": "A header is the bit of addressing/control info a layer writes on the outside of its envelope — like the address on the envelope or the route on the mailbag. The letter's contents are the payload, not the header.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-5.svg"
         },
         {
           "id": "models-layering-l3-mc3",
           "type": "mcq",
-          "prompt": "DHCP is which layer and over which transport?",
+          "prompt": "What exactly is a 'header'?",
           "choices": [
-            "Application layer over UDP",
-            "Network layer over IP only",
-            "Transport layer over TCP",
-            "Link layer with no transport"
+            "A small block of control information a layer adds to the front of the data",
+            "The title of a web page",
+            "The first computer in the network",
+            "A type of error that corrupts messages"
           ],
           "answerIndex": 0,
-          "explanation": "DHCP is an application-layer service that uses UDP (the DORA exchange uses broadcast on UDP ports 67/68)."
+          "explanation": "A header is a compact block of information a layer attaches (usually at the front) so the matching layer on the other side knows what to do. It is not a web-page title or a machine.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-3.svg"
         },
         {
           "id": "models-layering-l3-mc4",
           "type": "mcq",
-          "prompt": "To an Ethernet frame, an encapsulated IP packet is:",
+          "prompt": "As a message travels DOWN the stack, what happens at each layer?",
           "choices": [
-            "Inspected and rewritten field by field",
-            "Opaque payload it does not interpret",
-            "Discarded if it is not also Ethernet",
-            "Converted into a TCP segment"
+            "Each layer removes a header",
+            "Each layer adds its own header, wrapping what it received",
+            "Each layer translates the message into a new language",
+            "Nothing changes until it reaches the wire"
           ],
           "answerIndex": 1,
-          "explanation": "A layer treats the upper layer's unit as opaque payload — it reads only its own header. That isolation is what makes layering work."
+          "explanation": "Going down, layers add headers (wrapping). Removing headers happens on the way up at the receiver, which is called decapsulation.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-3.svg"
         },
         {
           "id": "models-layering-l3-mc5",
           "type": "mcq",
-          "prompt": "802.11 (WiFi) operates primarily at which OSI layer(s)?",
+          "prompt": "Match the chunk name to its layer: at the Internet layer, the chunk of data is called a...",
           "choices": [
-            "Transport and Application",
-            "Network and Transport",
-            "Physical and Data Link",
-            "Session and Presentation"
+            "Frame",
+            "Packet",
+            "Segment",
+            "Letter"
+          ],
+          "answerIndex": 1,
+          "explanation": "The Internet layer's chunk is a packet. A frame is the Link layer's chunk, and a segment is the Transport layer's chunk.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-3.svg"
+        },
+        {
+          "id": "models-layering-l3-mc6",
+          "type": "mcq",
+          "prompt": "What is the chunk of data called once the Transport layer has added its header?",
+          "choices": [
+            "A frame",
+            "A packet",
+            "A segment",
+            "A header"
           ],
           "answerIndex": 2,
-          "explanation": "802.11 defines the wireless physical layer and the MAC (data link) layer — the link layer in TCP/IP terms."
+          "explanation": "After the Transport layer wraps the data, the chunk is a segment. It becomes a packet at the Internet layer and a frame at the Link layer.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-3.svg"
+        },
+        {
+          "id": "models-layering-l3-mc7",
+          "type": "mcq",
+          "prompt": "Put the chunk names in the order they are formed as data goes DOWN the stack, starting from the top (Application).",
+          "choices": [
+            "Frame → Packet → Segment → Data",
+            "Data → Segment → Packet → Frame",
+            "Segment → Data → Frame → Packet",
+            "Packet → Frame → Data → Segment"
+          ],
+          "answerIndex": 1,
+          "explanation": "Top to bottom: it starts as application data, the Transport layer makes a segment, the Internet layer makes a packet, and the Link layer makes a frame for the wire.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-3.svg"
+        },
+        {
+          "id": "models-layering-l3-mc8",
+          "type": "mcq",
+          "prompt": "To the Link layer carrying a frame, the packet wrapped inside it is treated as:",
+          "choices": [
+            "Something it must read and rewrite field by field",
+            "Just cargo (payload) it carries without looking inside",
+            "An error that must be deleted",
+            "Its own header"
+          ],
+          "answerIndex": 1,
+          "explanation": "A layer reads only its own header and treats whatever is inside as opaque cargo. This 'don't peek inside' rule is what keeps the layers independent.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-3.svg"
+        },
+        {
+          "id": "models-layering-l3-mc9",
+          "type": "mcq",
+          "prompt": "When the message reaches the receiving computer and travels UP its stack, what does each layer do with the header its partner added?",
+          "choices": [
+            "Adds another copy of it",
+            "Strips off (removes) its own header and hands the rest up",
+            "Sends it back to the sender",
+            "Encrypts it"
+          ],
+          "answerIndex": 1,
+          "explanation": "On the way up, each layer removes the matching header its counterpart added and passes the inner data upward. This unwrapping is decapsulation — the mirror image of encapsulation.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-3.svg"
+        },
+        {
+          "id": "models-layering-l3-mc10",
+          "type": "mcq",
+          "prompt": "Why is the 'each handler reads only its own label' rule (the truck driver never opens the envelope) so useful?",
+          "choices": [
+            "It makes messages travel faster than light",
+            "It keeps layers independent, so each can do its job without understanding the others",
+            "It means only one layer is ever needed",
+            "It guarantees no message is ever lost"
+          ],
+          "answerIndex": 1,
+          "explanation": "Because each layer only handles its own header, layers stay independent and simple — the same separation-of-concerns benefit from lesson 1. It does not change physics or guarantee perfect delivery.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-5.svg"
+        }
+      ]
+    },
+    {
+      "id": "models-layering-l4",
+      "title": "One Message: Down Your Stack and Up the Other",
+      "order": 4,
+      "difficulty": 3,
+      "content": "Let's tie it all together by following one real action: you click a link and your computer asks a faraway computer (a **server**) for a web page. A **protocol** — an agreed set of rules for how computers talk — governs each step.\n\nThe request starts at the **Application** layer (your browser) as plain **data**. It moves **down** your computer's stack. The **Transport** layer wraps it into a **segment**, stamping a **port** number — think of it as picking which program on the far machine should get this (web pages, email, and games each use different ports). The **Internet** layer wraps that into a **packet**, stamping the **address** of the server — which machine to find among billions. The **Link** layer wraps that into a **frame** and finally turns it into signals on the wire or Wi-Fi.\n\nThose signals travel across the network — often hopping through several machines in between. When they reach the server, the message climbs **up** its stack. The Link layer unwraps the frame, the Internet layer unwraps the packet, the Transport layer unwraps the segment, and the Application layer (the web server program) finally reads your request and sends a page back — which makes the whole trip in reverse. Each layer 'talks to' the matching layer on the other side, but the bits really go all the way down one side and all the way up the other.\n\nWho decides what every header looks like so machines from different makers agree? **Standards bodies.** The main one for the internet is the **IETF** (Internet Engineering Task Force), which publishes its rules as numbered documents called **RFCs** (Requests for Comments). An RFC is just the public write-up of a protocol.\n\n**Recap:** A request goes down your stack gaining headers, crosses the network, and climbs the server's stack shedding them; shared rules (protocols), agreed in IETF RFCs, let any two machines understand each other.",
+      "items": [
+        {
+          "id": "models-layering-l4-mc1",
+          "type": "mcq",
+          "prompt": "What is a 'protocol'?",
+          "choices": [
+            "A single very fast cable",
+            "An agreed set of rules for how computers talk to each other",
+            "The name of the biggest computer on the internet",
+            "A program that only displays pictures"
+          ],
+          "answerIndex": 1,
+          "explanation": "A protocol is an agreed set of rules so two computers can understand each other — what to send, in what order, and what each part means. It is not hardware or a single program.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-4.svg"
+        },
+        {
+          "id": "models-layering-l4-mc2",
+          "type": "mcq",
+          "prompt": "When you request a web page, at which layer does the message START on your computer?",
+          "choices": [
+            "The Link layer",
+            "The Internet layer",
+            "The Application layer (your browser)",
+            "The Transport layer"
+          ],
+          "answerIndex": 2,
+          "explanation": "The request begins at the top, in the Application layer (the browser), then travels down through Transport, Internet, and Link to reach the wire.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-4.svg"
+        },
+        {
+          "id": "models-layering-l4-mc3",
+          "type": "mcq",
+          "prompt": "As your request leaves your computer, in what direction does it move through the layers?",
+          "choices": [
+            "Up the stack, from Link to Application",
+            "Down the stack, from Application to Link",
+            "It skips straight to the Internet layer",
+            "It stays in one layer the whole time"
+          ],
+          "answerIndex": 1,
+          "explanation": "On the sending side the message moves DOWN: Application → Transport → Internet → Link, gaining a header at each step before hitting the wire.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-4.svg"
+        },
+        {
+          "id": "models-layering-l4-mc4",
+          "type": "mcq",
+          "prompt": "An address (stamped by the Internet layer) and a port (stamped by the Transport layer) do which jobs?",
+          "choices": [
+            "Address picks the program; port picks the machine",
+            "Address picks the machine; port picks which program on it",
+            "Both pick the machine",
+            "Both pick the color of the data"
+          ],
+          "answerIndex": 1,
+          "explanation": "The address says which machine to find among billions; the port says which program on that machine should receive the data. (You will study addresses and ports in detail in later lessons.)",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-4.svg"
+        },
+        {
+          "id": "models-layering-l4-mc5",
+          "type": "mcq",
+          "prompt": "When the message arrives at the server, what direction does it travel through the server's layers?",
+          "choices": [
+            "Down, from Application to Link",
+            "Up, from Link to Application",
+            "It bounces back without entering the server",
+            "Sideways between two servers"
+          ],
+          "answerIndex": 1,
+          "explanation": "At the receiver the message climbs UP the stack: the Link layer unwraps the frame, then Internet, then Transport, and finally the Application layer reads it — the mirror of the sender's downward trip.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-4.svg"
+        },
+        {
+          "id": "models-layering-l4-mc6",
+          "type": "mcq",
+          "prompt": "The lesson says each layer 'talks to' the matching layer on the other computer. What is literally happening to the bits?",
+          "choices": [
+            "The bits jump directly between the two Transport layers",
+            "The bits travel all the way down one stack, across the network, and all the way up the other stack",
+            "The bits stay only in the Application layer",
+            "Each layer sends its own separate copy over a separate wire"
+          ],
+          "answerIndex": 1,
+          "explanation": "Same-layer 'conversation' is a useful way to think, but physically the bits go down the sender's whole stack, across the wire (often via in-between machines), and up the receiver's whole stack.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-4.svg"
+        },
+        {
+          "id": "models-layering-l4-mc7",
+          "type": "mcq",
+          "prompt": "What is a 'server' in this story?",
+          "choices": [
+            "A waiter in a restaurant",
+            "A computer that receives your request and sends back the web page",
+            "The wire between two computers",
+            "A header added by the Link layer"
+          ],
+          "answerIndex": 1,
+          "explanation": "Here a server is simply the faraway computer that receives your request and responds with the page. It is an ordinary participant in the same layered message exchange.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-4.svg"
+        },
+        {
+          "id": "models-layering-l4-mc8",
+          "type": "mcq",
+          "prompt": "Why do we need standards bodies like the IETF?",
+          "choices": [
+            "To sell internet cables",
+            "So machines from different makers agree on what every header and rule means",
+            "To make the internet slower on purpose",
+            "To decide which websites are allowed to exist"
+          ],
+          "answerIndex": 1,
+          "explanation": "Standards bodies publish agreed rules so independently built machines interoperate — everyone formats and reads headers the same way. They do not sell hardware or police content.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-4.svg"
+        },
+        {
+          "id": "models-layering-l4-mc9",
+          "type": "mcq",
+          "prompt": "What is an RFC?",
+          "choices": [
+            "A type of cable connector",
+            "A numbered public document that writes up an internet protocol's rules",
+            "A program that blocks viruses",
+            "The fastest available Wi-Fi speed"
+          ],
+          "answerIndex": 1,
+          "explanation": "RFC stands for Request for Comments — the numbered documents the IETF uses to publish protocol rules. It is the public specification, not hardware or software.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-4.svg"
+        },
+        {
+          "id": "models-layering-l4-mc10",
+          "type": "mcq",
+          "prompt": "Pulling the whole sub-topic together, which summary is correct?",
+          "choices": [
+            "Layers are pointless; one program does everything",
+            "A message gains headers going down the sender's stack, crosses the network, and sheds them going up the receiver's stack, all guided by shared protocols",
+            "Messages only ever stay on one computer",
+            "Only the Link layer ever touches the data"
+          ],
+          "answerIndex": 1,
+          "explanation": "That is the core picture: encapsulation on the way down, decapsulation on the way up, with each layer doing one job under agreed protocols — exactly why we split networking into layers in the first place.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/models-layering-4.svg"
         }
       ]
     }
