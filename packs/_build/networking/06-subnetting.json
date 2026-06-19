@@ -4,504 +4,542 @@
   "order": 6,
   "lessons": [
     {
-      "id": "subnetting-foundations",
-      "title": "Dotted-Decimal, Binary, and the Classful-to-CIDR Story",
+      "id": "subnetting-big-idea",
+      "title": "The Big Idea: Splitting a Network into Subnets",
       "order": 1,
       "difficulty": 1,
-      "content": "An IPv4 address is just **32 bits**. Dotted-decimal (`192.168.10.20`) is a human convenience: split the 32 bits into four 8-bit octets and write each octet 0–255. As an ex-radar tech you already think in bits, so internalize the one fact that makes all of subnetting mechanical: `192.168.10.20` is\n\n$$11000000\\,.\\,10101000\\,.\\,00001010\\,.\\,00010100$$\n\n**Classful history.** The 1981 scheme split the space by the leading bits: Class A (`0…`, /8, 16.7M hosts), Class B (`10…`, /16, 65k hosts), Class C (`110…`, /24, 254 hosts), plus D (multicast) and E (reserved). The class *was* the mask — you couldn't choose. This was wasteful: an org needing 500 hosts had to take a whole Class B (65k) because a Class C (254) was too small. That waste is a big reason we exhausted IPv4.\n\n**CIDR (Classless Inter-Domain Routing, RFC 1519, 1993)** threw away classes. Now the **prefix length** `/n` is explicit and arbitrary: the first `n` bits are the *network*, the remaining `32-n` are the *host* portion. `10.0.0.0/8`, `10.0.0.0/12`, `10.0.0.0/30` are all legal. This also enabled **route aggregation** — advertising one `/16` instead of 256 `/24`s — which kept the global routing table from exploding.\n\nThe whole modern game is: *where is the boundary between network bits and host bits, and what do the host bits range over?* Everything else (network address, broadcast, host count) falls straight out of that boundary.",
+      "content": "## Why split a network?\n\nYou already know an **IPv4 address** is just four numbers from 0 to 255, like `192.168.1.5`, and that it has two parts: a **network part** (which network) and a **host part** (which device on that network). This lesson is about *subnets* -- and a **subnet** is simply a way to split one big block of IP addresses into smaller groups, one group per local network.\n\nWhy bother? Imagine an office with 1,000 computers all sharing one giant network. Every announcement one computer shouts is heard by all 1,000 -- noisy and slow. It is also hard to organize and hard to keep groups separate. The fix is to carve the big block into smaller **subnets**: one for Sales, one for Engineering, one for guests. Think of **dividing an office building into departments** -- each department is its own area.\n\n## The trick that makes it work\n\nEvery address splits into a **network part** and a **host part**. Two everyday hooks:\n\n- A **phone number**: the area code says *which region* (network), the local number says *which phone* (host).\n- A **street address**: the ZIP code says *which neighborhood* (network), the house number says *which home* (host).\n\nDevices use this split to make one decision all day long: *is this destination on MY network?* If yes, talk to it directly. If no, hand the message to the **router** (the device that forwards traffic between networks) -- like going through the front desk to reach another department.\n\n## Reading \"/24\"\n\nHow does a device know where the network part ends and the host part begins? We write it after the address as a slash and a number, called **CIDR notation** (Classless Inter-Domain Routing). The number after the slash says **how many of the 32 bits belong to the network part**; the rest are for hosts.\n\nThe friendliest example is **/24**: the first 24 bits are the network, leaving the last 8 bits (the last number, 0-255) for hosts. So `192.168.1.0/24` is the block of addresses from `192.168.1.0` all the way to `192.168.1.255` -- one neighborhood of 256 addresses where only the last number changes. You can read that off without any math.\n\n## Recap\n\nA subnet splits a big address block into smaller per-network groups. Each address = network part + host part. The `/N` says how many bits are the network part; `/24` means \"first 24 bits are the network,\" giving the easy range `.0` to `.255`.",
       "items": [
         {
-          "id": "subnetting-foundations-fc-1",
-          "type": "flashcard",
-          "front": "How many bits is an IPv4 address, and how is dotted-decimal derived from it?",
-          "back": "32 bits, split into four 8-bit octets; each octet is written in decimal (0–255) separated by dots. It is purely a human-readable rendering of the 32-bit value.",
-          "hint": "4 octets."
-        },
-        {
-          "id": "subnetting-foundations-fc-2",
-          "type": "flashcard",
-          "front": "In CIDR notation /n, what do the first n bits and the remaining 32−n bits represent?",
-          "back": "The first n bits are the network (prefix) portion, fixed for every address in the block; the remaining 32−n bits are the host portion, which varies across the addresses in that block.",
-          "hint": "Network on the left, hosts on the right."
-        },
-        {
-          "id": "subnetting-foundations-fc-3",
-          "type": "flashcard",
-          "front": "What were the classful default masks for Class A, B, and C, and by what bits were the classes distinguished?",
-          "back": "Class A = /8 (leading bit 0), Class B = /16 (leading bits 10), Class C = /24 (leading bits 110). The leading bits of the first octet determined the class and therefore the fixed mask.",
-          "hint": "0… / 10… / 110… ; 8/16/24."
-        },
-        {
-          "id": "subnetting-foundations-fc-4",
-          "type": "flashcard",
-          "front": "Name two problems with classful addressing that CIDR solved.",
-          "back": "(1) Coarse, wasteful allocation — you got 254, 65k, or 16M hosts with nothing in between, stranding huge ranges. (2) Routing-table bloat — no way to aggregate. CIDR allows arbitrary prefix lengths and route aggregation (summarizing many prefixes into one).",
-          "hint": "Waste and table size."
-        },
-        {
-          "id": "subnetting-foundations-fc-5",
-          "type": "flashcard",
-          "front": "Convert the octet 172 to 8-bit binary.",
-          "back": "172 = 128 + 32 + 8 + 4 = 10101100. (Place values 128 64 32 16 8 4 2 1.)",
-          "hint": "128 + 44, and 44 = 32+8+4."
-        },
-        {
-          "id": "subnetting-foundations-mcq-1",
+          "id": "subnetting-big-idea-mcq-1",
           "type": "mcq",
-          "prompt": "Which of the following is NOT a valid IPv4 dotted-decimal address?",
+          "prompt": "In one sentence, what is a subnet?",
           "choices": [
-            "10.0.255.1",
-            "192.168.1.256",
-            "172.31.0.0",
-            "8.8.4.4"
-          ],
-          "answerIndex": 1,
-          "explanation": "Each octet is 8 bits, so the legal range is 0–255. 256 overflows a single octet and is invalid. The others all have every octet within 0–255."
-        },
-        {
-          "id": "subnetting-foundations-mcq-2",
-          "type": "mcq",
-          "prompt": "Under the original classful scheme, what class is 172.20.5.9 and what was its default mask?",
-          "choices": [
-            "Class A, /8",
-            "Class B, /16",
-            "Class C, /24",
-            "Class D, /32"
-          ],
-          "answerIndex": 1,
-          "explanation": "First octet 172 is in 128–191, whose leading bits are 10…, marking Class B with a default /16 mask. (128–191 = B; 1–126 = A; 192–223 = C.)"
-        },
-        {
-          "id": "subnetting-foundations-mcq-3",
-          "type": "mcq",
-          "prompt": "What is the decimal value of the binary octet 11000000?",
-          "choices": [
-            "192",
-            "224",
-            "128",
-            "240"
+            "A way to split one big block of IP addresses into smaller groups, one per local network",
+            "A special cable that connects two routers together",
+            "A password that protects a wireless network",
+            "A list of every website a network is allowed to visit"
           ],
           "answerIndex": 0,
-          "explanation": "11000000 = 128 + 64 = 192. This pattern (two leading 1s) is also the /26 third-borrowed-bit mask octet and the start of Class C, worth memorizing."
+          "explanation": "A subnet is about dividing addresses: take a large block and carve it into smaller groups, one for each local network. It is not hardware, a password, or a website list. Think of splitting an office building into departments.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-2.svg"
         },
         {
-          "id": "subnetting-foundations-mcq-4",
+          "id": "subnetting-big-idea-mcq-2",
           "type": "mcq",
-          "prompt": "Why did CIDR's introduction of route aggregation matter for the Internet's core routers?",
+          "prompt": "An IP address splits into two parts. What are they?",
           "choices": [
-            "It encrypted routing updates between autonomous systems",
-            "It let many contiguous prefixes be advertised as one shorter prefix, slowing growth of the global routing table",
-            "It increased the IPv4 address space from 32 to 64 bits",
-            "It removed the need for routers entirely on classless networks"
-          ],
-          "answerIndex": 1,
-          "explanation": "Aggregation (supernetting) summarizes contiguous blocks into a single shorter prefix, so an ISP can advertise one route instead of hundreds. This containment of routing-table growth was a primary motivation for CIDR."
-        },
-        {
-          "id": "subnetting-foundations-mcq-5",
-          "type": "mcq",
-          "prompt": "An address begins 110 in its first three bits. Before CIDR, what did that guarantee about its network size?",
-          "choices": [
-            "It was a Class C with a fixed /24 mask (254 usable hosts)",
-            "It was a Class A with a fixed /8 mask",
-            "Nothing — the mask was always chosen by the admin",
-            "It was a multicast group address"
+            "A network part (which network) and a host part (which device on it)",
+            "A public part and a secret part",
+            "A sending part and a receiving part",
+            "A speed part and a distance part"
           ],
           "answerIndex": 0,
-          "explanation": "Leading bits 110 identify Class C, which carried a fixed /24 default mask and thus 2^8 − 2 = 254 usable hosts. The whole point of classful addressing was that the leading bits dictated the mask."
+          "explanation": "Every IPv4 address is a network part plus a host part. The network part says which network the address belongs to; the host part picks the specific device on that network. The other options are not how an address is divided.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-3.svg"
+        },
+        {
+          "id": "subnetting-big-idea-mcq-3",
+          "type": "mcq",
+          "prompt": "In the phone-number analogy, what plays the role of the NETWORK part of an IP address?",
+          "choices": [
+            "The area code (which region)",
+            "The local number (which specific phone)",
+            "The ringtone",
+            "The length of the call"
+          ],
+          "answerIndex": 0,
+          "explanation": "The area code identifies a whole region, just as the network part identifies a whole network. The local number is like the host part -- it picks one specific phone within that region.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-3.svg"
+        },
+        {
+          "id": "subnetting-big-idea-mcq-4",
+          "type": "mcq",
+          "prompt": "What does the \"/24\" in 192.168.1.0/24 mean?",
+          "choices": [
+            "The first 24 bits are the network part; the rest are for hosts",
+            "The network can hold exactly 24 devices",
+            "The address is the 24th one on the network",
+            "The connection runs at 24 megabits per second"
+          ],
+          "answerIndex": 0,
+          "explanation": "The number after the slash counts how many of the 32 bits belong to the network part. /24 means the first 24 bits are locked as the network, leaving 8 bits for hosts. It is not a device count, a position, or a speed.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-3.svg"
+        },
+        {
+          "id": "subnetting-big-idea-mcq-5",
+          "type": "mcq",
+          "prompt": "Which range of addresses does 192.168.1.0/24 cover?",
+          "choices": [
+            "192.168.1.0 through 192.168.1.255",
+            "192.168.0.0 through 192.168.255.255",
+            "192.168.1.0 through 192.168.1.24",
+            "0.0.0.0 through 192.168.1.0"
+          ],
+          "answerIndex": 0,
+          "explanation": "With /24 the first three numbers (192.168.1) are locked as the network and only the last number is free to change, from 0 to 255. So the block runs .0 through .255 -- 256 addresses. The /24 does not mean 24 addresses.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-3.svg"
+        },
+        {
+          "id": "subnetting-big-idea-mcq-6",
+          "type": "mcq",
+          "prompt": "A device wants to send a message and finds the destination is NOT on its own network. What does it do?",
+          "choices": [
+            "Hands the message to the router to forward toward the other network",
+            "Drops the message because it cannot reach other networks",
+            "Changes its own IP address to match the destination",
+            "Sends the message to every device on the internet at once"
+          ],
+          "answerIndex": 0,
+          "explanation": "The whole point of the network/host split is this decision: same network means talk directly; different network means give it to the router (like the front desk that connects departments). Devices do not drop the message or rewrite their own address.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-2.svg"
+        },
+        {
+          "id": "subnetting-big-idea-mcq-7",
+          "type": "mcq",
+          "prompt": "Why might an office split one large network into several smaller subnets?",
+          "choices": [
+            "To organize groups, limit noisy broadcasts, and keep departments separate",
+            "To make every computer share a single IP address",
+            "To make the internet connection faster than the cable allows",
+            "To remove the need for any router in the building"
+          ],
+          "answerIndex": 0,
+          "explanation": "Smaller subnets give organization (a block per department), less broadcast noise (announcements stay within a group), and isolation (groups stay separate). Subnetting does not share one IP, exceed the cable's speed, or remove routers -- you actually need a router to connect the subnets.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-2.svg"
+        },
+        {
+          "id": "subnetting-big-idea-mcq-8",
+          "type": "mcq",
+          "prompt": "If a block is written /16 instead of /24, what changed?",
+          "choices": [
+            "More bits are now host bits, so the network holds many more addresses",
+            "The network now holds fewer addresses than a /24",
+            "Nothing -- /16 and /24 are just two names for the same size",
+            "The address is no longer valid"
+          ],
+          "answerIndex": 0,
+          "explanation": "A smaller number after the slash means fewer network bits and therefore MORE host bits. /16 locks only the first 16 bits, leaving 16 bits for hosts -- far more addresses than /24 (which leaves only 8). A smaller /N is a bigger block.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-3.svg"
+        },
+        {
+          "id": "subnetting-big-idea-mcq-9",
+          "type": "mcq",
+          "prompt": "Two devices are on the same subnet. How do they exchange a message?",
+          "choices": [
+            "They talk directly, without needing the router",
+            "They must always go through the router first",
+            "They cannot talk until an administrator approves each message",
+            "They broadcast to the entire internet and wait for a reply"
+          ],
+          "answerIndex": 0,
+          "explanation": "Same subnet means same local network, so the devices deliver directly to each other. The router is only needed to reach a different subnet or network. Being on the same subnet is exactly what lets them skip the router.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-2.svg"
         }
       ]
     },
     {
-      "id": "subnetting-masks-anatomy",
-      "title": "Masks, Wildcards, and the Anatomy of a Block",
+      "id": "subnetting-mask-anatomy",
+      "title": "Subnet Masks and the Parts of a Block",
       "order": 2,
       "difficulty": 2,
-      "content": "A **subnet mask** is the prefix written as 32 bits: `n` ones followed by `32-n` zeros. `/24` = `11111111.11111111.11111111.00000000` = `255.255.255.0`. The mask answers \"which bits are network?\" Bitwise-AND an address with its mask and you get the **network address** (host bits forced to 0). OR the address with the *inverted* mask and you get the **broadcast address** (host bits forced to 1).\n\nThe **wildcard mask** (used in Cisco ACLs and OSPF) is the bit-inverse of the netmask: `/24` → mask `255.255.255.0`, wildcard `0.0.0.255`. Wildcard + netmask octets always sum to 255 each. A 1 in the wildcard means \"don't care\" (host bit); a 0 means \"must match.\"\n\nFor any `/n` block the four key quantities are:\n\n- **Network address:** first address, all host bits 0.\n- **Broadcast address:** last address, all host bits 1.\n- **Usable host range:** everything strictly between them.\n- **Host count:** $2^{32-n} - 2$.\n\nThe $-2$ removes the network and broadcast addresses, which can't be assigned to interfaces. So a `/24` has $2^{8}-2 = 254$ hosts; a `/30` has $2^{2}-2 = 2$ (the classic point-to-point link); a `/31` is a special case (RFC 3021) that uses **both** addresses for 2-host p2p links, no $-2$. A `/32` is a single host route.\n\nThe **block size** trick: in the \"interesting\" octet (where the mask isn't 0 or 255), block size $= 256 - \\text{mask octet}$. Network addresses in that octet are multiples of the block size. This is the engine of fast mental subnetting.",
+      "content": "## Two ways to say the same thing\n\nLast lesson, `/24` told us the first 24 bits are the network part. There is an older way to write the exact same fact: a **subnet mask**, like `255.255.255.0`. A mask lines up under the address and marks each part. Where the mask shows **255**, all 8 of those bits are network (locked). Where it shows **0**, those bits are host (free).\n\nSo `255.255.255.0` has three 255s = 24 network bits, then a 0 = 8 host bits. That is **exactly /24**. They are two notations for one idea:\n\n$$255.255.255.0 \\;=\\; /24$$\n\nA couple more you will see often: `255.255.0.0` = `/16` (two 255s), and `255.255.255.192` = `/26` (we will meet /26 next lesson).\n\n## The four parts of any block\n\nPick any block, say `192.168.1.0/24`. Four things are always worth naming:\n\n- **Network address** -- the *first* address (`192.168.1.0`). It names the block; it is not given to a device.\n- **Broadcast address** -- the *last* address (`192.168.1.255`). A message sent here means \"everyone on this subnet\"; it is not given to a device either.\n- **Usable host range** -- everything in between (`192.168.1.1` to `192.168.1.254`). These go to real devices.\n- **Host count** -- how many usable addresses there are.\n\n## Counting hosts\n\nThe host bits are like the digits on an odometer: with `h` host bits you can count $2^{h}$ different patterns. For a `/N` block, $h = 32 - N$ host bits, so the block holds $2^{32-N}$ addresses.\n\nBut two of those are reserved -- the all-zeros pattern (the network address) and the all-ones pattern (the broadcast address) -- so the **usable** count is:\n\n$$2^{(32-N)} - 2$$\n\nFor a `/24`: $2^{8} - 2 = 256 - 2 = 254$ usable hosts. That matches the picture: 256 addresses on the number line, minus the first and last, leaves 254 for devices.\n\n## Recap\n\nA subnet mask is just `/N` written as four numbers; `255` means a network byte, `0` means a host byte, so `255.255.255.0 = /24`. Every block has a network address (first), a broadcast address (last), a usable range (the middle), and a usable count of $2^{(32-N)} - 2$.",
       "items": [
         {
-          "id": "subnetting-masks-fc-1",
-          "type": "flashcard",
-          "front": "How do you compute the network address from an IP and its mask, and the broadcast from there?",
-          "back": "Network = IP AND mask (host bits cleared to 0). Broadcast = IP OR (NOT mask), i.e. host bits set to 1. Equivalently, broadcast = network + block_size − 1 in the interesting octet.",
-          "hint": "AND with mask, OR with inverted mask."
-        },
-        {
-          "id": "subnetting-masks-fc-2",
-          "type": "flashcard",
-          "front": "What is a wildcard mask and how does it relate to the subnet mask?",
-          "back": "The wildcard mask is the bitwise inverse of the subnet mask (used in Cisco ACLs/OSPF). Each octet pair sums to 255: e.g. mask 255.255.255.0 ↔ wildcard 0.0.0.255. 0 = must match, 1 = don't care.",
-          "hint": "Inverse; octets sum to 255."
-        },
-        {
-          "id": "subnetting-masks-fc-3",
-          "type": "flashcard",
-          "front": "State the host-count formula for an IPv4 /n block and explain the −2.",
-          "back": "Usable hosts = $2^{32-n} - 2$. Subtract 2 because the all-zeros host portion is the network address and the all-ones host portion is the broadcast address; neither is assignable to an interface.",
-          "hint": "All-zeros and all-ones host portions are reserved."
-        },
-        {
-          "id": "subnetting-masks-fc-4",
-          "type": "flashcard",
-          "front": "What is the 'block size' trick and where does it apply?",
-          "back": "In the interesting octet (mask octet not 0 or 255), block size = 256 − mask_octet. Subnet/network boundaries in that octet fall on multiples of the block size, so you can step through subnets quickly without binary.",
-          "hint": "256 minus the mask octet."
-        },
-        {
-          "id": "subnetting-masks-fc-5",
-          "type": "flashcard",
-          "front": "Why are /31 and /32 exceptions to the −2 rule?",
-          "back": "/32 is a single-host route (one address, no network/broadcast concept). /31 (RFC 3021) is for point-to-point links and uses BOTH addresses as host endpoints — no broadcast needed on a 2-node link — so it gives 2 usable hosts instead of 2^1−2 = 0.",
-          "hint": "Point-to-point and single host."
-        },
-        {
-          "id": "subnetting-masks-mcq-1",
+          "id": "subnetting-mask-anatomy-mcq-1",
           "type": "mcq",
-          "prompt": "What dotted-decimal subnet mask corresponds to /26?",
+          "prompt": "Which subnet mask means the same thing as /24?",
           "choices": [
             "255.255.255.0",
-            "255.255.255.192",
-            "255.255.255.224",
-            "255.255.192.0"
-          ],
-          "answerIndex": 1,
-          "explanation": "/26 = 24 ones + 2 ones in the 4th octet = 11000000 = 192. So 255.255.255.192. (224 would be /27; .0 is /24.)"
-        },
-        {
-          "id": "subnetting-masks-mcq-2",
-          "type": "mcq",
-          "prompt": "The wildcard mask for /27 is:",
-          "choices": [
-            "0.0.0.31",
-            "0.0.0.32",
-            "0.0.0.15",
-            "0.0.0.224"
+            "255.255.255.255",
+            "255.0.0.0",
+            "0.0.0.255"
           ],
           "answerIndex": 0,
-          "explanation": "/27 mask 4th octet = 224. Wildcard = 255 − 224 = 31, so 0.0.0.31. (Block size 32, addresses 0–31 in the first subnet — the wildcard spans exactly one block minus one.)"
+          "explanation": "/24 locks the first 24 bits as network. Each 255 in a mask marks 8 network bits, so three 255s and a 0 (255.255.255.0) is 24 network bits. 255.0.0.0 is /8, and 0.0.0.255 is not a normal mask at all.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-4.svg"
         },
         {
-          "id": "subnetting-masks-mcq-3",
+          "id": "subnetting-mask-anatomy-mcq-2",
           "type": "mcq",
-          "prompt": "How many usable hosts does a /30 provide, and what is its classic use?",
+          "prompt": "In a subnet mask, what does a value of 255 in one of the four positions tell you?",
           "choices": [
-            "4 hosts; small office LANs",
-            "2 hosts; point-to-point router links",
-            "6 hosts; a printer VLAN",
-            "0 hosts; loopback only"
-          ],
-          "answerIndex": 1,
-          "explanation": "2^(32−30) − 2 = 4 − 2 = 2 usable hosts. With exactly two endpoints it is the traditional mask for point-to-point WAN/router links (a /31 also works under RFC 3021)."
-        },
-        {
-          "id": "subnetting-masks-mcq-4",
-          "type": "mcq",
-          "prompt": "Given mask 255.255.255.240, what is the block size in the 4th octet and how many usable hosts per subnet?",
-          "choices": [
-            "Block size 16, 14 hosts",
-            "Block size 240, 240 hosts",
-            "Block size 8, 6 hosts",
-            "Block size 16, 16 hosts"
+            "All 8 bits in that position are network bits (locked)",
+            "All 8 bits in that position are host bits (free)",
+            "That position is broken or invalid",
+            "Exactly 255 devices are allowed"
           ],
           "answerIndex": 0,
-          "explanation": "240 = /28. Block size = 256 − 240 = 16. Hosts = 2^(32−28) − 2 = 16 − 2 = 14. Subnets start at .0, .16, .32, …"
+          "explanation": "255 in binary is eight 1s, and a 1 in the mask marks a network bit. So a 255 means that whole byte is network. A 0 (eight 0s) would mean that byte is host. It is not a device count.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-4.svg"
         },
         {
-          "id": "subnetting-masks-mcq-5",
+          "id": "subnetting-mask-anatomy-mcq-3",
           "type": "mcq",
-          "prompt": "For 10.4.8.130/25, what are the network and broadcast addresses?",
+          "prompt": "How many USABLE host addresses are in a /24 network?",
           "choices": [
-            "Network 10.4.8.128, broadcast 10.4.8.255",
-            "Network 10.4.8.0, broadcast 10.4.8.127",
-            "Network 10.4.8.128, broadcast 10.4.8.191",
-            "Network 10.4.8.0, broadcast 10.4.8.255"
+            "254",
+            "256",
+            "255",
+            "253"
           ],
           "answerIndex": 0,
-          "explanation": "/25 → mask .128, block size 128. The two blocks in the 4th octet are 0–127 and 128–255. .130 falls in 128–255, so network = 10.4.8.128, broadcast = 10.4.8.255."
+          "explanation": "A /24 has 8 host bits, so 2^8 = 256 total addresses. Subtract 2 (the network address and the broadcast address are not assignable) to get 254 usable hosts. 256 forgets to subtract; 255 only subtracts one.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-5.svg"
         },
         {
-          "id": "subnetting-masks-mcq-6",
+          "id": "subnetting-mask-anatomy-mcq-4",
           "type": "mcq",
-          "prompt": "Which statement about the relationship between netmask and wildcard mask is correct?",
+          "prompt": "Why do we subtract 2 when counting usable hosts in a block?",
           "choices": [
-            "They are identical",
-            "Each corresponding octet of the two sums to 255",
-            "The wildcard is always 0.0.0.0",
-            "The wildcard equals the network address"
+            "The first address (network) and the last address (broadcast) cannot be given to a device",
+            "Two addresses are always reserved for the internet provider",
+            "The router and the switch each take one address that no one else can use",
+            "Two addresses are kept empty in case the network grows"
           ],
-          "answerIndex": 1,
-          "explanation": "The wildcard is the bitwise NOT of the netmask, so corresponding octets sum to 255 (e.g. 255 + 0, 192 + 63). A 1 in the wildcard marks a 'don't care' (host) bit."
+          "answerIndex": 0,
+          "explanation": "Every block reserves its first address as the network address (the block's name) and its last as the broadcast address (means 'everyone here'). Neither goes to a normal device, so usable = total - 2. It is not about the ISP, specific hardware, or growth.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-5.svg"
+        },
+        {
+          "id": "subnetting-mask-anatomy-mcq-5",
+          "type": "mcq",
+          "prompt": "In the block 192.168.1.0/24, which address is the broadcast address?",
+          "choices": [
+            "192.168.1.255",
+            "192.168.1.0",
+            "192.168.1.1",
+            "192.168.1.254"
+          ],
+          "answerIndex": 0,
+          "explanation": "The broadcast address is always the LAST address in the block. For 192.168.1.0/24 that is 192.168.1.255. The first address (.0) is the network address, and .1 and .254 are the first and last usable hosts.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-5.svg"
+        },
+        {
+          "id": "subnetting-mask-anatomy-mcq-6",
+          "type": "mcq",
+          "prompt": "In the block 192.168.1.0/24, which address is the network address (the one that names the block)?",
+          "choices": [
+            "192.168.1.0",
+            "192.168.1.255",
+            "192.168.1.1",
+            "192.168.1.100"
+          ],
+          "answerIndex": 0,
+          "explanation": "The network address is always the FIRST address in the block, here 192.168.1.0. It labels the whole subnet and is not assigned to a device. .255 is the broadcast, and .1 or .100 are ordinary host addresses.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-5.svg"
+        },
+        {
+          "id": "subnetting-mask-anatomy-mcq-7",
+          "type": "mcq",
+          "prompt": "The mask 255.255.0.0 is the same as which CIDR prefix?",
+          "choices": [
+            "/16",
+            "/8",
+            "/24",
+            "/32"
+          ],
+          "answerIndex": 0,
+          "explanation": "Two 255s mark 2 x 8 = 16 network bits, so 255.255.0.0 = /16. One 255 would be /8, three would be /24, and four (255.255.255.255) would be /32.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-4.svg"
+        },
+        {
+          "id": "subnetting-mask-anatomy-mcq-8",
+          "type": "mcq",
+          "prompt": "Using the formula, how many usable hosts does a /25 block have? (A /25 has 7 host bits.)",
+          "choices": [
+            "126",
+            "128",
+            "124",
+            "130"
+          ],
+          "answerIndex": 0,
+          "explanation": "Usable = 2^(32-25) - 2 = 2^7 - 2 = 128 - 2 = 126. The 128 is the total before subtracting the network and broadcast addresses; subtract 2 to get 126 usable.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-5.svg"
+        },
+        {
+          "id": "subnetting-mask-anatomy-mcq-9",
+          "type": "mcq",
+          "prompt": "Which list correctly names the four parts of a block, in order?",
+          "choices": [
+            "Network address (first), usable hosts (middle), broadcast (last), and the host count",
+            "Broadcast (first), network address (last), and two passwords",
+            "Router address, switch address, gateway, and DNS",
+            "Public address, private address, mask, and speed"
+          ],
+          "answerIndex": 0,
+          "explanation": "Every block has a network address (the first/lowest address), the usable host range in the middle, the broadcast address (the last/highest), and a host count of 2^(32-N) - 2. The other options mix in unrelated terms.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-5.svg"
         }
       ]
     },
     {
-      "id": "subnetting-carving-blocks",
-      "title": "Carving Blocks: Equal Subnets and Worked Examples",
+      "id": "subnetting-carving",
+      "title": "Carving a Block into Equal Subnets, and the Same-Subnet Test",
       "order": 3,
       "difficulty": 3,
-      "content": "To split a block into equal subnets you **borrow** host bits. Borrowing $k$ bits creates $2^{k}$ subnets, each with $2^{(32-n-k)} - 2$ usable hosts. Borrowing trades host bits for subnet bits — the 32-bit budget is conserved.\n\n**Worked example: 192.168.10.0/24 into 4 equal subnets.** Need 4 subnets → borrow $k=2$ bits ($2^2=4$) → new prefix /26, mask 255.255.255.192. Block size $= 256 - 192 = 64$. Step the 4th octet by 64:\n\n| Subnet | Network | Broadcast | Usable range | Hosts |\n|---|---|---|---|---|\n| 1 | .0/26 | .63 | .1 – .62 | 62 |\n| 2 | .64/26 | .127 | .65 – .126 | 62 |\n| 3 | .128/26 | .191 | .129 – .190 | 62 |\n| 4 | .192/26 | .255 | .193 – .254 | 62 |\n\nNotice every network address is a multiple of the block size (0, 64, 128, 192), and each broadcast is the next network minus one.\n\n**The fast algorithm for \"given IP/prefix, find everything\":**\n1. Find the interesting octet (where the mask is partial) and its block size $= 256 - \\text{mask octet}$.\n2. Round the address's value in that octet **down** to the nearest multiple of the block size → network address.\n3. Broadcast = network + block size $- 1$ in that octet.\n4. First host = network $+ 1$; last host = broadcast $- 1$.\n5. Host count $= 2^{32-n} - 2$.\n\nThis works in any octet — for `/18` the interesting octet is the *third*: block size $256-192=64$, networks at .0, .64, .128, .192 in octet 3. Drill until it's reflexive.",
+      "content": "## Borrowing bits to make subnets\n\nWe can take one block and split it into several equal smaller blocks. The trick: **borrow** some host bits and turn them into network bits. Each bit you borrow doubles the number of subnets. Borrow 1 bit and you get 2 subnets; borrow 2 bits and you get $2^2 = 4$ subnets; borrow 3 bits and you get $2^3 = 8$.\n\nIt is a trade. The 32-bit total never changes, so every bit you give to the network is one fewer bit for hosts. More subnets means fewer hosts in each.\n\n## Worked example: a /24 into four /26 subnets\n\nStart with `192.168.1.0/24` (256 addresses). We want **4 equal subnets**, so we borrow **2 bits**: the prefix grows from /24 to **/26**. Each /26 has $32 - 26 = 6$ host bits, so $2^6 = 64$ addresses per subnet (and $64 - 2 = 62$ usable).\n\nThe subnets begin on multiples of 64 -- a handy shortcut called the **block size** ($256 - 192 = 64$, since /26's mask byte is 192). Lining them up on the 0-255 number line:\n\n| Subnet | Network (first) | Broadcast (last) | Usable hosts |\n|---|---|---|---|\n| 1 | .0 | .63 | .1 - .62 |\n| 2 | .64 | .127 | .65 - .126 |\n| 3 | .128 | .191 | .129 - .190 |\n| 4 | .192 | .255 | .193 - .254 |\n\nNotice the pattern: each subnet's network address is a multiple of 64, and each broadcast is *one less* than the next subnet's start. Four tidy groups of 64.\n\n## The same-subnet test\n\nHere is the everyday question a device answers: *are these two IP addresses on the same subnet?* The rule is simple -- **compare their network parts** (using the same mask). Same network part, same subnet.\n\nExample with a /24 mask: are `192.168.1.5` and `192.168.1.9` on the same subnet? The network part for /24 is the first three numbers. Both are `192.168.1`, so **yes** -- they talk directly. Now `192.168.1.5` and `192.168.2.9` with /24: the network parts are `192.168.1` and `192.168.2` -- **different**, so they are on different subnets and must go through the router.\n\n## Recap\n\nBorrowing `k` host bits creates $2^k$ equal subnets, each smaller. A /24 split into four /26s gives blocks starting at .0, .64, .128, .192. To test if two addresses share a subnet, compare their network parts under the same mask: match means same subnet (direct); differ means route through the router.",
       "items": [
-        {
-          "id": "subnetting-carving-fc-1",
-          "type": "flashcard",
-          "front": "If you borrow k host bits, how many subnets do you create and how many hosts does each have?",
-          "back": "Subnets = $2^{k}$. Hosts per subnet = $2^{(32-n-k)} - 2$, where n was the original prefix. Borrowing bits moves the network/host boundary right.",
-          "hint": "2^k subnets; the rest are host bits."
-        },
-        {
-          "id": "subnetting-carving-fc-2",
-          "type": "flashcard",
-          "front": "List the 5-step algorithm to derive network, broadcast, host range, and count from any IP/prefix.",
-          "back": "1) Block size = 256 − mask octet (in the interesting octet). 2) Round that octet down to a multiple of block size → network. 3) Broadcast = network + block size − 1. 4) First host = net+1, last host = bcast−1. 5) Hosts = 2^(32−n) − 2.",
-          "hint": "Block size → round down → +size−1 → trim ends → count."
-        },
-        {
-          "id": "subnetting-carving-fc-3",
-          "type": "flashcard",
-          "front": "To split a /24 into subnets that each hold at least 50 hosts, what prefix do you use and why?",
-          "back": "/26. Need ≥50 usable hosts → 2^(32−n) − 2 ≥ 50 → host bits ≥ 6 (2^6−2 = 62 ≥ 50; 2^5−2 = 30 < 50). 6 host bits → /26, giving four 62-host subnets.",
-          "hint": "Smallest power of two minus 2 that is ≥ 50."
-        },
-        {
-          "id": "subnetting-carving-fc-4",
-          "type": "flashcard",
-          "front": "When the interesting octet is the third octet (e.g. a /18), how do you find the network address?",
-          "back": "Same method, applied to octet 3: block size = 256 − third-octet mask value; round the address's third octet down to a multiple of that block size; the 4th octet of the network address is 0.",
-          "hint": "The trick is octet-agnostic."
-        },
         {
           "id": "subnetting-carving-mcq-1",
           "type": "mcq",
-          "prompt": "For host 192.168.10.100/26, give network, broadcast, and first/last usable host.",
+          "prompt": "You split 192.168.1.0/24 into four equal subnets. What prefix does each subnet have?",
           "choices": [
-            "Net .64, bcast .127, hosts .65–.126",
-            "Net .96, bcast .127, hosts .97–.126",
-            "Net .64, bcast .128, hosts .65–.127",
-            "Net .100, bcast .163, hosts .101–.162"
+            "/26",
+            "/24",
+            "/22",
+            "/28"
           ],
           "answerIndex": 0,
-          "explanation": "/26 block size 64; multiples are 0, 64, 128, 192. 100 rounds down to 64 → network .64; broadcast = 64+64−1 = .127; usable .65–.126.",
-          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-1.svg"
+          "explanation": "Four equal subnets means borrowing 2 host bits (2^2 = 4). Adding 2 to /24 gives /26. /22 is a bigger block, not smaller; /28 would be 16 subnets, too many.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-6.svg"
         },
         {
           "id": "subnetting-carving-mcq-2",
           "type": "mcq",
-          "prompt": "How many equal subnets and how many hosts each result from subnetting 172.16.0.0/16 into /20s?",
+          "prompt": "After splitting 192.168.1.0/24 into four /26 subnets, what are the four network (starting) addresses?",
           "choices": [
-            "8 subnets, 4094 hosts each",
-            "16 subnets, 4094 hosts each",
-            "16 subnets, 4096 hosts each",
-            "4 subnets, 8190 hosts each"
+            "192.168.1.0, .64, .128, .192",
+            "192.168.1.0, .50, .100, .150",
+            "192.168.1.1, .2, .3, .4",
+            "192.168.1.0, .128, .256, .384"
           ],
-          "answerIndex": 1,
-          "explanation": "Borrowed bits = 20 − 16 = 4 → 2^4 = 16 subnets. Host bits = 32 − 20 = 12 → 2^12 − 2 = 4094 hosts each."
+          "answerIndex": 0,
+          "explanation": "Each /26 holds 64 addresses, so the subnets start on multiples of 64: 0, 64, 128, 192. The .50/.100 spacing ignores the block size, and 256/384 are impossible because a byte only goes up to 255.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-6.svg"
         },
         {
           "id": "subnetting-carving-mcq-3",
           "type": "mcq",
-          "prompt": "What is the network address of 10.45.200.37/19?",
+          "prompt": "How many usable hosts are in each /26 subnet?",
           "choices": [
-            "10.45.192.0",
-            "10.45.200.0",
-            "10.45.224.0",
-            "10.45.160.0"
+            "62",
+            "64",
+            "60",
+            "32"
           ],
           "answerIndex": 0,
-          "explanation": "/19 → third octet mask = 224, block size 32. Round 200 down to a multiple of 32: 192 (192, 224 bracket it). Network = 10.45.192.0; 4th octet 0."
+          "explanation": "A /26 has 6 host bits, so 2^6 = 64 total addresses. Subtract 2 for the network and broadcast addresses: 64 - 2 = 62 usable hosts. 64 forgets to subtract; 32 would be a /27.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-6.svg"
         },
         {
           "id": "subnetting-carving-mcq-4",
           "type": "mcq",
-          "prompt": "For 192.168.1.0/24 carved into eight equal subnets, what is the prefix and the network address of the FIFTH subnet?",
+          "prompt": "In the second /26 subnet (starting at 192.168.1.64), what is the broadcast address?",
           "choices": [
-            "/27, fifth network 192.168.1.128",
-            "/27, fifth network 192.168.1.96",
-            "/28, fifth network 192.168.1.64",
-            "/27, fifth network 192.168.1.160"
+            "192.168.1.127",
+            "192.168.1.128",
+            "192.168.1.126",
+            "192.168.1.191"
           ],
           "answerIndex": 0,
-          "explanation": "8 subnets → borrow 3 bits → /27, block size 32. Networks: .0, .32, .64, .96, .128, … The fifth is .128 → 192.168.1.128."
+          "explanation": "The subnet spans 64 addresses: .64 through .127. The broadcast is the last one, .127. Note .128 is the START of the next subnet, and .126 is the last usable host, not the broadcast.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-6.svg"
         },
         {
           "id": "subnetting-carving-mcq-5",
           "type": "mcq",
-          "prompt": "Which address is the broadcast address of the subnet containing 10.0.0.70/28?",
+          "prompt": "Each time you borrow one more host bit, what happens to the number of subnets?",
           "choices": [
-            "10.0.0.79",
-            "10.0.0.71",
-            "10.0.0.95",
-            "10.0.0.63"
+            "It doubles",
+            "It stays the same",
+            "It is cut in half",
+            "It increases by exactly one"
           ],
           "answerIndex": 0,
-          "explanation": "/28 block size 16; multiples 0,16,32,48,64,80. 70 rounds down to 64 → network .64, broadcast = 64+16−1 = .79."
+          "explanation": "Borrowing bits gives 2^k subnets, so each additional borrowed bit doubles the count (1 bit -> 2, 2 bits -> 4, 3 bits -> 8). It does not just add one. The trade-off is that each subnet then holds fewer hosts.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-6.svg"
         },
         {
           "id": "subnetting-carving-mcq-6",
           "type": "mcq",
-          "prompt": "Is 192.168.5.64 a valid host address inside the subnet 192.168.5.0/26?",
+          "prompt": "Using a /24 mask, are 192.168.1.5 and 192.168.1.9 on the same subnet?",
           "choices": [
-            "Yes, it is a usable host in that subnet",
-            "No — it is the network address of the NEXT /26 subnet",
-            "No — it is the broadcast of 192.168.5.0/26",
-            "Yes, but only as the default gateway"
+            "Yes -- their network part (192.168.1) is the same",
+            "No -- the last numbers (5 and 9) are different",
+            "No -- they must always go through a router",
+            "It cannot be determined without the broadcast address"
           ],
-          "answerIndex": 1,
-          "explanation": "192.168.5.0/26 spans .0–.63 (broadcast .63). .64 is the network address of the next /26 (.64–.127), not a host in the .0 subnet — a classic boundary off-by-one."
+          "answerIndex": 0,
+          "explanation": "With /24 the network part is the first three numbers. Both addresses share 192.168.1, so they are on the same subnet and talk directly. The differing last number is just the host part, which is supposed to differ between two devices.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-7.svg"
         },
         {
           "id": "subnetting-carving-mcq-7",
           "type": "mcq",
-          "prompt": "You need at least 1000 hosts per subnet. What is the largest prefix (longest mask) you can use?",
+          "prompt": "Using a /24 mask, are 192.168.1.5 and 192.168.2.9 on the same subnet?",
           "choices": [
-            "/22",
-            "/21",
-            "/23",
-            "/20"
+            "No -- their network parts (192.168.1 vs 192.168.2) differ, so they are on different subnets",
+            "Yes -- both start with 192.168",
+            "Yes -- all private addresses are one big subnet",
+            "No -- because 9 is larger than 5"
           ],
           "answerIndex": 0,
-          "explanation": "Need 2^(32−n) − 2 ≥ 1000 → host bits ≥ 10 (2^10−2 = 1022 ≥ 1000; 2^9−2 = 510 < 1000). 10 host bits → /22. Longer prefixes (e.g. /23) give too few hosts."
+          "explanation": "For /24 the network part is the first three numbers: 192.168.1 versus 192.168.2 -- these differ, so the addresses are on different subnets and traffic must go through the router. Matching only the first two numbers is not enough under a /24 mask.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-7.svg"
+        },
+        {
+          "id": "subnetting-carving-mcq-8",
+          "type": "mcq",
+          "prompt": "What is the simple rule for deciding whether two IP addresses are on the same subnet?",
+          "choices": [
+            "Compare their network parts under the same mask; if they match, same subnet",
+            "Check whether their last numbers are equal",
+            "See whether both addresses are even numbers",
+            "Add the four numbers of each and compare the totals"
+          ],
+          "answerIndex": 0,
+          "explanation": "Same-subnet means same network part. Apply the same mask to both and compare the network portions: equal network parts mean the same subnet (direct delivery). The last number is the host part and is expected to differ; sums and even/odd are irrelevant.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-7.svg"
+        },
+        {
+          "id": "subnetting-carving-mcq-9",
+          "type": "mcq",
+          "prompt": "When you split a block into more subnets by borrowing bits, what is the trade-off?",
+          "choices": [
+            "Each subnet holds fewer host addresses",
+            "Each subnet holds more host addresses",
+            "The total number of addresses grows",
+            "There is no trade-off; you get more of everything"
+          ],
+          "answerIndex": 0,
+          "explanation": "The 32 bits are fixed, so bits borrowed for the network are taken away from hosts. More subnets therefore means fewer hosts per subnet. The grand total of addresses never changes -- you are only regrouping them.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-6.svg"
         }
       ]
     },
     {
-      "id": "subnetting-vlsm-aggregation-special",
-      "title": "VLSM, Supernetting, Special Ranges, and Plan Design",
+      "id": "subnetting-vlsm-history",
+      "title": "Different-Sized Subnets, Old Classes, and Combining Blocks",
       "order": 4,
       "difficulty": 4,
-      "content": "**VLSM (Variable-Length Subnet Masking)** drops the equal-size rule: carve a block into subnets of *different* sizes so each fits its host requirement, wasting no addresses. Method: **sort requirements largest-first**, allocate each from the next free address using the smallest prefix that fits, and keep them block-aligned.\n\n**Worked VLSM on 192.168.1.0/24:** Sales 100, Eng 50, Ops 25, plus a router p2p link (2).\n- Sales (100 ≤ 126): /25 → .0–.127 (network .0, bcast .127).\n- Eng (50 ≤ 62): /26 → .128–.191.\n- Ops (25 ≤ 30): /27 → .192–.223.\n- p2p (2): /30 → .224–.227. Plenty of room left (.228–.255).\n\nThe golden rule: **largest first**, or you fragment the space and can't fit the big blocks.\n\n**Supernetting / aggregation** is the inverse — combine contiguous blocks into one shorter prefix. Four contiguous /24s `192.168.4.0`, `.5.0`, `.6.0`, `.7.0` aggregate to `192.168.4.0/22` (they share the top 22 bits; the third octet 4–7 = `000001` + 2 varying bits). Aggregation only works on a power-of-two count of blocks aligned on the right boundary.\n\n**Special ranges to know cold:**\n- **RFC 1918 private:** `10.0.0.0/8`, `172.16.0.0/12` (172.16–172.31), `192.168.0.0/16`. Not routed on the public Internet; NAT bridges them out.\n- **Loopback:** `127.0.0.0/8` (usually 127.0.0.1).\n- **Link-local / APIPA:** `169.254.0.0/16` (self-assigned when DHCP fails — a diagnostic signal).\n- **Multicast:** `224.0.0.0/4` (Class D).\n- **Documentation/TEST-NET, broadcast 255.255.255.255**, etc.\n\nA good addressing plan reserves room for growth, aligns blocks for aggregation, groups by function/VLAN, and documents masks — not just IPs.",
+      "content": "## When subnets need different sizes (VLSM)\n\nReal networks rarely need four equal groups. Sales might need 100 addresses, a small team 25, and a link between two routers just 2. Making everything the same size wastes addresses. **VLSM (Variable-Length Subnet Masking)** just means: give each subnet its own size by using a different `/N` for each, picking the smallest block that still fits its devices.\n\nThe one rule: **place the biggest group first**, then the next biggest, and so on. If you scatter tiny groups first, you can leave the space too broken up to fit a big one later -- like seating large parties in a restaurant before small ones.\n\nA quick worked plan on `192.168.1.0/24`:\n\n- **Sales, ~100 devices** -> a /25 holds 126 usable, so take `.0 - .127`.\n- **Team, ~25 devices** -> a /27 holds 30 usable, so take `.128 - .159`.\n- **Router link, 2 devices** -> a /30 holds 2 usable, so take `.160 - .163`.\n\nEveryone fits, with room to spare -- and no big block was blocked by a small one.\n\n## A bit of history: the old classes\n\nBefore CIDR's flexible `/N`, IPv4 used fixed **classes**. **Class A** networks were huge (millions of hosts), **Class B** medium (about 65,000), and **Class C** small (254). You had to take a whole class, even if it was the wrong size.\n\nThe problem: an organization needing 500 addresses was stuck. A Class C (254) was too small, so they grabbed a Class B (65,000) and wasted tens of thousands. This waste is a big reason the world started running out of IPv4 addresses. **CIDR** (the `/N` system) fixed it by letting the network part be *any* length, so a block can be sized to fit.\n\n## Combining blocks (supernetting)\n\nThe opposite of splitting is **combining** -- also called **supernetting** or **route aggregation**. If four neighboring blocks sit next to each other, a router can describe them with one shorter prefix instead of four.\n\nExample: `192.168.4.0/24`, `192.168.5.0/24`, `192.168.6.0/24`, and `192.168.7.0/24` together become **`192.168.4.0/22`** -- a single block covering all four. Now a router can advertise one route instead of four. Fewer routes to track keeps the internet's giant routing tables manageable -- which was another major reason CIDR replaced the old classes.\n\n## Recap\n\nVLSM sizes each subnet to its need (biggest first) so addresses are not wasted. The old fixed Class A/B/C system wasted huge ranges, so flexible CIDR `/N` replaced it. Supernetting combines neighboring blocks into one shorter prefix to shrink routing tables.",
       "items": [
         {
-          "id": "subnetting-vlsm-fc-1",
-          "type": "flashcard",
-          "front": "What is VLSM and what is the cardinal rule when allocating with it?",
-          "back": "Variable-Length Subnet Masking: subnetting a block into subnets of different sizes, each sized to its host requirement. Cardinal rule: allocate largest requirement first (then descending), block-aligned, to avoid fragmenting the space.",
-          "hint": "Different-size subnets; biggest first."
-        },
-        {
-          "id": "subnetting-vlsm-fc-2",
-          "type": "flashcard",
-          "front": "State the three RFC 1918 private address ranges with prefixes.",
-          "back": "10.0.0.0/8, 172.16.0.0/12 (covers 172.16.0.0–172.31.255.255), and 192.168.0.0/16. These are non-routable on the public Internet and reached via NAT.",
-          "hint": "10/8, 172.16/12, 192.168/16."
-        },
-        {
-          "id": "subnetting-vlsm-fc-3",
-          "type": "flashcard",
-          "front": "What is supernetting/route aggregation, and what must be true to aggregate blocks?",
-          "back": "Combining contiguous subnets into one shorter prefix (e.g. four /24s → one /22). Requires a power-of-two count of contiguous blocks aligned on the correct boundary so they share a common shorter prefix.",
-          "hint": "Inverse of subnetting; power-of-two & aligned."
-        },
-        {
-          "id": "subnetting-vlsm-fc-4",
-          "type": "flashcard",
-          "front": "What does an interface address in 169.254.0.0/16 usually indicate?",
-          "back": "Link-local / APIPA self-assignment: the host failed to obtain an address from DHCP and auto-configured one. It's a diagnostic clue that DHCP (or L2 connectivity to the DHCP server) is broken.",
-          "hint": "DHCP failed."
-        },
-        {
-          "id": "subnetting-vlsm-fc-5",
-          "type": "flashcard",
-          "front": "Give the loopback and multicast IPv4 ranges.",
-          "back": "Loopback = 127.0.0.0/8 (commonly 127.0.0.1). Multicast (old Class D) = 224.0.0.0/4 (224.0.0.0–239.255.255.255).",
-          "hint": "127/8 and 224/4."
-        },
-        {
-          "id": "subnetting-vlsm-fc-6",
-          "type": "flashcard",
-          "front": "Name three properties of a well-designed IPv4 addressing plan.",
-          "back": "Reserve room for growth; align blocks on boundaries that permit future aggregation; group addresses by function/VLAN/site; and document prefixes/masks (not just bare IPs) so the structure is recoverable.",
-          "hint": "Growth, alignment, grouping, documentation."
-        },
-        {
-          "id": "subnetting-vlsm-mcq-1",
+          "id": "subnetting-vlsm-history-mcq-1",
           "type": "mcq",
-          "prompt": "Doing VLSM on 192.168.1.0/24 for needs of 100, 50, 25, and 2 hosts (largest first), what prefix and block does the 50-host subnet get?",
+          "prompt": "What does VLSM (Variable-Length Subnet Masking) let you do?",
           "choices": [
-            "/26, 192.168.1.128–.191",
-            "/25, 192.168.1.0–.127",
-            "/26, 192.168.1.64–.127",
-            "/27, 192.168.1.128–.159"
+            "Give each subnet its own size by using a different /N for each",
+            "Force every subnet to be exactly the same size",
+            "Remove the network part from an address",
+            "Turn an IPv4 address into an IPv6 address"
           ],
           "answerIndex": 0,
-          "explanation": "100 → /25 takes .0–.127 first. Next, 50 ≤ 62 → /26, allocated from .128 → .128–.191. Largest-first keeps everything aligned."
+          "explanation": "VLSM means the subnets can have variable lengths -- a different prefix for each, sized to its need. That is the opposite of forcing one size. It has nothing to do with deleting the network part or converting to IPv6.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-8.svg"
         },
         {
-          "id": "subnetting-vlsm-mcq-2",
+          "id": "subnetting-vlsm-history-mcq-2",
           "type": "mcq",
-          "prompt": "Which single prefix aggregates 10.8.0.0/24, 10.8.1.0/24, 10.8.2.0/24, and 10.8.3.0/24?",
+          "prompt": "When laying out subnets of different sizes with VLSM, which order should you allocate them in?",
           "choices": [
-            "10.8.0.0/22",
-            "10.8.0.0/23",
-            "10.8.0.0/21",
-            "10.8.0.0/24"
+            "Largest group first, then smaller ones",
+            "Smallest group first, then larger ones",
+            "Alphabetical order by department name",
+            "The order does not matter at all"
           ],
           "answerIndex": 0,
-          "explanation": "Four contiguous /24s aligned at .0 share the top 22 bits (third octet 0–3 = 000000xx). They aggregate to 10.8.0.0/22 (2 borrowed bits cover 4 blocks)."
+          "explanation": "Place the largest block first so a big contiguous space is still available for it. Allocating small blocks first can fragment the range so the big block no longer fits. Order definitely matters, and names are irrelevant.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-8.svg"
         },
         {
-          "id": "subnetting-vlsm-mcq-3",
+          "id": "subnetting-vlsm-history-mcq-3",
           "type": "mcq",
-          "prompt": "Is 172.20.300.5 a valid RFC 1918 private address?",
+          "prompt": "A point-to-point link between two routers needs just 2 usable addresses. Which prefix fits best?",
           "choices": [
-            "No — 300 is not a valid octet value at all",
-            "Yes — it falls in 172.16.0.0/12",
-            "No — 172.20 is public",
-            "Yes — it is in 192.168.0.0/16"
+            "/30 (2 usable hosts)",
+            "/24 (254 usable hosts)",
+            "/26 (62 usable hosts)",
+            "/16 (about 65,000 usable hosts)"
           ],
           "answerIndex": 0,
-          "explanation": "An octet cannot exceed 255, so 172.20.300.5 is malformed regardless of range. (Note: 172.20.x.x WOULD be private — 172.16/12 spans 172.16–172.31 — but the address is invalid.)"
+          "explanation": "A /30 has 2 host bits: 2^2 - 2 = 2 usable, exactly enough for a two-router link with nothing wasted. The larger blocks would all work but waste dozens to thousands of addresses -- the whole point of VLSM is to avoid that.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-8.svg"
         },
         {
-          "id": "subnetting-vlsm-mcq-4",
+          "id": "subnetting-vlsm-history-mcq-4",
           "type": "mcq",
-          "prompt": "Why must VLSM allocations be done largest-requirement-first?",
+          "prompt": "Under the old classful system, why was it wasteful for an organization that needed 500 addresses?",
           "choices": [
-            "Routers reject small subnets defined before large ones",
-            "Allocating small blocks first fragments the space so a large contiguous block may no longer fit",
-            "It changes the host-count formula",
-            "Small subnets cannot be aggregated otherwise"
+            "A Class C (254) was too small, so they took a Class B (~65,000) and wasted most of it",
+            "Every organization was forced to take a Class A with millions of addresses",
+            "Classes could only be assigned to governments",
+            "There was no way to connect more than 254 devices, ever"
           ],
-          "answerIndex": 1,
-          "explanation": "If small blocks are scattered through the range first, no aligned contiguous span large enough for a big subnet may remain. Descending order keeps large blocks placeable and the layout aggregatable."
+          "answerIndex": 0,
+          "explanation": "Classes came in fixed sizes. With 500 needed, the 254-host Class C was too small, so the next step up was a 65,000-host Class B -- wasting tens of thousands of addresses. They were not forced into Class A, and 500 devices were certainly possible.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-8.svg"
         },
         {
-          "id": "subnetting-vlsm-mcq-5",
+          "id": "subnetting-vlsm-history-mcq-5",
           "type": "mcq",
-          "prompt": "A laptop shows IP 169.254.13.7/16 with no default gateway. What is the most likely cause?",
+          "prompt": "How did CIDR (the /N system) improve on the old fixed classes?",
           "choices": [
-            "It received a valid public IP and is online",
-            "DHCP failed, so the host self-assigned an APIPA link-local address",
-            "It is on the loopback interface",
-            "It joined a multicast group"
+            "It lets the network part be any length, so a block can be sized to fit the need",
+            "It made every network exactly 256 addresses",
+            "It removed the need for IP addresses entirely",
+            "It doubled the speed of every connection"
           ],
-          "answerIndex": 1,
-          "explanation": "169.254.0.0/16 is the APIPA/link-local range used when DHCP fails. No gateway and a 169.254 address is the textbook signature of a broken DHCP path."
+          "answerIndex": 0,
+          "explanation": "CIDR is 'classless': the prefix /N can be any length, so blocks come in flexible sizes instead of only three fixed ones. This cut the huge waste of the class system. It is about address sizing, not a fixed 256, and not about speed.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-8.svg"
         },
         {
-          "id": "subnetting-vlsm-mcq-6",
+          "id": "subnetting-vlsm-history-mcq-6",
           "type": "mcq",
-          "prompt": "From a /22 you must serve departments of 500, 200, 100, and 60 hosts via VLSM. What prefix fits the 200-host department, and is the total feasible?",
+          "prompt": "What is supernetting (route aggregation)?",
           "choices": [
-            "/24 for 200; not feasible — exceeds the /22",
-            "/24 for 200; feasible — /23 + /24 + /25 + /26 fit inside a /22",
-            "/25 for 200; feasible",
-            "/23 for 200; not feasible"
+            "Combining several neighboring blocks into one shorter prefix",
+            "Splitting one block into many tiny subnets",
+            "Encrypting the traffic between two routers",
+            "Assigning two IP addresses to the same device"
           ],
-          "answerIndex": 1,
-          "explanation": "500 → /23 (510 hosts), 200 → /24 (254), 100 → /25 (126), 60 → /26 (62). Sizes 512+256+128+64 = 960 ≤ 1024 addresses in a /22, and they pack contiguously — feasible."
+          "answerIndex": 0,
+          "explanation": "Supernetting is the opposite of subnetting: merge contiguous blocks into a single shorter prefix so one route covers them all. Splitting a block is subnetting; encryption and dual addresses are unrelated topics.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-8.svg"
         },
         {
-          "id": "subnetting-vlsm-mcq-7",
+          "id": "subnetting-vlsm-history-mcq-7",
           "type": "mcq",
-          "prompt": "Which range is multicast (former Class D)?",
+          "prompt": "The four blocks 192.168.4.0/24, 192.168.5.0/24, 192.168.6.0/24, and 192.168.7.0/24 combine into which single block?",
           "choices": [
-            "240.0.0.0/4",
-            "224.0.0.0/4",
-            "192.0.2.0/24",
-            "169.254.0.0/16"
+            "192.168.4.0/22",
+            "192.168.4.0/23",
+            "192.168.4.0/26",
+            "192.168.0.0/16"
           ],
-          "answerIndex": 1,
-          "explanation": "224.0.0.0/4 (224.0.0.0–239.255.255.255) is multicast. 240.0.0.0/4 is reserved (former Class E); 192.0.2.0/24 is TEST-NET documentation; 169.254/16 is link-local."
+          "answerIndex": 0,
+          "explanation": "Four neighboring /24s combine by borrowing 2 bits back (2^2 = 4), shortening /24 to /22: 192.168.4.0/22 covers .4 through .7. A /23 would only combine two /24s, and /26 is smaller, not larger.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-8.svg"
+        },
+        {
+          "id": "subnetting-vlsm-history-mcq-8",
+          "type": "mcq",
+          "prompt": "Why is supernetting useful for the internet's core routers?",
+          "choices": [
+            "Fewer, shorter routes mean smaller routing tables to track",
+            "It makes individual web pages load at higher resolution",
+            "It hides the true source of every packet",
+            "It gives each home user a public Class A network"
+          ],
+          "answerIndex": 0,
+          "explanation": "Advertising one /22 instead of four /24s means routers store and process fewer routes, keeping the global routing tables manageable -- a key reason CIDR was adopted. It is about route count, not image quality, privacy, or handing out giant networks.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-8.svg"
+        },
+        {
+          "id": "subnetting-vlsm-history-mcq-9",
+          "type": "mcq",
+          "prompt": "In the VLSM plan on 192.168.1.0/24, Sales needs ~100 addresses. A /25 gives 126 usable. Why pick /25 rather than a /24 for Sales?",
+          "choices": [
+            "A /25 (126 usable) already covers 100, leaving the rest of the /24 free for other groups",
+            "A /25 is faster than a /24",
+            "A /24 cannot hold 100 devices",
+            "A /25 is the only size that exists"
+          ],
+          "answerIndex": 0,
+          "explanation": "A /25 fits the 100 devices (126 usable) while using only half the /24, so the other half is left for the team and the router link. Taking the whole /24 for Sales would waste the space other groups need. Prefix size is not about speed.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/subnetting-8.svg"
         }
       ]
     }
