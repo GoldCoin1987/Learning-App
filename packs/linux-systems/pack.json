@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "id": "linux-systems",
   "title": "Linux Systems",
-  "version": "1.15.0",
+  "version": "1.16.0",
   "description": "Linux from scratch (beginner rework in progress): 19 sub-topics from the shell through systemd, the kernel, containers, storage, networking, and embedded Linux. Beginner-first readings, code, and diagrams; tiered easy to hard.",
   "requires": [],
   "tags": [
@@ -10414,361 +10414,649 @@
       "lessons": [
         {
           "id": "linux-networking-linux-networking-1",
-          "title": "Inspecting the Stack with iproute2 and ss",
+          "title": "Seeing Your Network: Your Address, Your Way Out, and a Reachability Test",
           "order": 1,
           "difficulty": 1,
-          "content": "Forget `ifconfig`, `route`, and `netstat` — they are deprecated, often not even installed on modern distros, and they hide things (e.g. multiple IPs per interface, policy routing). The `iproute2` suite is the single front door to the kernel's networking, and `ss` replaces `netstat` for sockets. Learn these four verbs reflexively.\n\n```bash\nip addr show          # IPs per interface (alias: ip a)\nip -br addr           # brief, one line per iface\nip link show          # L2 devices, MAC, MTU, up/down state\nip route show         # the routing table (default gw, subnets)\nip neigh show         # the ARP/ND cache (L2<->L3 mappings)\n```\n\nFor sockets and who owns them, `ss` is faster than `netstat` because it reads kernel structures directly:\n\n```bash\nss -tulpn             # TCP+UDP, listening, numeric, with PID/program\nss -tp state established   # active TCP connections + process\nlsof -i :8080         # which process holds port 8080\nlsof -i -nP           # all network files, no name/port resolution\n```\n\nThe mental model: `ip link` is layer 2 (the wire/MAC), `ip addr` is layer 3 (IP), `ip route` decides where a packet goes, and `ip neigh` is the cache that turns the next-hop IP into a MAC. `ss`/`lsof` answer \"what is talking, and which process is it.\" Coming from radar, this is your signal chain made inspectable: link state, address assignment, routing decision, and the active connections all visible from the command line.",
+          "content": "**Hook.** When your phone joins Wi-Fi, there's a settings screen showing your network name, your IP address, and the router. Linux has the same information, but you ask for it by typing commands. Three questions cover almost everything a beginner needs at first: *What is my address? Which way do I get out? Can I actually reach that other machine?*\n\n**Build.** First, some plain words. A **network** is just machines that can talk to each other. An **IP address** is the number that identifies one machine on a network, the way a street address identifies one house (for example `192.168.1.42`). An **interface** is one network connection on your machine, usually a card or chip; common names are `eth0` (a wired connection) and `wlan0` (Wi-Fi). The **gateway** (also called the *default route*) is the device, normally your home router, that passes your traffic onward when you want to reach anything outside your own local network. Picture a building: your office has a room number (your IP), and the mailroom by the exit (the gateway) is where anything addressed to the outside world goes.\n\nThe one command for addresses and routes is `ip`. Ask it what your address is, and which way out it uses:\n\n```bash\nip addr show     # your interfaces and their IP addresses (short form: ip a)\nip route show    # your routes, including the default gateway\n```\n\nIn `ip addr`, the line starting `inet` shows your IP address. In `ip route`, the line starting `default via` shows your gateway. That's your address and your way out.\n\nNow, *can you reach a machine?* The classic test is `ping`. It sends a tiny \"are you there?\" message and waits for the echo back, timing the round trip:\n\n```bash\nping -c3 8.8.8.8     # send 3 probes to a host, then stop\n```\n\nIf replies come back, the host is **reachable**. If nothing comes back, it is unreachable: it may be off, the address may be wrong, or something in between may be blocking you. The `-c3` just means \"send three and stop\" so it doesn't run forever.\n\nOne note for later: the modern command is `ip` (from a toolkit called *iproute2*). You may see an older command called `ifconfig` in old tutorials; it is outdated and often not even installed now. Reach for `ip`. The deep theory of *how* addresses and packets work (TCP/IP and the rest) lives in the separate Networking topic; here we just learn the Linux tools to see and control it.\n\n**Recap.** `ip addr` shows your address, `ip route` shows your gateway (your way out), and `ping` tests whether you can reach another machine. Three commands, three everyday questions answered.",
           "items": [
-            {
-              "id": "linux-networking-1-fc-1",
-              "type": "flashcard",
-              "front": "Which modern command replaces all of `ifconfig`, `route`, and `arp`?",
-              "back": "The `ip` command from the `iproute2` suite: `ip addr` (was ifconfig), `ip route` (was route), `ip neigh` (was arp). `ifconfig`/`route`/`netstat` are deprecated and may be absent.",
-              "hint": "One binary, several subcommands."
-            },
-            {
-              "id": "linux-networking-1-fc-2",
-              "type": "flashcard",
-              "front": "What does `ss -tulpn` show, and why prefer it over `netstat`?",
-              "back": "TCP+UDP listening sockets, numeric addresses/ports, and the owning PID/program. `ss` reads kernel socket structures directly so it is faster and the modern replacement for `netstat`.",
-              "hint": "t=tcp, u=udp, l=listening, p=process, n=numeric."
-            },
-            {
-              "id": "linux-networking-1-fc-3",
-              "type": "flashcard",
-              "front": "What lives in `ip neigh`?",
-              "back": "The neighbor cache: IPv4 ARP and IPv6 NDP entries mapping next-hop IP addresses to MAC addresses on the local link — the L3-to-L2 lookup table.",
-              "hint": "It's the modern `arp -n`."
-            },
-            {
-              "id": "linux-networking-1-fc-4",
-              "type": "flashcard",
-              "front": "Which `ip` subcommand operates at layer 2 versus layer 3?",
-              "back": "`ip link` = layer 2 (device state, MAC, MTU). `ip addr` = layer 3 (IP address assignment). One interface can hold several addresses, which `ifconfig` hid.",
-              "hint": "link = wire, addr = IP."
-            },
-            {
-              "id": "linux-networking-1-fc-5",
-              "type": "flashcard",
-              "front": "How do you find which process is listening on TCP port 8080?",
-              "back": "`ss -tlpn 'sport = :8080'` or `lsof -i :8080`. Both map the socket to a PID/program; use `-nP` on lsof to skip name/port resolution.",
-              "hint": "ss with a filter, or lsof -i."
-            },
             {
               "id": "linux-networking-1-mcq-1",
               "type": "mcq",
-              "prompt": "You run `ifconfig` on a fresh Debian/Ubuntu container and get 'command not found.' What is the correct response?",
+              "prompt": "Which command shows your machine's own IP address?",
               "choices": [
-                "Install net-tools; ifconfig is the standard tool",
-                "Use `ip addr` / `ip link` — ifconfig is deprecated and net-tools is often not installed",
-                "The network stack is broken and must be reconfigured",
-                "Reboot, since networking failed to initialize"
+                "ip route show",
+                "ip addr show",
+                "ping 8.8.8.8",
+                "ss -tulpn"
               ],
               "answerIndex": 1,
-              "explanation": "`ifconfig` ships in the legacy `net-tools` package, which is deprecated and increasingly absent from minimal images. The supported tool is `ip` from iproute2; reach for it reflexively instead of reinstalling old tools."
+              "explanation": "`ip addr show` lists your interfaces and the IP addresses assigned to them (look for the line starting `inet`). `ip route show` tells you the way out (the gateway), `ping` tests reachability, and `ss` shows connections and listening ports -- none of those is where you read your own address.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/linux-networking-2.svg"
             },
             {
               "id": "linux-networking-1-mcq-2",
               "type": "mcq",
-              "prompt": "Which command shows the default gateway the kernel will use for off-subnet traffic?",
+              "prompt": "What is the gateway (the \"default route\") on a typical home machine?",
               "choices": [
-                "ip addr show",
-                "ip link show",
-                "ip route show",
-                "ip neigh show"
+                "The website you are currently visiting",
+                "Your own machine's IP address",
+                "The router that forwards your traffic toward anything outside your local network",
+                "The DNS server that turns names into numbers"
               ],
               "answerIndex": 2,
-              "explanation": "`ip route show` prints the routing table, including the `default via <gw>` entry. `addr` shows IPs, `link` shows L2 device state, and `neigh` shows the ARP/ND cache."
+              "explanation": "The gateway is the device (usually your home router) that your machine hands off traffic to when the destination is not on your own local network -- like the mailroom by the building exit. It is not your own address, not the remote website, and not the name-lookup service (that is DNS, covered later)."
             },
             {
               "id": "linux-networking-1-mcq-3",
               "type": "mcq",
-              "prompt": "Why can `ip addr` show information that `ifconfig` simply could not?",
+              "prompt": "You want to check whether a server is reachable from your machine. Which command is the simple first test?",
               "choices": [
-                "ifconfig could not display IPv6 at all under any circumstances",
-                "ifconfig assumed one primary IP per interface and hid additional addresses and policy details",
-                "ifconfig required root while ip does not",
-                "ip queries a different kernel than ifconfig"
+                "ping",
+                "ip link",
+                "ip addr",
+                "nft list ruleset"
+              ],
+              "answerIndex": 0,
+              "explanation": "`ping` sends a small \"are you there?\" probe and waits for the echo reply, which is the quickest way to ask \"can I reach this host?\" `ip link` and `ip addr` describe your own machine, and `nft list ruleset` shows firewall rules -- none of those tests reachability to a remote host."
+            },
+            {
+              "id": "linux-networking-1-mcq-4",
+              "type": "mcq",
+              "prompt": "In the output of `ip addr show`, which part is your machine's IP address?",
+              "choices": [
+                "The interface name, like eth0",
+                "The value after `inet`, like 192.168.1.42",
+                "The value after `link/ether`, like a4:5e:60:1b:cc:01",
+                "The word UP"
               ],
               "answerIndex": 1,
-              "explanation": "The legacy ifconfig model assumed a single primary address per interface and could not cleanly represent multiple addresses, scopes, and modern policy routing — a key reason iproute2 superseded it."
+              "explanation": "The IP address appears on the line beginning with `inet` (for example `inet 192.168.1.42/24`). `eth0` is the interface name, `link/ether ...` is the hardware (MAC) address, and `UP` just means the interface is active."
+            },
+            {
+              "id": "linux-networking-1-mcq-5",
+              "type": "mcq",
+              "prompt": "An IP address is best described as which of the following?",
+              "choices": [
+                "The brand name of the network card",
+                "A number that identifies one machine on a network, like a house's street address",
+                "The password needed to join the Wi-Fi",
+                "The speed of the connection in megabits per second"
+              ],
+              "answerIndex": 1,
+              "explanation": "An IP address identifies one machine on a network so traffic can find it, just as a street address identifies one house. It is not the hardware brand, not a Wi-Fi password, and not a measure of speed."
+            },
+            {
+              "id": "linux-networking-1-mcq-6",
+              "type": "mcq",
+              "prompt": "You ran `ping -c3 example.com` and got zero replies. Which conclusion is reasonable?",
+              "choices": [
+                "The host is definitely powered on and healthy",
+                "Your own network card has been physically removed",
+                "The host may be down, the address may be wrong, or something may be blocking the probes",
+                "Your IP address must have changed to a public one"
+              ],
+              "answerIndex": 2,
+              "explanation": "No replies means \"not reachable right now,\" but ping cannot tell you exactly why: the target could be off, the name/address could be wrong, or a firewall in between could be dropping the probes. It does not prove the host is healthy, and it says nothing about your card being removed or your address changing."
+            },
+            {
+              "id": "linux-networking-1-mcq-7",
+              "type": "mcq",
+              "prompt": "You see `ifconfig` in an old tutorial, but it is missing on your fresh Linux system. What is the modern thing to do?",
+              "choices": [
+                "Conclude the network is broken and reinstall the operating system",
+                "Use `ip` (the iproute2 tool), which is the modern replacement for the deprecated ifconfig",
+                "Reboot repeatedly until ifconfig appears",
+                "Edit the kernel to add ifconfig back"
+              ],
+              "answerIndex": 1,
+              "explanation": "`ifconfig` is the old, deprecated tool and is often not installed anymore; the modern command is `ip` from the iproute2 toolkit (`ip addr`, `ip route`, and so on). Nothing is broken -- you just reach for the current tool instead of the legacy one."
+            },
+            {
+              "id": "linux-networking-1-mcq-8",
+              "type": "mcq",
+              "prompt": "What does the `-c3` option do in `ping -c3 8.8.8.8`?",
+              "choices": [
+                "It makes ping send 3 probes and then stop, instead of running forever",
+                "It connects on port 3",
+                "It waits 3 minutes before starting",
+                "It pings 3 different hosts at once"
+              ],
+              "answerIndex": 0,
+              "explanation": "`-c3` means \"count = 3\": send three probes and then exit. Without a count, ping keeps going until you stop it. It is not a port number, not a delay, and not a way to target multiple hosts."
+            },
+            {
+              "id": "linux-networking-1-mcq-9",
+              "type": "mcq",
+              "prompt": "An interface named `wlan0` most likely represents what?",
+              "choices": [
+                "A Wi-Fi (wireless) connection",
+                "A wired Ethernet cable",
+                "The firewall ruleset",
+                "The DNS resolver"
+              ],
+              "answerIndex": 0,
+              "explanation": "Interface names hint at the connection type: `wlan0` is a wireless (Wi-Fi) interface, while `eth0` is typically a wired Ethernet connection. Interfaces are network connections, not firewall rules or name-lookup services."
             }
           ]
         },
         {
           "id": "linux-networking-linux-networking-2",
-          "title": "Configuration Layers and the DNS Resolution Path",
+          "title": "Connections and Ports: What Is Listening, What Is Connected",
           "order": 2,
           "difficulty": 2,
-          "content": "`ip` commands are runtime and vanish on reboot. Persistent configuration is owned by one of several competing managers — know which one your box uses before editing files by hand:\n\n- **NetworkManager** (`nmcli`): desktops, laptops, many servers (RHEL family).\n- **systemd-networkd** (`networkctl`, `/etc/systemd/network/*.network`): minimal/server/container hosts.\n- **netplan** (`/etc/netplan/*.yaml`, `netplan apply`): Ubuntu's YAML front end that renders to networkd or NetworkManager.\n\n```bash\nnmcli device status            # NetworkManager view\nnetworkctl list                # systemd-networkd view\nnetplan get                    # Ubuntu's merged config\n```\n\nThe **DNS resolution path** is a separate, layered question — a name lookup walks `/etc/nsswitch.conf` (the `hosts:` line picks order, e.g. `files dns`), then `/etc/hosts` (static overrides), then the resolver in `/etc/resolv.conf`. On systemd-resolved hosts, `/etc/resolv.conf` is a symlink to a stub (`127.0.0.53`); query the real state with `resolvectl`:\n\n```bash\nresolvectl status              # per-link DNS servers + DNSSEC\nresolvectl query example.com   # use the system resolver path\ngetent hosts example.com       # honors nsswitch, not just DNS\n```\n\nThe trap: editing `/etc/resolv.conf` directly when it is a managed symlink — your change gets overwritten. Find the owning layer first. `getent hosts` is the honest test because it follows `nsswitch` exactly the way real programs do, whereas `dig`/`nslookup` talk straight to a DNS server and skip `/etc/hosts`.",
+          "content": "**Hook.** Your machine isn't just sitting there with one address. At any moment some programs are *waiting* for visitors (a web server waiting for browsers), and some are *in the middle of a conversation* with another machine (your browser talking to a website). The tool that shows both is `ss`. It answers two questions: *what is listening here?* and *what am I connected to right now?*\n\n**Build.** First, two plain words. A **port** is a numbered slot on a machine that picks which service a connection is for. One machine, one IP address, but many ports, so different services don't collide. Think of the IP address as a building and ports as numbered doors: door 22 is the secure-login service (SSH), door 80 is a plain web server, door 443 is a secure web server. A **socket** is just one endpoint of a network conversation, identified by an address and a port.\n\nA program that is **listening** has opened a door and is waiting for someone to connect, like a shop with its door propped open during business hours. A connection that is **established** is a conversation already in progress, like a phone call already connected.\n\nThe command is `ss` (think \"socket statistics\"). The handful of letters you'll use most:\n\n```bash\nss -ltn                    # listening (l), TCP (t), numeric (n): open doors\nss -tn state established   # conversations currently in progress\nss -tulpn                  # the everyday combo (see below)\n```\n\nThat last one is worth memorizing: `t` = TCP, `u` = UDP, `l` = listening, `p` = show the program that owns each socket, `n` = numeric (don't slow down translating numbers to names). So `ss -tulpn` means \"show me every listening TCP and UDP door, and tell me which program is behind each one.\" That last part is the key to a common task: *something is using a port, what is it?* A close relative does the same job from the program's side:\n\n```bash\nlsof -i :8080     # which program is using port 8080 (lsof = list open files)\n```\n\nLinux treats a network socket as a kind of open file, which is why a tool named \"list open files\" can answer network questions.\n\nOne note: `ss` is the modern replacement for an older command called `netstat`. If you see `netstat` in old guides, `ss` does the same job and is what's installed today.\n\n**Recap.** A port is a numbered door; *listening* means a program is waiting at one, *established* means a conversation is in progress. `ss -tulpn` shows what's listening and which program owns it; `lsof -i :PORT` finds the program on a given port. `ss` is today's tool, replacing `netstat`.",
           "items": [
-            {
-              "id": "linux-networking-2-fc-1",
-              "type": "flashcard",
-              "front": "Name the three competing modern network configuration layers and their CLIs.",
-              "back": "NetworkManager (`nmcli`), systemd-networkd (`networkctl`, .network files), and netplan (Ubuntu YAML, `netplan apply`) which renders to one of the other two.",
-              "hint": "Desktop, server/minimal, and Ubuntu's YAML wrapper."
-            },
-            {
-              "id": "linux-networking-2-fc-2",
-              "type": "flashcard",
-              "front": "What does `/etc/nsswitch.conf` control for name lookups?",
-              "back": "The source order for resolution. The `hosts:` line (e.g. `files dns`) tells glibc to check `/etc/hosts` first, then DNS — so it governs whether static entries win over the resolver.",
-              "hint": "Name Service Switch — ordering of sources."
-            },
-            {
-              "id": "linux-networking-2-fc-3",
-              "type": "flashcard",
-              "front": "On a systemd-resolved system, what is `/etc/resolv.conf` typically?",
-              "back": "A symlink to a stub file pointing at the local resolver `127.0.0.53`. Editing it directly is futile — it is regenerated. Use `resolvectl` to inspect/configure real per-link DNS.",
-              "hint": "127.0.0.53 stub listener."
-            },
-            {
-              "id": "linux-networking-2-fc-4",
-              "type": "flashcard",
-              "front": "Why use `getent hosts <name>` instead of `dig` to debug resolution?",
-              "back": "`getent hosts` follows `/etc/nsswitch.conf` exactly like real applications (files then DNS), so it reflects what programs actually see. `dig`/`nslookup` query a DNS server directly and ignore `/etc/hosts`.",
-              "hint": "Honors nsswitch and /etc/hosts."
-            },
-            {
-              "id": "linux-networking-2-fc-5",
-              "type": "flashcard",
-              "front": "Why is editing `/etc/resolv.conf` by hand often a mistake?",
-              "back": "It is frequently a managed symlink or auto-generated by systemd-resolved, NetworkManager, or DHCP, so manual edits get overwritten. Configure DNS at the owning layer instead.",
-              "hint": "Find who owns the file first."
-            },
             {
               "id": "linux-networking-2-mcq-1",
               "type": "mcq",
-              "prompt": "On Ubuntu, you edit `/etc/netplan/01-netcfg.yaml`. What makes the change take effect?",
+              "prompt": "What is a network port, in plain terms?",
               "choices": [
-                "Rebooting is the only way",
-                "`netplan apply`, which renders the YAML to the active backend (networkd or NetworkManager)",
-                "`systemctl restart resolv.conf`",
-                "`ip addr add`, since netplan is read-only"
+                "The physical socket where the Ethernet cable plugs in",
+                "A numbered slot on a machine that selects which service a connection is for",
+                "Another name for the machine's IP address",
+                "The speed of the link in megabits per second"
               ],
               "answerIndex": 1,
-              "explanation": "netplan is a declarative front end. `netplan apply` generates the backend config (systemd-networkd or NetworkManager) and reloads it. No reboot is needed."
+              "explanation": "A port is a number that distinguishes services on the same machine, like numbered doors on one building (22 = SSH, 80 = web). It is not the physical cable jack, not the IP address itself, and not a measure of speed.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/linux-networking-4.svg"
             },
             {
               "id": "linux-networking-2-mcq-2",
               "type": "mcq",
-              "prompt": "A name in `/etc/hosts` resolves but `dig` returns NXDOMAIN. Why?",
+              "prompt": "A socket is in the LISTEN state. What does that mean?",
               "choices": [
-                "`/etc/hosts` is corrupt",
-                "dig queries DNS directly and bypasses nsswitch/`/etc/hosts`",
-                "DNSSEC validation failed",
-                "The resolver cache is stale"
+                "A program has opened that port and is waiting for someone to connect",
+                "A conversation with a remote machine is already in progress",
+                "The port has been permanently blocked by the firewall",
+                "The machine is downloading a file from that port"
               ],
-              "answerIndex": 1,
-              "explanation": "`dig` talks straight to a DNS server and does not consult `/etc/hosts` or nsswitch. Static host entries only show up through the glibc resolver path — use `getent hosts` to see them."
+              "answerIndex": 0,
+              "explanation": "LISTEN means a program has a door open and is waiting to ACCEPT new connections on that port, like a shop open for business. An in-progress conversation is the ESTABLISHED state, and blocking is a firewall matter, not a socket state."
             },
             {
               "id": "linux-networking-2-mcq-3",
               "type": "mcq",
-              "prompt": "Which tool shows per-link DNS servers and DNSSEC status on a systemd-resolved host?",
+              "prompt": "Which command lists what is listening AND tells you the program behind each socket?",
               "choices": [
-                "cat /etc/resolv.conf",
-                "resolvectl status",
-                "ip neigh show",
-                "nmcli device status"
+                "ip route show",
+                "ping -c3 localhost",
+                "ss -tulpn",
+                "ip addr show"
+              ],
+              "answerIndex": 2,
+              "explanation": "`ss -tulpn` shows listening TCP and UDP sockets (`t u l`), as numbers (`n`), with the owning program (`p`). `ip route` shows your gateway, `ping` tests reachability, and `ip addr` shows your address -- none of them lists listening sockets and their programs."
+            },
+            {
+              "id": "linux-networking-2-mcq-4",
+              "type": "mcq",
+              "prompt": "In `ss -tulpn`, what does the `p` stand for?",
+              "choices": [
+                "ping the socket",
+                "show the program (process) that owns each socket",
+                "use the proxy",
+                "show only private addresses"
               ],
               "answerIndex": 1,
-              "explanation": "`resolvectl status` reports the actual resolver state systemd-resolved is using per interface, including DNS servers and DNSSEC mode. The stub `/etc/resolv.conf` only shows 127.0.0.53."
+              "explanation": "`p` asks ss to show the process/program owning each socket -- exactly what you need to answer \"what is using this port?\" The other letters are `t` (TCP), `u` (UDP), `l` (listening), and `n` (numeric). It has nothing to do with pinging, proxies, or address privacy."
+            },
+            {
+              "id": "linux-networking-2-mcq-5",
+              "type": "mcq",
+              "prompt": "You need to know which program is using port 8080. Which command answers that directly?",
+              "choices": [
+                "lsof -i :8080",
+                "ip link show",
+                "ping 8080",
+                "ip route get 8080"
+              ],
+              "answerIndex": 0,
+              "explanation": "`lsof -i :8080` lists the program holding port 8080 (lsof = list open files, and Linux treats a socket as an open file). `ip link` shows interface state, `ping` needs a host not a bare port, and `ip route get` expects an address -- none identifies the program on a port."
+            },
+            {
+              "id": "linux-networking-2-mcq-6",
+              "type": "mcq",
+              "prompt": "Why can a tool called `lsof` (\"list open files\") answer questions about network connections?",
+              "choices": [
+                "Because Linux treats a network socket as a kind of open file",
+                "Because lsof secretly runs ss underneath",
+                "Because every connection writes a log file to disk",
+                "Because files and ports are the same number"
+              ],
+              "answerIndex": 0,
+              "explanation": "In Linux a network socket is represented as an open file held by a process, so a file-listing tool can report on sockets too (the `-i` option filters to network ones). It does not require ss, does not depend on disk log files, and files and ports are unrelated numbers."
+            },
+            {
+              "id": "linux-networking-2-mcq-7",
+              "type": "mcq",
+              "prompt": "Which command is the modern replacement for the older `netstat`?",
+              "choices": [
+                "ifconfig",
+                "ss",
+                "route",
+                "arp"
+              ],
+              "answerIndex": 1,
+              "explanation": "`ss` replaces `netstat` for viewing sockets and connections and is what ships on current systems. `ifconfig`, `route`, and `arp` are the older address/route/neighbor tools (now handled by the `ip` command), not socket viewers."
+            },
+            {
+              "id": "linux-networking-2-mcq-8",
+              "type": "mcq",
+              "prompt": "A socket shows the ESTABLISHED state with a peer address of 140.82.112.3:443. What does this tell you?",
+              "choices": [
+                "Your machine is waiting for someone to connect on port 443",
+                "Your machine has an active conversation in progress with that remote peer",
+                "Port 443 is blocked by the firewall",
+                "The remote machine is down"
+              ],
+              "answerIndex": 1,
+              "explanation": "ESTABLISHED means an active connection is currently in progress between you and that peer (here, a secure web server on port 443). Waiting for connections is the LISTEN state, and an established connection is the opposite of blocked or down."
+            },
+            {
+              "id": "linux-networking-2-mcq-9",
+              "type": "mcq",
+              "prompt": "In the everyday picture used here, an IP address is the building and a port is the...",
+              "choices": [
+                "numbered door that selects which service you reach",
+                "color of the building",
+                "street the building sits on",
+                "key to the front gate"
+              ],
+              "answerIndex": 0,
+              "explanation": "The analogy is: one IP address (the building) with many numbered ports (doors), each leading to a different service. Ports are not a street (that is more like the network) or a key, and they are certainly not a color."
             }
           ]
         },
         {
           "id": "linux-networking-linux-networking-3",
-          "title": "Network Namespaces and veth Pairs — the Container Primitive",
+          "title": "Names to Numbers: How Linux Resolves a Hostname",
           "order": 3,
           "difficulty": 2,
-          "content": "A **network namespace** is an isolated copy of the entire network stack: its own interfaces, routing table, ARP/ND cache, and firewall rules. This is the kernel mechanism containers use — a Docker/Podman container is (in part) just a process living in its own netns. A **veth pair** is a virtual cable: two linked interfaces where a packet entering one end exits the other. Put one end in each namespace and you have wired them together.\n\n```bash\nip netns add red\nip netns add blue\nip link add veth-r type veth peer name veth-b\nip link set veth-r netns red\nip link set veth-b netns blue\n# configure each end inside its namespace\nip -n red  addr add 10.0.0.1/24 dev veth-r\nip -n blue addr add 10.0.0.2/24 dev veth-b\nip -n red  link set veth-r up\nip -n blue link set veth-b up\nip netns exec red ping -c1 10.0.0.2   # ping across the pair\n```\n\n`ip -n red ...` is shorthand for `ip netns exec red ip ...`. To connect more than two namespaces, replace the point-to-point cable with a **Linux bridge** (`ip link add br0 type bridge`) and attach each veth's host end to it — which is exactly the `docker0` bridge model. This single exercise is the from-scratch version of container networking: namespaces for isolation, veth pairs for connectivity, a bridge for the shared LAN, and (next lesson) NAT to reach the outside. Build it once by hand and container networking stops being magic.",
+          "content": "**Hook.** You type `example.com`, but the network only understands numbers like `93.184.216.34`. Something has to turn the friendly name into the number. That lookup is called **name resolution** (or just **DNS**), and on Linux it follows a specific path through a couple of files. Knowing that path is the difference between fixing a \"can't find the server\" problem and guessing.\n\n**Build.** **DNS** stands for *Domain Name System*: the internet's phone book that maps names to IP addresses. When a program needs the number for a name, Linux checks sources in order:\n\n1. **`/etc/hosts`** — a small local file you can edit, listing name-to-IP entries by hand. Like a personal speed-dial list you check before the public phone book. An entry looks like `93.184.216.34  example.com`. This is handy for testing or for naming machines on your own network.\n2. **A DNS server** — if the name isn't in that local file, Linux asks a DNS server (the public phone book) over the network. Which server to ask is configured in **`/etc/resolv.conf`** (a `nameserver` line gives the server's IP).\n\nSo the friendly mental model is: *check my personal list first, then call the phone book.* The order itself is set in a file called `/etc/nsswitch.conf`, on its `hosts:` line (commonly `files dns`, meaning files first, then DNS) — you rarely change it, but that's where the order lives.\n\nTo test resolution the honest way — the same way normal programs do, including the `/etc/hosts` shortcut — use `getent`:\n\n```bash\ngetent hosts example.com    # follows the real path: /etc/hosts then DNS\n```\n\nThere are also dedicated DNS query tools, `dig` and `nslookup`:\n\n```bash\ndig example.com             # asks a DNS server directly\n```\n\nHere's the catch that trips beginners: `dig` talks straight to a DNS server and **skips `/etc/hosts`**. So a name you added to `/etc/hosts` will work in your browser but appear \"missing\" in `dig`. That's not a bug — `dig` is only testing the DNS-server step. Use `getent hosts` when you want to see what your programs actually see.\n\nOne modern wrinkle: many systems run a small local helper called *systemd-resolved*, and there `/etc/resolv.conf` is a managed file pointing at a local address (`127.0.0.53`). On those systems you inspect the real settings with `resolvectl status`. The point for now: don't be surprised if `/etc/resolv.conf` looks indirect.\n\n**Recap.** A name is turned into a number by checking `/etc/hosts` first, then asking a DNS server listed in `/etc/resolv.conf`. Test the real path with `getent hosts`; remember `dig` queries DNS directly and ignores `/etc/hosts`.",
           "items": [
-            {
-              "id": "linux-networking-3-fc-1",
-              "type": "flashcard",
-              "front": "What does a Linux network namespace isolate?",
-              "back": "An entire independent network stack: its own interfaces, routing table, neighbor (ARP/ND) cache, and netfilter/firewall rules. It is the kernel primitive behind container networking.",
-              "hint": "A private copy of the whole stack."
-            },
-            {
-              "id": "linux-networking-3-fc-2",
-              "type": "flashcard",
-              "front": "What is a veth pair and how does it behave?",
-              "back": "A virtual Ethernet cable: two linked interfaces created together where a frame sent into one end emerges from the other. Used to connect a namespace (container) to the host or a bridge.",
-              "hint": "Created in pairs; a virtual patch cable."
-            },
-            {
-              "id": "linux-networking-3-fc-3",
-              "type": "flashcard",
-              "front": "What does `ip -n red <cmd>` do?",
-              "back": "Runs the `ip` command inside the `red` network namespace — shorthand for `ip netns exec red ip <cmd>`. Lets you configure/inspect a namespace's stack from the host.",
-              "hint": "-n is short for netns exec."
-            },
-            {
-              "id": "linux-networking-3-fc-4",
-              "type": "flashcard",
-              "front": "How is a Docker/Podman container related to network namespaces and veth?",
-              "back": "Each container runs in its own network namespace; one end of a veth pair lives inside it and the other attaches to a host bridge (e.g. docker0). That is the actual container networking model.",
-              "hint": "netns + veth + bridge = docker0."
-            },
-            {
-              "id": "linux-networking-3-fc-5",
-              "type": "flashcard",
-              "front": "How do you connect three or more namespaces on one shared LAN?",
-              "back": "Create a Linux bridge (`ip link add br0 type bridge`) and attach the host end of each namespace's veth to it. The bridge acts as a virtual switch — the docker0 pattern.",
-              "hint": "Replace the cable with a virtual switch."
-            },
-            {
-              "id": "linux-networking-3-fc-6",
-              "type": "flashcard",
-              "front": "How do you run a command, like ping, inside a network namespace called red?",
-              "back": "`ip netns exec red ping -c1 10.0.0.2`. `ip netns exec <name> <cmd>` enters the namespace and runs the command with that isolated stack.",
-              "hint": "ip netns exec <name> <cmd>",
-              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/linux-networking-1.svg"
-            },
             {
               "id": "linux-networking-3-mcq-1",
               "type": "mcq",
-              "prompt": "You create a veth pair and put each end in a separate namespace but ping fails. Most likely cause?",
+              "prompt": "What does DNS do?",
               "choices": [
-                "veth pairs cannot cross namespaces",
-                "The interfaces are still DOWN and/or have no IP assigned in their namespace",
-                "Namespaces block ICMP by default and cannot be changed",
-                "You must reboot to register a new veth"
+                "Encrypts your network traffic",
+                "Maps friendly names (like example.com) to IP addresses",
+                "Decides which port a service listens on",
+                "Forwards packets between two networks"
               ],
               "answerIndex": 1,
-              "explanation": "Moving a veth end into a namespace does not bring it up or address it. You must `ip ... addr add` and `ip ... link set <dev> up` inside each namespace (and bring up `lo` if needed) before traffic flows."
+              "explanation": "DNS (Domain Name System) is the internet's phone book: it turns names into the IP numbers the network actually uses. It is not encryption, not port assignment, and not routing/forwarding -- those are separate jobs.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/linux-networking-3.svg"
             },
             {
               "id": "linux-networking-3-mcq-2",
               "type": "mcq",
-              "prompt": "Why are veth pairs central to container networking?",
+              "prompt": "When resolving a name, which source does Linux normally check before asking a DNS server?",
               "choices": [
-                "They encrypt container traffic by default",
-                "They provide a virtual cable linking a container's namespace to the host/bridge, giving the container connectivity",
-                "They replace the need for a routing table",
-                "They are required to share the host's IP directly"
+                "/etc/resolv.conf",
+                "/etc/hosts",
+                "/etc/fstab",
+                "/etc/passwd"
               ],
               "answerIndex": 1,
-              "explanation": "A container lives in its own network namespace; a veth pair bridges that isolated stack to the host (typically via a bridge like docker0), which is how packets get in and out. veth + netns + bridge is the core model."
+              "explanation": "With the common `files dns` order, Linux checks the local `/etc/hosts` file first, then falls back to a DNS server. `/etc/resolv.conf` lists which DNS server to ask, `/etc/fstab` is about mounting disks, and `/etc/passwd` is about user accounts."
             },
             {
               "id": "linux-networking-3-mcq-3",
               "type": "mcq",
-              "prompt": "What does a Linux bridge act as when host ends of several veth pairs are attached to it?",
+              "prompt": "Which file tells Linux which DNS server to ask over the network?",
               "choices": [
-                "A layer-3 router that NATs each namespace",
-                "A virtual layer-2 switch forwarding frames among the attached interfaces",
-                "A DNS resolver for the namespaces",
-                "A firewall that isolates each namespace"
+                "/etc/hosts",
+                "/etc/resolv.conf",
+                "/etc/nsswitch.conf",
+                "/etc/hostname"
               ],
               "answerIndex": 1,
-              "explanation": "A Linux bridge is a software L2 switch: it learns MACs and forwards frames between its ports. Attaching veth host ends to it puts those namespaces on one virtual LAN — the docker0 design."
+              "explanation": "`/etc/resolv.conf` holds the `nameserver` line(s) naming the DNS server to query. `/etc/hosts` is the static local list, `/etc/nsswitch.conf` sets the order of sources, and `/etc/hostname` just stores this machine's own name."
+            },
+            {
+              "id": "linux-networking-3-mcq-4",
+              "type": "mcq",
+              "prompt": "You added `93.184.216.34  myserver` to `/etc/hosts`. The browser reaches `myserver`, but `dig myserver` says it cannot find it. Why?",
+              "choices": [
+                "/etc/hosts is corrupt and must be deleted",
+                "dig queries a DNS server directly and does not read /etc/hosts",
+                "The entry needs a reboot to take effect",
+                "dig only works for real public domains"
+              ],
+              "answerIndex": 1,
+              "explanation": "`dig` is a pure DNS-server query tool and deliberately ignores `/etc/hosts`, so a hand-added local entry won't appear there even though programs (and your browser) honor it. The file isn't corrupt and no reboot is needed -- use `getent hosts myserver` to see the real result."
+            },
+            {
+              "id": "linux-networking-3-mcq-5",
+              "type": "mcq",
+              "prompt": "Which command tests name resolution the same way normal programs do, including the /etc/hosts shortcut?",
+              "choices": [
+                "getent hosts example.com",
+                "dig example.com",
+                "ping -c1 8.8.8.8",
+                "ss -tulpn"
+              ],
+              "answerIndex": 0,
+              "explanation": "`getent hosts` walks the real resolver path (files then DNS, per nsswitch), so it reflects what applications actually see -- including `/etc/hosts`. `dig` skips `/etc/hosts`, `ping` to a literal IP tests reachability not name lookup, and `ss` shows sockets."
+            },
+            {
+              "id": "linux-networking-3-mcq-6",
+              "type": "mcq",
+              "prompt": "What is the purpose of an entry in /etc/hosts like `127.0.0.1  mylaptop`?",
+              "choices": [
+                "It blocks that name in the firewall",
+                "It is a hand-written name-to-IP mapping checked before DNS",
+                "It sets the machine's default gateway",
+                "It opens a listening port for that name"
+              ],
+              "answerIndex": 1,
+              "explanation": "An `/etc/hosts` line is a static, local name-to-IP mapping that the resolver checks before querying DNS -- useful for testing or naming local machines. It has nothing to do with firewall blocking, gateways, or opening ports."
+            },
+            {
+              "id": "linux-networking-3-mcq-7",
+              "type": "mcq",
+              "prompt": "On a system using systemd-resolved, you look at /etc/resolv.conf and it just points at 127.0.0.53. What is going on?",
+              "choices": [
+                "DNS is broken because that is not a real server",
+                "It is a managed stub pointing at the local resolver; check the real settings with resolvectl status",
+                "Someone set your DNS server to your own laptop by mistake",
+                "127.0.0.53 is the default gateway"
+              ],
+              "answerIndex": 1,
+              "explanation": "With systemd-resolved, `/etc/resolv.conf` is a managed file pointing at the local resolver stub on 127.0.0.53; the actual upstream DNS servers are shown by `resolvectl status`. It is normal, not a misconfiguration, and 127.0.0.53 is a local resolver address, not a gateway."
+            },
+            {
+              "id": "linux-networking-3-mcq-8",
+              "type": "mcq",
+              "prompt": "In the analogy used here, /etc/hosts is like your personal speed-dial list and DNS is like...",
+              "choices": [
+                "the public phone book you consult if the name is not on your list",
+                "the phone company's billing department",
+                "a busy signal",
+                "the phone's ringtone"
+              ],
+              "answerIndex": 0,
+              "explanation": "The picture is: check your personal speed-dial (/etc/hosts) first, then call the public phone book (DNS) for anything not on it. Billing, busy signals, and ringtones don't map to any step in name resolution."
+            },
+            {
+              "id": "linux-networking-3-mcq-9",
+              "type": "mcq",
+              "prompt": "Which file decides the ORDER of sources (for example, files before DNS) for name lookups?",
+              "choices": [
+                "/etc/nsswitch.conf",
+                "/etc/resolv.conf",
+                "/etc/hosts",
+                "/etc/services"
+              ],
+              "answerIndex": 0,
+              "explanation": "`/etc/nsswitch.conf` sets the lookup order on its `hosts:` line (commonly `files dns`). `/etc/resolv.conf` names the DNS server, `/etc/hosts` is the static list itself, and `/etc/services` just maps service names to port numbers."
             }
           ]
         },
         {
           "id": "linux-networking-linux-networking-4",
-          "title": "Firewalling with nftables, Routing, and Diagnostics",
+          "title": "The Firewall and the Router: Controlling What Passes",
           "order": 4,
           "difficulty": 3,
-          "content": "Beneath every Linux firewall is **netfilter**, the kernel's packet-processing framework. `iptables` is the legacy front end; **nftables** (`nft`) is the modern replacement — one unified tool with explicit **tables -> chains -> rules**, better performance, and IPv4/IPv6 together. Higher-level wrappers (`ufw`, `firewalld`) generate rules for you, but knowing `nft` is expected.\n\n```bash\nnft add table inet filter\nnft 'add chain inet filter input { type filter hook input priority 0; policy drop; }'\nnft add rule inet filter input ct state established,related accept\nnft add rule inet filter input iif lo accept\nnft add rule inet filter input tcp dport 22 accept   # SSH only\nnft list ruleset                                      # show everything\n```\n\nThat is a basic **stateful** firewall: allow return traffic, allow loopback, allow SSH, drop the rest. **NAT** is just another chain with a `nat` hook (`masquerade` for outbound). To make the box a **router**, enable forwarding: `sysctl -w net.ipv4.ip_forward=1`. Related building blocks: **bridges** (virtual switch), **VLANs** (`ip link add link eth0 name eth0.10 type vlan id 10`), and **bonding/teaming** for link aggregation.\n\nDiagnostics, in order of depth:\n\n```bash\nping host            # reachability + RTT\nmtr host             # continuous traceroute + loss per hop\ntcpdump -ni eth0 port 53   # capture packets on the wire\nethtool eth0         # link speed, duplex, driver, offloads\n```\n\nHand-off to topic 06: Linux gives you the interfaces, sockets, routing table, and firewall; topic 06 explains TCP/IP, routing protocols, and what is actually on the wire that `tcpdump` shows you.",
+          "content": "**Hook.** So far you've been *looking* at the network. Now you *control* it. Two related powers: a **firewall** decides which incoming connections are allowed in (a reception desk that turns most visitors away), and **forwarding** lets one Linux machine pass traffic between two networks (a mailroom that relays letters from one wing to another). Both are conceptual here — the goal is to recognize what they do, not to memorize every rule.\n\n**Build.** A **firewall** is a set of rules that decides, packet by packet, what may pass. The everyday picture is a building's reception desk: a visitor for a meeting (allowed) gets a badge; everyone else is turned away. The modern Linux firewall tool is **nftables**, run with the `nft` command. Its rules are organized as *tables* that hold *chains* that hold *rules*; a chain checks incoming packets top to bottom and each rule says `accept` or `drop`.\n\nThe most common safe pattern is **default-deny**: turn everyone away unless a rule explicitly lets them in. A firewall that allows secure login (SSH, port 22) and drops everything else inbound reads like this:\n\n```bash\nnft add table inet filter\nnft 'add chain inet filter input { type filter hook input priority 0; policy drop; }'\nnft add rule inet filter input ct state established accept   # let replies back in\nnft add rule inet filter input iif lo accept                 # allow the machine to talk to itself\nnft add rule inet filter input tcp dport 22 accept           # allow SSH\nnft list ruleset                                             # show all rules\n```\n\nRead it plainly: the chain's *policy* is `drop` (turn everyone away by default); then we *accept* replies to connections we started, *accept* the machine talking to itself, and *accept* new SSH. Anything else falls through to the drop. `accept` lets a packet pass; `drop` silently discards it. As with the other tools, `nft` (nftables) is the modern replacement for the older `iptables`.\n\nA close cousin of firewalling is **NAT** (*Network Address Translation*): rewriting addresses so a whole group of machines can share one public address. It's how your home router lets many devices reach the internet through a single address — just know the idea for now.\n\nThe second power is making Linux a **router**. Normally a Linux machine keeps to itself: it will *not* pass traffic from one network to another. You enable that with a single switch:\n\n```bash\nsysctl -w net.ipv4.ip_forward=1    # allow this machine to forward packets between interfaces\n```\n\nWith two network cards on two networks and that switch on, the machine relays packets between them — it has become a router (the mailroom is now open).\n\n**Recap.** A firewall allows or denies traffic; the safe default-deny pattern accepts only what you list (like SSH) and drops the rest, using the modern `nft` (replacing `iptables`). Turning on `ip_forward` lets one Linux box route traffic between networks. NAT shares one address among many machines.",
           "items": [
-            {
-              "id": "linux-networking-4-fc-1",
-              "type": "flashcard",
-              "front": "What framework sits beneath both iptables and nftables?",
-              "back": "netfilter — the kernel's packet-filtering/NAT framework with hooks in the network path. `iptables` (legacy) and `nftables` (modern `nft`) are both front ends that program netfilter.",
-              "hint": "The kernel layer, not the userspace tool."
-            },
-            {
-              "id": "linux-networking-4-fc-2",
-              "type": "flashcard",
-              "front": "Describe the nftables hierarchy.",
-              "back": "tables -> chains -> rules. A table (e.g. `inet filter`) holds chains; a chain is attached to a hook with a priority and policy; rules inside match traffic and take actions (accept/drop/etc.).",
-              "hint": "Three nested levels."
-            },
-            {
-              "id": "linux-networking-4-fc-3",
-              "type": "flashcard",
-              "front": "What makes a firewall rule 'stateful', and how is it expressed in nft?",
-              "back": "It tracks connection state via conntrack. `ct state established,related accept` admits return traffic for connections you initiated, so you only need to explicitly allow new inbound services.",
-              "hint": "ct state established,related."
-            },
-            {
-              "id": "linux-networking-4-fc-4",
-              "type": "flashcard",
-              "front": "What single sysctl turns a Linux box into a router?",
-              "back": "`net.ipv4.ip_forward=1` (and `net.ipv6.conf.all.forwarding=1` for IPv6). Set with `sysctl -w` at runtime or in `/etc/sysctl.d/` to persist. It lets the kernel forward packets between interfaces.",
-              "hint": "ip_forward."
-            },
-            {
-              "id": "linux-networking-4-fc-5",
-              "type": "flashcard",
-              "front": "How do nftables NAT and masquerade fit in?",
-              "back": "NAT is a chain attached to the `nat` hook. `masquerade` rewrites outbound source addresses to the egress interface's IP — the standard way a Linux router/container host shares one public IP.",
-              "hint": "A nat-hook chain; masquerade on egress."
-            },
-            {
-              "id": "linux-networking-4-fc-6",
-              "type": "flashcard",
-              "front": "What do `ufw` and `firewalld` actually do?",
-              "back": "They are higher-level front ends that generate underlying nftables/iptables rules from simpler commands or zones. Convenient, but the rules they emit are still netfilter — know `nft` underneath.",
-              "hint": "Wrappers that emit the real rules."
-            },
             {
               "id": "linux-networking-4-mcq-1",
               "type": "mcq",
-              "prompt": "You want a firewall that allows SSH and drops all other new inbound traffic. Which chain setup is correct?",
+              "prompt": "What does a firewall do?",
               "choices": [
-                "An input chain with policy accept and a single drop rule for port 22",
-                "An input chain with policy drop, plus accept rules for established/related, loopback, and tcp dport 22",
-                "A forward chain with masquerade on port 22",
-                "A nat chain that redirects all ports to 22"
+                "Turns hostnames into IP addresses",
+                "Decides, packet by packet, which network traffic is allowed to pass",
+                "Speeds up the network connection",
+                "Stores your files on disk"
               ],
               "answerIndex": 1,
-              "explanation": "Default-deny is the safe posture: set the input chain policy to drop, then explicitly accept established/related (return traffic), loopback, and new SSH (tcp dport 22). Everything else falls through to the drop policy."
+              "explanation": "A firewall is a set of rules that allows or blocks traffic -- like a reception desk admitting some visitors and turning others away. Turning names into numbers is DNS, and a firewall neither speeds up links nor stores files.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/linux-networking-5.svg"
             },
             {
               "id": "linux-networking-4-mcq-2",
               "type": "mcq",
-              "prompt": "A host has two NICs on different subnets but won't pass traffic between them even with correct routes. What is missing?",
+              "prompt": "Which is the modern Linux firewall tool that replaces the older iptables?",
               "choices": [
-                "A VLAN tag on each interface",
-                "IP forwarding enabled (net.ipv4.ip_forward=1)",
-                "A bonding interface joining the NICs",
-                "systemd-resolved must be restarted"
+                "ifconfig",
+                "nftables (the nft command)",
+                "netstat",
+                "ping"
               ],
               "answerIndex": 1,
-              "explanation": "By default the kernel does not forward packets between interfaces (it acts as a host, not a router). Setting net.ipv4.ip_forward=1 enables routing; correct routes and firewall forward rules must also be present."
+              "explanation": "nftables, used through the `nft` command, is the modern firewall front end that replaces iptables. `ifconfig` and `netstat` are older networking tools for addresses and sockets, and `ping` is a reachability test -- none is a firewall."
             },
             {
               "id": "linux-networking-4-mcq-3",
               "type": "mcq",
-              "prompt": "You suspect intermittent packet loss to a remote host across several hops. Which tool best shows per-hop loss over time?",
+              "prompt": "You want a firewall that allows SSH and blocks all other new inbound connections. Which approach is the safe one?",
               "choices": [
-                "ping",
-                "ethtool",
-                "mtr",
-                "ss"
+                "Set the policy to accept, then add one rule dropping port 22",
+                "Set the policy to drop (deny by default), then add accept rules for replies, loopback, and SSH",
+                "Accept everything and hope the service is secure",
+                "Drop port 22 and accept everything else"
               ],
-              "answerIndex": 2,
-              "explanation": "`mtr` combines traceroute and ping, continuously probing each hop and reporting loss and latency per hop — ideal for localizing intermittent loss. `ping` tests only the endpoint; `ethtool` reports local link state; `ss` shows sockets."
+              "answerIndex": 1,
+              "explanation": "The safe \"default-deny\" pattern sets the chain policy to drop and then explicitly accepts only what you want (established replies, the loopback interface, and new SSH); everything else falls through to the drop. Accepting by default, or dropping the very port you want open, gets it backwards."
             },
             {
               "id": "linux-networking-4-mcq-4",
               "type": "mcq",
-              "prompt": "Which statement best captures the hand-off from this Linux topic to topic 06 (networking protocols)?",
+              "prompt": "In an nftables rule, what is the difference between `accept` and `drop`?",
               "choices": [
-                "Topic 06 replaces iproute2 with protocol-specific tools",
-                "Linux provides the interfaces, sockets, routing table, and firewall; topic 06 explains TCP/IP, routing protocols, and what's on the wire",
-                "Topic 06 covers only wireless, so there is no overlap",
-                "The two topics are independent and share no concepts"
+                "accept lets the packet pass; drop silently discards it",
+                "accept logs the packet; drop emails an alert",
+                "accept is for TCP only; drop is for UDP only",
+                "They are two words for the same action"
+              ],
+              "answerIndex": 0,
+              "explanation": "`accept` allows the packet through, while `drop` quietly throws it away with no reply. They are opposite actions, not synonyms, and they are not tied to logging, alerts, or a specific protocol."
+            },
+            {
+              "id": "linux-networking-4-mcq-5",
+              "type": "mcq",
+              "prompt": "How are nftables rules organized?",
+              "choices": [
+                "Files contain folders that contain links",
+                "Tables contain chains that contain rules",
+                "Ports contain sockets that contain packets",
+                "Users contain groups that contain passwords"
               ],
               "answerIndex": 1,
-              "explanation": "This module covers the Linux mechanisms — the interfaces, sockets, routing table, and firewall you manipulate with ip/ss/nft. Topic 06 covers the protocols themselves (TCP/IP, routing protocols, packet formats) that those mechanisms carry."
+              "explanation": "The nftables hierarchy is tables -> chains -> rules: a table holds chains, a chain is attached to a point in the packet path and holds an ordered list of rules. The other options describe unrelated parts of the system."
+            },
+            {
+              "id": "linux-networking-4-mcq-6",
+              "type": "mcq",
+              "prompt": "A Linux machine has two network cards on two different networks but refuses to pass traffic between them, even with correct addresses. What is most likely missing?",
+              "choices": [
+                "A second IP address on one card",
+                "IP forwarding turned on (net.ipv4.ip_forward=1)",
+                "A faster network cable",
+                "A DNS server entry"
+              ],
+              "answerIndex": 1,
+              "explanation": "By default a Linux host does not forward packets between interfaces; you must enable it with `net.ipv4.ip_forward=1` for the box to act as a router. Extra addresses, faster cables, or DNS entries do not control whether forwarding happens."
+            },
+            {
+              "id": "linux-networking-4-mcq-7",
+              "type": "mcq",
+              "prompt": "What is NAT (Network Address Translation) used for, in everyday terms?",
+              "choices": [
+                "Letting many devices share one public IP address to reach the internet",
+                "Encrypting passwords before login",
+                "Listing which ports are open",
+                "Turning names into IP addresses"
+              ],
+              "answerIndex": 0,
+              "explanation": "NAT rewrites addresses so a group of machines (for example, all the devices in a home) can share a single public IP address -- exactly what a home router does. It is not encryption, not a port scan, and not name resolution (that is DNS)."
+            },
+            {
+              "id": "linux-networking-4-mcq-8",
+              "type": "mcq",
+              "prompt": "In the default-deny firewall above, why include the rule `ct state established accept`?",
+              "choices": [
+                "To block all replies for safety",
+                "To let replies to connections you started come back in, so normal traffic still works",
+                "To open every port at once",
+                "To turn the machine into a router"
+              ],
+              "answerIndex": 1,
+              "explanation": "`ct state established accept` admits return traffic for connections the machine itself started, so things like web requests still get their replies even though new inbound connections are dropped. It does not block replies, open all ports, or enable routing."
+            },
+            {
+              "id": "linux-networking-4-mcq-9",
+              "type": "mcq",
+              "prompt": "Which command lets you see the full set of firewall rules currently loaded?",
+              "choices": [
+                "nft list ruleset",
+                "ip addr show",
+                "getent hosts",
+                "ping -c1 localhost"
+              ],
+              "answerIndex": 0,
+              "explanation": "`nft list ruleset` prints all loaded nftables tables, chains, and rules. `ip addr` shows addresses, `getent hosts` tests name resolution, and `ping` tests reachability -- none of those displays firewall rules."
+            }
+          ]
+        },
+        {
+          "id": "linux-networking-linux-networking-5",
+          "title": "Isolated Networks and Watching the Wire: Namespaces, veth, and tcpdump",
+          "order": 5,
+          "difficulty": 3,
+          "content": "**Hook.** How does a container (a lightweight, isolated package for running a program, like Docker) get its *own* network — its own address and rules — without a second computer? Linux can hand a process a private copy of the whole network stack. And when you want to *watch* the actual traffic going by to debug a problem, there's a tool that shows you each packet on the wire. These are the deeper tools; treat this lesson as a guided tour of the ideas.\n\n**Build.** A **network namespace** is a private, isolated copy of a machine's network: its own interfaces, its own addresses, its own routing table, its own firewall rules. A normal machine has one; Linux can create extra ones. Picture a large office where each team gets a separate, walled-off mailroom that can't see the others. This is exactly the trick containers use — a container runs in its own network namespace, which is why it feels like it has its own little network.\n\nAn isolated namespace has no way to reach anything — so we add a **veth pair**, a *virtual network cable*. It comes as two connected ends: whatever goes in one end comes out the other. Put one end inside a namespace and leave the other outside, and you've wired the namespace to the rest of the machine, like running a cable between two rooms.\n\n```bash\nip netns add lab                                  # create a namespace called lab\nip link add veth0 type veth peer name veth1       # make a virtual cable (two ends)\nip link set veth1 netns lab                        # push one end into the namespace\nip netns exec lab ip addr add 10.0.0.2/24 dev veth1\nip netns exec lab ip link set veth1 up             # bring the inside end up\nip netns exec lab ping -c1 10.0.0.1                # run a command inside the namespace\n```\n\n`ip netns exec lab <command>` means \"run this command inside the lab namespace.\" A common beginner slip: moving a cable end into a namespace doesn't switch it on or give it an address — you must add an address and bring it `up` inside. To connect *many* namespaces at once, you attach their outside ends to a **bridge** (a virtual switch); that is the model Docker uses to put many containers on one shared network.\n\nThe second tool is **tcpdump**, which *captures* and prints packets as they pass an interface — like holding a microphone up to the wire to hear the conversation. It's the go-to when you need to *prove* what is (or isn't) actually being sent:\n\n```bash\ntcpdump -ni eth0 port 53     # show packets on eth0 involving port 53 (DNS), as numbers\n```\n\n`-n` keeps it numeric (no slow name lookups) and `-i eth0` picks the interface. You'll see one line per packet with its source, destination, and ports.\n\nA reminder tying the whole topic together: the modern toolset is `ip`, `ss`, and `nft`, which replace the older `ifconfig`, `netstat`, and `iptables`. And the *protocols* these tools carry — what's actually inside the packets tcpdump shows you — are the subject of the separate Networking topic.\n\n**Recap.** A network namespace is a private copy of the network stack (the basis of container networking); a veth pair is the virtual cable that connects it; `ip netns exec` runs commands inside one; a bridge joins many. `tcpdump` captures packets so you can see real traffic. Modern `ip`/`ss`/`nft` replace `ifconfig`/`netstat`/`iptables`.",
+          "items": [
+            {
+              "id": "linux-networking-5-mcq-1",
+              "type": "mcq",
+              "prompt": "What is a network namespace?",
+              "choices": [
+                "A private, isolated copy of a machine's network stack (its own interfaces, addresses, routes, and firewall rules)",
+                "A list of allowed hostnames",
+                "Another name for an IP address",
+                "A faster kind of network cable"
+              ],
+              "answerIndex": 0,
+              "explanation": "A network namespace gives a process its own isolated network stack -- separate interfaces, addresses, routing table, and firewall -- which is how containers get their own networking. It is not a hostname list, not an address, and not a cable.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/linux-networking-1.svg"
+            },
+            {
+              "id": "linux-networking-5-mcq-2",
+              "type": "mcq",
+              "prompt": "What is a veth pair?",
+              "choices": [
+                "A pair of physical Ethernet ports on the motherboard",
+                "A virtual network cable with two connected ends; traffic into one end comes out the other",
+                "Two firewalls working together",
+                "A backup copy of the routing table"
+              ],
+              "answerIndex": 1,
+              "explanation": "A veth pair is a virtual cable created as two linked ends, used to connect a namespace to the outside (or to a bridge). It is not physical hardware, not a firewall, and not a routing-table copy."
+            },
+            {
+              "id": "linux-networking-5-mcq-3",
+              "type": "mcq",
+              "prompt": "How does a container relate to network namespaces?",
+              "choices": [
+                "Containers do not use the network at all",
+                "A container runs in its own network namespace, which gives it its own isolated network",
+                "All containers share one global routing table with the host directly",
+                "A container is just another name for a veth pair"
+              ],
+              "answerIndex": 1,
+              "explanation": "A container runs inside its own network namespace, which is exactly why it appears to have its own address and rules. Containers very much use the network; they do not share one global table by default, and a container is a process environment, not a cable."
+            },
+            {
+              "id": "linux-networking-5-mcq-4",
+              "type": "mcq",
+              "prompt": "What does `ip netns exec lab ping -c1 10.0.0.1` do?",
+              "choices": [
+                "Deletes the lab namespace",
+                "Runs the ping command inside the network namespace named lab",
+                "Creates a new veth pair named lab",
+                "Adds a firewall rule to lab"
+              ],
+              "answerIndex": 1,
+              "explanation": "`ip netns exec lab <command>` runs the given command inside the `lab` namespace, so here it pings from within that isolated network. It does not delete the namespace, create a cable, or add firewall rules."
+            },
+            {
+              "id": "linux-networking-5-mcq-5",
+              "type": "mcq",
+              "prompt": "You moved one end of a veth pair into a namespace but cannot ping across it. What is the most common beginner mistake?",
+              "choices": [
+                "veth pairs cannot enter namespaces",
+                "The interface inside still has no IP address and/or was never brought up",
+                "Namespaces block all ping forever",
+                "You must reboot to register a veth"
+              ],
+              "answerIndex": 1,
+              "explanation": "Moving a cable end into a namespace does not assign it an address or switch it on; you must add an IP and bring it `up` inside the namespace before traffic flows. veth ends are made for namespaces, ping is not permanently blocked, and no reboot is needed."
+            },
+            {
+              "id": "linux-networking-5-mcq-6",
+              "type": "mcq",
+              "prompt": "What does tcpdump do?",
+              "choices": [
+                "Blocks unwanted packets",
+                "Captures and displays packets as they pass an interface, so you can see real traffic",
+                "Assigns IP addresses to interfaces",
+                "Turns names into IP addresses"
+              ],
+              "answerIndex": 1,
+              "explanation": "tcpdump captures live packets on an interface and prints them, like holding a microphone to the wire -- ideal for proving what is actually being sent. Blocking is a firewall's job, address assignment is `ip addr`, and name lookups are DNS."
+            },
+            {
+              "id": "linux-networking-5-mcq-7",
+              "type": "mcq",
+              "prompt": "In `tcpdump -ni eth0 port 53`, what does the `-i eth0` part do?",
+              "choices": [
+                "Sets the number of packets to capture",
+                "Chooses which interface to capture on",
+                "Filters by IP address",
+                "Saves the capture to a file"
+              ],
+              "answerIndex": 1,
+              "explanation": "`-i eth0` selects the interface to listen on. The count is a separate option, `port 53` is the filter (here DNS traffic), and saving to a file would use a different option (`-w`)."
+            },
+            {
+              "id": "linux-networking-5-mcq-8",
+              "type": "mcq",
+              "prompt": "To connect many namespaces together on one shared virtual network, you attach their outside ends to a...",
+              "choices": [
+                "bridge (a virtual switch)",
+                "DNS server",
+                "single ping command",
+                "firewall drop rule"
+              ],
+              "answerIndex": 0,
+              "explanation": "A Linux bridge acts as a virtual switch; attaching each namespace's outside veth end to it puts them on one shared network -- the model Docker uses for many containers. A DNS server, a ping, or a drop rule does not join namespaces together."
+            },
+            {
+              "id": "linux-networking-5-mcq-9",
+              "type": "mcq",
+              "prompt": "Which set correctly pairs each modern tool with the older one it replaces?",
+              "choices": [
+                "ip replaces ping; ss replaces dig; nft replaces tcpdump",
+                "ip replaces ifconfig; ss replaces netstat; nft replaces iptables",
+                "ip replaces iptables; ss replaces ifconfig; nft replaces netstat",
+                "ip replaces netstat; ss replaces iptables; nft replaces ifconfig"
+              ],
+              "answerIndex": 1,
+              "explanation": "The modern toolkit maps cleanly: `ip` (addresses/links/routes) replaces `ifconfig`, `ss` (sockets) replaces `netstat`, and `nft` (firewall) replaces `iptables`. ping, dig, and tcpdump are separate tools that were not replaced by these."
+            },
+            {
+              "id": "linux-networking-5-mcq-10",
+              "type": "mcq",
+              "prompt": "This Linux topic gives you the tools (interfaces, sockets, routing, firewall). Where is the deep theory of the protocols inside the packets (TCP/IP and the rest) covered?",
+              "choices": [
+                "It is never covered anywhere",
+                "In the separate Networking topic",
+                "Inside the tcpdump manual only",
+                "It is the same thing as DNS"
+              ],
+              "answerIndex": 1,
+              "explanation": "This module is the Linux-side companion: it teaches the commands to see and control networking. The protocol theory (TCP/IP, routing protocols, packet formats) is the subject of the separate Networking topic. It is broader than the tcpdump manual and distinct from DNS."
             }
           ]
         }
