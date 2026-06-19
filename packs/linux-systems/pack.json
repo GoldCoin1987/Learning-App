@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "id": "linux-systems",
   "title": "Linux Systems",
-  "version": "1.11.0",
+  "version": "1.12.0",
   "description": "Linux from scratch (beginner rework in progress): 19 sub-topics from the shell through systemd, the kernel, containers, storage, networking, and embedded Linux. Beginner-first readings, code, and diagrams; tiered easy to hard.",
   "requires": [],
   "tags": [
@@ -7207,381 +7207,840 @@
       "order": 12,
       "lessons": [
         {
-          "id": "bash-scripting-structure-safety",
-          "title": "Script Structure, set -euo pipefail & IFS",
+          "id": "bash-scripting-what-is-a-script",
+          "title": "What a Script Is: Shebang and chmod +x",
           "order": 1,
           "difficulty": 1,
-          "content": "Every robust bash script opens the same way, and as an ex-technician you can treat this as the pre-flight checklist that separates professional glue from a fragile hack.\n\nStart with a portable shebang: `#!/usr/bin/env bash` finds bash via `PATH` instead of hardcoding `/bin/bash`, which matters because bash lives in different places across distros and macOS.\n\nNext, the safety triad `set -euo pipefail`:\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\nIFS=$'\\n\\t'\n```\n\n- `-e` (errexit): abort the moment any command returns non-zero, instead of blindly charging ahead on a failed `cd`.\n- `-u` (nounset): treat use of an *unset* variable as an error, catching typos like `$flie` before they silently expand to empty.\n- `-o pipefail`: make a pipeline fail if *any* stage fails, not just the last. Without it, `false | true` reports success.\n\nSetting `IFS=$'\\n\\t'` (newline and tab only, dropping the default space) is the classic defense against word-splitting filenames that contain spaces.\n\nThese are not magic — `set -e` has well-known blind spots (it won't trigger inside `if`/`&&` tests, and a function's failure can be masked), which is exactly why you still write explicit checks and run ShellCheck. Think of `set -euo pipefail` as turning your script from \"keep going and hope\" into \"fail fast and loud,\" the same discipline as a built-in test that halts on the first out-of-spec reading rather than shipping the unit.",
+          "content": "You already know how to type commands into the shell one at a time. But some jobs need the *same* handful of commands every time — backing up a folder, setting up a project, cleaning out old files. Retyping them is slow and easy to get wrong.\n\nA **bash script** is the fix. A script is simply a plain text file that holds a list of shell commands. When you run the file, bash reads it top to bottom and runs each command in order, exactly as if you had typed them yourself. Think of it as **writing down a recipe** so you (or anyone) can repeat the steps perfectly, or a **macro** that replays your keystrokes.\n\nHere is a complete tiny script:\n\n```bash\n#!/usr/bin/env bash\necho \"starting backup\"\ncp -r ~/work /backup\necho \"done\"\n```\n\nThe first line, `#!/usr/bin/env bash`, is called the **shebang** (from \"hash-bang\", the `#!` characters). It tells the system *which program should run this file* — here, bash. Writing `#!/usr/bin/env bash` lets the system find bash wherever it is installed, which is the portable, works-everywhere form. The shebang must be the very first line.\n\nSave that as `backup.sh`. One more step: a fresh text file is not yet allowed to run as a program. You give it permission once with **chmod +x** (\"change mode, add e**x**ecutable\"):\n\n```bash\nchmod +x backup.sh\n./backup.sh\n```\n\nThe `./` means \"the file right here in this folder\". From now on, `./backup.sh` replays all three commands.\n\n**Recap:** a script is saved commands in a text file. Start it with the shebang `#!/usr/bin/env bash`, make it runnable once with `chmod +x`, then run it with `./name.sh`.",
           "items": [
             {
-              "id": "bash-scripting-structure-safety-001",
-              "type": "flashcard",
-              "front": "Why use `#!/usr/bin/env bash` instead of `#!/bin/bash`?",
-              "back": "`env` resolves `bash` through `PATH`, so the script runs against whichever bash is installed rather than assuming a fixed path. bash lives in different locations across distros and macOS (often a newer one under `/usr/local` or Homebrew), so the env form is more portable.",
-              "hint": "Where does bash actually live?"
-            },
-            {
-              "id": "bash-scripting-structure-safety-002",
-              "type": "flashcard",
-              "front": "Expand the three options in `set -euo pipefail`.",
-              "back": "`-e` (errexit): exit on any command failing. `-u` (nounset): error on referencing an unset variable. `-o pipefail`: a pipeline returns the first non-zero exit of any stage, not just the last command's status.",
-              "hint": "errexit, nounset, pipefail."
-            },
-            {
-              "id": "bash-scripting-structure-safety-003",
-              "type": "flashcard",
-              "front": "What problem does setting `IFS=$'\\n\\t'` solve?",
-              "back": "The default `IFS` includes the space, so unquoted expansions get word-split on spaces — breaking iteration over filenames like `my file.txt`. Restricting IFS to newline and tab stops space-splitting. (Still prefer quoting and `while read -r` / null-delimited iteration.)",
-              "hint": "Filenames with spaces."
-            },
-            {
-              "id": "bash-scripting-structure-safety-004",
-              "type": "flashcard",
-              "front": "Give one well-known blind spot of `set -e`.",
-              "back": "`set -e` does NOT trigger when a command runs as the condition of `if`, `while`, `until`, or on the left of `&&`/`||`. A failing command inside those contexts is treated as a normal boolean test, so errors there are silently tolerated.",
-              "hint": "Conditions and short-circuit operators."
-            },
-            {
-              "id": "bash-scripting-structure-safety-005",
+              "id": "bash-scripting-mcq-what-is-script",
               "type": "mcq",
-              "prompt": "Without `pipefail`, what does `false | true` return as the pipeline's exit status?",
+              "prompt": "In one sentence, what is a bash script?",
               "choices": [
-                "1, because false failed",
-                "0, the status of the last command (true)",
-                "It is undefined / random",
-                "The script aborts immediately"
+                "A special compiled program only experts can write",
+                "A plain text file containing shell commands that bash runs in order",
+                "A setting that changes how the terminal looks",
+                "A folder that stores your command history"
               ],
               "answerIndex": 1,
-              "explanation": "By default a pipeline's exit status is the status of its LAST command, so `false | true` reports 0 (success) and the upstream failure is hidden. `set -o pipefail` changes this so the pipeline reflects the first failing stage."
+              "explanation": "A script is just a text file listing commands; running it is the same as typing those commands yourself, one after another. It is not compiled and it is not a terminal setting.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-2.svg"
             },
             {
-              "id": "bash-scripting-structure-safety-006",
+              "id": "bash-scripting-mcq-why-script",
               "type": "mcq",
-              "prompt": "With `set -u` active, what happens at `echo \"$undefined_var\"`?",
+              "prompt": "What is the main reason to put commands in a script instead of typing them each time?",
               "choices": [
-                "It prints an empty line",
-                "It prints the literal text $undefined_var",
-                "Bash errors out: unbound variable",
-                "It prints 0"
+                "Scripts run faster than typing the same commands",
+                "So you can repeat a task exactly without retyping it, and share it",
+                "Typing commands by hand is not allowed on Linux",
+                "Scripts use less disk space than commands"
+              ],
+              "answerIndex": 1,
+              "explanation": "A script captures a repeatable recipe: run it any time to redo the steps perfectly, and hand it to someone else. The commands themselves run at the same speed whether typed or scripted.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-2.svg"
+            },
+            {
+              "id": "bash-scripting-mcq-shebang-purpose",
+              "type": "mcq",
+              "prompt": "What does the shebang line `#!/usr/bin/env bash` do?",
+              "choices": [
+                "It prints a welcome message when the script starts",
+                "It tells the system which program (bash) should run this file",
+                "It is a comment that bash ignores completely",
+                "It makes the file executable, replacing chmod"
+              ],
+              "answerIndex": 1,
+              "explanation": "The shebang names the interpreter for the file, so the system knows to run it with bash. It does not print anything and does not set the executable permission — that is chmod's job.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-2.svg"
+            },
+            {
+              "id": "bash-scripting-mcq-shebang-position",
+              "type": "mcq",
+              "prompt": "Where must the shebang line appear in a script?",
+              "choices": [
+                "On the very first line",
+                "On the last line",
+                "Anywhere, as long as it is somewhere in the file",
+                "Only inside a comment block"
+              ],
+              "answerIndex": 0,
+              "explanation": "The shebang only works as the first line of the file. If anything (even a blank line) comes before it, the system will not recognize it as a shebang.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-2.svg"
+            },
+            {
+              "id": "bash-scripting-mcq-chmod-x",
+              "type": "mcq",
+              "prompt": "Why do you run `chmod +x backup.sh` before running the script?",
+              "choices": [
+                "To save the file to disk",
+                "To give the file permission to run as a program",
+                "To translate the script into another language",
+                "To delete the old version of the file"
+              ],
+              "answerIndex": 1,
+              "explanation": "A new text file is not executable by default. `chmod +x` adds the 'executable' permission so the system will let you run it. You only need to do this once per file.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-2.svg"
+            },
+            {
+              "id": "bash-scripting-mcq-run-dot-slash",
+              "type": "mcq",
+              "prompt": "You made the script executable. How do you run a script named backup.sh that is in your current folder?",
+              "choices": [
+                "run backup.sh",
+                "./backup.sh",
+                "open backup.sh",
+                "bash.exe backup.sh"
+              ],
+              "answerIndex": 1,
+              "explanation": "`./backup.sh` runs the file in the current folder; the `./` means 'right here'. There is no `run` or `open` command for this, and `bash.exe` is a Windows-style name, not how you launch it on Linux.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-2.svg"
+            },
+            {
+              "id": "bash-scripting-mcq-order-of-execution",
+              "type": "mcq",
+              "prompt": "In what order does bash run the lines of a script?",
+              "choices": [
+                "Bottom to top",
+                "In a random order each time",
+                "Top to bottom, one line after another",
+                "All lines at the same time"
               ],
               "answerIndex": 2,
-              "explanation": "`set -u` (nounset) makes referencing an unset variable a fatal error (\"unbound variable\"), catching typos. Use `${undefined_var:-}` to intentionally allow an empty default under nounset."
+              "explanation": "Bash reads the script from the top and runs each command in turn before moving to the next. This predictable top-to-bottom order is what makes a script behave like a recipe.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-2.svg"
             },
             {
-              "id": "bash-scripting-structure-safety-007",
+              "id": "bash-scripting-mcq-comment-hash",
               "type": "mcq",
-              "prompt": "Which line belongs at the very TOP of a robust bash script?",
+              "prompt": "Inside a script, what does a line that starts with `#` (other than the shebang) do?",
               "choices": [
-                "set +e to keep going on errors",
-                "#!/usr/bin/env bash followed by set -euo pipefail",
-                "export DEBUG=1",
-                "trap cleanup EXIT only"
+                "It runs as a special command",
+                "It is a comment — a note for humans that bash ignores",
+                "It causes an error",
+                "It repeats the previous line"
               ],
               "answerIndex": 1,
-              "explanation": "The portable shebang `#!/usr/bin/env bash` must be the first line, immediately followed by `set -euo pipefail` to enable fail-fast behavior before any real work runs. `trap` comes after, once cleanup targets exist."
+              "explanation": "A `#` begins a comment, so bash skips the rest of that line. Comments let you leave notes explaining what the script does. The shebang only has special meaning because of the `!` and its position on line 1.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-2.svg"
             },
             {
-              "id": "bash-scripting-structure-safety-008",
-              "type": "flashcard",
-              "front": "If `set -euo pipefail` is so good, why still run ShellCheck and write explicit tests?",
-              "back": "`set -e` has documented blind spots (conditions, command substitutions, functions called in tests) and can lull you into a false sense of safety. ShellCheck statically catches quoting, word-splitting, and logic bugs that runtime flags miss, so the two are complementary, not redundant.",
-              "hint": "Runtime flags vs. static analysis."
-            },
-            {
-              "id": "bash-scripting-structure-safety-009",
-              "type": "flashcard",
-              "front": "What is the difference between `set -e` and `set -x`?",
-              "back": "`set -e` controls error behavior (exit on failure). `set -x` is a *debugging* trace: it prints each command (with expansions) to stderr before running it. They are orthogonal — you often add `set -x` temporarily or run `bash -x script.sh`.",
-              "hint": "Error handling vs. tracing."
+              "id": "bash-scripting-mcq-env-portable",
+              "type": "mcq",
+              "prompt": "Why is `#!/usr/bin/env bash` often preferred over hard-coding a fixed path to bash?",
+              "choices": [
+                "It runs the script twice for safety",
+                "It lets the system find bash wherever it happens to be installed, so the script is more portable",
+                "It makes the script run without bash at all",
+                "It is required for comments to work"
+              ],
+              "answerIndex": 1,
+              "explanation": "Using `env` looks bash up in the normal search path, so the script works even when bash lives in a different location on another machine. It does not run anything twice and bash is still required.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-2.svg"
             }
           ]
         },
         {
-          "id": "bash-scripting-expansion-arrays",
-          "title": "Parameter Expansion & Arrays",
+          "id": "bash-scripting-variables-and-echo",
+          "title": "Variables and echo",
           "order": 2,
-          "difficulty": 2,
-          "content": "Parameter expansion is bash's built-in string toolkit — using it avoids spawning `sed`/`cut`/`basename` subprocesses and keeps scripts fast and quote-safe.\n\nDefaults and assertions:\n\n```bash\nname=${1:-world}        # use $1, or 'world' if unset/empty\n: \"${API_KEY:?must set API_KEY}\"  # abort with message if unset\nname=${name:=guest}     # assign default into the variable\n```\n\nTrimming with patterns (greedy doubles the symbol):\n\n```bash\npath=/var/log/app.log\n${path##*/}   # app.log   (strip longest leading */)\n${path%/*}    # /var/log  (strip shortest trailing /*)\n${path%.log}  # /var/log/app (strip suffix)\n```\n\nSubstitution and slicing:\n\n```bash\n${path/log/LOG}   # replace first match\n${path//\\//_}     # replace all '/' with '_'\n${path:5:3}       # substring: offset 5, length 3\n${#path}          # string length\n```\n\nArrays are essential for building argument lists safely — never store multiple arguments in a single space-separated string.\n\n```bash\nfiles=(report.txt \"my notes.md\" data.csv)\necho \"${files[@]}\"     # each element quoted separately\necho \"${#files[@]}\"    # element count\nfiles+=(extra.log)     # append\n```\n\nAssociative arrays (bash 4+, declare them):\n\n```bash\ndeclare -A age\nage[alice]=30; age[bob]=25\nfor k in \"${!age[@]}\"; do echo \"$k=${age[$k]}\"; done\n```\n\nThe golden rule: always expand with `\"${arr[@]}\"` (quoted, `@`, not `*`) so each element survives spaces intact — the array equivalent of the quoting discipline that keeps filenames safe.",
+          "difficulty": 1,
+          "content": "A script gets far more useful once it can *remember* things. A **variable** is a labelled box that holds a piece of text. You put a value in it once and reuse it by name, so you do not repeat yourself and you can change a value in one place.\n\nYou create a variable by writing `name=value`. The rule that trips up every beginner: **no spaces around the `=`**.\n\n```bash\nname=\"Sam\"\ngreeting=\"Hello\"\n```\n\n(`name = \"Sam\"` with spaces does NOT work — bash would think `name` is a command.)\n\nTo *use* the value later, put a `$` in front of the name. This is called **expansion**: bash replaces `$name` with the text inside the box.\n\nThe **echo** command simply prints text to the screen. Combine them:\n\n```bash\nname=\"Sam\"\necho \"Hello $name\"        # prints: Hello Sam\n```\n\nQuotes matter here. **Double quotes** `\"...\"` still let `$name` turn into its value. **Single quotes** `'...'` are completely literal — they print the `$name` as-is:\n\n```bash\necho \"Hi $name\"     # Hi Sam\necho 'Hi $name'     # Hi $name\n```\n\nA habit to start right now: always wrap a variable in double quotes, like `\"$name\"`. You will see exactly why in a later lesson (it protects values that contain spaces). You can also capture the output of a command into a variable with `$( )`:\n\n```bash\ntoday=$(date +%F)        # today holds something like 2026-06-19\necho \"Report for $today\"\n```\n\n**Recap:** set a variable with `name=value` (no spaces). Read it back as `$name`, ideally quoted as `\"$name\"`. `echo` prints text; double quotes expand variables, single quotes do not.",
           "items": [
             {
-              "id": "bash-scripting-expansion-arrays-001",
-              "type": "flashcard",
-              "front": "What does `${var:-default}` do, and how does `${var:=default}` differ?",
-              "back": "`${var:-default}` expands to `default` if `var` is unset or empty but leaves `var` unchanged. `${var:=default}` does the same expansion AND assigns `default` into `var` as a side effect.",
-              "hint": "One assigns, one doesn't."
-            },
-            {
-              "id": "bash-scripting-expansion-arrays-002",
-              "type": "flashcard",
-              "front": "For `f=/var/log/app.log`, what do `${f##*/}` and `${f%/*}` produce?",
-              "back": "`${f##*/}` strips the longest leading match of `*/`, giving `app.log` (basename). `${f%/*}` strips the shortest trailing match of `/*`, giving `/var/log` (dirname). `#` trims from the front, `%` from the back; doubling makes it greedy.",
-              "hint": "# = front, % = back; double = greedy."
-            },
-            {
-              "id": "bash-scripting-expansion-arrays-003",
-              "type": "flashcard",
-              "front": "Difference between `${path/old/new}` and `${path//old/new}`?",
-              "back": "`${path/old/new}` replaces only the FIRST occurrence of `old`; `${path//old/new}` replaces ALL occurrences. Anchors: `${path/#old/new}` matches at the start, `${path/%old/new}` at the end.",
-              "hint": "Single vs. double slash."
-            },
-            {
-              "id": "bash-scripting-expansion-arrays-004",
-              "type": "flashcard",
-              "front": "How do you abort a script with a custom message if `API_KEY` is unset?",
-              "back": "Use the error expansion: `: \"${API_KEY:?must set API_KEY}\"`. If `API_KEY` is unset or empty, bash prints the message to stderr and exits non-zero. The leading `:` is a no-op command so the expansion is the only effect.",
-              "hint": "${var:?message}"
-            },
-            {
-              "id": "bash-scripting-expansion-arrays-005",
+              "id": "bash-scripting-mcq-var-what",
               "type": "mcq",
-              "prompt": "Why expand an array as `\"${arr[@]}\"` rather than `${arr[*]}` or unquoted?",
+              "prompt": "What is a variable in a bash script?",
               "choices": [
-                "`*` is faster than `@`",
-                "`\"${arr[@]}\"` yields each element as a separate, intact word even with spaces",
-                "They are identical in all cases",
-                "`@` joins everything into one string"
+                "A command that deletes files",
+                "A labelled place that holds a value you can reuse by name",
+                "A type of comment",
+                "Another word for the shebang"
               ],
               "answerIndex": 1,
-              "explanation": "Quoted `\"${arr[@]}\"` produces one shell word per element, preserving spaces inside elements — exactly what you want when passing an argument list. `\"${arr[*]}\"` joins all elements into one string (separated by the first IFS char), and unquoted forms word-split, breaking elements with spaces."
+              "explanation": "A variable is a named box for a value (usually text). You store something once and refer back to it by name, which keeps scripts tidy and easy to change.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-3.svg"
             },
             {
-              "id": "bash-scripting-expansion-arrays-006",
+              "id": "bash-scripting-mcq-var-assign",
               "type": "mcq",
-              "prompt": "You need a key/value map keyed by username. What declaration do you use?",
+              "prompt": "Which line correctly sets a variable named city to the value London?",
               "choices": [
-                "arr=()",
-                "declare -a arr",
-                "declare -A arr",
-                "local arr"
-              ],
-              "answerIndex": 2,
-              "explanation": "`declare -A` creates an associative array (string-keyed map), available in bash 4+. `declare -a` (lowercase) makes an indexed array. Associative arrays MUST be declared with `-A` before use; you cannot create one implicitly."
-            },
-            {
-              "id": "bash-scripting-expansion-arrays-007",
-              "type": "mcq",
-              "prompt": "Given `s=hello`, what does `${s:1:3}` evaluate to?",
-              "choices": [
-                "hel",
-                "ell",
-                "llo",
-                "hello"
+                "city = \"London\"",
+                "city=\"London\"",
+                "$city = London",
+                "set city London"
               ],
               "answerIndex": 1,
-              "explanation": "Substring expansion `${s:offset:length}` starts at offset 1 (the second char, 'e') and takes 3 characters: 'e', 'l', 'l' -> `ell`. `${#s}` would give the length, 5."
+              "explanation": "Assignment is `name=value` with NO spaces around the `=`. `city = \"London\"` fails because bash reads `city` as a command. The `$` is only for reading the value back, not for setting it.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-3.svg"
             },
             {
-              "id": "bash-scripting-expansion-arrays-008",
-              "type": "flashcard",
-              "front": "How do you iterate over the KEYS of an associative array `age`?",
-              "back": "Use the `!` (indirection) form: `for k in \"${!age[@]}\"; do echo \"$k -> ${age[$k]}\"; done`. `${!age[@]}` lists keys; `${age[@]}` lists values. The quoting keeps keys with spaces intact.",
-              "hint": "${!arr[@]} gives keys."
+              "id": "bash-scripting-mcq-var-spaces",
+              "type": "mcq",
+              "prompt": "Why does `count = 5` (with spaces around =) fail in bash?",
+              "choices": [
+                "Numbers cannot be stored in variables",
+                "Bash reads `count` as a command name and `= 5` as its arguments",
+                "The value must be in quotes",
+                "Variables must be all capitals"
+              ],
+              "answerIndex": 1,
+              "explanation": "With spaces, bash treats the first word as a command to run. Assignment must be written tightly as `count=5`. (Variables can hold numbers, and capitals are not required.)",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-3.svg"
             },
             {
-              "id": "bash-scripting-expansion-arrays-009",
-              "type": "flashcard",
-              "front": "Why prefer parameter expansion over piping to `sed`/`basename` for simple string work?",
-              "back": "Parameter expansion is built into the shell, so it avoids forking a subprocess per operation (faster in loops) and sidesteps an extra layer of quoting/escaping. For trimming paths, defaults, and simple replacement it is cleaner and safer than external tools.",
-              "hint": "No fork, fewer quoting bugs."
+              "id": "bash-scripting-mcq-var-read",
+              "type": "mcq",
+              "prompt": "You set `fruit=\"apple\"`. How do you use that value later?",
+              "choices": [
+                "Write fruit",
+                "Write $fruit",
+                "Write &fruit",
+                "Write echo(fruit)"
+              ],
+              "answerIndex": 1,
+              "explanation": "Put a `$` in front of the name to expand it: `$fruit` becomes `apple`. Writing just `fruit` is plain text, and `&` / function-call syntax are not how bash reads variables.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-3.svg"
+            },
+            {
+              "id": "bash-scripting-mcq-echo-what",
+              "type": "mcq",
+              "prompt": "What does the `echo` command do?",
+              "choices": [
+                "It deletes text from a file",
+                "It prints text to the screen (standard output)",
+                "It repeats the last command you ran",
+                "It records audio"
+              ],
+              "answerIndex": 1,
+              "explanation": "`echo` writes its arguments to the screen. It is the simplest way to show a message or the value of a variable. It does not delete anything or replay commands.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-3.svg"
+            },
+            {
+              "id": "bash-scripting-mcq-double-quote-expand",
+              "type": "mcq",
+              "prompt": "Given `name=\"Sam\"`, what does `echo \"Hi $name\"` print?",
+              "choices": [
+                "Hi $name",
+                "Hi Sam",
+                "$name",
+                "Hi \"Sam\""
+              ],
+              "answerIndex": 1,
+              "explanation": "Inside double quotes, `$name` is expanded to its value, so the output is `Hi Sam`. Double quotes allow variable expansion while still grouping the text together.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-3.svg"
+            },
+            {
+              "id": "bash-scripting-mcq-single-quote-literal",
+              "type": "mcq",
+              "prompt": "Given `name=\"Sam\"`, what does `echo 'Hi $name'` print (note the SINGLE quotes)?",
+              "choices": [
+                "Hi Sam",
+                "Hi $name",
+                "Sam",
+                "An error"
+              ],
+              "answerIndex": 1,
+              "explanation": "Single quotes are fully literal: nothing inside them is expanded, so `$name` is printed exactly as typed. Use double quotes when you want the variable replaced by its value.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-3.svg"
+            },
+            {
+              "id": "bash-scripting-mcq-command-substitution",
+              "type": "mcq",
+              "prompt": "What does `today=$(date +%F)` do?",
+              "choices": [
+                "Sets today to the literal text 'date +%F'",
+                "Runs the date command and stores its output in the variable today",
+                "Prints the date to the screen",
+                "Creates a file called today"
+              ],
+              "answerIndex": 1,
+              "explanation": "`$( )` runs the command inside and captures its output as text. So `today` holds the result of `date +%F` (a date like 2026-06-19). This is called command substitution.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-3.svg"
+            },
+            {
+              "id": "bash-scripting-mcq-quote-habit",
+              "type": "mcq",
+              "prompt": "Which is the recommended habit when using a variable's value?",
+              "choices": [
+                "Always leave it bare, like $file",
+                "Wrap it in double quotes, like \"$file\"",
+                "Wrap it in single quotes, like '$file'",
+                "Write it in capitals, like $FILE"
+              ],
+              "answerIndex": 1,
+              "explanation": "Double-quoting `\"$file\"` is the safe default — it protects values that contain spaces (covered fully in a later lesson). Single quotes would stop the value from expanding at all, and capitalization does not affect safety.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-3.svg"
             }
           ]
         },
         {
-          "id": "bash-scripting-control-flow-functions",
-          "title": "Control Flow, Functions, getopts & Safe File Loops",
+          "id": "bash-scripting-making-decisions",
+          "title": "Making Decisions: if, [[ ]] Tests, and case",
           "order": 3,
-          "difficulty": 3,
-          "content": "With safety and strings handled, structure the logic. Use `[[ ]]` for tests, not the old `[ ]`/`test`:\n\n```bash\nif [[ -f $file && $count -gt 0 ]]; then ...; fi\n```\n\n`[[ ]]` is a bash keyword: it does no word-splitting or glob expansion on its operands (so unquoted `$file` is safe), supports `&&`/`||`/`==` pattern matching and `=~` regex. Plain `[ ]` is just the `test` command — it word-splits, needs every variable quoted, and is only worth it for strict POSIX sh. For integer math use the arithmetic context `(( ))`:\n\n```bash\nif (( count > 0 )); then ((total += count)); fi\n```\n\n`case` beats long if-chains for dispatch, and functions keep things tidy — always declare loop and temp variables `local`:\n\n```bash\nlog() { printf '%s\\n' \"$*\" >&2; }   # log to stderr\nbackup() {\n  local src=$1 dest=$2\n  cp -a -- \"$src\" \"$dest\"\n}\n```\n\nFunctions return an *exit code* (0-255) via `return`; emit real data on stdout and capture with `$(func)`.\n\nParse flags with `getopts` (POSIX, short options):\n\n```bash\nwhile getopts \":o:v\" opt; do\n  case $opt in\n    o) out=$OPTARG ;;\n    v) verbose=1 ;;\n    *) echo \"usage: ...\" >&2; exit 2 ;;\n  esac\ndone\nshift $((OPTIND - 1))\n```\n\nThe single most important loop idiom is safe filename iteration — never `for f in $(ls)`. Use `while read -r` with a null delimiter:\n\n```bash\nwhile IFS= read -r -d '' f; do\n  printf 'processing %s\\n' \"$f\"\ndone < <(find . -type f -print0)\n```\n\n`-r` keeps backslashes literal, `IFS=` preserves leading/trailing whitespace, `-d ''` splits on NUL so spaces and newlines in names are harmless.",
+          "difficulty": 2,
+          "content": "So far a script runs every line no matter what. A real program needs to **make decisions**: do this *only if* something is true. That is what `if` is for.\n\nThe shape is `if` ... `then` ... `fi` (`fi` is `if` spelled backwards, marking the end):\n\n```bash\nif [[ -f report.txt ]]; then\n    echo \"found it\"\nelse\n    echo \"missing\"\nfi\n```\n\nThe part in `[[ ... ]]` is the **test** — a question that is either true or false. The `then` block runs when the test is true; the optional `else` block runs otherwise. Always use the modern `[[ ]]` form in bash; the older `[ ]` (also spelled `test`) works but is fussier about spaces and quoting, so prefer `[[ ]]`.\n\nCommon tests:\n\n```bash\n[[ -f path ]]       # true if path is a file that exists\n[[ -d path ]]       # true if path is a directory\n[[ -z \"$x\" ]]       # true if the string $x is empty\n[[ \"$a\" == \"$b\" ]]  # true if the two strings are equal\n```\n\nComparing **numbers** uses a different bracket, the arithmetic `(( ))`:\n\n```bash\nif (( count > 0 )); then echo \"have $count\"; fi\n```\n\nUse `(( ))` for math (`>`, `<`, `==` on numbers) and `[[ ]]` for files and strings. (A classic mix-up: inside `[[ ]]`, `>` compares text alphabetically, not by size.)\n\nWhen you have many possible values, a long `if`/`elif` chain gets clumsy. **case** is cleaner for matching one value against several options:\n\n```bash\ncase \"$1\" in\n  start) echo \"starting\" ;;\n  stop)  echo \"stopping\" ;;\n  *)     echo \"usage: start|stop\" ;;\nesac\n```\n\nEach branch ends with `;;`, and `*)` is the catch-all default.\n\n**Recap:** `if [[ test ]]; then ... fi` runs code only when the test is true; add `else` for the other path. Use `(( ))` for number comparisons, and `case` to match one value against many options.",
           "items": [
             {
-              "id": "bash-scripting-control-flow-functions-001",
-              "type": "flashcard",
-              "front": "Name two concrete advantages of `[[ ]]` over `[ ]` in bash.",
-              "back": "1) `[[ ]]` does no word-splitting or glob expansion on its operands, so unquoted `$var` is safe and empty values don't break the test. 2) It supports `&&`, `||`, `==` glob pattern matching and `=~` regex directly. `[ ]` is the external/builtin `test` and requires careful quoting.",
-              "hint": "Word-splitting and regex."
-            },
-            {
-              "id": "bash-scripting-control-flow-functions-002",
-              "type": "flashcard",
-              "front": "When would you still use `[ ]` instead of `[[ ]]`?",
-              "back": "When the script must be portable POSIX `sh` (e.g. `#!/bin/sh`, running under dash/busybox), since `[[ ]]` is a bash/ksh extension not in POSIX. In that case use `[ ]` and quote every variable.",
-              "hint": "POSIX portability."
-            },
-            {
-              "id": "bash-scripting-control-flow-functions-003",
-              "type": "flashcard",
-              "front": "Why declare variables `local` inside functions?",
-              "back": "Bash variables are global by default, so an unmarked assignment inside a function can clobber a caller's variable (especially loop counters like `i`). `local` scopes the variable to the function, preventing action-at-a-distance bugs.",
-              "hint": "Default scope is global."
-            },
-            {
-              "id": "bash-scripting-control-flow-functions-004",
-              "type": "flashcard",
-              "front": "How does a bash function return data vs. a status?",
-              "back": "`return N` sets the exit STATUS (0-255), used for success/failure, read via `$?`. To return DATA, print it to stdout and capture with command substitution: `result=$(myfunc)`. Conflating the two (e.g. `return $bignum`) truncates mod 256.",
-              "hint": "stdout for data, return for status."
-            },
-            {
-              "id": "bash-scripting-control-flow-functions-005",
+              "id": "bash-scripting-mcq-if-purpose",
               "type": "mcq",
-              "prompt": "Why is `for f in $(ls)` an unsafe way to loop over files?",
+              "prompt": "What is the purpose of an `if` statement in a script?",
               "choices": [
-                "ls is deprecated",
-                "The unquoted command substitution word-splits on IFS and glob-expands, breaking on filenames with spaces, newlines, or shell metacharacters",
-                "It only lists hidden files",
-                "It is too slow"
+                "To repeat a command many times",
+                "To run a block of code only when a test is true",
+                "To define a variable",
+                "To print text faster"
               ],
               "answerIndex": 1,
-              "explanation": "`$(ls)` output is word-split on IFS (spaces, tabs, newlines) and then pathname-expanded, so any filename containing whitespace or glob chars is mangled or split into multiple iterations. Use `while IFS= read -r -d '' f; do ...; done < <(find . -print0)` or a plain glob `for f in *`."
+              "explanation": "`if` lets the script branch: the `then` block runs only when the test is true. Repeating commands is what loops do, which is a separate idea.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-4.svg"
             },
             {
-              "id": "bash-scripting-control-flow-functions-006",
+              "id": "bash-scripting-mcq-fi-keyword",
               "type": "mcq",
-              "prompt": "In the safe loop `while IFS= read -r -d '' f`, what does the `-r` flag do?",
+              "prompt": "What marks the end of an `if` block in bash?",
               "choices": [
-                "Reads in reverse",
-                "Prevents backslashes from being interpreted as escape characters",
-                "Reads recursively",
-                "Requires root"
+                "end",
+                "fi",
+                "}",
+                "endif"
               ],
               "answerIndex": 1,
-              "explanation": "`-r` (raw) tells `read` not to treat backslashes as escapes, so a filename like `a\\b` is read literally. `IFS=` preserves leading/trailing whitespace, and `-d ''` sets a NUL delimiter to match `find -print0`. You should essentially always use `read -r`."
+              "explanation": "Bash closes an `if` with `fi` (\"if\" reversed). It does not use `end`, curly braces, or `endif` for this. Similarly `case` ends with `esac`.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-4.svg"
             },
             {
-              "id": "bash-scripting-control-flow-functions-007",
+              "id": "bash-scripting-mcq-test-file",
               "type": "mcq",
-              "prompt": "After a `getopts` parsing loop, why run `shift $((OPTIND - 1))`?",
+              "prompt": "What does the test `[[ -f config.txt ]]` check?",
               "choices": [
-                "To reset getopts for reuse",
-                "To discard the parsed options so the remaining positional arguments start at $1",
-                "To sort the arguments",
-                "It is purely cosmetic"
+                "Whether config.txt is empty",
+                "Whether config.txt exists and is a regular file",
+                "Whether config.txt is a directory",
+                "Whether you can write to config.txt"
               ],
               "answerIndex": 1,
-              "explanation": "`getopts` advances `OPTIND` past the options it consumed. `shift $((OPTIND - 1))` drops those, so `$1`, `$2`, ... and `$@` now refer to the non-option (positional) arguments — e.g. the file paths after the flags."
+              "explanation": "`-f` is true when the path exists and is a regular file. `-d` would test for a directory, and `-z` tests whether a string is empty.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-4.svg"
             },
             {
-              "id": "bash-scripting-control-flow-functions-008",
+              "id": "bash-scripting-mcq-else-branch",
               "type": "mcq",
-              "prompt": "Which construct is the right tool for integer comparison in bash?",
+              "prompt": "In `if [[ -d backups ]]; then echo yes; else echo no; fi`, when does it print `no`?",
               "choices": [
-                "[[ $a > $b ]]",
-                "[ $a -gt $b ] only",
-                "(( a > b ))",
-                "$a > $b"
+                "Always",
+                "When `backups` is NOT an existing directory",
+                "Only when `backups` is a file",
+                "Never"
               ],
-              "answerIndex": 2,
-              "explanation": "The arithmetic context `(( a > b ))` does numeric comparison and lets you write `count`, `total += 1`, etc. naturally. Inside `[[ ]]`, `>` is a STRING (lexical) comparison, so `[[ 9 > 10 ]]` is true lexically — a classic bug. Use `(( ))` for math, `[[ ]]` for strings/files."
+              "answerIndex": 1,
+              "explanation": "The `else` block runs whenever the test is false — here, when `backups` is not an existing directory. If it is a directory, the `then` block prints `yes` instead.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-4.svg"
             },
             {
-              "id": "bash-scripting-control-flow-functions-009",
-              "type": "flashcard",
-              "front": "Why send log/diagnostic output to stderr (`>&2`) in a function meant to also return data?",
-              "back": "If the function's data is captured via `$(func)`, anything printed to stdout becomes part of the captured value. Routing logs to stderr (`printf ... >&2`) keeps them visible on the terminal / journald without polluting the captured result.",
-              "hint": "stdout is the return channel."
+              "id": "bash-scripting-mcq-string-equal",
+              "type": "mcq",
+              "prompt": "Which test is true when the variable mode equals the text \"on\"?",
+              "choices": [
+                "[[ \"$mode\" == \"on\" ]]",
+                "[[ $mode = = on ]]",
+                "(( mode == on ))",
+                "[[ mode equals on ]]"
+              ],
+              "answerIndex": 0,
+              "explanation": "String comparison uses `==` (or `=`) inside `[[ ]]`, with the variable quoted: `[[ \"$mode\" == \"on\" ]]`. `(( ))` is for numbers, not text, and there is no `equals` keyword.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-4.svg"
+            },
+            {
+              "id": "bash-scripting-mcq-arithmetic-compare",
+              "type": "mcq",
+              "prompt": "Which is the right way to check whether the number in `count` is greater than 0?",
+              "choices": [
+                "[[ count > 0 ]]",
+                "(( count > 0 ))",
+                "if count > 0",
+                "[[ $count -bigger 0 ]]"
+              ],
+              "answerIndex": 1,
+              "explanation": "`(( count > 0 ))` does a numeric comparison. Inside `[[ ]]`, `>` compares strings alphabetically, so `[[ 9 > 10 ]]` would be true — a classic bug. Use `(( ))` for math.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-4.svg"
+            },
+            {
+              "id": "bash-scripting-mcq-bracket-vs-test",
+              "type": "mcq",
+              "prompt": "Why is `[[ ]]` preferred over the older `[ ]` for tests in a bash script?",
+              "choices": [
+                "`[[ ]]` is the only one that works at all",
+                "`[[ ]]` is more forgiving — it handles unquoted variables and empty values more safely",
+                "`[ ]` only works for numbers",
+                "There is no difference"
+              ],
+              "answerIndex": 1,
+              "explanation": "`[[ ]]` is a bash keyword that avoids many word-splitting and quoting pitfalls of the older `[ ]` command. `[ ]` still works (and is needed for strict POSIX sh), but `[[ ]]` is safer in bash.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-4.svg"
+            },
+            {
+              "id": "bash-scripting-mcq-case-purpose",
+              "type": "mcq",
+              "prompt": "When is `case` a better choice than a long `if`/`elif` chain?",
+              "choices": [
+                "When you need to loop over files",
+                "When you are matching one value against several possible options",
+                "When you only have a single true/false test",
+                "When you want to do arithmetic"
+              ],
+              "answerIndex": 1,
+              "explanation": "`case` cleanly dispatches one value (like a command word) to many branches, each ending in `;;`. For a single condition, a plain `if` is simpler; for math you use `(( ))`.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-4.svg"
+            },
+            {
+              "id": "bash-scripting-mcq-case-default",
+              "type": "mcq",
+              "prompt": "In a `case` statement, what does the `*)` branch do?",
+              "choices": [
+                "It multiplies the value",
+                "It is the catch-all default that matches anything not listed above",
+                "It ends the whole script",
+                "It comments out the branch"
+              ],
+              "answerIndex": 1,
+              "explanation": "`*)` matches any value that did not match an earlier pattern, so it acts as the default (often an error/usage message). It has nothing to do with multiplication.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-4.svg"
             }
           ]
         },
         {
-          "id": "bash-scripting-robustness-python-boundary",
-          "title": "Traps, ShellCheck, Process Substitution & the Python Boundary",
+          "id": "bash-scripting-loops",
+          "title": "Loops: for and while",
           "order": 4,
-          "difficulty": 3,
-          "content": "Production scripts clean up after themselves. `trap` registers a handler that runs on signals or pseudo-signals:\n\n```bash\ntmp=$(mktemp -d)\ncleanup() { rm -rf -- \"$tmp\"; }\ntrap cleanup EXIT          # runs on normal exit, error, or Ctrl-C\ntrap 'echo \"failed at line $LINENO\" >&2' ERR\n```\n\n`trap ... EXIT` is the workhorse: it fires no matter how the script ends (success, `set -e` abort, or signal), so a temp dir is always removed — the scripting analog of a `finally` block, and the same discipline as powering down a test rig cleanly.\n\nProcess substitution `<(...)` lets a command read another command's output as if it were a file, avoiding temp files and the subshell-variable-loss of pipes:\n\n```bash\ndiff <(sort a.txt) <(sort b.txt)\nwhile read -r line; do count=$line; done < <(wc -l < big.log)\n```\n\nBefore shipping, **run ShellCheck** (`shellcheck script.sh`) — it statically flags unquoted expansions, useless `cat`, missing `read -r`, and `set -e` gotchas; treat a clean ShellCheck pass as mandatory, like a clean lint. For runtime issues, `bash -x script.sh` or `set -x` traces execution.\n\nThe most important judgment call is **when to abandon bash for Python**. Reach for Python (`subprocess`, `pathlib`, `argparse`, `json`, `venv`) once a script: grows past ~50-100 lines; needs real data structures (lists of dicts, nested JSON); does HTTP/API calls or parses structured data; needs proper error handling, retries, or unit tests; or has quoting that keeps biting you. Bash excels at gluing CLI tools and short pipelines; Python excels at logic, data, and testability. Recognizing that boundary early is itself a senior skill.",
+          "difficulty": 2,
+          "content": "Computers are great at doing the same thing many times. A **loop** repeats a block of commands so you do not have to copy-paste it. Bash has two everyday loops: `for` and `while`.\n\nA **for loop** runs its body once for each item in a list. The body sits between `do` and `done`:\n\n```bash\nfor color in red green blue; do\n    echo \"$color\"\ndone\n```\n\nOn each pass, the variable (`color` here) is set to the next item. So this prints `red`, then `green`, then `blue`. The list can be words you type, a number range, or a glob of filenames:\n\n```bash\nfor n in 1 2 3; do echo \"$n\"; done       # 1 2 3\nfor f in *.txt; do echo \"$f\"; done        # every .txt file in this folder\n```\n\nUsing a glob like `*.txt` directly is the **safe** way to loop over files, because bash hands each real filename to the loop intact — even names with spaces.\n\nA **while loop** repeats *as long as a test stays true*. It is the right tool when you do not know the count ahead of time:\n\n```bash\ncount=1\nwhile (( count <= 3 )); do\n    echo \"pass $count\"\n    (( count++ ))         # add 1 to count\ndone\n```\n\nIf you forget to change the test (here, increasing `count`), the loop never ends — an **infinite loop**. Press Ctrl-C to stop a runaway loop.\n\nA very common `while` pattern is reading a file one line at a time, which you will meet again later:\n\n```bash\nwhile IFS= read -r line; do\n    echo \"got: $line\"\ndone < notes.txt\n```\n\n**Recap:** a `for` loop repeats once per item in a list (use `*.txt` to loop over files safely); a `while` loop repeats while a test is true (remember to change the test, or it runs forever).",
           "items": [
             {
-              "id": "bash-scripting-robustness-python-boundary-001",
-              "type": "flashcard",
-              "front": "Why is `trap cleanup EXIT` preferred over putting `rm -rf \"$tmp\"` at the end of the script?",
-              "back": "`EXIT` fires on EVERY exit path — normal completion, a `set -e` abort, an error, or a caught signal — so the temp dir is removed even when the script dies early. A cleanup line at the bottom is skipped on any premature exit. It is bash's `finally`.",
-              "hint": "What happens if the script aborts halfway?"
-            },
-            {
-              "id": "bash-scripting-robustness-python-boundary-002",
-              "type": "flashcard",
-              "front": "What does the `ERR` trap give you that `EXIT` does not?",
-              "back": "`trap '...' ERR` runs specifically when a command fails (returns non-zero) under `set -e`, letting you log context like `$LINENO` or the failing command before exiting. `EXIT` runs unconditionally and can't distinguish success from failure on its own (you check `$?`).",
-              "hint": "Failure-specific diagnostics."
-            },
-            {
-              "id": "bash-scripting-robustness-python-boundary-003",
-              "type": "flashcard",
-              "front": "What does process substitution `<(cmd)` provide?",
-              "back": "It runs `cmd` and exposes its output via a filename (a `/dev/fd/...` path or FIFO) so another command can read it as a file — e.g. `diff <(sort a) <(sort b)`. It also avoids the pipe pitfall where `cmd | while read` runs the loop in a subshell and loses variable changes.",
-              "hint": "Command output as a file."
-            },
-            {
-              "id": "bash-scripting-robustness-python-boundary-004",
-              "type": "flashcard",
-              "front": "What is ShellCheck and why run it on every script?",
-              "back": "ShellCheck is a static analyzer for shell scripts. It catches unquoted variables, missing `read -r`, useless `cat`, `set -e` blind spots, and dozens of common bugs before runtime. A clean ShellCheck pass is the shell equivalent of a clean lint and should be treated as mandatory.",
-              "hint": "Static analysis / linter for shell."
-            },
-            {
-              "id": "bash-scripting-robustness-python-boundary-005",
+              "id": "bash-scripting-mcq-loop-what",
               "type": "mcq",
-              "prompt": "Which is the STRONGEST signal that you should rewrite a bash script in Python?",
+              "prompt": "What does a loop do in a script?",
               "choices": [
-                "It uses more than one pipe",
-                "It needs to parse and manipulate nested JSON / structured data with real error handling",
-                "It has a for loop",
-                "It calls `grep`"
+                "Runs a block of commands repeatedly",
+                "Deletes a block of commands",
+                "Hides output from the screen",
+                "Defines a new variable"
+              ],
+              "answerIndex": 0,
+              "explanation": "A loop repeats a block of commands so you avoid copy-pasting. `for` repeats per item in a list; `while` repeats while a condition holds.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-5.svg"
+            },
+            {
+              "id": "bash-scripting-mcq-for-passes",
+              "type": "mcq",
+              "prompt": "How many times does the body run in `for x in a b c d; do echo \"$x\"; done`?",
+              "choices": [
+                "Once",
+                "Three times",
+                "Four times",
+                "Forever"
+              ],
+              "answerIndex": 2,
+              "explanation": "A `for` loop runs once per item in the list. The list `a b c d` has four items, so the body runs four times, printing each in turn.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-5.svg"
+            },
+            {
+              "id": "bash-scripting-mcq-do-done",
+              "type": "mcq",
+              "prompt": "Which keywords wrap the body of a bash loop?",
+              "choices": [
+                "begin ... end",
+                "do ... done",
+                "{ ... }",
+                "then ... fi"
               ],
               "answerIndex": 1,
-              "explanation": "Nested data structures, JSON/HTTP, real error handling, and testability are exactly where bash gets painful and Python (json, requests/urllib, dataclasses, try/except, unit tests) shines. Pipes, loops, and calling grep are bread-and-butter bash and not reasons to switch."
+              "explanation": "Both `for` and `while` loops put their body between `do` and `done`. `then ... fi` belongs to `if`, and bash loops do not use `begin/end` or braces for this.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-5.svg"
             },
             {
-              "id": "bash-scripting-robustness-python-boundary-006",
+              "id": "bash-scripting-mcq-for-variable",
               "type": "mcq",
-              "prompt": "Which Python standard-library trio replaces the typical 'shell out + manipulate paths + parse flags' job when porting a script?",
+              "prompt": "In `for color in red green blue; do echo \"$color\"; done`, what is `$color` during the second pass?",
               "choices": [
-                "os.system + glob + sys.argv",
-                "subprocess + pathlib + argparse",
-                "eval + open + getopt only",
-                "shutil + pickle + re"
+                "red",
+                "green",
+                "blue",
+                "the whole list red green blue"
               ],
               "answerIndex": 1,
-              "explanation": "`subprocess` (run external commands safely with argument lists, no shell quoting), `pathlib` (object-oriented path/file handling), and `argparse` (declarative flag parsing with help and validation) are the modern idiomatic replacements for shelling out, path munging, and getopts."
+              "explanation": "Each pass sets the loop variable to the next item. Pass one is `red`, pass two is `green`, pass three is `blue`. The variable holds one item at a time, not the whole list.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-5.svg"
             },
             {
-              "id": "bash-scripting-robustness-python-boundary-007",
+              "id": "bash-scripting-mcq-for-glob",
               "type": "mcq",
-              "prompt": "How do you trace exactly which commands a script runs, with their expanded arguments?",
+              "prompt": "What does `for f in *.txt; do ... done` loop over?",
+              "choices": [
+                "The literal text '*.txt' once",
+                "Each file ending in .txt in the current folder",
+                "Every file on the whole system",
+                "Only the first .txt file"
+              ],
+              "answerIndex": 1,
+              "explanation": "Bash expands the glob `*.txt` into the matching filenames in the current folder, and the loop runs once per file. This is the safe, recommended way to iterate over files.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-5.svg"
+            },
+            {
+              "id": "bash-scripting-mcq-while-condition",
+              "type": "mcq",
+              "prompt": "A `while` loop keeps running...",
+              "choices": [
+                "exactly ten times",
+                "as long as its test stays true",
+                "until you save the file",
+                "only once"
+              ],
+              "answerIndex": 1,
+              "explanation": "A `while` loop checks its test before each pass and continues while the test is true. It is ideal when you do not know in advance how many passes you need.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-5.svg"
+            },
+            {
+              "id": "bash-scripting-mcq-infinite-loop",
+              "type": "mcq",
+              "prompt": "What is an infinite loop, and how is it usually caused?",
+              "choices": [
+                "A loop that runs zero times because the list is empty",
+                "A loop that never ends because its test never becomes false (e.g. you forgot to update the counter)",
+                "A loop that runs on another computer",
+                "A loop that prints nothing"
+              ],
+              "answerIndex": 1,
+              "explanation": "If the condition never turns false — often because the counter is never increased — the loop runs forever. Press Ctrl-C to stop it. Make sure each pass moves toward ending the loop.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-5.svg"
+            },
+            {
+              "id": "bash-scripting-mcq-while-read",
+              "type": "mcq",
+              "prompt": "What does `while IFS= read -r line; do ...; done < notes.txt` do?",
+              "choices": [
+                "Reads notes.txt one line at a time into the variable line",
+                "Deletes every line of notes.txt",
+                "Counts the words in notes.txt",
+                "Writes new lines into notes.txt"
+              ],
+              "answerIndex": 0,
+              "explanation": "This is the standard pattern for reading a file line by line: each pass puts the next line into `line`. The `< notes.txt` feeds the file in as input. `read -r` keeps the line exactly as written.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-5.svg"
+            },
+            {
+              "id": "bash-scripting-mcq-stop-runaway",
+              "type": "mcq",
+              "prompt": "A loop is running forever and flooding your screen. What stops it?",
+              "choices": [
+                "Pressing Ctrl-C",
+                "Closing the lid",
+                "Typing 'stop' and Enter",
+                "Waiting; it will end on its own"
+              ],
+              "answerIndex": 0,
+              "explanation": "Ctrl-C sends an interrupt that stops the running command. An infinite loop will not end on its own, and there is no magic `stop` word for it.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-5.svg"
+            }
+          ]
+        },
+        {
+          "id": "bash-scripting-arguments",
+          "title": "Reading Arguments: $1, $@, shift, getopts",
+          "order": 5,
+          "difficulty": 2,
+          "content": "A script becomes a real reusable tool when you can feed it different inputs each time, instead of hard-coding values. The words you type *after* the script name are its **arguments**, and the script reads them through special variables.\n\nIf you run:\n\n```bash\n./greet.sh Sam Alex Jo\n```\n\nthen inside the script:\n\n- `$1` is the first argument (`Sam`), `$2` the second (`Alex`), `$3` the third (`Jo`).\n- `$@` is *all* the arguments as a list — always write it quoted, `\"$@\"`, so each one stays separate even if it contains spaces.\n- `$#` is the *count* of arguments (here, `3`). `$0` is the script's own name.\n\n```bash\n#!/usr/bin/env bash\necho \"first is $1\"\necho \"there are $# arguments\"\nfor name in \"$@\"; do\n    echo \"hello $name\"\ndone\n```\n\nIt is good manners to check you actually got an argument before using it:\n\n```bash\nif [[ -z \"$1\" ]]; then\n    echo \"usage: greet.sh NAME\" >&2\n    exit 1\nfi\n```\n\n**shift** drops `$1` and slides everything down: the old `$2` becomes the new `$1`. It is handy for processing arguments one at a time in a loop.\n\nFor proper *named options* like `-o output.txt` or `-v`, counting positions gets awkward. Bash provides **getopts** to parse single-letter flags cleanly:\n\n```bash\nwhile getopts \"o:v\" opt; do\n  case \"$opt\" in\n    o) out=\"$OPTARG\" ;;   # the colon after o means it takes a value\n    v) verbose=1 ;;\n    *) echo \"usage: ...\" >&2; exit 2 ;;\n  esac\ndone\n```\n\n**Recap:** arguments after the script name arrive as `$1`, `$2`, ...; `\"$@\"` is the whole list and `$#` is the count. Use `shift` to step through them, and `getopts` for named `-x` style options.",
+          "items": [
+            {
+              "id": "bash-scripting-mcq-arg-what",
+              "type": "mcq",
+              "prompt": "What are a script's 'arguments'?",
+              "choices": [
+                "Error messages it prints",
+                "The words you type after the script name when you run it",
+                "Comments inside the script",
+                "The script's variables"
+              ],
+              "answerIndex": 1,
+              "explanation": "Arguments are the extra words supplied on the command line after the script name, like the file or name you want it to act on. They let one script handle different inputs.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-6.svg"
+            },
+            {
+              "id": "bash-scripting-mcq-arg-first",
+              "type": "mcq",
+              "prompt": "You run `./backup.sh photos`. Inside the script, what is `$1`?",
+              "choices": [
+                "backup.sh",
+                "photos",
+                "the number 1",
+                "empty"
+              ],
+              "answerIndex": 1,
+              "explanation": "`$1` is the first argument after the script name, which is `photos`. The script's own name is `$0`, not `$1`.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-6.svg"
+            },
+            {
+              "id": "bash-scripting-mcq-arg-all",
+              "type": "mcq",
+              "prompt": "Which variable holds ALL the arguments as a list?",
+              "choices": [
+                "$#",
+                "$@",
+                "$0",
+                "$?"
+              ],
+              "answerIndex": 1,
+              "explanation": "`$@` is the full list of arguments (best written quoted as `\"$@\"`). `$#` is just the count, `$0` is the script name, and `$?` is the exit status of the last command.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-6.svg"
+            },
+            {
+              "id": "bash-scripting-mcq-arg-count",
+              "type": "mcq",
+              "prompt": "You run `./tool.sh a b c`. What is the value of `$#`?",
+              "choices": [
+                "0",
+                "1",
+                "3",
+                "a b c"
+              ],
+              "answerIndex": 2,
+              "explanation": "`$#` is the number of arguments passed, which is 3 here. To see the arguments themselves you would use `\"$@\"`.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-6.svg"
+            },
+            {
+              "id": "bash-scripting-mcq-arg-quote-at",
+              "type": "mcq",
+              "prompt": "Why should you usually write `\"$@\"` with quotes when looping over arguments?",
+              "choices": [
+                "Quotes make it run faster",
+                "So each argument stays as one piece, even if it contains spaces",
+                "Quotes are required or bash crashes",
+                "It changes $@ into a number"
+              ],
+              "answerIndex": 1,
+              "explanation": "Quoted `\"$@\"` keeps every argument intact as a separate word, so an argument like `my file.txt` is not split on its space. Unquoted, it would break apart — the same quoting lesson as for any variable.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-6.svg"
+            },
+            {
+              "id": "bash-scripting-mcq-shift",
+              "type": "mcq",
+              "prompt": "What does the `shift` command do to a script's arguments?",
+              "choices": [
+                "Sorts the arguments alphabetically",
+                "Drops $1 so that the old $2 becomes the new $1",
+                "Reverses the order of all arguments",
+                "Adds a new argument at the end"
+              ],
+              "answerIndex": 1,
+              "explanation": "`shift` removes the first argument and slides the rest down by one position. It is useful for processing arguments one at a time in a loop.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-6.svg"
+            },
+            {
+              "id": "bash-scripting-mcq-check-arg",
+              "type": "mcq",
+              "prompt": "Why check `if [[ -z \"$1\" ]]; then ...; exit 1; fi` near the top of a script?",
+              "choices": [
+                "To make the script run twice",
+                "To stop with a helpful message when the required argument is missing",
+                "To delete the first argument",
+                "To convert $1 to a number"
+              ],
+              "answerIndex": 1,
+              "explanation": "`-z \"$1\"` is true when the first argument is empty (not supplied). Catching that lets you print a usage message and exit instead of failing in a confusing way later.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-6.svg"
+            },
+            {
+              "id": "bash-scripting-mcq-getopts-when",
+              "type": "mcq",
+              "prompt": "When is `getopts` the right tool?",
+              "choices": [
+                "When you need to parse named single-letter options like -o and -v",
+                "When you want to loop over files",
+                "When you need to do arithmetic",
+                "When you want to print text"
+              ],
+              "answerIndex": 0,
+              "explanation": "`getopts` cleanly parses short options such as `-v` or `-o value`, rather than you counting positional arguments by hand. For plain inputs, `$1`/`$@` are enough.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-6.svg"
+            },
+            {
+              "id": "bash-scripting-mcq-getopts-colon",
+              "type": "mcq",
+              "prompt": "In a getopts string like `\"o:v\"`, what does the colon after `o` mean?",
+              "choices": [
+                "The -o option is required",
+                "The -o option takes a value (an argument), available in $OPTARG",
+                "The -o option is disabled",
+                "It marks the end of the options"
+              ],
+              "answerIndex": 1,
+              "explanation": "A trailing colon means that option expects a value; getopts puts that value in `$OPTARG`. So `o:` means `-o something`, while `v` (no colon) is a simple on/off flag.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-6.svg"
+            }
+          ]
+        },
+        {
+          "id": "bash-scripting-robust-scripts",
+          "title": "Robust Scripts: Quoting, set -euo pipefail, Functions, Cleanup, and When to Use Python",
+          "order": 6,
+          "difficulty": 3,
+          "content": "A script that works on your machine today should not quietly break tomorrow. This lesson collects the habits that make scripts trustworthy.\n\n**Always quote your variables.** This is the single most common bash bug. If a filename has a space, an unquoted variable splits into two words:\n\n```bash\nfile=\"my report.txt\"\nrm $file        # WRONG: bash sees rm \"my\" \"report.txt\" — two names!\nrm \"$file\"      # RIGHT: stays one name\n```\n\nThe same trap is why `for f in $(ls)` is buggy: the output of `ls` is split on spaces, so a name like `my report.txt` becomes two items. Loop with a glob (`for f in *`) and quote `\"$f\"` instead.\n\n**Fail fast with `set -euo pipefail`.** Put this right under the shebang:\n\n```bash\n#!/usr/bin/env bash\nset -euo pipefail\n```\n\n- `-e`: stop on the first command that fails, instead of charging on.\n- `-u`: error if you use a variable you never set (catches typos like `$flie`).\n- `-o pipefail`: a pipeline fails if *any* stage fails, not just the last.\n\n**Exit codes** are how programs report success: `0` means success, any other number means an error. Your script returns one with `exit 0` (good) or `exit 1` (problem); the special variable `$?` holds the last command's code.\n\n**Functions** group commands under a name so you can reuse them. Mark a function's own variables `local` so they do not leak out:\n\n```bash\ngreet() {\n    local who=\"$1\"\n    echo \"hello $who\"\n}\ngreet Sam\n```\n\n**Clean up with `trap`.** A `trap` runs a command when the script exits — even if it fails partway — so temporary files always get removed:\n\n```bash\ntmp=$(mktemp)\ntrap 'rm -f \"$tmp\"' EXIT\n```\n\n**Debugging:** run `bash -x script.sh` to see each command as it executes, and run **ShellCheck** (`shellcheck script.sh`), a free tool that flags quoting and other common mistakes before they bite.\n\n**When to switch to Python.** Bash is perfect for short scripts that glue commands together. But once a script grows past roughly 100 lines, needs real data structures (lists, dictionaries, JSON), makes web/API calls, or you want to write tests, reach for **Python** (`subprocess`, `pathlib`, `argparse`) instead — it stays readable where bash gets painful.\n\n**Recap:** quote every `\"$var\"`, start with `set -euo pipefail`, return clear exit codes, group reuse into `local` functions, clean up with `trap ... EXIT`, lint with ShellCheck — and move to Python when the job outgrows simple glue.",
+          "items": [
+            {
+              "id": "bash-scripting-mcq-quote-why",
+              "type": "mcq",
+              "prompt": "Why should you write `rm \"$file\"` instead of `rm $file`?",
+              "choices": [
+                "Quotes make rm run faster",
+                "Without quotes, a filename containing a space splits into two separate names",
+                "rm requires quotes or it errors",
+                "Quotes delete the file more thoroughly"
+              ],
+              "answerIndex": 1,
+              "explanation": "An unquoted `$file` is split on spaces, so `my report.txt` becomes two arguments (`my` and `report.txt`) and rm acts on the wrong things. Quoting keeps the value as a single piece. This is the most common bash bug.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-7.svg"
+            },
+            {
+              "id": "bash-scripting-mcq-for-ls-bug",
+              "type": "mcq",
+              "prompt": "Why is `for f in $(ls)` considered buggy?",
+              "choices": [
+                "ls is not a real command",
+                "The output of ls is split on spaces, so filenames containing spaces break into multiple items",
+                "for loops cannot use ls",
+                "It only ever lists one file"
+              ],
+              "answerIndex": 1,
+              "explanation": "The unquoted command output is word-split, so a name like `my report.txt` is treated as two entries. The safe pattern is `for f in *` (a glob), with the body using `\"$f\"`.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-7.svg"
+            },
+            {
+              "id": "bash-scripting-mcq-set-e",
+              "type": "mcq",
+              "prompt": "What does the `-e` in `set -euo pipefail` do?",
+              "choices": [
+                "Echoes every command",
+                "Makes the script stop as soon as a command fails",
+                "Enables editing mode",
+                "Erases the screen"
+              ],
+              "answerIndex": 1,
+              "explanation": "`-e` (errexit) halts the script on the first command that returns a failure, so it does not keep running after something has already gone wrong.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-8.svg"
+            },
+            {
+              "id": "bash-scripting-mcq-set-u",
+              "type": "mcq",
+              "prompt": "What problem does the `-u` option catch?",
+              "choices": [
+                "Files that are too large",
+                "Using a variable that was never set (often a typo in its name)",
+                "Commands that run too slowly",
+                "Lines that are too long"
+              ],
+              "answerIndex": 1,
+              "explanation": "`-u` (nounset) makes referencing an unset variable an error, so a misspelling like `$flie` is caught immediately instead of silently expanding to nothing.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-8.svg"
+            },
+            {
+              "id": "bash-scripting-mcq-exit-code",
+              "type": "mcq",
+              "prompt": "By convention, what exit code does a program return to mean 'success'?",
+              "choices": [
+                "1",
+                "0",
+                "-1",
+                "Any number above 100"
+              ],
+              "answerIndex": 1,
+              "explanation": "An exit code of 0 means success; any non-zero value signals an error. Your script reports this with `exit 0` or `exit 1`, and `$?` holds the last command's code.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-8.svg"
+            },
+            {
+              "id": "bash-scripting-mcq-function-local",
+              "type": "mcq",
+              "prompt": "Why declare a function's variables with `local`?",
+              "choices": [
+                "It makes them run faster",
+                "So they stay inside the function and do not overwrite variables outside it",
+                "It is required or the function will not run",
+                "It prints the variable automatically"
+              ],
+              "answerIndex": 1,
+              "explanation": "Bash variables are global by default, so an unmarked assignment inside a function can clobber a variable elsewhere. `local` keeps the function's variables private to it, avoiding surprising bugs.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-8.svg"
+            },
+            {
+              "id": "bash-scripting-mcq-trap-cleanup",
+              "type": "mcq",
+              "prompt": "What is the benefit of `trap 'rm -f \"$tmp\"' EXIT`?",
+              "choices": [
+                "It deletes the script after running",
+                "It removes the temp file whenever the script exits, even if it fails partway",
+                "It traps and ignores all errors",
+                "It runs the script on every login"
+              ],
+              "answerIndex": 1,
+              "explanation": "A `trap ... EXIT` runs your cleanup on every exit path — normal finish, error, or interruption — so a temporary file is always cleaned up. A plain `rm` at the bottom would be skipped if the script exited early.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-8.svg"
+            },
+            {
+              "id": "bash-scripting-mcq-debug-x",
+              "type": "mcq",
+              "prompt": "How can you watch each command run, with its values filled in, to debug a script?",
               "choices": [
                 "shellcheck script.sh",
-                "bash -x script.sh (or set -x)",
+                "bash -x script.sh",
                 "set -e",
-                "trap DEBUG only"
+                "chmod +x script.sh"
               ],
               "answerIndex": 1,
-              "explanation": "`bash -x script.sh` (or `set -x` within the script) prints each command to stderr after expansion, just before executing it — the go-to runtime trace. ShellCheck is static (no execution); `set -e` controls error behavior, not tracing."
+              "explanation": "`bash -x script.sh` traces execution, printing each command after expansion just before it runs — great for seeing where things go wrong. ShellCheck is a separate, static check that does not run the script.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-8.svg"
             },
             {
-              "id": "bash-scripting-robustness-python-boundary-008",
+              "id": "bash-scripting-mcq-shellcheck",
               "type": "mcq",
-              "prompt": "Why does `count=0; ... | while read x; do ((count++)); done; echo $count` print 0?",
+              "prompt": "What is ShellCheck?",
               "choices": [
-                "read resets count",
-                "The piped `while` runs in a SUBSHELL, so its `count` changes don't reach the parent",
-                "((count++)) is invalid",
-                "echo runs before the loop"
+                "A command that runs your script as root",
+                "A free tool that reads your script and warns about common mistakes like missing quotes",
+                "A way to encrypt scripts",
+                "A replacement for bash"
               ],
               "answerIndex": 1,
-              "explanation": "In a pipeline, each stage runs in a subshell, so the loop's `count` increments are lost when the subshell exits. Use process substitution `done < <(cmd)` (loop runs in the current shell) so the variable survives — a key reason `<(...)` exists."
+              "explanation": "ShellCheck statically analyzes a script and flags issues such as unquoted variables and other common bugs, before you ever run it. Running it and fixing its findings is a great habit.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-9.svg"
             },
             {
-              "id": "bash-scripting-robustness-python-boundary-009",
-              "type": "flashcard",
-              "front": "Summarize the bash-vs-Python boundary heuristic in one sentence.",
-              "back": "Stay in bash for short scripts that glue CLI tools and pipelines together; switch to Python once you need data structures, HTTP/JSON, robust error handling/retries, unit tests, or you've passed roughly 50-100 lines and quoting keeps biting.",
-              "hint": "Glue vs. logic/data/tests."
+              "id": "bash-scripting-mcq-when-python",
+              "type": "mcq",
+              "prompt": "Which situation is the strongest sign you should switch from bash to Python?",
+              "choices": [
+                "The script uses a single pipe",
+                "The script needs to parse and manipulate nested JSON / data structures with real error handling",
+                "The script has one for loop",
+                "The script calls grep once"
+              ],
+              "answerIndex": 1,
+              "explanation": "Nested data, JSON/HTTP, and real error handling are exactly where bash gets painful and Python (with json, pathlib, try/except, tests) shines. A single pipe, one loop, or calling grep are everyday bash and not reasons to switch.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-9.svg"
             },
             {
-              "id": "bash-scripting-robustness-python-boundary-010",
-              "type": "flashcard",
-              "front": "Study this diagram.",
-              "back": "Decision diagram contrasting when to stay in bash (gluing CLI tools, short pipelines, always set -euo pipefail and ShellCheck) versus when to switch to Python (JSON/data structures, HTTP, error handling, testing, past ~50-100 lines).",
-              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-1.svg"
+              "id": "bash-scripting-mcq-bash-strength",
+              "type": "mcq",
+              "prompt": "What is bash best suited for, compared with Python?",
+              "choices": [
+                "Large programs with complex data structures and unit tests",
+                "Short scripts that glue command-line tools and pipelines together",
+                "Building web servers",
+                "Heavy numerical computation"
+              ],
+              "answerIndex": 1,
+              "explanation": "Bash excels at short glue: chaining commands, redirection, and file work. Once you need data structures, tests, or lots of logic (roughly past ~100 lines), Python is the clearer choice.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/linux-systems/images/bash-scripting-9.svg"
             }
           ]
         }
