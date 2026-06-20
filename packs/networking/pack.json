@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "id": "networking",
   "title": "Networking",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "description": "Networking from scratch (beginner rework in progress): 17 sub-topics from layering and the physical layer through IP, subnetting, routing, TCP/UDP, TLS, DNS, wireless and modern transport. Beginner-first readings, MCQ practice, and diagrams; tiered easy to hard.",
   "requires": [],
   "tags": [
@@ -4376,409 +4376,590 @@
       "order": 10,
       "lessons": [
         {
-          "id": "transport-tcp-udp-transport-tcp-udp-ports-udp",
-          "title": "Ports, the 4-Tuple & UDP",
+          "id": "transport-tcp-udp-transport-tcp-udp-intro-ports",
+          "title": "Ports, the Right Program, and Reliable vs Fast",
           "order": 1,
           "difficulty": 1,
-          "content": "# Ports, the 4-Tuple, and UDP\n\nThe transport layer's core job is **process-to-process delivery**. IP gets a packet to the right *host*; a 16-bit **port** number gets it to the right *process*. A connection (or flow) is uniquely identified by the **4-tuple**: `(src IP, src port, dst IP, dst port)`. Two browser tabs to the same server differ only in their ephemeral *source* port, yet the kernel demultiplexes them perfectly.\n\nPort ranges: **well-known** 0-1023 (80 HTTP, 443 HTTPS, 53 DNS, 22 SSH), **registered** 1024-49151, and **ephemeral/dynamic** ~49152-65535 (Linux default `32768-60999`) handed out for outbound client sockets.\n\n**UDP** is the minimal transport: a fixed **8-byte header** (src port, dst port, length, checksum) wrapping a datagram. It is **connectionless, unordered, and unreliable** — no handshake, no retransmission, no flow or congestion control. The kernel just stamps the header and hands it to IP. That austerity is a feature: there is no head-of-line blocking and no setup latency, so it is ideal for **DNS** (one tiny request/reply), **DHCP**, **VoIP/streaming** (a late packet is worthless — better to drop it), gaming, and as the **substrate for QUIC**, which rebuilds reliability and ordering per-stream in user space.\n\n```python\nimport socket\ns = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # UDP\ns.sendto(b'ping', ('192.0.2.10', 9999))   # fire-and-forget, no connect\ndata, addr = s.recvfrom(2048)             # who replied is in addr\n```\n",
+          "content": "# Getting Data to the Right Program\n\nYou already know that IP gets a packet to the right *computer*. But it does best-effort delivery only: packets can be lost, arrive out of order, or never show up, and IP makes no promises. That leaves two everyday problems unsolved. **(1)** A computer runs many programs at once — your web browser, an email app, a chat app. When data arrives, *which program should get it?* **(2)** Do you even need every byte to arrive completely and in order, or would you rather have it fast? The **transport layer** sits on top of IP and solves both.\n\n## Build: apartment numbers and delivery styles\n\nThink of an IP address as the **street address of a building**. It gets the mail to the right building, but the building has many apartments. A **port number** is like the **apartment number**: a 16-bit label (0 to 65535) that says which program inside the computer the data is for. Your browser might use apartment 443; email uses a different one. The pairing of an IP address *and* a port is called a **socket** — it pinpoints one program on one machine, the way \"123 Main St, Apartment 443\" pinpoints one home. Because every program listens on its own port, the computer can sort incoming data to the correct app. Sorting data to many ports at once is called **multiplexing** (just \"sharing one line among many\").\n\nWith data reaching the right program, you still pick a **delivery style**. **TCP** (Transmission Control Protocol) is reliable and ordered: like a **tracked package with delivery confirmation**, it sets things up first, re-sends anything lost, and hands the data over in the right order. **UDP** (User Datagram Protocol) is fast and simple: like **dropping a postcard in the mail**, you just send it — no setup, no guarantee. UDP is great when speed beats perfection (live video, games, quick lookups).\n\n## Recap\n\nThe transport layer adds two things over IP: it delivers data to the right **program** using **port numbers** (an IP + port = a socket), and it lets you choose **reliable & ordered (TCP)** versus **fast & simple (UDP)**.",
           "items": [
             {
-              "id": "transport-tcp-udp-ports-001",
-              "type": "flashcard",
-              "front": "What four values uniquely identify a transport connection, and what is this called?",
-              "back": "The **4-tuple**: `(source IP, source port, destination IP, destination port)`. The transport layer uses it to *demultiplex* arriving segments to the correct socket/process.",
-              "hint": "Two endpoints, two fields each."
-            },
-            {
-              "id": "transport-tcp-udp-ports-002",
-              "type": "flashcard",
-              "front": "Why can two browser tabs connect to the same `server:443` simultaneously without collision?",
-              "back": "They share dst IP, dst port (443), and src IP, but each gets a distinct **ephemeral source port**, so the 4-tuples differ and the kernel keeps the flows separate.",
-              "hint": "Only one field needs to differ."
-            },
-            {
-              "id": "transport-tcp-udp-ports-003",
-              "type": "flashcard",
-              "front": "List the three port ranges and give an example of each.",
-              "back": "**Well-known** 0-1023 (e.g. 443 HTTPS); **registered** 1024-49151 (e.g. 5432 PostgreSQL); **ephemeral/dynamic** ~49152-65535 (Linux 32768-60999) for client source ports.",
-              "hint": "Three bands across 0-65535."
-            },
-            {
-              "id": "transport-tcp-udp-ports-004",
-              "type": "flashcard",
-              "front": "What are the four fields of the UDP header and its total size?",
-              "back": "**Source port, destination port, length, checksum** — each 16 bits, for a fixed **8-byte** header. Length and checksum cover header + data.",
-              "hint": "Eight bytes, four 16-bit fields."
-            },
-            {
-              "id": "transport-tcp-udp-ports-005",
-              "type": "flashcard",
-              "front": "Name three properties UDP does NOT provide that TCP does.",
-              "back": "No **reliability** (retransmission), no **ordering**, and no **flow/congestion control**. It is connectionless and fire-and-forget; the application must add anything it needs.",
-              "hint": "Reliability, ordering, control."
-            },
-            {
-              "id": "transport-tcp-udp-ports-010",
+              "id": "transport-tcp-udp-intro-001",
               "type": "mcq",
-              "prompt": "A VoIP application drops a voice packet that arrives 300 ms late rather than waiting for it. Which transport best matches this need and why?",
+              "prompt": "IP already delivers a packet to the correct computer. What extra job does a port number do?",
               "choices": [
-                "TCP, because in-order delivery guarantees clean audio",
-                "UDP, because retransmitting stale audio is useless and adds latency",
-                "TCP, because its congestion control prevents jitter",
-                "UDP, because it guarantees ordered delivery without ACKs"
+                "It identifies which program on that computer should receive the data",
+                "It encrypts the data so no one else can read it",
+                "It picks which computer on the internet to send to",
+                "It guarantees the packet will never be lost"
+              ],
+              "answerIndex": 0,
+              "explanation": "A port number is like an apartment number: the IP gets data to the building (the computer), and the port says which program inside (browser, email, chat) it is for. It does not choose the computer (that is the IP's job) and does not encrypt or guarantee delivery."
+            },
+            {
+              "id": "transport-tcp-udp-intro-002",
+              "type": "mcq",
+              "prompt": "What is a 'socket' in the sense used here?",
+              "choices": [
+                "A physical plug on the back of the computer",
+                "The combination of an IP address and a port number, pinpointing one program",
+                "Another name for the entire transport layer",
+                "A list of every computer on the local network"
               ],
               "answerIndex": 1,
-              "explanation": "Real-time media values timeliness over completeness. TCP would stall the stream retransmitting a packet that is already too old to play. UDP lets the app discard late data — and UDP gives no ordering guarantee, ruling out the last choice."
+              "explanation": "A socket is an IP address plus a port number together — like 'street address + apartment number'. That pair pinpoints one specific program on one specific machine. It is not the physical connector, nor the whole layer.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/transport-tcp-udp-3.svg"
             },
             {
-              "id": "transport-tcp-udp-ports-011",
+              "id": "transport-tcp-udp-intro-003",
               "type": "mcq",
-              "prompt": "What is the size of the UDP header?",
+              "prompt": "Using the analogy in the lesson, TCP is most like which of these?",
               "choices": [
-                "20 bytes",
-                "8 bytes",
-                "12 bytes",
-                "Variable, 20-60 bytes"
+                "A postcard dropped in the mail with no tracking",
+                "A tracked package with delivery confirmation",
+                "A radio broadcast heard by everyone at once",
+                "A phone book listing many addresses"
               ],
               "answerIndex": 1,
-              "explanation": "UDP is fixed at 8 bytes (src port, dst port, length, checksum, each 16 bits). 20-60 bytes describes the TCP/IPv4 header, not UDP."
+              "explanation": "TCP is reliable and ordered: it sets up the delivery, confirms receipt, and re-sends anything lost — like a tracked package with delivery confirmation. The postcard analogy describes UDP, which has no tracking or guarantee."
             },
             {
-              "id": "transport-tcp-udp-ports-012",
+              "id": "transport-tcp-udp-intro-004",
               "type": "mcq",
-              "prompt": "Why is UDP a natural substrate for QUIC?",
+              "prompt": "Which everyday analogy best fits UDP?",
               "choices": [
-                "UDP already provides encryption QUIC can reuse",
-                "UDP's lack of built-in ordering/retransmission lets QUIC implement per-stream reliability in user space without kernel TCP semantics",
-                "UDP guarantees in-order delivery that QUIC needs",
-                "UDP has a larger header that QUIC fills with stream IDs"
+                "A certified letter you must sign for",
+                "A dropped-in-the-mailbox postcard: just send it, no guarantee",
+                "A locked safe delivered by armored truck",
+                "A package you must assemble before it ships"
               ],
               "answerIndex": 1,
-              "explanation": "QUIC needs a thin, ubiquitously-routed datagram layer it can build on. UDP imposes no ordering or HOL blocking, so QUIC adds reliability, congestion control, and TLS 1.3 itself — in user space, deployable without OS changes."
+              "explanation": "UDP just fires off a packet with no setup and no promise it arrives — like mailing a postcard. The certified-letter and armored-truck images imply confirmation and guarantees, which describe TCP, not UDP."
             },
             {
-              "id": "transport-tcp-udp-ports-013",
+              "id": "transport-tcp-udp-intro-005",
               "type": "mcq",
-              "prompt": "When a Linux client opens an outbound TCP connection, where does its source port typically come from?",
+              "prompt": "Why does a single computer need port numbers at all?",
               "choices": [
-                "It reuses the destination port number",
-                "The ephemeral range (e.g. 32768-60999) assigned by the kernel",
-                "It is always 0 until the handshake completes",
-                "The well-known range 0-1023"
+                "Because one computer often runs many programs that each need their own arriving data",
+                "Because IP addresses are too short to be unique",
+                "Because every packet must be encrypted by the port",
+                "Because computers can only send, never receive, without a port"
+              ],
+              "answerIndex": 0,
+              "explanation": "A computer runs many programs at once (browser, email, chat). Ports let arriving data be sorted to the right program. This has nothing to do with IP length or encryption."
+            },
+            {
+              "id": "transport-tcp-udp-intro-006",
+              "type": "mcq",
+              "prompt": "What does it mean that IP is 'best-effort'?",
+              "choices": [
+                "IP tries hard and always succeeds in delivering every packet in order",
+                "IP forwards packets but does not promise they arrive, arrive in order, or arrive at all",
+                "IP only works on the fastest available connection",
+                "IP encrypts every packet to keep it safe"
               ],
               "answerIndex": 1,
-              "explanation": "Clients bind an ephemeral source port automatically; the well-known range is reserved for listening servers and needs privilege on Unix."
+              "explanation": "Best-effort means IP will forward a packet toward its destination but makes no guarantees — packets can be lost, duplicated, or reordered. Adding reliability on top of that is exactly what TCP does."
+            },
+            {
+              "id": "transport-tcp-udp-intro-007",
+              "type": "mcq",
+              "prompt": "Two of your apps (a browser and a music streamer) receive data from the internet at the same time. How does the computer know which data goes to which app?",
+              "choices": [
+                "It guesses based on which app was opened first",
+                "Each app uses a different port number, so the transport layer sorts the data to the right one",
+                "Both apps share all data and pick out what they need",
+                "The IP address alone tells the apps apart"
+              ],
+              "answerIndex": 1,
+              "explanation": "Each running app is reachable at its own port. The transport layer reads the destination port and hands the data to the matching app — this sorting is called multiplexing. The IP address alone only identifies the computer, not the app."
+            },
+            {
+              "id": "transport-tcp-udp-intro-008",
+              "type": "mcq",
+              "prompt": "Which statement best captures the two new things the transport layer adds on top of IP?",
+              "choices": [
+                "It chooses the route across the internet and assigns IP addresses",
+                "It delivers data to the right program (ports) and lets you pick reliable-or-fast delivery",
+                "It turns wireless signals into bits and back",
+                "It stores web pages so they load faster next time"
+              ],
+              "answerIndex": 1,
+              "explanation": "The transport layer's two additions are process-to-process delivery via ports and a choice of delivery style (reliable/ordered TCP vs fast/simple UDP). Routing and addressing belong to the network layer; signaling is the physical layer; caching is an application concern."
+            },
+            {
+              "id": "transport-tcp-udp-intro-009",
+              "type": "mcq",
+              "prompt": "A friend says 'the IP address is enough — we don't need ports.' Why is that wrong?",
+              "choices": [
+                "Ports are needed to encrypt the connection",
+                "Without ports, the computer could not tell which of its many programs an arriving packet is meant for",
+                "IP addresses change too often to be useful",
+                "Ports are what make the internet wireless"
+              ],
+              "answerIndex": 1,
+              "explanation": "An IP address only reaches the computer. Since a computer runs many programs, you still need a port to say which program gets the data. Ports are about addressing the right program, not encryption or wireless."
+            },
+            {
+              "id": "transport-tcp-udp-intro-010",
+              "type": "mcq",
+              "prompt": "You are downloading a tax document where every byte must be correct and in order. Which delivery style fits, and why?",
+              "choices": [
+                "UDP, because speed matters more than getting every byte",
+                "TCP, because it re-sends lost data and delivers everything in order",
+                "UDP, because it guarantees order without any setup",
+                "TCP, because it skips setup to be faster"
+              ],
+              "answerIndex": 1,
+              "explanation": "A document must arrive complete and correct, so you want TCP: it confirms receipt, re-sends anything lost, and delivers bytes in order. UDP gives no such guarantee, and it does not guarantee order.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/transport-tcp-udp-4.svg"
             }
           ]
         },
         {
-          "id": "transport-tcp-udp-transport-tcp-udp-tcp-header-handshake",
-          "title": "TCP Header, Flags, Handshake & Teardown",
+          "id": "transport-tcp-udp-transport-tcp-udp-tcp-story",
+          "title": "How TCP Works: Setup, Numbering, Re-sending, Teardown",
           "order": 2,
           "difficulty": 2,
-          "content": "# TCP Header, Flags, Handshake & Teardown\n\nTCP turns IP's best-effort packets into a **reliable, ordered byte stream**. Its header is normally 20 bytes (plus options): **source/destination ports**, a 32-bit **sequence number**, a 32-bit **acknowledgment number**, a data-offset (header length), **control flags**, a 16-bit **receive window**, **checksum**, and urgent pointer.\n\nKey flags: **SYN** (synchronize — open, carries the initial sequence number/ISN), **ACK** (the ack field is valid), **FIN** (graceful close, no more data this direction), **RST** (abrupt reset — 'this connection is dead/refused'), **PSH** (push buffered data to the app), **URG** (urgent, largely obsolete).\n\n**Three-way handshake:** client sends `SYN seq=x`; server replies `SYN,ACK seq=y ack=x+1`; client sends `ACK ack=y+1`. Both sides now know each other's ISN; the connection is **ESTABLISHED**. The SYN and FIN each consume one sequence number even though they carry no data.\n\n**Teardown** is a four-way exchange (each direction closes independently): `FIN` / `ACK` one way, then `FIN` / `ACK` the other. The active closer enters **TIME_WAIT** for ~2×MSL so a delayed duplicate segment can't be misread by a new connection on the same 4-tuple, and so the final ACK is reliably delivered. A **RST** skips all of this — it tears the connection down immediately, e.g. when you connect to a port with nothing listening.\n\n```\nss -tan        # see states: LISTEN, SYN-SENT, ESTABLISHED, TIME-WAIT, ...\n```\n",
+          "content": "# TCP, Told as a Story\n\nTCP's promise is simple to state: take IP's unreliable packets and turn them into a stream of data that arrives **complete and in the right order**. To keep that promise, TCP does four things — it sets up a connection, numbers the data, re-sends anything lost, and then closes down cleanly. Let's walk through each like a short story between your computer and a server.\n\n## Build: the four parts\n\n**1. Setup — the 3-way handshake.** Before sending real data, both sides say hello and agree to talk. This takes three short messages. Your computer sends a **SYN** (\"synchronize\" — *let's start, my counting begins at x*). The server replies **SYN-ACK** (*okay, I got yours, and my counting begins at y*). Your computer sends a final **ACK** (\"acknowledge\" — *got yours too*). After these three steps the connection is **established** and both sides are ready.\n\n**2. Numbering — sequence and acknowledgment numbers.** TCP gives every chunk of data a **sequence number** so the receiver can put chunks back in order even if they arrive jumbled. Each time the receiver gets data, it sends back an **acknowledgment (ACK)** saying, in effect, \"I have everything up to here; send the next part.\" These running counts are how both sides stay in sync.\n\n**3. Re-sending — retransmission.** If the sender does not get an ACK for a chunk within a reasonable time, it assumes that chunk was lost and **sends it again**. Nothing is silently skipped — this is the heart of TCP's reliability.\n\n**4. Teardown — closing with FIN.** When a side is done, it sends a **FIN** (\"finish\") and the other side acknowledges it. Each direction is closed politely so no data in flight is dropped.\n\n## Recap\n\nTCP earns the word \"reliable\" by **setting up** a connection (SYN / SYN-ACK / ACK), **numbering** data so it can be ordered and acknowledged, **re-sending** anything that goes missing, and **closing** cleanly with FIN.",
           "items": [
             {
               "id": "transport-tcp-udp-tcp-001",
-              "type": "flashcard",
-              "front": "What does TCP provide on top of IP, in one phrase?",
-              "back": "A **reliable, ordered, byte-stream** connection between two processes — with retransmission, sequencing, flow control, and congestion control layered over IP's best-effort packets.",
-              "hint": "Reliable ordered stream."
+              "type": "mcq",
+              "prompt": "What is the purpose of the TCP 3-way handshake?",
+              "choices": [
+                "To encrypt all data before it is sent",
+                "To let both sides agree to start talking and sync up their counting before sending real data",
+                "To pick the fastest route across the internet",
+                "To compress the data so it transfers faster"
+              ],
+              "answerIndex": 1,
+              "explanation": "The handshake (SYN, SYN-ACK, ACK) is how both sides say hello, confirm the other is there, and agree on starting sequence numbers before any real data flows. It is about setup and synchronization, not encryption, routing, or compression."
             },
             {
               "id": "transport-tcp-udp-tcp-002",
-              "type": "flashcard",
-              "front": "Describe the TCP three-way handshake with sequence numbers.",
-              "back": "Client → `SYN seq=x`. Server → `SYN,ACK seq=y, ack=x+1`. Client → `ACK ack=y+1`. Each side learns the other's initial sequence number; connection becomes ESTABLISHED. SYN consumes one sequence number.",
-              "hint": "SYN, SYN-ACK, ACK.",
-              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/transport-tcp-udp-1.svg"
+              "type": "mcq",
+              "prompt": "Which sequence of messages is the correct TCP 3-way handshake?",
+              "choices": [
+                "ACK, then SYN, then FIN",
+                "SYN, then SYN-ACK, then ACK",
+                "FIN, then FIN-ACK, then RST",
+                "SYN-ACK, then ACK, then SYN"
+              ],
+              "answerIndex": 1,
+              "explanation": "The order is SYN (start), SYN-ACK (yes, and here's my start), then ACK (got it). A handshake never begins with ACK or FIN; FIN messages are for closing, not opening.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/transport-tcp-udp-5.svg"
             },
             {
               "id": "transport-tcp-udp-tcp-003",
-              "type": "flashcard",
-              "front": "What does each TCP flag mean: SYN, ACK, FIN, RST?",
-              "back": "**SYN** open/synchronize ISN; **ACK** acknowledgment field is valid; **FIN** graceful half-close (no more data this direction); **RST** abrupt reset/refuse — immediate teardown, no FIN dance.",
-              "hint": "Open, acknowledge, finish, reset."
+              "type": "mcq",
+              "prompt": "In the handshake, what does the word SYN stand for, and what is it asking?",
+              "choices": [
+                "Synchronize — 'let's start a connection and line up our counts'",
+                "System — 'restart the computer'",
+                "Send — 'here is the actual file data'",
+                "Sync — 'close this connection now'"
+              ],
+              "answerIndex": 0,
+              "explanation": "SYN means synchronize: it opens the connection and shares the sender's starting sequence number so both sides can line up their counting. It is not the file data and is not a close request."
             },
             {
               "id": "transport-tcp-udp-tcp-004",
-              "type": "flashcard",
-              "front": "Why does graceful teardown take four segments, not two?",
-              "back": "Each direction is closed independently: one side sends FIN and gets an ACK, then the other side sends its own FIN and gets an ACK. A connection can be half-open (one side done sending) in between.",
-              "hint": "Each direction closes on its own."
+              "type": "mcq",
+              "prompt": "What does an acknowledgment (ACK) tell the sender?",
+              "choices": [
+                "That the receiver wants to close the connection",
+                "Roughly, 'I have received the data up to here — send the next part'",
+                "That the data was encrypted successfully",
+                "That the sender should slow down to zero and stop"
+              ],
+              "answerIndex": 1,
+              "explanation": "An ACK confirms received data and signals what the receiver expects next, keeping both sides in sync. It is not a close request and not an encryption confirmation."
             },
             {
               "id": "transport-tcp-udp-tcp-005",
-              "type": "flashcard",
-              "front": "What does a RST signify and when do you see one?",
-              "back": "An **abrupt reset**: kill the connection now, discard state. Common causes: connecting to a port with no listener (connection refused), a crashed peer, or a firewall injecting RSTs.",
-              "hint": "Connection refused / abort."
+              "type": "mcq",
+              "prompt": "Why does TCP attach a sequence number to each chunk of data?",
+              "choices": [
+                "To encrypt each chunk with a different key",
+                "So the receiver can put chunks back in the correct order even if they arrive jumbled",
+                "To decide which Wi-Fi channel to use",
+                "To make each chunk smaller"
+              ],
+              "answerIndex": 1,
+              "explanation": "Sequence numbers label the data so the receiver can reassemble it in order and notice anything missing — essential because IP can deliver chunks out of order. They are not about encryption, Wi-Fi, or size."
+            },
+            {
+              "id": "transport-tcp-udp-tcp-006",
+              "type": "mcq",
+              "prompt": "A sender transmits a chunk of data but never receives an acknowledgment for it. What does TCP do?",
+              "choices": [
+                "Skips that chunk and moves on",
+                "Assumes it was lost and sends it again (retransmission)",
+                "Immediately closes the connection with a FIN",
+                "Encrypts the chunk and tries a different port"
+              ],
+              "answerIndex": 1,
+              "explanation": "No ACK suggests the chunk was lost, so TCP retransmits it. This is the core of TCP's reliability — nothing is silently skipped. It does not close the connection just because one chunk went missing.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/transport-tcp-udp-6.svg"
+            },
+            {
+              "id": "transport-tcp-udp-tcp-007",
+              "type": "mcq",
+              "prompt": "What does 'ordered delivery' mean in TCP, and how is it achieved?",
+              "choices": [
+                "Data is delivered alphabetically; the app sorts it",
+                "The app receives bytes in the same order they were sent, because TCP reorders chunks using their sequence numbers",
+                "Data is delivered fastest-first regardless of order",
+                "Only one chunk is ever sent at a time, so order is automatic"
+              ],
+              "answerIndex": 1,
+              "explanation": "TCP hands data to the application in the original send order. It uses sequence numbers to reorder any chunks that arrived out of order before delivering them. It is not alphabetical, and TCP can have many chunks in flight at once."
+            },
+            {
+              "id": "transport-tcp-udp-tcp-008",
+              "type": "mcq",
+              "prompt": "When a side is finished and wants to close a TCP connection gracefully, which message does it send?",
+              "choices": [
+                "SYN",
+                "FIN",
+                "ACK only, forever",
+                "A second handshake"
+              ],
+              "answerIndex": 1,
+              "explanation": "FIN ('finish') signals that a side is done sending; the other side acknowledges it, and each direction closes cleanly. SYN is for opening, not closing."
+            },
+            {
+              "id": "transport-tcp-udp-tcp-009",
+              "type": "mcq",
+              "prompt": "Why is closing a TCP connection done politely (FIN and an acknowledgment) instead of just cutting it off?",
+              "choices": [
+                "To make sure data still in transit is not dropped and both sides agree it is over",
+                "Because the internet charges money per open connection",
+                "To re-encrypt the connection one last time",
+                "Because a connection cannot be reopened otherwise"
+              ],
+              "answerIndex": 0,
+              "explanation": "A graceful close lets any data still in flight finish and confirms to both sides that the conversation is complete, so nothing is lost. It is about clean, lossless shutdown, not billing or encryption."
             },
             {
               "id": "transport-tcp-udp-tcp-010",
               "type": "mcq",
-              "prompt": "A client sends SYN seq=1000. What does a correct SYN-ACK acknowledgment number contain?",
+              "prompt": "Put the life of a simple TCP connection in order.",
               "choices": [
-                "1000",
-                "1001",
-                "0",
-                "The server's own ISN"
+                "Send data → handshake → close",
+                "Handshake (SYN/SYN-ACK/ACK) → send and acknowledge data, re-sending anything lost → close with FIN",
+                "Close with FIN → handshake → send data",
+                "Send FIN → send SYN → send data"
               ],
               "answerIndex": 1,
-              "explanation": "SYN consumes one sequence number, so the server acknowledges the next expected byte: 1000+1 = 1001. The server's ISN goes in the *sequence* field of the same segment, not the ack field."
+              "explanation": "A connection opens with the 3-way handshake, then exchanges and acknowledges data (retransmitting losses), then closes with FIN. Setup always comes before data, and the close comes last."
             },
             {
               "id": "transport-tcp-udp-tcp-011",
               "type": "mcq",
-              "prompt": "You run `ss -tan` and many sockets sit in TIME-WAIT on the client. What does this indicate?",
+              "prompt": "Which single phrase best summarizes what TCP adds on top of IP's best-effort packets?",
               "choices": [
-                "The connections failed to open",
-                "These sockets actively closed and are waiting ~2*MSL before fully releasing the 4-tuple",
-                "The server is refusing connections with RST",
-                "Flow control has paused the connections"
+                "A faster route with no setup time",
+                "A reliable, in-order stream of data with re-sending of anything lost",
+                "Encryption of every byte by default",
+                "A way to reach more than one computer at once"
               ],
               "answerIndex": 1,
-              "explanation": "TIME_WAIT is normal for the side that performed the active close. It prevents a delayed duplicate from a prior connection being accepted by a new one on the same 4-tuple and ensures the final ACK is delivered."
-            },
-            {
-              "id": "transport-tcp-udp-tcp-012",
-              "type": "mcq",
-              "prompt": "Which sequence of flags represents a normal connection setup?",
-              "choices": [
-                "SYN -> ACK -> FIN",
-                "SYN -> SYN,ACK -> ACK",
-                "SYN,ACK -> ACK -> RST",
-                "ACK -> SYN -> SYN,ACK"
-              ],
-              "answerIndex": 1,
-              "explanation": "The three-way handshake is SYN, then SYN+ACK, then ACK. Anything starting with ACK or involving RST/FIN is not a clean open."
-            },
-            {
-              "id": "transport-tcp-udp-tcp-013",
-              "type": "mcq",
-              "prompt": "Connecting to TCP port 9999 where no process is listening typically yields what?",
-              "choices": [
-                "A SYN-ACK then immediate FIN",
-                "A RST from the host (connection refused)",
-                "Silence, then a successful handshake after timeout",
-                "An ICMP echo reply"
-              ],
-              "answerIndex": 1,
-              "explanation": "With no listener, the kernel responds to the SYN with a RST, surfaced to the app as 'connection refused'. (A firewall may instead drop it silently, causing a timeout.)"
+              "explanation": "TCP turns unreliable packets into a reliable, ordered byte stream and retransmits losses. It is not inherently faster (setup and acknowledgments add overhead) and does not provide encryption by itself."
             }
           ]
         },
         {
-          "id": "transport-tcp-udp-transport-tcp-udp-reliability-congestion",
-          "title": "Reliability, Sliding Window & Congestion Control",
+          "id": "transport-tcp-udp-transport-tcp-udp-udp-simple",
+          "title": "UDP: Bare and Fast, and When to Use It",
           "order": 3,
-          "difficulty": 3,
-          "content": "# Reliability, Sliding Window & Congestion Control\n\nTCP numbers **every byte**. The receiver ACKs the next byte it expects (cumulative ACK). Lost or reordered data is detected and retransmitted, then delivered to the app **in order** — hence *byte stream*, not packets.\n\n**Flow control** stops a fast sender from drowning a slow receiver: the receiver advertises a **receive window** (rwnd) = free buffer space; the sender may have at most rwnd unacknowledged bytes in flight. **Window scaling** (an option) extends rwnd beyond 64 KB for long-fat networks.\n\n**Congestion control** protects the *network*. The sender keeps a **congestion window** (cwnd) and sends `min(cwnd, rwnd)`. Phases: **slow start** grows cwnd exponentially (roughly doubling each RTT) until it hits `ssthresh`; then **congestion avoidance** grows it linearly (+1 MSS/RTT) — this is the **AI** in **AIMD**. On loss signalled by **three duplicate ACKs**, **fast retransmit** resends the missing segment immediately and **fast recovery** halves cwnd (the **MD**) — producing the classic **sawtooth**. A full **retransmission timeout (RTO)** is worse: it collapses cwnd to 1 MSS and restarts slow start.\n\n**SACK** (selective ACK) lets the receiver report exactly which non-contiguous blocks arrived, so the sender retransmits only the true gaps. Modern Linux defaults to **CUBIC** (a cubic growth curve, loss-based). **BBR** is the modern alternative: it *models* the bottleneck bandwidth and RTT instead of reacting to loss, which often gives higher throughput and lower latency on lossy or buffer-bloated paths.\n\n```\nsysctl net.ipv4.tcp_congestion_control   # cubic (default) or bbr\n```\n",
+          "difficulty": 2,
+          "content": "# UDP: As Simple As It Gets\n\nIf TCP is a careful, tracked delivery, **UDP** is the opposite: send the packet and move on. There is **no handshake**, **no acknowledgments**, **no re-sending**, and **no ordering**. UDP just stamps a small header on your data (mainly the source and destination port numbers) and hands it to IP. That bareness sounds like a weakness, but for the right jobs it is exactly the point.\n\n## Build: why 'no guarantees' is sometimes perfect\n\nImagine a **live video call**. Each tiny slice of audio and video is only useful *right now*. If one slice is lost, re-sending it would deliver it too late — the conversation has already moved on — so it is better to skip it and keep going. TCP would stubbornly stop and re-send the missing slice, causing a freeze or lag. UDP just lets the lost slice go, and the call stays smooth. The same logic fits **online games** (your position a moment ago no longer matters), and **streaming** live media.\n\nUDP is also great for **short request-and-reply** exchanges where setting up a whole TCP connection would be wasteful. The classic example is **DNS**, the system that looks up a name like example.com and returns its IP address. It is one tiny question and one tiny answer; UDP sends each in a single packet with no setup. Because UDP does no work to guarantee anything, *if* an app needs reliability it must add that itself — but many apps simply do not need it.\n\nA quick word on **ports**: certain port numbers are **well-known** because they are reserved for common services so everyone can find them. A few to recognize: **80** for web traffic (HTTP), **443** for secure web (HTTPS), **53** for DNS lookups, and **22** for secure remote login (SSH).\n\n## Recap\n\nUDP is connectionless and unreliable on purpose: no setup, no re-sending, no ordering, just speed and a tiny header. That makes it ideal for **live voice/video, games, streaming, and quick lookups like DNS**, where being fast matters more than being perfect.",
           "items": [
             {
-              "id": "transport-tcp-udp-rel-001",
-              "type": "flashcard",
-              "front": "What does a TCP acknowledgment number actually acknowledge?",
-              "back": "The **next byte the receiver expects** (cumulative). An ACK of N means 'I have all bytes up to N-1'. TCP numbers bytes, not segments, which is why it delivers a reliable ordered byte stream.",
-              "hint": "Next expected byte, cumulative."
-            },
-            {
-              "id": "transport-tcp-udp-rel-002",
-              "type": "flashcard",
-              "front": "Distinguish flow control from congestion control in TCP.",
-              "back": "**Flow control** protects the *receiver* via the advertised receive window (rwnd). **Congestion control** protects the *network* via the sender's congestion window (cwnd). The sender uses `min(cwnd, rwnd)`.",
-              "hint": "Receiver buffer vs network capacity."
-            },
-            {
-              "id": "transport-tcp-udp-rel-003",
-              "type": "flashcard",
-              "front": "Explain AIMD and the sawtooth shape of cwnd.",
-              "back": "**Additive Increase, Multiplicative Decrease**: grow cwnd by ~1 MSS per RTT in congestion avoidance; on loss (3 dup-ACKs) halve it. Repeated probe-then-back-off draws a sawtooth that hunts around the path's capacity.",
-              "hint": "Climb slowly, drop sharply.",
-              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/transport-tcp-udp-2.svg"
-            },
-            {
-              "id": "transport-tcp-udp-rel-004",
-              "type": "flashcard",
-              "front": "How does a fast-retransmit (3 dup-ACKs) recovery differ from an RTO?",
-              "back": "3 dup-ACKs → **fast retransmit** the one missing segment and **halve** cwnd (fast recovery) — a mild dip. An **RTO** means no ACKs at all arrived in time → cwnd collapses to 1 MSS and slow start restarts — a severe throughput hit.",
-              "hint": "Halve vs collapse to 1."
-            },
-            {
-              "id": "transport-tcp-udp-rel-005",
-              "type": "flashcard",
-              "front": "What problem does SACK solve over plain cumulative ACKs?",
-              "back": "Cumulative ACKs only report the highest contiguous byte, so a single gap can force resending good data after it. **Selective ACK** lists the exact non-contiguous blocks received, so the sender retransmits only the real holes.",
-              "hint": "Report exactly which blocks arrived."
-            },
-            {
-              "id": "transport-tcp-udp-rel-006",
-              "type": "flashcard",
-              "front": "CUBIC vs BBR — what is the fundamental difference?",
-              "back": "**CUBIC** (Linux default) is **loss-based**: it grows cwnd along a cubic curve and treats packet loss as the congestion signal. **BBR** is **model-based**: it estimates bottleneck **bandwidth × RTT** and paces to it, largely ignoring loss — better on lossy or buffer-bloated links.",
-              "hint": "React to loss vs model BW×RTT."
-            },
-            {
-              "id": "transport-tcp-udp-rel-010",
+              "id": "transport-tcp-udp-udp-001",
               "type": "mcq",
-              "prompt": "During slow start, how does the congestion window grow per RTT (before reaching ssthresh)?",
+              "prompt": "Which set of features describes UDP?",
               "choices": [
-                "Linearly, +1 MSS per RTT",
-                "Exponentially, roughly doubling each RTT",
-                "It stays fixed at the receiver window",
-                "It halves each RTT"
+                "Handshake, acknowledgments, re-sending, and ordering",
+                "No handshake, no acknowledgments, no re-sending, no ordering",
+                "Encryption and compression built in",
+                "Guaranteed delivery but no ordering"
               ],
               "answerIndex": 1,
-              "explanation": "Slow start increases cwnd by one MSS per ACK, which roughly doubles cwnd every RTT — exponential growth — until it reaches ssthresh, where linear congestion avoidance takes over."
+              "explanation": "UDP is deliberately bare: it skips setup, acknowledgments, retransmission, and ordering. The first option describes TCP. UDP does not guarantee delivery at all.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/transport-tcp-udp-7.svg"
             },
             {
-              "id": "transport-tcp-udp-rel-011",
+              "id": "transport-tcp-udp-udp-002",
               "type": "mcq",
-              "prompt": "A sender receives three duplicate ACKs for the same sequence number. What does TCP do?",
+              "prompt": "TCP vs UDP: which is better for a live video call, and why?",
               "choices": [
-                "Collapse cwnd to 1 MSS and restart slow start",
-                "Fast-retransmit the missing segment and halve cwnd (fast recovery)",
-                "Send a RST to reset the connection",
-                "Increase cwnd to probe for more bandwidth"
+                "TCP, because re-sending every lost slice keeps the picture perfect",
+                "UDP, because a lost slice is better skipped than re-sent late, keeping the call smooth and low-latency",
+                "TCP, because it has a smaller header for video",
+                "UDP, because it guarantees slices arrive in order"
               ],
               "answerIndex": 1,
-              "explanation": "Three dup-ACKs strongly imply a single segment was lost while later ones arrived. TCP retransmits it immediately (fast retransmit) and enters fast recovery, halving cwnd rather than collapsing it as a timeout would."
+              "explanation": "In a live call, data is only useful immediately. UDP skips lost slices and keeps going, avoiding freezes; TCP would stall to re-send slices that are already too late to matter. (UDP does not guarantee order, ruling out the last choice.)"
             },
             {
-              "id": "transport-tcp-udp-rel-012",
+              "id": "transport-tcp-udp-udp-003",
               "type": "mcq",
-              "prompt": "On a long-fat network (high bandwidth, high RTT), throughput is capped well below link rate. The most likely fix is:",
+              "prompt": "TCP vs UDP: which is better for downloading a file, and why?",
               "choices": [
-                "Disabling Nagle's algorithm",
-                "Enabling TCP window scaling so the window can exceed 64 KB",
-                "Switching from IPv4 to IPv6",
-                "Reducing the MTU"
+                "UDP, because losing a few bytes of a file is fine",
+                "TCP, because the whole file must arrive complete and in order, and TCP re-sends anything lost",
+                "UDP, because it sets up a connection to protect the file",
+                "TCP, because it never adds any overhead"
               ],
               "answerIndex": 1,
-              "explanation": "Full utilization requires the window to hold a bandwidth-delay product of data in flight. The base 16-bit window tops out at 64 KB; window scaling lets it grow large enough to fill a long-fat pipe."
+              "explanation": "A file is useless if bytes are missing or scrambled, so you want TCP's reliable, ordered delivery with retransmission. Losing bytes (the UDP behavior) would corrupt the file. TCP does add some overhead, but correctness is what matters here."
             },
             {
-              "id": "transport-tcp-udp-rel-013",
+              "id": "transport-tcp-udp-udp-004",
               "type": "mcq",
-              "prompt": "Why might BBR outperform CUBIC across a lossy wireless or transoceanic link?",
+              "prompt": "Why is UDP a good fit for DNS (looking up a name to get its IP address)?",
               "choices": [
-                "BBR retransmits faster after every lost packet",
-                "BBR does not treat random (non-congestion) loss as a signal to back off, so it keeps the pipe full",
-                "BBR uses a larger receive window automatically",
-                "BBR disables congestion control entirely"
+                "DNS transfers huge files that need ordering",
+                "DNS is one tiny question and one tiny answer, so skipping connection setup makes it fast",
+                "DNS must be encrypted, which only UDP allows",
+                "DNS needs guaranteed in-order delivery of many packets"
               ],
               "answerIndex": 1,
-              "explanation": "Loss-based CUBIC mistakes random link loss for congestion and repeatedly halves cwnd. BBR paces to its bandwidth×RTT estimate and ignores such loss, sustaining higher throughput on lossy paths."
+              "explanation": "A DNS exchange is usually a single small request and a single small reply. UDP sends each in one packet with no handshake overhead, which is quick. DNS is small, not a huge ordered transfer, and UDP does not provide encryption by itself."
+            },
+            {
+              "id": "transport-tcp-udp-udp-005",
+              "type": "mcq",
+              "prompt": "If an app uses UDP but actually needs some reliability, what has to happen?",
+              "choices": [
+                "UDP automatically turns into TCP",
+                "The application itself must add whatever reliability it needs, because UDP provides none",
+                "The router adds the missing acknowledgments",
+                "Nothing — UDP quietly re-sends lost packets anyway"
+              ],
+              "answerIndex": 1,
+              "explanation": "UDP gives no guarantees, so any reliability (such as detecting and re-requesting lost data) must be built into the application. UDP never silently becomes TCP and does not re-send on its own."
+            },
+            {
+              "id": "transport-tcp-udp-udp-006",
+              "type": "mcq",
+              "prompt": "Which port number is well-known for secure web traffic (HTTPS)?",
+              "choices": [
+                "22",
+                "443",
+                "53",
+                "25"
+              ],
+              "answerIndex": 1,
+              "explanation": "443 is the well-known port for HTTPS (secure web). 22 is SSH (secure login), 53 is DNS, and 25 is email transfer. Well-known ports let clients find common services at predictable numbers."
+            },
+            {
+              "id": "transport-tcp-udp-udp-007",
+              "type": "mcq",
+              "prompt": "What does it mean that ports 80, 443, 53, and 22 are 'well-known'?",
+              "choices": [
+                "They are randomly chosen each time a program starts",
+                "They are reserved for common services so clients always know where to find them",
+                "They are the only ports that exist",
+                "They are reserved for the fastest computers"
+              ],
+              "answerIndex": 1,
+              "explanation": "Well-known ports are reserved for standard services (web, secure web, DNS, SSH) so a client can connect without guessing. Ports are not randomly assigned for these services, and there are tens of thousands of port numbers in total."
+            },
+            {
+              "id": "transport-tcp-udp-udp-008",
+              "type": "mcq",
+              "prompt": "An online multiplayer game sends your character's position many times per second. Why is UDP usually the better choice?",
+              "choices": [
+                "Because old position updates are useless once a newer one exists, so re-sending lost ones would only add delay",
+                "Because UDP guarantees every position arrives in order",
+                "Because UDP encrypts the game data automatically",
+                "Because TCP cannot be used for games at all"
+              ],
+              "answerIndex": 0,
+              "explanation": "Fresh updates replace old ones, so a lost update is best ignored rather than re-sent late. UDP's no-re-send, low-latency behavior fits this. UDP does not guarantee order or add encryption, and TCP is technically usable but a worse fit here."
+            },
+            {
+              "id": "transport-tcp-udp-udp-009",
+              "type": "mcq",
+              "prompt": "Compared with TCP, the UDP header is best described as:",
+              "choices": [
+                "Much larger, to hold acknowledgment and ordering information",
+                "Very small, mainly just the source and destination port numbers",
+                "The same size, since both do the same work",
+                "Empty — UDP has no header at all"
+              ],
+              "answerIndex": 1,
+              "explanation": "Because UDP does so little, its header is tiny — essentially the port numbers (plus a length and a checksum). TCP needs more header space for sequence numbers, acknowledgments, and control flags. UDP does have a small header; it is not absent."
+            },
+            {
+              "id": "transport-tcp-udp-udp-010",
+              "type": "mcq",
+              "prompt": "Which job is the WORST fit for UDP?",
+              "choices": [
+                "A live voice call",
+                "Transferring a bank statement PDF that must be byte-perfect",
+                "A fast DNS name lookup",
+                "Streaming a live sports broadcast"
+              ],
+              "answerIndex": 1,
+              "explanation": "A byte-perfect file transfer needs reliable, ordered delivery — TCP's strength — because any lost or scrambled bytes corrupt it. Live calls, DNS lookups, and live streaming all tolerate occasional loss in exchange for speed, which suits UDP."
             }
           ]
         },
         {
-          "id": "transport-tcp-udp-transport-tcp-udp-sockets-scaling",
-          "title": "Sockets API, Blocking vs Non-Blocking & Reading a Capture",
+          "id": "transport-tcp-udp-transport-tcp-udp-control-quic",
+          "title": "Not Overwhelming the Receiver or the Network (plus a Peek at QUIC)",
           "order": 4,
-          "difficulty": 4,
-          "content": "# Berkeley Sockets, Blocking vs Non-Blocking & Reading a Capture\n\nThe **Berkeley sockets API** is the universal interface to transport. A TCP server walks `socket() -> bind() -> listen() -> accept()` (one accept per incoming connection), while a client does `socket() -> connect()`. Both then `send()/recv()` (or `read/write`) and `close()`. UDP skips listen/accept: you `socket()` then `sendto()/recvfrom()` directly, since there is no connection state.\n\n```c\nint s = socket(AF_INET, SOCK_STREAM, 0);   // TCP\nbind(s, (struct sockaddr*)&addr, sizeof addr);\nlisten(s, 128);                            // backlog\nint c = accept(s, NULL, NULL);             // blocks until a client arrives\nrecv(c, buf, sizeof buf, 0);               // blocks until data or close\n```\n\nBy default sockets are **blocking**: `accept`, `recv`, `connect` sleep until they can proceed. Set `O_NONBLOCK` and they return immediately with `EAGAIN/EWOULDBLOCK` when there is nothing to do. To serve many connections in one thread you ask the kernel which sockets are ready: **select**/**poll** scan an O(n) list each call; **epoll** (Linux) registers interest once and returns only the ready sockets, scaling to tens of thousands of connections — the basis of nginx, Redis, and async runtimes.\n\n**Nagle's algorithm** coalesces small writes to avoid tiny 'tinygram' packets; **delayed ACK** holds an ACK ~40 ms hoping to piggyback it. Together they can **deadlock briefly** on request/response workloads (sender waits for an ACK, receiver waits for more data) — cure with `TCP_NODELAY`. Note **head-of-line blocking**: one lost TCP segment stalls *all* bytes behind it because the byte stream must stay ordered — the very pain that motivated QUIC's independent streams.\n\nTo **narrate a capture**: SYN/SYN-ACK/ACK opens it; watch cwnd ramp as ACKs return; a gap + 3 dup-ACKs marks a loss, a single fast-retransmit fills it, throughput dips then climbs (sawtooth); FIN/ACK ×2 closes it, active side rests in TIME_WAIT.",
+          "difficulty": 3,
+          "content": "# Going Fast Without Causing a Pile-Up\n\nTCP does more than re-send lost data. It also paces itself so it does not flood two things that have limits: the **receiver** at the other end, and the **network** in between. These two ideas — **flow control** and **congestion control** — are the difference between a smooth transfer and a stuttering one. We will keep them at the level of plain ideas (no formulas).\n\n## Build: two kinds of 'don't overwhelm'\n\n**Flow control — don't overwhelm the *receiver*.** The receiving computer has a limited buffer (a holding area) for incoming data. If the sender blasts data faster than the receiver can process it, that buffer overflows and data is lost. So the receiver tells the sender how much room it has left — a number called the **window**. The sender keeps the amount of unconfirmed data within that window. Think of it as the receiver saying \"I can take this much more right now\"; as it works through the data, the window opens up again.\n\n**Congestion control — don't overwhelm the *network*.** Even if the receiver is fast, the links and routers between you have limits. Flooding them causes packets to be dropped. TCP cannot see the whole network, so it probes carefully. It begins by sending slowly and **speeding up** as acknowledgments come back smoothly — an approach called **slow start**. When a packet is lost (a hint the network is full), TCP **backs off**, slowing down, then cautiously climbs again. This gentle rise-and-back-off keeps the network busy without melting it.\n\n## A peek ahead: head-of-line blocking and QUIC\n\nBecause TCP delivers one strictly ordered stream, a single lost chunk makes everything behind it wait until that chunk is re-sent — even unrelated data is stuck. This stall is called **head-of-line blocking** (the front of the line holds up the rest). A newer protocol, **QUIC**, was built to avoid it. Cleverly, QUIC runs on top of **UDP** and rebuilds reliability and ordering itself, but in a way that lets independent streams flow without blocking each other. You will meet QUIC in detail in a later sub-topic; for now, just know that modern protocols can rebuild TCP-like reliability on UDP.\n\n## Recap\n\n**Flow control** uses a **window** so the sender does not overwhelm the **receiver**; **congestion control** (start slow, speed up, back off on loss) keeps the sender from overwhelming the **network**. And because strict ordering can cause head-of-line blocking, newer protocols like **QUIC** rebuild reliability on top of UDP to avoid it.",
           "items": [
             {
-              "id": "transport-tcp-udp-sock-001",
-              "type": "flashcard",
-              "front": "Give the Berkeley sockets call sequence for a TCP server and a TCP client.",
-              "back": "**Server:** `socket -> bind -> listen -> accept` (then `recv/send`, `close`). **Client:** `socket -> connect` (then `send/recv`, `close`). UDP uses `socket` then `sendto/recvfrom` with no listen/accept/connect.",
-              "hint": "Server binds and listens; client connects."
-            },
-            {
-              "id": "transport-tcp-udp-sock-002",
-              "type": "flashcard",
-              "front": "What is the difference between a blocking and a non-blocking socket?",
-              "back": "A **blocking** socket sleeps in `recv`/`accept`/`connect` until the operation can complete. A **non-blocking** socket (`O_NONBLOCK`) returns immediately, signalling `EAGAIN`/`EWOULDBLOCK` when it would have blocked — the basis of event loops.",
-              "hint": "Sleep vs return EAGAIN."
-            },
-            {
-              "id": "transport-tcp-udp-sock-003",
-              "type": "flashcard",
-              "front": "Why does epoll scale better than select/poll for many connections?",
-              "back": "`select`/`poll` pass and scan the *entire* fd set on every call — O(n). `epoll` registers interest once and the kernel returns only the **ready** fds — O(ready) — so it handles tens of thousands of sockets cheaply.",
-              "hint": "O(n) rescan vs O(ready)."
-            },
-            {
-              "id": "transport-tcp-udp-sock-004",
-              "type": "flashcard",
-              "front": "Explain the Nagle + delayed-ACK pathology and its fix.",
-              "back": "Nagle withholds a small write until prior data is ACKed; delayed ACK withholds the ACK ~40 ms hoping to piggyback. On request/response traffic each side waits for the other — a ~40 ms stall. Fix: set **TCP_NODELAY** to disable Nagle.",
-              "hint": "Both sides wait; set TCP_NODELAY."
-            },
-            {
-              "id": "transport-tcp-udp-sock-005",
-              "type": "flashcard",
-              "front": "What is TCP head-of-line blocking and what does it motivate?",
-              "back": "Because TCP delivers one ordered byte stream, a single lost segment stalls *all* later bytes until it is retransmitted — even data for an unrelated request multiplexed on the same connection. This motivated **QUIC**, whose independent streams don't block each other.",
-              "hint": "One loss stalls everything behind it; QUIC."
-            },
-            {
-              "id": "transport-tcp-udp-sock-006",
-              "type": "flashcard",
-              "front": "When would you reach for UDP instead of TCP?",
-              "back": "When you need low latency and can tolerate or handle loss/ordering yourself: real-time media (VoIP, video, games), simple request/reply (DNS), broadcast/multicast, or as a base to build your own transport (QUIC). Reach for TCP when you need a reliable ordered stream and don't want to reinvent it.",
-              "hint": "Real-time, request/reply, multicast, custom transport."
-            },
-            {
-              "id": "transport-tcp-udp-sock-007",
-              "type": "flashcard",
-              "front": "Narrate the life of a TCP connection as seen in a packet capture, including a loss event.",
-              "back": "1) **SYN / SYN-ACK / ACK** — handshake. 2) Data flows; **cwnd ramps** (slow start then linear) as ACKs return, throughput climbing. 3) A segment is lost → receiver sends **3 duplicate ACKs**; sender does a **fast retransmit** and **halves cwnd** (recovery), so throughput dips then re-climbs (sawtooth). 4) **FIN / ACK** each way tears it down; the active closer sits in **TIME_WAIT** ~2×MSL.",
-              "hint": "Handshake, window growth, dup-ACK loss, recovery, teardown."
-            },
-            {
-              "id": "transport-tcp-udp-sock-010",
+              "id": "transport-tcp-udp-ctrl-001",
               "type": "mcq",
-              "prompt": "Which call does a UDP program NOT use that a TCP server does?",
+              "prompt": "What problem does flow control solve?",
               "choices": [
-                "socket()",
-                "sendto()",
-                "listen() / accept()",
-                "close()"
+                "It stops the sender from overwhelming the receiver's limited buffer",
+                "It chooses the shortest route across the internet",
+                "It encrypts the connection end to end",
+                "It assigns port numbers to each app"
               ],
-              "answerIndex": 2,
-              "explanation": "UDP is connectionless: there is no connection to listen for or accept. A UDP program uses socket(), then sendto()/recvfrom(), and close(). listen()/accept() are TCP-only."
+              "answerIndex": 0,
+              "explanation": "Flow control matches the sender's pace to what the receiver can handle, so the receiver's buffer does not overflow and lose data. It is not about routing, encryption, or ports."
             },
             {
-              "id": "transport-tcp-udp-sock-011",
+              "id": "transport-tcp-udp-ctrl-002",
               "type": "mcq",
-              "prompt": "An interactive request/response protocol shows ~40 ms stalls on small writes. The most likely cause and fix:",
+              "prompt": "In flow control, what does the 'window' represent?",
               "choices": [
-                "Receive window too small; enable window scaling",
-                "Nagle's algorithm interacting with delayed ACK; set TCP_NODELAY",
-                "Congestion control set to BBR; switch to CUBIC",
-                "MTU mismatch; lower the MTU"
+                "The time of day the connection is allowed to run",
+                "How much more data the receiver currently has room to accept",
+                "The number of routers between sender and receiver",
+                "The encryption strength of the connection"
               ],
               "answerIndex": 1,
-              "explanation": "The signature ~40 ms stall on tiny writes is the classic Nagle + delayed-ACK deadlock. Disabling Nagle with TCP_NODELAY lets small segments go out immediately."
+              "explanation": "The window is the receiver's advertised free buffer space — 'I can take this much more right now.' The sender keeps unconfirmed data within it. It is not a time limit, a hop count, or an encryption setting."
             },
             {
-              "id": "transport-tcp-udp-sock-012",
+              "id": "transport-tcp-udp-ctrl-003",
               "type": "mcq",
-              "prompt": "Why does one lost TCP segment delay delivery of later, already-received data to the application?",
+              "prompt": "What problem does congestion control solve?",
               "choices": [
-                "TCP discards out-of-order data",
-                "TCP must deliver the byte stream in order, so the receiver holds later bytes until the gap is filled (head-of-line blocking)",
-                "The receive window shrinks to zero on any loss",
-                "The connection resets and restarts"
+                "It stops the sender from overwhelming the network between the two computers",
+                "It guarantees the data is encrypted",
+                "It decides which program receives the data",
+                "It makes IP addresses shorter"
               ],
-              "answerIndex": 1,
-              "explanation": "TCP guarantees in-order delivery of a single byte stream. Out-of-order segments are buffered but not handed up until the missing bytes arrive — head-of-line blocking, the motivation for QUIC's per-stream independence."
+              "answerIndex": 0,
+              "explanation": "Congestion control protects the shared network (links and routers) from being flooded, which would cause dropped packets. Choosing the program is what ports do; it is unrelated to encryption or address length."
             },
             {
-              "id": "transport-tcp-udp-sock-013",
+              "id": "transport-tcp-udp-ctrl-004",
               "type": "mcq",
-              "prompt": "In a capture you see data flowing, then three identical ACKs for the same seq, then one retransmitted segment, then ACKs jump forward. What happened?",
+              "prompt": "What is the main difference between flow control and congestion control?",
               "choices": [
-                "The connection was reset",
-                "A segment was lost; 3 dup-ACKs triggered fast retransmit, which filled the gap and let cumulative ACKs advance",
-                "The receiver ran out of buffer (zero window)",
-                "Nagle coalesced several segments into one"
+                "Flow control protects the receiver; congestion control protects the network",
+                "Flow control protects the network; congestion control protects the receiver",
+                "They are two names for the same thing",
+                "Flow control encrypts data; congestion control compresses it"
+              ],
+              "answerIndex": 0,
+              "explanation": "Flow control is about not overwhelming the receiving computer; congestion control is about not overwhelming the network in between. They target two different bottlenecks, and neither does encryption or compression."
+            },
+            {
+              "id": "transport-tcp-udp-ctrl-005",
+              "type": "mcq",
+              "prompt": "What does 'slow start' mean in congestion control?",
+              "choices": [
+                "The connection is permanently capped at a slow speed",
+                "TCP begins by sending slowly and speeds up as acknowledgments return smoothly",
+                "The receiver slowly reads the data to save power",
+                "The handshake is performed very slowly"
               ],
               "answerIndex": 1,
-              "explanation": "Three dup-ACKs are TCP's loss signal; the sender fast-retransmits the missing segment, the receiver gets the gap filled, and the cumulative ACK jumps past all the buffered data — a textbook fast-recovery sequence."
+              "explanation": "Slow start means TCP starts cautious and ramps up as it sees that data is getting through. It is not a permanent cap, nor about the receiver's reading speed or the handshake timing.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/transport-tcp-udp-8.svg"
+            },
+            {
+              "id": "transport-tcp-udp-ctrl-006",
+              "type": "mcq",
+              "prompt": "In congestion control, why does packet loss cause TCP to slow down?",
+              "choices": [
+                "Loss means the receiver wants to close the connection",
+                "Loss is a hint the network may be full, so backing off helps relieve the overload",
+                "Loss means the data was encrypted incorrectly",
+                "Loss tells TCP to switch to UDP"
+              ],
+              "answerIndex": 1,
+              "explanation": "Dropped packets often signal that links or routers are overloaded. TCP treats loss as that hint and reduces its sending rate to ease the congestion, then climbs again. Loss is not a close request or an encryption error."
+            },
+            {
+              "id": "transport-tcp-udp-ctrl-007",
+              "type": "mcq",
+              "prompt": "A receiver advertises a smaller and smaller window as a transfer goes on. What is most likely happening?",
+              "choices": [
+                "The network routers are rebooting",
+                "The receiver is filling up faster than it can process the data, so it has less free buffer room",
+                "The sender ran out of data to send",
+                "The connection is being encrypted more strongly"
+              ],
+              "answerIndex": 1,
+              "explanation": "A shrinking window means the receiver's free buffer space is decreasing — it is not keeping up. Flow control then tells the sender to ease off so nothing overflows. It is not about routers, running out of data, or encryption."
+            },
+            {
+              "id": "transport-tcp-udp-ctrl-008",
+              "type": "mcq",
+              "prompt": "What is 'head-of-line blocking' in TCP?",
+              "choices": [
+                "When the fastest data is always delivered first",
+                "When one lost chunk forces all the data behind it to wait until that chunk is re-sent",
+                "When two computers try to connect to the same port",
+                "When the receiver's window drops to zero on purpose"
+              ],
+              "answerIndex": 1,
+              "explanation": "Because TCP delivers one strictly ordered stream, a single missing chunk holds up everything after it until it is retransmitted — like one stalled car blocking the whole lane. It is not about speed ordering or port collisions."
+            },
+            {
+              "id": "transport-tcp-udp-ctrl-009",
+              "type": "mcq",
+              "prompt": "How does QUIC relate to UDP?",
+              "choices": [
+                "QUIC replaces UDP with a brand-new lower layer",
+                "QUIC runs on top of UDP and rebuilds reliability and ordering itself, while avoiding head-of-line blocking",
+                "QUIC is just another name for TCP",
+                "QUIC removes the need for any port numbers"
+              ],
+              "answerIndex": 1,
+              "explanation": "QUIC is built on UDP's bare delivery and adds back reliable, ordered streams — but in a way that keeps independent streams from blocking each other. It does not replace UDP, is not TCP, and still uses ports."
+            },
+            {
+              "id": "transport-tcp-udp-ctrl-010",
+              "type": "mcq",
+              "prompt": "Why would designers build a new protocol like QUIC on top of UDP rather than on TCP?",
+              "choices": [
+                "Because UDP already guarantees ordering they can reuse",
+                "Because UDP's bare, no-ordering delivery lets QUIC add its own smarter reliability without TCP's head-of-line blocking",
+                "Because UDP is encrypted and TCP is not",
+                "Because TCP cannot be used on the internet anymore"
+              ],
+              "answerIndex": 1,
+              "explanation": "UDP imposes no ordering, so QUIC is free to build independent streams that do not block one another — sidestepping TCP's head-of-line blocking. UDP does not provide ordering or built-in encryption, and TCP is still widely used."
+            },
+            {
+              "id": "transport-tcp-udp-ctrl-011",
+              "type": "mcq",
+              "prompt": "Which pairing correctly matches each control to what it protects?",
+              "choices": [
+                "Flow control → the network; congestion control → the receiver",
+                "Flow control → the receiver (via the window); congestion control → the network (start slow, back off on loss)",
+                "Both protect only the sender",
+                "Flow control → encryption; congestion control → routing"
+              ],
+              "answerIndex": 1,
+              "explanation": "Flow control uses the receiver's window to avoid overwhelming the receiver; congestion control starts slow and backs off on loss to avoid overwhelming the network. The other options swap or misattribute these roles."
             }
           ]
         }
