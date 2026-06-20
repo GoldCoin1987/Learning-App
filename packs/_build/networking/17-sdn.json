@@ -5,366 +5,541 @@
   "lessons": [
     {
       "id": "sdn-l1",
-      "title": "The SDN Idea: Centralize the Brain, Dumb Down the Pipes",
+      "title": "The Big Idea: One Brain for the Whole Network",
       "order": 1,
       "difficulty": 1,
-      "content": "**Take the control/data plane split to its conclusion.** In a classic router each box runs its own routing protocols (the *control plane*, deciding paths) and its own forwarding ASIC (the *data plane*, moving packets). Software-defined networking (SDN) asks: what if you rip the control plane out of every box and put it in one place?\n\nThe result is a **logically centralized controller** that holds a global view of the topology and programs every switch's forwarding table. The switches become *dumb, fast forwarders*: they no longer think, they just match packets and apply actions the controller pushed down. This is the same separation you already know from OSPF/BGP (control) versus the FIB lookup (data) in Module 7 — SDN just relocates the control plane off the device.\n\nWhy bother? Centralization buys you a single point to express *intent* (\"tenant A's traffic never touches tenant B\"), instant global reconfiguration, and the ability to write network policy as software instead of logging into 200 boxes. The trade-off is a new dependency: the controller (and its southbound channel) becomes critical infrastructure, so real deployments run controller clusters and let switches keep a cached \"fail-standalone\" mode.\n\n```bash\n# Conceptually: the data plane is now a table the controller writes\n# match: in_port=3, dst_ip=10.0.0.5  -> action: output port 7\n```\n\nMentally file SDN as *\"BGP's brain, but extracted and centralized, driving plumbing it can reprogram in milliseconds.\"* Everything else in this module — OpenFlow, overlays, eBPF, intent-based networking — is an elaboration of this one move.",
+      "content": "**Hook.** A network is built from lots of boxes — routers and switches — that forward traffic. Traditionally, each box is set up one at a time, by hand, and each one makes its own decisions about where to send packets. That works for a few boxes. But imagine a company with hundreds of them: every change means logging into box after box and typing commands. It is slow, and one typo can break things. The network is rigid and hard to manage.\n\n**Build.** *Software-defined networking* (SDN) changes the model with one simple move: **separate the brain from the muscle.** Instead of every box thinking for itself, a single piece of software called a **controller** becomes the brain. It makes the decisions and then *programs* the boxes below it. Those boxes become simple, fast **forwarders** — the muscle — that just do what the controller tells them. Now the whole network can be managed and changed from one place, and software can even do it automatically.\n\nTwo everyday pictures help. **Air-traffic control:** one tower directs every plane from a single place, instead of each pilot improvising — far safer and more coordinated. **A smart-home app:** you control all your lights from one screen, instead of walking around flipping each switch by hand.\n\nThe key idea has a name: split the **control plane** (deciding where traffic should go — now centralized in the controller) from the **data plane** (actually forwarding the packets — still done by the boxes). Same two jobs as before; SDN just moves the deciding into one shared brain.\n\n**Recap.** SDN = a central controller (brain) that decides, plus simple fast forwarders (muscle) that do. The payoff is managing the whole network from one place; the deeper concept is the control-plane / data-plane split.",
       "items": [
-        {
-          "id": "sdn-l1-fc1",
-          "type": "flashcard",
-          "front": "In one sentence, what is the core move of SDN?",
-          "back": "Extract the control plane out of every device into a logically centralized controller, leaving devices as dumb, fast forwarders the controller programs.",
-          "hint": "It's a relocation, not a new function."
-        },
-        {
-          "id": "sdn-l1-fc2",
-          "type": "flashcard",
-          "front": "Define the control plane vs. the data plane.",
-          "back": "Control plane = decides paths/policy (routing protocols, the brain). Data plane (forwarding plane) = actually moves packets via fast table lookups (the muscle).",
-          "hint": "Brain vs. muscle."
-        },
-        {
-          "id": "sdn-l1-fc3",
-          "type": "flashcard",
-          "front": "How does SDN's split differ from the control/data split already inside a normal router?",
-          "back": "A normal router has both planes on the same box. SDN moves the control plane OFF the device into a central controller that programs many devices at once.",
-          "hint": "Location, not concept."
-        },
-        {
-          "id": "sdn-l1-fc4",
-          "type": "flashcard",
-          "front": "Name two concrete benefits of centralizing the control plane.",
-          "back": "A single place to express network-wide intent/policy, and near-instant global reconfiguration via software instead of per-box CLI.",
-          "hint": "Policy + speed of change."
-        },
-        {
-          "id": "sdn-l1-fc5",
-          "type": "flashcard",
-          "front": "What is the main risk introduced by a centralized controller, and how is it mitigated?",
-          "back": "The controller and its southbound channel become critical infrastructure / a failure point. Mitigated with controller clusters and switch 'fail-standalone' modes.",
-          "hint": "Single brain = single point of failure."
-        },
-        {
-          "id": "sdn-l1-fc6",
-          "type": "flashcard",
-          "front": "Map SDN onto something you already know from Module 7.",
-          "back": "OSPF/BGP = control plane; the FIB lookup that forwards a packet = data plane. SDN just relocates that control plane off the device into a controller.",
-          "hint": "Routing protocol vs. FIB."
-        },
         {
           "id": "sdn-l1-mc1",
           "type": "mcq",
-          "prompt": "In a pure SDN switch, what does the switch itself decide?",
+          "prompt": "What problem is software-defined networking (SDN) mainly trying to solve?",
           "choices": [
-            "The full routing topology of the network",
-            "Almost nothing about paths; it matches packets and applies controller-installed actions",
-            "Which BGP routes to advertise to peers",
-            "The encryption keys for each flow"
+            "Computers cannot send packets without a controller",
+            "Configuring every router and switch one-by-one by hand is slow, error-prone, and hard to change at scale",
+            "Network cables are too expensive to install",
+            "Packets travel too slowly through ordinary switches"
           ],
           "answerIndex": 1,
-          "explanation": "The whole point is that the switch becomes a dumb fast forwarder: path/policy decisions live in the controller, and the switch just executes match/action rules it was given."
+          "explanation": "Traditionally each box is set up by hand and decides on its own, so managing a big network means editing box after box — slow and easy to get wrong. SDN centralizes the decision-making so the network can be managed and changed from one place. The other options describe problems SDN does not address.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-2.svg"
         },
         {
           "id": "sdn-l1-mc2",
           "type": "mcq",
-          "prompt": "Which phrase best captures 'logically centralized' control?",
+          "prompt": "In one sentence, what is the core move of SDN?",
           "choices": [
-            "Exactly one physical server makes all decisions",
-            "A single decision-making view that may run as a resilient cluster under the hood",
-            "Each switch keeps its own independent control plane",
-            "Control is centralized in the data plane ASIC"
+            "Make every switch run its own routing software",
+            "Separate the decision-making brain from the boxes and put it in one central controller, leaving the boxes as simple forwarders",
+            "Replace all routers with a single giant router",
+            "Encrypt every packet that crosses the network"
           ],
           "answerIndex": 1,
-          "explanation": "'Logically centralized' means one coherent control view/API; physically it is usually a clustered controller for availability, not a single fragile box."
+          "explanation": "SDN takes the 'brain' (the deciding) out of each box and centralizes it in a controller; the boxes become simple, fast forwarders that just follow instructions. It is a relocation of the decision-making, not a new way to encrypt or a single mega-router.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-2.svg"
         },
         {
           "id": "sdn-l1-mc3",
           "type": "mcq",
-          "prompt": "A failure of the SDN controller's southbound channel is dangerous because:",
+          "prompt": "What is the SDN controller's role?",
           "choices": [
-            "Packets can no longer be encrypted",
-            "Switches lose the brain that programs their forwarding tables",
-            "Routing protocols stop converging on the switches",
-            "The data plane ASICs physically power off"
+            "It physically carries every packet between the switches",
+            "It is the central brain (software) that makes the decisions and programs the forwarding boxes below it",
+            "It is a faster type of network cable",
+            "It stores all the user data on the network"
           ],
           "answerIndex": 1,
-          "explanation": "With the control plane centralized, the southbound channel is how the brain reaches the muscle; losing it means switches can't be (re)programmed, which is why fail-standalone modes and controller clusters exist."
+          "explanation": "The controller is the centralized 'brain': it decides how traffic should flow and pushes those instructions down to the simple forwarders. It does not carry the packets itself (the forwarders do that), and it is software, not cabling or storage.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-2.svg"
         },
         {
           "id": "sdn-l1-mc4",
           "type": "mcq",
-          "prompt": "For a software developer entering today's market, why is SDN/cloud networking emphasized over configuring physical routers?",
+          "prompt": "What is the difference between the control plane and the data plane?",
           "choices": [
-            "Physical routers no longer exist",
-            "Modern cloud, Kubernetes, and data-center networks are software-defined, so that's where the relevant work is",
-            "SDN is easier than subnetting",
-            "Routers cannot be automated"
+            "The control plane forwards packets; the data plane decides the routes",
+            "The control plane decides where traffic should go; the data plane actually forwards the packets",
+            "They are two names for exactly the same thing",
+            "The control plane is hardware; the data plane is the building it sits in"
           ],
           "answerIndex": 1,
-          "explanation": "Per the module's framing, modern infrastructure is software-defined; container/cloud networking is more immediately relevant to a developer than hand-configuring physical boxes."
+          "explanation": "Control plane = the deciding (the brain, the rules and the map). Data plane = the doing (the muscle that moves packets out a port). Option 1 swaps the two; they are not the same thing, and both are about logical jobs, not the physical building.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-3.svg"
+        },
+        {
+          "id": "sdn-l1-mc5",
+          "type": "mcq",
+          "prompt": "In SDN, which plane is centralized and which stays in the network boxes?",
+          "choices": [
+            "The data plane is centralized; the control plane stays in the boxes",
+            "Both planes are centralized in the controller",
+            "The control plane is centralized in the controller; the data plane stays in the forwarding boxes",
+            "Both planes stay in the boxes, just renamed"
+          ],
+          "answerIndex": 2,
+          "explanation": "SDN moves the control plane (the deciding) into the central controller, while the data plane (the actual packet forwarding) stays in the switches. Centralizing the forwarding itself would be impossible — packets still have to physically pass through the boxes.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-3.svg"
+        },
+        {
+          "id": "sdn-l1-mc6",
+          "type": "mcq",
+          "prompt": "How is SDN different from a traditional network of routers and switches?",
+          "choices": [
+            "Traditional networks have no forwarding; SDN adds it",
+            "In a traditional network each box has its own brain and is set up by hand; in SDN one controller is the shared brain for all the boxes",
+            "SDN uses no physical devices at all",
+            "Traditional networks are always faster than SDN ones"
+          ],
+          "answerIndex": 1,
+          "explanation": "The difference is where the 'brain' lives. Traditionally every box decides for itself and must be configured individually; SDN gives the whole network one central brain. Physical forwarders still exist in SDN, and speed is not the defining difference.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-2.svg"
+        },
+        {
+          "id": "sdn-l1-mc7",
+          "type": "mcq",
+          "prompt": "Which everyday example is the best analogy for an SDN controller?",
+          "choices": [
+            "Each pilot independently choosing their own route mid-flight",
+            "An air-traffic-control tower directing many planes from one place",
+            "A single light switch that only controls one bulb",
+            "A locked box that nobody can change"
+          ],
+          "answerIndex": 1,
+          "explanation": "An air-traffic-control tower is one place that coordinates many planes — just like a controller coordinating many forwarders. 'Every pilot improvising' is the opposite (the traditional, decentralized model), and a single one-bulb switch is the very by-hand approach SDN replaces.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-3.svg"
+        },
+        {
+          "id": "sdn-l1-mc8",
+          "type": "mcq",
+          "prompt": "In a smart-home analogy, flipping each light switch by hand corresponds to which networking model?",
+          "choices": [
+            "SDN, because one app controls everything",
+            "The traditional model, where each box is configured individually",
+            "The data plane being centralized",
+            "A network with no control plane at all"
+          ],
+          "answerIndex": 1,
+          "explanation": "Flipping each switch by hand = configuring each box individually, which is the traditional model. The SDN equivalent is the single app that controls all the lights at once — one central place of control.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-2.svg"
+        },
+        {
+          "id": "sdn-l1-mc9",
+          "type": "mcq",
+          "prompt": "Why do people describe SDN as making 'the network as code,' similar to cloud data centers?",
+          "choices": [
+            "Because the switches are made of source code instead of metal",
+            "Because a central controller lets software set up and change the whole network automatically, the way cloud servers are created and managed by software",
+            "Because SDN deletes the need for any network devices",
+            "Because every packet now contains a small program"
+          ],
+          "answerIndex": 1,
+          "explanation": "With one controller in charge, software can define and change the network automatically — just like infrastructure-as-code spins up cloud servers on demand. The devices are still real hardware, and packets are not programs.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-2.svg"
         }
       ]
     },
     {
       "id": "sdn-l2",
-      "title": "OpenFlow, Flow Tables & Open vSwitch",
+      "title": "How It Works: A Global View, Pushed Down to the Switches",
       "order": 2,
       "difficulty": 2,
-      "content": "**OpenFlow** was the first widely deployed southbound protocol that made the SDN split concrete. It defines exactly how a controller programs a switch's **flow tables**. Each flow-table entry is a *match/action* rule: match on header fields (in-port, MAC, VLAN, IP, TCP/UDP ports) and apply actions (output to port, drop, rewrite a field, push/pop a tag, send to controller). A packet walks the tables, hits the highest-priority matching entry, and the switch executes its actions — pure data-plane mechanics with no local decision-making.\n\nWhen a packet matches nothing, the switch does a **packet-in** to the controller, which decides and installs a new flow rule (**flow-mod**) so future packets are handled in hardware at line rate. That's the SDN loop: rare slow-path consultation, fast-path forwarding everywhere else.\n\n```bash\n# Open vSwitch (OVS) speaks OpenFlow; inspect and add flows by hand\novs-ofctl dump-flows br0\novs-ofctl add-flow br0 \"priority=100,ip,nw_dst=10.0.0.5,actions=output:7\"\novs-ofctl add-flow br0 \"priority=10,actions=drop\"\n```\n\n**Open vSwitch** is the workhorse software switch: a programmable, OpenFlow-capable bridge that runs on every hypervisor and is the data plane underneath much of cloud networking. **Controllers** (ONOS, OpenDaylight, Faucet, or cloud-proprietary ones) provide the northbound API where you express intent and the southbound drivers that push flows down.\n\nIn practice raw OpenFlow is now often hidden beneath higher abstractions, but the model — *centralized controller writes match/action tables into programmable switches* — is the mental skeleton for everything that follows, including how overlays and Kubernetes networking are wired up.",
+      "content": "**Hook.** We know the controller is the brain. But how does one piece of software actually run a whole network of switches? Two things make it work: the controller sees everything, and it speaks a language the switches understand.\n\n**Build.** First, the controller has a **global view**. Each switch reports what it is connected to, so the controller builds a single map of the entire network — every device and every link. A normal router only sees its own neighbors and has to guess the rest; the controller sees the whole picture at once, so it can plan the best path from end to end and avoid trouble spots.\n\nSecond, the controller **pushes rules down** to the switches. A rule is simple: *if a packet looks like this, send it out that port* (or drop it). These are often called forwarding rules or flow rules. The switch just stores them and matches each arriving packet against them — fast, and with no thinking required.\n\nTo send those rules, the controller uses a **southbound interface**: think of it as *the language the controller uses to program the switches*. The most famous one is **OpenFlow**. You do not need its details — just remember southbound = downward, controller-to-switch.\n\nThere is also an upward direction. A **northbound API** (Application Programming Interface — a way for programs to talk to each other) lets apps and automation tools tell the controller *what they want* (\"keep these two groups separate,\" \"give this service more bandwidth\"). The controller figures out the rules and pushes them down. Easy compass: **northbound = up to the apps, southbound = down to the switches.**\n\n**Recap.** The controller works by (1) holding a global map and (2) pushing forwarding rules down over a southbound interface like OpenFlow, while apps make requests through a northbound API.",
       "items": [
-        {
-          "id": "sdn-l2-fc1",
-          "type": "flashcard",
-          "front": "What is an OpenFlow flow-table entry made of?",
-          "back": "A match (on header fields like in-port, MAC, VLAN, IP, L4 ports) plus actions (output, drop, rewrite, push/pop tag, send-to-controller), with a priority.",
-          "hint": "match + action + priority."
-        },
-        {
-          "id": "sdn-l2-fc2",
-          "type": "flashcard",
-          "front": "What happens on an OpenFlow 'table miss' (no matching flow)?",
-          "back": "The switch sends a packet-in to the controller; the controller decides and installs a flow-mod so subsequent packets are forwarded in hardware at line rate.",
-          "hint": "Slow path once, fast path forever after."
-        },
-        {
-          "id": "sdn-l2-fc3",
-          "type": "flashcard",
-          "front": "What role does OpenFlow play in SDN?",
-          "back": "It is a southbound protocol: the concrete way a controller programs a switch's forwarding (flow) tables.",
-          "hint": "Controller-to-switch wire protocol."
-        },
-        {
-          "id": "sdn-l2-fc4",
-          "type": "flashcard",
-          "front": "What is Open vSwitch (OVS)?",
-          "back": "A programmable, OpenFlow-capable software switch/bridge that runs on hypervisors and hosts; it's the data plane under much of cloud and container networking.",
-          "hint": "The software switch on every host."
-        },
-        {
-          "id": "sdn-l2-fc5",
-          "type": "flashcard",
-          "front": "What is a controller's northbound vs. southbound interface?",
-          "back": "Northbound = the API where operators/apps express intent and policy. Southbound (e.g. OpenFlow) = the channel that pushes resulting rules down to switches.",
-          "hint": "Up to apps, down to switches.",
-          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-1.svg"
-        },
-        {
-          "id": "sdn-l2-fc6",
-          "type": "flashcard",
-          "front": "Why is the OpenFlow model worth learning even though raw OpenFlow is often hidden today?",
-          "back": "It is the mental skeleton — centralized controller writes match/action tables into programmable forwarders — that overlays, OVS, and Kubernetes networking are all built on.",
-          "hint": "Abstraction hides it, but it's still underneath."
-        },
         {
           "id": "sdn-l2-mc1",
           "type": "mcq",
-          "prompt": "A packet hits an OVS switch and matches no flow entry. What is the typical sequence?",
+          "prompt": "What does it mean that the SDN controller has a 'global view' of the network?",
           "choices": [
-            "The packet is silently dropped with no record",
-            "packet-in to controller -> controller installs flow-mod -> future packets forwarded in hardware",
-            "The switch floods it out every port forever",
-            "The switch runs OSPF to compute a route locally"
+            "It can see traffic on the public internet worldwide",
+            "It holds a single map of all the devices and links, so it can plan paths across the whole network",
+            "It only knows about the switch directly next to it",
+            "It views the network through a web browser"
           ],
           "answerIndex": 1,
-          "explanation": "A table miss triggers a packet-in to the controller, which installs a flow rule (flow-mod); after that, matching packets are handled on the fast path without consulting the controller."
+          "explanation": "A global view means the controller knows the entire topology — every device and link — and can plan end-to-end paths. That is exactly what an individual router lacks: it only knows its own neighbors. It is not about the public internet or a browser.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-4.svg"
         },
         {
           "id": "sdn-l2-mc2",
           "type": "mcq",
-          "prompt": "In OpenFlow, when two flow entries both match a packet, which wins?",
+          "prompt": "How does the controller actually control a switch's behavior?",
           "choices": [
-            "The oldest installed entry",
-            "The one with the higher priority value",
-            "The entry with the broadest match",
-            "Both actions are applied in sequence"
+            "By physically rewiring the switch",
+            "By pushing forwarding rules (if a packet looks like this, send it out that port) down to the switch",
+            "By asking a human to type commands on each switch",
+            "By replacing the switch's power supply"
           ],
           "answerIndex": 1,
-          "explanation": "Flow entries carry a priority; the highest-priority matching entry's actions are executed. That's why a low-priority 'drop everything' rule can coexist with specific high-priority allow rules."
+          "explanation": "The controller installs forwarding rules into the switch; the switch then matches each packet against those rules and acts. That is the whole point of SDN — no per-box human typing and no physical rewiring needed to change behavior.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-4.svg"
         },
         {
           "id": "sdn-l2-mc3",
           "type": "mcq",
-          "prompt": "Which command adds a flow that forwards IP traffic destined to 10.0.0.5 out port 7 on bridge br0?",
+          "prompt": "What is a southbound interface, such as OpenFlow?",
           "choices": [
-            "ovs-ofctl del-flows br0",
-            "ovs-ofctl add-flow br0 \\\"priority=100,ip,nw_dst=10.0.0.5,actions=output:7\\\"",
-            "ip route add 10.0.0.5 dev br0",
-            "iptables -A FORWARD -d 10.0.0.5 -j ACCEPT"
+            "The language the controller uses to program the switches below it",
+            "A way for end users to log into their email",
+            "The cable that carries electricity to a switch",
+            "A method for switches to vote on the best route"
           ],
-          "answerIndex": 1,
-          "explanation": "ovs-ofctl add-flow installs an OpenFlow rule on the OVS bridge with a match (ip, nw_dst) and an action (output:7); the other commands are unrelated (route table or netfilter, not the OVS flow table)."
+          "answerIndex": 0,
+          "explanation": "Southbound = downward, from controller to switches. It is the language/protocol (OpenFlow being the best-known example) the controller uses to install rules in the switches. It is not a power cable, and switches do not vote in SDN — the controller decides.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-4.svg"
         },
         {
           "id": "sdn-l2-mc4",
           "type": "mcq",
-          "prompt": "Why does the SDN fast path matter for performance?",
+          "prompt": "What is the northbound API used for?",
           "choices": [
-            "Because the controller forwards every packet itself",
-            "Because once a flow is installed, packets are matched/forwarded in the switch data plane at line rate without per-packet controller involvement",
-            "Because OpenFlow encrypts every packet",
-            "Because flow tables replace the need for any addressing"
+            "For the controller to send rules down to switches",
+            "For apps and automation tools to tell the controller what they want",
+            "For switches to forward packets to each other",
+            "For users to physically plug in new cables"
           ],
           "answerIndex": 1,
-          "explanation": "Consulting the controller is the slow path and happens rarely (on misses); the value is that installed flows let the dumb-but-fast data plane handle the bulk of traffic at line rate."
+          "explanation": "Northbound = upward, toward apps. It is how software tells the controller the desired outcome (\"keep these groups apart,\" \"add bandwidth here\"); the controller then works out the rules. Sending rules down to switches is the southbound direction.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-4.svg"
+        },
+        {
+          "id": "sdn-l2-mc5",
+          "type": "mcq",
+          "prompt": "Which way is which: northbound vs. southbound?",
+          "choices": [
+            "Northbound goes down to the switches; southbound goes up to the apps",
+            "Northbound goes up to the apps; southbound goes down to the switches",
+            "Both point to other controllers",
+            "Both point at the end users' laptops"
+          ],
+          "answerIndex": 1,
+          "explanation": "The simple compass: northbound = up to the apps and automation, southbound = down to the switches. Option 1 reverses them.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-4.svg"
+        },
+        {
+          "id": "sdn-l2-mc6",
+          "type": "mcq",
+          "prompt": "A forwarding rule pushed to a switch is basically:",
+          "choices": [
+            "A full copy of the controller's software",
+            "A match-and-action: if a packet matches this pattern, do this (send out a port, or drop it)",
+            "A list of every website a user may visit",
+            "The switch's serial number"
+          ],
+          "answerIndex": 1,
+          "explanation": "A forwarding rule pairs a match (what the packet looks like) with an action (which port to use, or drop). The switch just applies it. It is not a copy of the controller or a browsing policy.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-4.svg"
+        },
+        {
+          "id": "sdn-l2-mc7",
+          "type": "mcq",
+          "prompt": "Why does the controller's global view help compared with a traditional router that only sees its neighbors?",
+          "choices": [
+            "It lets the controller plan the best end-to-end paths and react to the whole network at once",
+            "It makes the cables physically shorter",
+            "It removes the need for any forwarding rules",
+            "It lets each switch ignore the controller"
+          ],
+          "answerIndex": 0,
+          "explanation": "Seeing the entire map means the controller can choose optimal end-to-end paths and respond to changes everywhere, instead of each box guessing from a local view. It still needs to push forwarding rules, and the switches still follow them.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-4.svg"
+        },
+        {
+          "id": "sdn-l2-mc8",
+          "type": "mcq",
+          "prompt": "An 'API' (as in northbound API) is best described as:",
+          "choices": [
+            "A type of network cable",
+            "A defined way for one program to talk to another",
+            "A physical port on the front of a switch",
+            "A brand of controller hardware"
+          ],
+          "answerIndex": 1,
+          "explanation": "API stands for Application Programming Interface — a defined way for programs to talk to each other. The northbound API is how apps speak to the controller. It is software, not a cable or a physical port.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-4.svg"
+        },
+        {
+          "id": "sdn-l2-mc9",
+          "type": "mcq",
+          "prompt": "After the controller installs a forwarding rule, what does the switch do with matching packets?",
+          "choices": [
+            "It asks the controller again about every single packet",
+            "It applies the stored rule itself and forwards the packets quickly, with no decision-making",
+            "It deletes the packets to save space",
+            "It sends them to a different controller"
+          ],
+          "answerIndex": 1,
+          "explanation": "Once a rule is installed, the switch handles matching packets on its own — fast and without thinking. Asking the controller about every packet would be far too slow; the controller is consulted only when something does not match a known rule.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-4.svg"
         }
       ]
     },
     {
       "id": "sdn-l3",
-      "title": "Overlays, Container Networking & eBPF/XDP",
+      "title": "Virtual Networks on Top of Real Ones: Overlays, VXLAN, and NFV",
       "order": 3,
       "difficulty": 3,
-      "content": "**Now wire real cloud/container networks from these parts.** Start in Linux (Module 05). A **network namespace** (`netns`) is an isolated network stack — its own interfaces, routes, and firewall. A **veth pair** is a virtual cable: two linked interfaces, one end in a namespace, the other on the host, plugged into a **Linux bridge** or **Open vSwitch**. Do this a few times and you've hand-built a container network: that's literally the Container Network Model and what Docker/Kubernetes automate.\n\n```bash\nip netns add c1\nip link add veth0 type veth peer name veth0-c\nip link set veth0-c netns c1\nip link set veth0 master br0   # attach host end to a bridge\n```\n\n**How do two containers on different hosts talk?** Their host-local bridges aren't connected, and you can't assume a flat L2 between hosts. The answer is an **overlay**: a **VXLAN** tunnel. The source host's VTEP takes the container's entire L2 frame and encapsulates it inside UDP/IP addressed host-to-host (L2-over-L3). A 24-bit **VNI** identifies the tenant, giving thousands of isolated virtual segments — multi-tenant networking. The far VTEP decapsulates and delivers the original frame. This is **encapsulation come full circle** from Module 1: a frame inside a packet inside a frame. (**GRE** does the same generically without the multi-tenant VNI.)\n\n**Kubernetes** standardizes this via **CNI** plugins. **Calico** can route pod traffic (often BGP) or use overlays; **Cilium** uses **eBPF/XDP** to run programmable packet-processing code *inside the kernel*, replacing iptables/kube-proxy with efficient in-kernel maps and even dropping/redirecting packets at the NIC driver (XDP) before the stack — this is why eBPF is reshaping kernel networking. **Service meshes** (Envoy/Istio) add L7 SDN: identity, mTLS, and routing for HTTP/gRPC. Finally, **IaC** closes the loop: NETCONF/YANG and gNMI model device config; Ansible/Terraform apply it; **intent-based networking** lets you declare desired state and let the system reconcile.",
+      "content": "**Hook.** Once software controls the network, you can do something powerful: build *virtual* networks that float on top of the physical wires. Cloud data centers — huge buildings full of servers shared by many customers — rely on this every day.\n\n**Build.** Start with the idea of an **overlay**: a virtual network drawn on top of the real, physical one (called the *underlay*). To the machines using it, an overlay looks like a simple, private network — even though their traffic is really crossing many shared physical devices underneath.\n\nHow? With **encapsulation**, which just means *putting one packet inside another, like a letter inside an envelope*. The most common tool here is **VXLAN** (Virtual Extensible LAN). When a virtual machine sends a packet, the host wraps that whole packet inside a new outer packet addressed from one physical host to another, ships it across the ordinary network, and the far host unwraps it and delivers the original. VXLAN tags each virtual network with an ID number, so thousands of separate virtual networks can share the same physical wires without ever seeing each other — this is why one data center can safely host many different customers. (An older method called GRE does similar wrapping but without that customer-ID number.)\n\nA second big idea is **NFV** (Network Functions Virtualization): instead of buying a dedicated hardware box for each job — a firewall appliance, a load-balancer appliance — you run those same functions as **software** on ordinary servers. Need another firewall? Start a program, not a shopping order. Combined with overlays, this lets a whole network of \"devices\" be created and rearranged purely in software.\n\n**Recap.** An overlay is a virtual network running on top of the physical one; VXLAN builds overlays by wrapping (encapsulating) packets and tagging each virtual network with an ID; NFV runs network functions as software instead of dedicated boxes.",
       "items": [
-        {
-          "id": "sdn-l3-fc1",
-          "type": "flashcard",
-          "front": "What is a Linux network namespace, and why does it matter for containers?",
-          "back": "An isolated network stack with its own interfaces, routes, and firewall. It's the primitive that gives each container its own private networking — the basis of the Container Network Model.",
-          "hint": "Per-container private network stack."
-        },
-        {
-          "id": "sdn-l3-fc2",
-          "type": "flashcard",
-          "front": "What is a veth pair?",
-          "back": "A virtual cable: two linked interfaces. One end sits in a namespace (the container), the other on the host, usually plugged into a Linux bridge or OVS.",
-          "hint": "A patch cable with two ends."
-        },
-        {
-          "id": "sdn-l3-fc3",
-          "type": "flashcard",
-          "front": "How do two containers on DIFFERENT hosts communicate?",
-          "back": "Via an overlay: the source host's VTEP encapsulates the container's entire L2 frame inside a UDP/IP packet addressed host-to-host (VXLAN, L2-over-L3); the far VTEP decapsulates and delivers it. A VNI tags the tenant.",
-          "hint": "Encapsulate the frame, ship it host-to-host, decapsulate.",
-          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-1.svg"
-        },
-        {
-          "id": "sdn-l3-fc4",
-          "type": "flashcard",
-          "front": "What does the 24-bit VXLAN VNI provide?",
-          "back": "A tenant/segment identifier giving up to ~16 million isolated virtual L2 networks over a shared L3 underlay — multi-tenant network virtualization.",
-          "hint": "Which virtual network this frame belongs to."
-        },
-        {
-          "id": "sdn-l3-fc5",
-          "type": "flashcard",
-          "front": "Why is eBPF changing kernel networking?",
-          "back": "eBPF lets you safely run sandboxed programmable code inside the kernel (and at the NIC driver via XDP) to filter, redirect, or drop packets at high speed, replacing slower iptables chains with efficient in-kernel maps — programmable fast packet processing without kernel patches.",
-          "hint": "Programmable, sandboxed code inside the kernel / at the driver."
-        },
-        {
-          "id": "sdn-l3-fc6",
-          "type": "flashcard",
-          "front": "What is CNI in Kubernetes, and name two implementations.",
-          "back": "CNI (Container Network Interface) is the plugin standard Kubernetes uses to wire pod networking. Examples: Calico (routing, often BGP, or overlay) and Cilium (eBPF-based).",
-          "hint": "The pluggable networking layer for pods."
-        },
-        {
-          "id": "sdn-l3-fc7",
-          "type": "flashcard",
-          "front": "How does VXLAN bring encapsulation 'full circle' from Module 1?",
-          "back": "You get a frame inside a packet inside a frame: the inner tenant Ethernet frame is wrapped in outer UDP/IP, which is wrapped in an outer Ethernet frame on the wire — encapsulation nesting taken literally.",
-          "hint": "Frame-in-packet-in-frame."
-        },
-        {
-          "id": "sdn-l3-fc8",
-          "type": "flashcard",
-          "front": "What is a service mesh (Envoy/Istio) in SDN terms?",
-          "back": "L7 SDN: sidecar/data-plane proxies provide identity, mTLS, and HTTP/gRPC routing and policy, with a control plane programming them — the SDN model applied at the application layer.",
-          "hint": "SDN moved up to L7."
-        },
-        {
-          "id": "sdn-l3-fc9",
-          "type": "flashcard",
-          "front": "What do NETCONF/YANG and gNMI provide for network IaC?",
-          "back": "A structured, model-driven way to read and write device configuration/state (YANG models over NETCONF or gNMI), so tools like Ansible/Terraform can manage networks as code.",
-          "hint": "Model-driven config APIs."
-        },
-        {
-          "id": "sdn-l3-fc10",
-          "type": "flashcard",
-          "front": "What is intent-based networking?",
-          "back": "You declare the desired end state (intent); the system continuously reconciles the actual network to match it, rather than you issuing imperative box-by-box commands.",
-          "hint": "Declare desired state; let it reconcile."
-        },
         {
           "id": "sdn-l3-mc1",
           "type": "mcq",
-          "prompt": "A VXLAN frame on the wire, outermost to innermost, looks like:",
+          "prompt": "What is a network overlay?",
           "choices": [
-            "Inner Ethernet | Inner IP | payload only",
-            "Outer Ethernet | Outer IP | UDP | VXLAN(VNI) | inner Ethernet frame",
-            "Outer IP | TCP | inner IP | payload",
-            "GRE | inner Ethernet only, no IP"
+            "A faster physical cable laid over the old one",
+            "A virtual network running on top of the physical (underlay) network",
+            "A backup copy of the controller",
+            "The metal cover on top of a switch"
           ],
           "answerIndex": 1,
-          "explanation": "VXLAN encapsulates the entire inner L2 frame inside UDP (dport 4789) with a VXLAN header carrying the VNI, all inside an outer IP and outer Ethernet for transport across the L3 underlay."
+          "explanation": "An overlay is a virtual network built on top of the real physical network (the underlay). The machines using it see a simple private network, while their traffic actually crosses shared physical gear. It is not a cable or a hardware cover.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-5.svg"
         },
         {
           "id": "sdn-l3-mc2",
           "type": "mcq",
-          "prompt": "What is the role of a VTEP in a VXLAN overlay?",
+          "prompt": "What does 'encapsulation' mean in this context?",
           "choices": [
-            "It assigns IP addresses via DHCP",
-            "It encapsulates outgoing frames and decapsulates incoming ones at the tunnel endpoints",
-            "It runs BGP between containers",
-            "It encrypts all tenant traffic by default"
+            "Deleting a packet's header to make it smaller",
+            "Putting one packet inside another, like a letter inside an envelope",
+            "Encrypting a packet so no one can read it",
+            "Splitting a packet into single bits"
           ],
           "answerIndex": 1,
-          "explanation": "The VXLAN Tunnel Endpoint (VTEP) is where encapsulation/decapsulation happens; it wraps the tenant frame for transit and unwraps it on arrival. VXLAN itself provides no encryption."
+          "explanation": "Encapsulation = wrapping one packet inside another for transport, like a letter inside an envelope. The outer wrapper carries it across the physical network; the inside is delivered untouched. It is not the same as encryption (which scrambles contents) or deletion.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-5.svg"
         },
         {
           "id": "sdn-l3-mc3",
           "type": "mcq",
-          "prompt": "Cilium replaces much of kube-proxy/iptables by:",
+          "prompt": "What does VXLAN do?",
           "choices": [
-            "Adding more iptables chains",
-            "Running eBPF programs in the kernel (and XDP at the NIC driver) with in-kernel maps for fast packet processing",
-            "Tunneling everything through a userspace proxy",
-            "Disabling the Linux network stack entirely"
+            "It speeds up the physical cables",
+            "It builds virtual networks by wrapping each packet inside an outer packet sent host-to-host, and tags each virtual network with an ID",
+            "It replaces the SDN controller",
+            "It encrypts all traffic by default"
           ],
           "answerIndex": 1,
-          "explanation": "Cilium leverages eBPF/XDP to do programmable, efficient in-kernel packet handling and service load-balancing via maps, avoiding the scaling pain of long iptables rule chains."
+          "explanation": "VXLAN creates overlays: it encapsulates a virtual machine's packet inside an outer host-to-host packet and labels each virtual network with an ID so many can share one physical network. It does not speed up cables, replace the controller, or provide encryption on its own.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-5.svg"
         },
         {
           "id": "sdn-l3-mc4",
           "type": "mcq",
-          "prompt": "You connect a container to the host using a veth pair. Where do the two ends go?",
+          "prompt": "Why is the per-virtual-network ID that VXLAN adds useful in a cloud data center?",
           "choices": [
-            "Both ends inside the container namespace",
-            "One end in the container's netns, the other on the host attached to a bridge/OVS",
-            "Both ends on the physical NIC",
-            "One end in the kernel, one in the controller"
+            "It makes packets travel faster",
+            "It lets thousands of separate virtual networks share the same physical wires while staying isolated from each other",
+            "It tells the user their password",
+            "It reduces the number of servers needed to zero"
           ],
           "answerIndex": 1,
-          "explanation": "A veth pair is a virtual cable: one end lives in the container's network namespace, the other stays on the host and is typically attached to a Linux bridge or Open vSwitch to reach other endpoints."
+          "explanation": "The ID keeps each customer's virtual network separate even though they all ride the same physical underlay — essential when one data center hosts many customers. It is about isolation and scale, not speed or passwords.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-5.svg"
         },
         {
           "id": "sdn-l3-mc5",
           "type": "mcq",
-          "prompt": "What primarily distinguishes GRE from VXLAN as overlay tunnels?",
+          "prompt": "Two virtual machines on different physical hosts are on the same VXLAN overlay. How does their traffic get across?",
           "choices": [
-            "GRE encrypts, VXLAN does not",
-            "VXLAN carries a 24-bit VNI for multi-tenant L2 segmentation; GRE is a generic encapsulation without that tenant identifier",
-            "GRE works only inside one host",
-            "VXLAN runs over TCP, GRE over UDP"
+            "It cannot — they must be on the same physical host",
+            "The sending host wraps the packet in an outer host-to-host packet, sends it over the physical network, and the receiving host unwraps it",
+            "The controller carries each packet by hand",
+            "The packet is broadcast to every machine in the data center"
           ],
           "answerIndex": 1,
-          "explanation": "Both encapsulate traffic for transport over L3, but VXLAN adds a 24-bit VNI giving many isolated tenant segments; plain GRE is a generic tunnel without that multi-tenant identifier (and runs directly over IP, protocol 47, not UDP)."
+          "explanation": "The source host encapsulates the packet inside an outer packet addressed to the destination host, the physical network delivers it, and the destination host decapsulates and hands over the original. That wrapping is exactly what lets one virtual network span many physical hosts.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-5.svg"
         },
         {
           "id": "sdn-l3-mc6",
           "type": "mcq",
-          "prompt": "Why is XDP (eXpress Data Path) significant for performance?",
+          "prompt": "The 'underlay' in overlay networking refers to:",
           "choices": [
-            "It runs packet-processing code at the NIC driver, before the kernel network stack, allowing very fast drop/redirect",
-            "It moves all processing to userspace",
-            "It compresses every packet",
-            "It replaces the need for IP addressing"
+            "The real, physical network that actually carries the wrapped traffic",
+            "A second controller hidden underground",
+            "The oldest packet in the queue",
+            "The virtual network the machines think they are using"
           ],
           "answerIndex": 0,
-          "explanation": "XDP attaches eBPF programs at the earliest point in the driver, so packets can be dropped or redirected before incurring full stack processing — ideal for DDoS mitigation and high-speed load balancing."
+          "explanation": "The underlay is the actual physical network (real switches, routers, and cables) that transports the encapsulated overlay traffic. The virtual network the machines perceive is the overlay sitting on top of it.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-5.svg"
+        },
+        {
+          "id": "sdn-l3-mc7",
+          "type": "mcq",
+          "prompt": "What is NFV (Network Functions Virtualization)?",
+          "choices": [
+            "Running network functions like firewalls and load balancers as software on ordinary servers, instead of as dedicated hardware boxes",
+            "A faster version of VXLAN",
+            "A way to virtually paint network diagrams",
+            "A protocol for assigning IP addresses"
+          ],
+          "answerIndex": 0,
+          "explanation": "NFV means taking jobs that used to need dedicated appliances — firewall, load balancer, router — and running them as software on standard servers. That makes them easy to create, move, and scale. It is not a flavor of VXLAN or an addressing protocol.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-6.svg"
+        },
+        {
+          "id": "sdn-l3-mc8",
+          "type": "mcq",
+          "prompt": "A team needs a second firewall in their cloud network. With NFV, what does that typically involve?",
+          "choices": [
+            "Ordering and physically installing a new firewall appliance",
+            "Starting another firewall as software — no new hardware to rack and cable",
+            "Replacing the SDN controller",
+            "Rewiring the entire data center"
+          ],
+          "answerIndex": 1,
+          "explanation": "Because the firewall is software (NFV), you just launch another instance — no waiting for hardware to arrive and be cabled. Needing to physically install an appliance is exactly the old, slow way NFV replaces.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-6.svg"
+        },
+        {
+          "id": "sdn-l3-mc9",
+          "type": "mcq",
+          "prompt": "How does an overlay relate to the idea of encapsulation you might recognize from how networks layer packets?",
+          "choices": [
+            "It is unrelated — overlays never wrap packets",
+            "An overlay takes encapsulation a step further: a whole packet is wrapped inside another packet to travel across the physical network",
+            "Encapsulation only ever happens inside a single switch",
+            "Overlays remove all headers from packets"
+          ],
+          "answerIndex": 1,
+          "explanation": "Networks already nest headers inside one another; an overlay extends that by wrapping an entire packet inside a new outer packet for transport over the underlay. The far end unwraps it. Overlays clearly do use encapsulation, and they add headers rather than removing them.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-5.svg"
+        }
+      ]
+    },
+    {
+      "id": "sdn-l4",
+      "title": "Why It Matters: Automation, Intent, and the One-Brain Risk",
+      "order": 4,
+      "difficulty": 3,
+      "content": "**Hook.** We have the pieces: a central controller, programmable forwarders, and virtual networks. So what does all of this buy us in the real world — and what is the catch?\n\n**Build.** The headline benefit is **agility through automation**. Because one controller can program the whole network, software can set it up and change it in seconds rather than an engineer editing hundreds of boxes by hand. This is how giant **cloud data centers** work: when you click to create servers, software automatically wires up their networking too — the \"network as code\" idea, the same spirit as treating servers as code.\n\nThis enables a friendlier way to manage networks called **intent-based networking**. Instead of typing low-level commands box by box, you declare your *intent* — the outcome you want, such as \"these two groups must never share traffic\" or \"this app always gets priority.\" The controller translates that goal into the detailed rules and keeps the network matching it, even fixing drift automatically. You say *what* you want; the system figures out *how*.\n\n**But there is a trade-off.** Centralizing the brain is exactly what makes SDN powerful — and also what makes the controller a **single point to protect**. If the one controller fails or is attacked, it can affect the whole network. In engineering terms it is a potential *single point of failure* (SPOF). The standard fix is to run several controllers together that back each other up, and to guard access to them carefully, so no single failure takes everything down.\n\n**Recap.** SDN's big wins are automation, agility, and intent-based management — declaring outcomes and letting software realize them. The price is that the powerful central controller must be protected and made redundant, because it is a single point to defend.",
+      "items": [
+        {
+          "id": "sdn-l4-mc1",
+          "type": "mcq",
+          "prompt": "What is the headline benefit of SDN for running a large network?",
+          "choices": [
+            "It removes the need for any cables",
+            "Agility through automation — software can set up and change the whole network quickly instead of editing each box by hand",
+            "It makes every packet smaller",
+            "It guarantees the network can never fail"
+          ],
+          "answerIndex": 1,
+          "explanation": "Central control lets software configure and reconfigure the entire network fast — that agility and automation is the main payoff. SDN does not eliminate cabling, shrink packets, or make failure impossible (in fact it adds a central piece to protect).",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-7.svg"
+        },
+        {
+          "id": "sdn-l4-mc2",
+          "type": "mcq",
+          "prompt": "How do cloud data centers use SDN-style automation?",
+          "choices": [
+            "Engineers manually cable each new server's network",
+            "When servers are created by software, their networking is automatically set up too — the 'network as code' idea",
+            "They avoid networks entirely",
+            "They use one cable shared by every customer with no separation"
+          ],
+          "answerIndex": 1,
+          "explanation": "In the cloud, creating servers and wiring up their networking are both done automatically by software — network as code. Manual cabling per server is the old approach, and customers are kept separated (often via overlays), not lumped onto one shared link.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-7.svg"
+        },
+        {
+          "id": "sdn-l4-mc3",
+          "type": "mcq",
+          "prompt": "What is intent-based networking?",
+          "choices": [
+            "Typing detailed commands into each switch one at a time",
+            "Declaring the outcome you want and letting the controller work out and maintain the detailed rules",
+            "Letting each switch choose its own goals",
+            "A way to encrypt the controller"
+          ],
+          "answerIndex": 1,
+          "explanation": "Intent-based networking means you state the desired result (the intent) — like 'keep these groups apart' — and the controller figures out the rules and keeps reality matching that intent. Typing per-switch commands is the manual style it replaces.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-7.svg"
+        },
+        {
+          "id": "sdn-l4-mc4",
+          "type": "mcq",
+          "prompt": "With intent-based networking, who works out the low-level rules that make the goal happen?",
+          "choices": [
+            "The person, who must still type every rule by hand",
+            "The controller, which translates the stated intent into detailed rules",
+            "Each end user's laptop",
+            "Nobody — intent-based networks need no rules"
+          ],
+          "answerIndex": 1,
+          "explanation": "You provide the 'what' (the intent); the controller provides the 'how' by generating and maintaining the detailed rules. The whole appeal is that you do not type them by hand, and rules are still needed underneath.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-7.svg"
+        },
+        {
+          "id": "sdn-l4-mc5",
+          "type": "mcq",
+          "prompt": "What is the main trade-off or risk introduced by centralizing control in one controller?",
+          "choices": [
+            "Packets become unreadable",
+            "The controller becomes a single point to protect — if it fails or is attacked, the whole network can be affected",
+            "Switches can no longer forward packets at all",
+            "The network can only have one user"
+          ],
+          "answerIndex": 1,
+          "explanation": "Concentrating the brain in one place is powerful but risky: a failed or compromised controller can impact the entire network — a single point of failure. It does not make packets unreadable or cap the number of users.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-7.svg"
+        },
+        {
+          "id": "sdn-l4-mc6",
+          "type": "mcq",
+          "prompt": "'Single point of failure' (SPOF) in the context of an SDN controller means:",
+          "choices": [
+            "A single packet that fails to arrive",
+            "One critical component whose failure can bring down or disrupt the whole system",
+            "A switch that has exactly one port",
+            "A network with only one cable"
+          ],
+          "answerIndex": 1,
+          "explanation": "A SPOF is one piece whose failure takes down the larger system — here, the lone controller. That is why it must be protected and duplicated. It is about a critical component, not a single lost packet or a one-port switch.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-7.svg"
+        },
+        {
+          "id": "sdn-l4-mc7",
+          "type": "mcq",
+          "prompt": "What is the standard way to reduce the single-point-of-failure risk of the controller?",
+          "choices": [
+            "Turn the controller off during busy hours",
+            "Run several controllers together that back each other up, and carefully guard access to them",
+            "Give every switch its own brain again, abandoning SDN",
+            "Unplug the network when the controller is busy"
+          ],
+          "answerIndex": 1,
+          "explanation": "Running multiple cooperating controllers (so one can take over if another fails) plus tightly controlling access is the normal mitigation. Turning it off or unplugging the network would cause the very outage you want to avoid.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-7.svg"
+        },
+        {
+          "id": "sdn-l4-mc8",
+          "type": "mcq",
+          "prompt": "Why is the central controller described as both SDN's greatest strength and its greatest risk?",
+          "choices": [
+            "Because it is the most expensive cable in the network",
+            "Because controlling everything from one place is what makes the network easy to automate, but it also means one place can affect everything",
+            "Because it stores all the user passwords",
+            "Because it is the only device that can forward packets"
+          ],
+          "answerIndex": 1,
+          "explanation": "The same centralization that lets one place automate the whole network also concentrates risk in that one place — strength and weakness are two sides of the same design. The controller is software, not a cable, a password store, or the device that forwards packets.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-7.svg"
+        },
+        {
+          "id": "sdn-l4-mc9",
+          "type": "mcq",
+          "prompt": "Pulling the module together, which statement best summarizes SDN?",
+          "choices": [
+            "Every box keeps its own brain and is configured by hand",
+            "A central controller (the brain) holds a global view and programs simple fast forwarders (the muscle), enabling automation — at the cost of protecting that central brain",
+            "SDN replaces all software with hardware appliances",
+            "SDN is only about encrypting packets"
+          ],
+          "answerIndex": 1,
+          "explanation": "That captures the whole arc: split control (centralized brain with a global view) from data (the forwarders), program everything from one place for automation, and accept the trade-off of protecting that central controller. The other options describe the traditional model or unrelated ideas.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/sdn-7.svg"
         }
       ]
     }
