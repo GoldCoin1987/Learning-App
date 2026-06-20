@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "id": "networking",
   "title": "Networking",
-  "version": "1.12.0",
+  "version": "1.13.0",
   "description": "Networking from scratch (beginner rework in progress): 17 sub-topics from layering and the physical layer through IP, subnetting, routing, TCP/UDP, TLS, DNS, wireless and modern transport. Beginner-first readings, MCQ practice, and diagrams; tiered easy to hard.",
   "requires": [],
   "tags": [
@@ -6135,318 +6135,1217 @@
       "order": 13,
       "lessons": [
         {
-          "id": "troubleshooting-troubleshooting-l1",
-          "title": "The Layered Methodology & the First-Pass Toolkit",
+          "id": "troubleshooting-troubleshooting-method",
+          "title": "When the Internet Isn't Working: Check It Bottom-Up",
           "order": 1,
           "difficulty": 1,
-          "content": "The difference between an engineer who is *trusted* and one who is merely *busy* is methodology. When you get the dreaded \"the website is slow/down\" report, do not start guessing. Walk the stack, bottom-up, asking one yes/no question per layer and *only* assuming the layer below passed:\n\n1. **Is the link up?** `ip link show` (look for `state UP`), `ethtool eth0` for speed/duplex.\n2. **Do I have an IP and a gateway?** `ip addr`, `ip route` (is there a `default via`?).\n3. **Can I reach the gateway?** `ping <gw>`, and `ip neigh` to confirm ARP resolved the gateway MAC.\n4. **Does DNS resolve?** `dig example.com` — separate name failure from reachability failure.\n5. **Can I open a TCP connection?** `nc -vz example.com 443`.\n6. **Does the application respond?** `curl -v https://example.com`.\n\nThe first step that *fails* localizes the fault to one layer. That is the whole game: you have turned an open-ended \"it's broken\" into \"DNS resolves but TCP won't open on 443\" — a sentence you can act on. Top-down works too (start at `curl`, descend on failure); pick whichever gets you to the layer fastest.\n\n```bash\nping -c4 1.1.1.1          # reachability + RTT + loss\nip route get 93.184.216.34 # which gateway/iface will be used\ndig +short example.com    # does the name resolve?\nnc -vz example.com 443    # can TCP open the port?\n```\n\nFor someone with a radar/RF background this is the same instinct as isolating a fault to a stage in a signal chain: inject a known good signal, check each stage's output, find the first one that's wrong. Methodology beats tool-trivia every time.",
+          "content": "Your screen says \"no internet.\" The worst thing you can do is start randomly: reboot, unplug things, click buttons, and hope. There is a calmer way.\n\nThink of a plumber. When no water comes out of the tap, they do not rip open the wall. They follow the pipe from the tap back toward the street, checking each joint, until they find the blockage. A doctor does the same with a checklist of vital signs, in order. You can troubleshoot a network the exact same way: **check it layer by layer, from the bottom up, until you find where it breaks.**\n\nYou have already met the layers. Here they are again as plain yes/no questions, starting from the most basic:\n\n1. **Link** - am I even connected? Is the cable plugged in, or is Wi-Fi joined?\n2. **IP** - do I have an address? A device needs an **IP address** (its number on the network) to do anything.\n3. **Gateway** - can I reach my router? The **gateway** is your router, the door from your home network to the outside world.\n4. **Internet** - can I reach the outside world past the router?\n5. **DNS** - can I look up names? **DNS (Domain Name System)** turns a name like example.com into an IP number.\n6. **App** - can the actual program (browser, game, email) connect?\n\nThe rule: **only move up a step once the step below it passes, and stop at the first step that fails.** That failing step is where the problem lives. You have just turned a vague \"it's broken\" into something precise, like \"everything works except looking up names.\"\n\n**Recap:** Do not guess. Walk the network from the bottom up - link, IP, gateway, internet, DNS, app - and the first rung that fails tells you which part to fix.",
           "items": [
             {
-              "id": "troubleshooting-l1-fc1",
-              "type": "flashcard",
-              "front": "List the bottom-up layered diagnostic questions for a 'site is down' report.",
-              "back": "Link up? IP/gateway present? Can I reach the gateway? Does DNS resolve? Can TCP open the port? Does the app respond? The first failing step localizes the fault.",
-              "hint": "Six yes/no questions, link to app.",
-              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-1.svg"
-            },
-            {
-              "id": "troubleshooting-l1-fc2",
-              "type": "flashcard",
-              "front": "Which command confirms you have a default route, and what do you look for?",
-              "back": "`ip route` (or `ip route show`). Look for a `default via <gateway> dev <iface>` line; its absence explains why off-subnet destinations are unreachable."
-            },
-            {
-              "id": "troubleshooting-l1-fc3",
-              "type": "flashcard",
-              "front": "How do you test 'can I open a TCP connection to port 443?' without an application?",
-              "back": "`nc -vz host 443` (netcat). It performs just the TCP handshake and reports open/refused/timeout — isolating transport reachability from app behavior."
-            },
-            {
-              "id": "troubleshooting-l1-fc4",
-              "type": "flashcard",
-              "front": "Produce a layered checklist for a slow/down site (commands per layer).",
-              "back": "L2 link: `ip link` / `ethtool`. L3 addr+route: `ip addr`, `ip route`. Gateway: `ping gw`, `ip neigh`. DNS: `dig name`. Path: `mtr host`. TCP: `nc -vz host 443`. App: `curl -v https://host`. Stop at the first failure; that is your layer.",
-              "hint": "One tool per rung, link to app."
-            },
-            {
-              "id": "troubleshooting-l1-fc5",
-              "type": "flashcard",
-              "front": "What does ping's output give you beyond a yes/no answer?",
-              "back": "Round-trip time (latency), jitter (variation in RTT), and packet loss percentage from the summary line — three distinct signals of link/path health."
-            },
-            {
-              "id": "troubleshooting-l1-mc1",
+              "id": "troubleshooting-method-mcq-001",
               "type": "mcq",
-              "prompt": "`ping <gateway>` succeeds but `ping 1.1.1.1` (an external IP) times out. Which layer is implicated?",
+              "prompt": "Your computer shows \"no internet.\" According to the bottom-up method, what is the best first move?",
               "choices": [
-                "Local link (cable/NIC) is down",
-                "DNS resolution is broken",
-                "Routing/gateway forwarding or upstream connectivity beyond the gateway",
-                "The application on the remote server is crashed"
+                "Reboot the computer and hope it fixes itself",
+                "Start at the most basic layer and check each layer in order until one fails",
+                "Immediately call your internet provider",
+                "Reinstall the web browser"
+              ],
+              "answerIndex": 1,
+              "explanation": "Random reboots are guessing. The disciplined method is to start at the bottom (am I connected at all?) and climb one layer at a time, stopping at the first failure. That tells you exactly where the problem is instead of hoping.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-2.svg"
+            },
+            {
+              "id": "troubleshooting-method-mcq-002",
+              "type": "mcq",
+              "prompt": "What does the plumber analogy (following the pipe from the tap back to the main) teach about troubleshooting a network?",
+              "choices": [
+                "Always replace the most expensive part first",
+                "Follow the path step by step to find exactly where the flow stops",
+                "The problem is always at the very end of the path",
+                "You should change several things at once to save time"
+              ],
+              "answerIndex": 1,
+              "explanation": "A plumber traces the pipe joint by joint to find the blockage rather than tearing open the whole wall. Networking is the same: follow the path one step at a time and find the single point where things stop working.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-2.svg"
+            },
+            {
+              "id": "troubleshooting-method-mcq-003",
+              "type": "mcq",
+              "prompt": "In the bottom-up checklist, which question comes FIRST?",
+              "choices": [
+                "Can the web browser load a page?",
+                "Does the name example.com turn into an IP?",
+                "Am I even connected (cable plugged in or Wi-Fi joined)?",
+                "Can I reach a server on the other side of the world?"
               ],
               "answerIndex": 2,
-              "explanation": "You reached the gateway (link, local IP, and ARP are fine), so the fault is past it: the gateway's route/forwarding or the upstream path. DNS is not involved because you pinged an IP."
+              "explanation": "You start at the very bottom: the physical link. If you are not connected at all, nothing above it can possibly work, so there is no point checking DNS or the browser yet.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-2.svg"
             },
             {
-              "id": "troubleshooting-l1-mc2",
+              "id": "troubleshooting-method-mcq-004",
               "type": "mcq",
-              "prompt": "`dig example.com` returns the correct A record, but `curl https://example.com` hangs. The NEXT best single check is:",
+              "prompt": "Why does the method say to move up a layer ONLY after the layer below it passes?",
               "choices": [
-                "Re-run dig against a different resolver",
-                "`nc -vz example.com 443` to test whether TCP even opens",
-                "Reboot the local machine",
-                "Check the link with ethtool"
+                "To make the checklist take longer on purpose",
+                "Because each layer depends on the one below it, so the first failure pinpoints the problem",
+                "Because the top layer is always the real cause",
+                "Because the tools can only test one layer ever"
               ],
               "answerIndex": 1,
-              "explanation": "DNS already resolved, so the name layer is good. Before blaming the app/TLS, confirm TCP connectivity to the port; nc isolates transport from application behavior."
+              "explanation": "The layers stack: you cannot look up a name if you have no IP, and you cannot get an IP if you are not connected. Climbing in order and stopping at the first failure points straight at the broken layer without chasing false leads.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-2.svg"
             },
             {
-              "id": "troubleshooting-l1-mc3",
+              "id": "troubleshooting-method-mcq-005",
               "type": "mcq",
-              "prompt": "Why does the methodology say to assume only the layer BELOW the current one has passed?",
+              "prompt": "What is the \"gateway\" in this checklist?",
               "choices": [
-                "To make the checklist longer",
-                "Because each layer depends on the one beneath it, so the first failure pinpoints the fault without false leads",
-                "Because higher layers are always the real problem",
-                "Because tools cannot test more than one layer"
+                "A website you are trying to visit",
+                "Your router - the door from your home network to the outside world",
+                "The name-to-number lookup service",
+                "The cable that connects your computer"
               ],
               "answerIndex": 1,
-              "explanation": "Layers are dependent: TCP can't open if IP can't route, which can't work if the link is down. Walking up and stopping at the first failure localizes the fault precisely."
+              "explanation": "The gateway (or default gateway) is your router: the device that forwards your traffic out to the rest of the internet. If you cannot reach the gateway, you cannot reach anything beyond your own network.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-2.svg"
             },
             {
-              "id": "troubleshooting-l1-mc4",
+              "id": "troubleshooting-method-mcq-006",
               "type": "mcq",
-              "prompt": "Which command both resolves the name AND lets you query a SPECIFIC DNS server to bypass a suspect resolver?",
+              "prompt": "You check the layers in order. Link, IP, gateway, and reaching the outside internet all PASS, but looking up names FAILS. Which layer is the problem?",
               "choices": [
-                "`ping example.com`",
-                "`dig @8.8.8.8 example.com`",
-                "`nc -vz example.com 53`",
-                "`ip neigh`"
+                "The physical link (cable/Wi-Fi)",
+                "DNS (turning names into IP numbers)",
+                "Getting an IP address",
+                "Reaching the gateway"
               ],
               "answerIndex": 1,
-              "explanation": "`dig @<server> <name>` forces the query to a chosen resolver, isolating 'is DNS broken' from 'is THIS resolver broken'. ping would itself fail if your default resolver is broken."
+              "explanation": "Everything below the name-lookup step passed, so the connection itself is fine. The first failing step is DNS, the system that turns names like example.com into IP numbers. That is exactly where to focus.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-2.svg"
+            },
+            {
+              "id": "troubleshooting-method-mcq-007",
+              "type": "mcq",
+              "prompt": "What is the main benefit of turning \"it's broken\" into \"everything works except looking up names\"?",
+              "choices": [
+                "It makes the problem sound more impressive",
+                "It is a precise statement you can actually act on, pointing at one layer to fix",
+                "It guarantees the problem is not your fault",
+                "It means you can skip checking the lower layers next time"
+              ],
+              "answerIndex": 1,
+              "explanation": "A vague complaint gives you nowhere to start. A precise statement (\"name lookup is the only thing failing\") points directly at one layer, so you know what to check and fix instead of guessing.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-2.svg"
+            },
+            {
+              "id": "troubleshooting-method-mcq-008",
+              "type": "mcq",
+              "prompt": "Which ordering of layers, from most basic to highest, matches the bottom-up method?",
+              "choices": [
+                "App -> DNS -> internet -> gateway -> IP -> link",
+                "Link -> IP -> gateway -> internet -> DNS -> app",
+                "DNS -> link -> app -> IP -> gateway -> internet",
+                "IP -> link -> DNS -> gateway -> app -> internet"
+              ],
+              "answerIndex": 1,
+              "explanation": "You build upward: first a working link, then an IP address, then reaching your gateway, then the wider internet, then name lookups (DNS), and finally the app itself. Each step rests on the one below it.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-2.svg"
+            },
+            {
+              "id": "troubleshooting-method-mcq-009",
+              "type": "mcq",
+              "prompt": "A friend says \"just try lots of fixes quickly until something works.\" Why is the bottom-up method better?",
+              "choices": [
+                "It is slower, which is always safer",
+                "It finds the actual cause, so you fix the real problem instead of stumbling onto it",
+                "It never requires any commands",
+                "It only works for Wi-Fi, not cables"
+              ],
+              "answerIndex": 1,
+              "explanation": "Throwing fixes at the wall might accidentally work, but you learn nothing and may break something else. Checking layer by layer finds the true cause so the fix is deliberate and you understand what happened.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-2.svg"
             }
           ]
         },
         {
-          "id": "troubleshooting-troubleshooting-l2",
-          "title": "Path, Sockets & Packet Capture (tcpdump + Wireshark)",
+          "id": "troubleshooting-troubleshooting-ping",
+          "title": "ping: Can I Reach It at All?",
           "order": 2,
-          "difficulty": 2,
-          "content": "Once you've localized the layer, you need tools that *see* what's happening. **Path tools:** `traceroute`/`tracert` map per-hop routers; `mtr` is the one to reach for — it combines traceroute and ping, showing per-hop latency *and* loss continuously, so you can spot the exact hop where loss begins.\n\n**Socket state:** `ss -tlnp` lists listening TCP sockets with owning process (`-t` TCP, `-l` listening, `-n` numeric, `-p` process); `ss -tan` shows all connections and their states (`SYN-SENT` stuck = no SYN-ACK coming back; many `TIME-WAIT` = lots of short connections). `ss` has largely replaced the older `netstat`.\n\n**Packet capture** is ground truth. `tcpdump` uses **BPF filter syntax** — a compact expression language compiled to a kernel filter so you capture only what matters:\n\n```bash\ntcpdump -i eth0 host 10.0.0.5\ntcpdump -i eth0 tcp port 443\ntcpdump -i eth0 'tcp[tcpflags] & tcp-syn != 0'   # SYNs only\ntcpdump -i eth0 'udp port 53'                     # DNS\ntcpdump -i eth0 -w cap.pcap 'host 10.0.0.5 and port 443'\n```\n\nFilters combine with `and`/`or`/`not`, support `host`/`net`/`port`/`portrange`, direction (`src`/`dst`), and byte-offset matches like `ip[8]<5` (low TTL). Write to a `.pcap` with `-w`, then open it in **Wireshark** for analysis: **display filters** (a different syntax, e.g. `tcp.port==443 && tcp.flags.reset==1`), **Follow Stream** to reassemble a conversation as text, **Expert Info** to auto-flag retransmissions/resets/duplicate ACKs, and the **IO/TCP graphs** and **Statistics** menus to visualize throughput and round-trips. Capture filters limit what you record; display filters limit what you view. Learn both.",
+          "difficulty": 1,
+          "content": "The simplest network question is \"are you there?\" The tool that asks it is **ping**.\n\nPing is like shouting across a canyon and listening for the echo. Your computer sends a tiny message to another machine that says, in effect, \"are you there?\" If that machine is reachable, it sends a tiny message straight back: \"yes, I'm here.\" Each successful round - request out, reply back - is one **echo**. The whole exchange is named after sonar, where a ship sends a *ping* of sound and listens for it to bounce back.\n\nYou run it by typing `ping` and an address:\n\n```\nping 1.1.1.1\n```\n\nTwo outcomes matter, and each tells you something:\n\n- **A reply** (\"Reply from 1.1.1.1: time=14ms\") means the target is **reachable** - the message got there and an answer came back. The `time` is how long the round trip took.\n- **A timeout** (\"Request timed out\") means **nothing came back**. Either something along the way is broken, or the target is switched off or set to ignore pings.\n\nThis is why ping is your first real test. Want to know if your router is alive? `ping` its address. Want to know if you can reach the outside world without worrying about names yet? `ping 1.1.1.1` (a public address that almost always answers). Ping deliberately uses raw IP numbers, so it tests the *connection* without involving name lookups at all.\n\n**Recap:** Ping sends \"are you there?\" and waits for the echo. A reply means reachable; a timeout means no answer came back. It is the fastest way to test whether one machine can reach another.",
           "items": [
             {
-              "id": "troubleshooting-l2-fc1",
-              "type": "flashcard",
-              "front": "Why prefer `mtr` over a single `traceroute` for intermittent problems?",
-              "back": "mtr runs continuously, combining traceroute + ping to show per-hop latency AND loss over time, so you can see exactly which hop starts dropping packets rather than a one-shot snapshot."
-            },
-            {
-              "id": "troubleshooting-l2-fc2",
-              "type": "flashcard",
-              "front": "What does `ss -tlnp` show, flag by flag?",
-              "back": "-t TCP, -l listening sockets only, -n numeric (no name resolution), -p owning process/PID. Together: which processes are listening on which TCP ports."
-            },
-            {
-              "id": "troubleshooting-l2-fc3",
-              "type": "flashcard",
-              "front": "Write a tcpdump BPF filter that captures only DNS traffic on eth0.",
-              "back": "`tcpdump -i eth0 udp port 53` (add `or tcp port 53` to catch large/zone-transfer DNS over TCP).",
-              "hint": "DNS is UDP/53 normally."
-            },
-            {
-              "id": "troubleshooting-l2-fc4",
-              "type": "flashcard",
-              "front": "Write a tcpdump BPF filter that captures only TCP SYN packets.",
-              "back": "`tcpdump -i eth0 'tcp[tcpflags] & tcp-syn != 0'`. This masks the flags byte and matches any packet with the SYN bit set (SYN and SYN-ACK)."
-            },
-            {
-              "id": "troubleshooting-l2-fc5",
-              "type": "flashcard",
-              "front": "Write a tcpdump BPF filter for traffic to/from host 10.0.0.5 on port 443, saved to a pcap.",
-              "back": "`tcpdump -i eth0 -w cap.pcap 'host 10.0.0.5 and port 443'`. `-w` writes raw packets to a file for later Wireshark analysis."
-            },
-            {
-              "id": "troubleshooting-l2-fc6",
-              "type": "flashcard",
-              "front": "Distinguish a tcpdump CAPTURE filter from a Wireshark DISPLAY filter.",
-              "back": "Capture filter (BPF, e.g. `tcp port 443`) decides what is recorded by the kernel and cannot be undone. Display filter (Wireshark syntax, e.g. `tcp.port==443`) only changes what is shown from an already-captured set. Different syntaxes.",
-              "hint": "One limits recording, one limits viewing."
-            },
-            {
-              "id": "troubleshooting-l2-mc1",
+              "id": "troubleshooting-ping-mcq-001",
               "type": "mcq",
-              "prompt": "Which BPF expression captures only packets WITHOUT the SYN flag to port 80?",
+              "prompt": "In one sentence, what does ping test?",
               "choices": [
-                "`tcp port 80 and tcp[tcpflags] & tcp-syn != 0`",
-                "`tcp port 80 and tcp[tcpflags] & tcp-syn == 0`",
-                "`udp port 80 and not syn`",
-                "`port 80 or tcp-syn`"
+                "Whether a website's design looks correct",
+                "Whether your computer can reach another machine and get a reply back",
+                "How much data you have used this month",
+                "Which programs are installed on your computer"
               ],
               "answerIndex": 1,
-              "explanation": "Masking the flags byte with tcp-syn and testing == 0 matches packets where the SYN bit is clear, restricted to TCP/80."
+              "explanation": "Ping sends a small \"are you there?\" message and listens for the reply. It answers exactly one question: can I reach that machine and hear back from it? It says nothing about page design or data usage.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-3.svg"
             },
             {
-              "id": "troubleshooting-l2-mc2",
+              "id": "troubleshooting-ping-mcq-002",
               "type": "mcq",
-              "prompt": "A connection shows state SYN-SENT in `ss -tan` and never advances. What does this most directly indicate?",
+              "prompt": "You run ping and see \"Reply from 1.1.1.1: time=14ms\" repeating. What does this mean?",
               "choices": [
-                "The TLS handshake failed after connecting",
-                "No SYN-ACK is coming back: a firewall drop, wrong port, or unreachable host at the transport layer",
-                "DNS returned the wrong record",
-                "The application returned HTTP 500"
+                "The target is unreachable",
+                "The target is reachable and answered; the round trip took about 14 milliseconds",
+                "Your computer has no IP address",
+                "The name could not be looked up"
               ],
               "answerIndex": 1,
-              "explanation": "SYN-SENT means your host sent SYN and is waiting for SYN-ACK. Stuck there = no response to the SYN, typically a silent firewall drop or dead/listening-less port."
+              "explanation": "A reply means the message reached the target and came back, so it is reachable. The \"time\" value is the round-trip time - here about 14 thousandths of a second.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-3.svg"
             },
             {
-              "id": "troubleshooting-l2-mc3",
+              "id": "troubleshooting-ping-mcq-003",
               "type": "mcq",
-              "prompt": "In Wireshark, which feature reassembles a full TCP conversation into readable application bytes?",
+              "prompt": "Your ping shows \"Request timed out\" over and over. What does a timeout tell you?",
               "choices": [
-                "Expert Info",
-                "IO Graph",
-                "Follow Stream",
-                "Capture Filter"
-              ],
-              "answerIndex": 2,
-              "explanation": "Follow > TCP Stream reassembles the bidirectional byte stream of a single conversation into a readable view (e.g. an HTTP request/response). Expert Info flags anomalies; IO Graph plots rates."
-            },
-            {
-              "id": "troubleshooting-l2-mc4",
-              "type": "mcq",
-              "prompt": "Which Wireshark display filter shows only TCP resets?",
-              "choices": [
-                "`tcp.flags.syn==1`",
-                "`tcp.flags.reset==1`",
-                "`tcp.analysis.retransmission`",
-                "`tcp port 443`"
+                "The target definitely received your message",
+                "No reply came back - something is broken on the way, or the target is off or ignoring pings",
+                "Your download speed is too slow",
+                "The website's password is wrong"
               ],
               "answerIndex": 1,
-              "explanation": "`tcp.flags.reset==1` matches RST packets. Note `tcp port 443` is BPF capture-filter syntax, not a Wireshark display filter (which would be `tcp.port==443`)."
+              "explanation": "A timeout means your \"are you there?\" got no answer. That can be a break somewhere along the path, or a target that is powered off or deliberately not answering pings. Either way, no echo came back.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-3.svg"
             },
             {
-              "id": "troubleshooting-l2-mc5",
+              "id": "troubleshooting-ping-mcq-004",
               "type": "mcq",
-              "prompt": "`ss` is generally preferred over `netstat` because it:",
+              "prompt": "Which everyday comparison best fits how ping works?",
               "choices": [
-                "Captures packets to a file",
-                "Reads kernel socket state more efficiently and is the actively maintained successor",
-                "Resolves DNS names automatically",
-                "Replaces tcpdump for analysis"
+                "Mailing a letter and never expecting a response",
+                "Shouting across a canyon and listening for the echo to come back",
+                "Reading a book from start to finish",
+                "Filling a glass with water from a tap"
               ],
               "answerIndex": 1,
-              "explanation": "ss queries the kernel via netlink, is faster on busy hosts, and is the maintained modern tool; netstat is legacy. Neither captures packets."
+              "explanation": "Ping sends a signal out and waits for it to bounce back, exactly like shouting and listening for an echo (the name even comes from sonar). If you hear the echo, the other side is reachable.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-3.svg"
+            },
+            {
+              "id": "troubleshooting-ping-mcq-005",
+              "type": "mcq",
+              "prompt": "You want to check whether your own router is alive. What is a sensible thing to ping?",
+              "choices": [
+                "A random word like 'hello'",
+                "Your gateway (router) address, for example ping 192.168.1.1",
+                "Your own email password",
+                "Nothing - ping cannot test a router"
+              ],
+              "answerIndex": 1,
+              "explanation": "Pinging your gateway (router) address asks the router directly \"are you there?\" A reply means your computer can reach the router; a timeout suggests a problem between you and it.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-3.svg"
+            },
+            {
+              "id": "troubleshooting-ping-mcq-006",
+              "type": "mcq",
+              "prompt": "Why does pinging a raw IP address like 1.1.1.1 (instead of a name) help when troubleshooting?",
+              "choices": [
+                "Numbers are easier to type than names",
+                "It tests the connection itself without depending on name lookups (DNS)",
+                "Names cannot be pinged at all, ever",
+                "It makes the ping faster to type"
+              ],
+              "answerIndex": 1,
+              "explanation": "Pinging a number skips the name-to-number step entirely. So if the IP replies, you know the connection works and any remaining trouble must be about names (DNS), not about reaching the machine.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-6.svg"
+            },
+            {
+              "id": "troubleshooting-ping-mcq-007",
+              "type": "mcq",
+              "prompt": "Pinging your gateway (router) succeeds, but pinging 1.1.1.1 (an outside address) times out. What does this suggest?",
+              "choices": [
+                "Your cable is unplugged",
+                "You can reach your router, but something beyond it (routing or your provider) is broken",
+                "DNS is the problem",
+                "The web browser is broken"
+              ],
+              "answerIndex": 1,
+              "explanation": "Reaching the router proves your link and local connection are fine. Failing to reach an outside address means the break is past the router - in the path out or at your internet provider. You pinged a number, so this is not a DNS issue.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-3.svg"
+            },
+            {
+              "id": "troubleshooting-ping-mcq-008",
+              "type": "mcq",
+              "prompt": "A ping reply shows a \"time\" value. What is that value?",
+              "choices": [
+                "The time of day the message was sent",
+                "The round-trip time: how long the request took to reach the target and the reply to come back",
+                "How many times you have pinged today",
+                "The size of the file being downloaded"
+              ],
+              "answerIndex": 1,
+              "explanation": "The \"time\" is the round-trip time - out to the target and back - usually in milliseconds. Smaller numbers feel snappier; large numbers mean a slow path.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-3.svg"
+            },
+            {
+              "id": "troubleshooting-ping-mcq-009",
+              "type": "mcq",
+              "prompt": "A ping timeout to a specific website always means YOUR internet is down. True or false, and why?",
+              "choices": [
+                "True - a timeout can only be caused by your own connection",
+                "False - the target could be off or set to ignore pings, even when your internet is fine",
+                "True - websites always answer pings",
+                "False - ping never times out"
+              ],
+              "answerIndex": 1,
+              "explanation": "A timeout just means no reply came back. The cause might be your connection, but it could equally be that the target is down or simply configured to ignore pings. That is why you also test a known-good address like 1.1.1.1.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-3.svg"
             }
           ]
         },
         {
-          "id": "troubleshooting-troubleshooting-l3",
-          "title": "Reading Captures & Modern Observability",
+          "id": "troubleshooting-troubleshooting-localconfig",
+          "title": "Check Your Own Settings First: IP and Gateway",
           "order": 3,
-          "difficulty": 3,
-          "content": "Capturing is easy; *reading* is the skill. Train your eye for these signatures:\n\n- **Retransmissions / duplicate ACKs:** the sender re-sends because ACKs are missing — points to loss or congestion on the path (cross-check with `mtr`).\n- **RST (reset):** an abrupt teardown. A RST right after SYN usually means the port is closed or a firewall is actively rejecting; a mid-stream RST means a peer or middlebox killed the connection.\n- **DNS failures:** `SERVFAIL`/`NXDOMAIN` in the response, or a query with no answer (resolver unreachable).\n- **TLS alerts:** in the handshake, a `fatal` alert (e.g. `handshake_failure`, `bad_certificate`, `unknown_ca`) tells you the negotiation broke and why — read the ClientHello/ServerHello.\n- **MTU/PMTUD issues:** the handshake completes but bulk transfer stalls; you see large packets disappear and `ICMP fragmentation needed` being dropped. Classic on tunnels/VPNs.\n\nThe **modern** shift is away from device-centric SNMP polling toward continuous, fine-grained telemetry. Know the categories: **flow telemetry** — NetFlow/IPFIX (per-flow records: who talked to whom, how much) and **sFlow** (packet sampling) for traffic visibility. **Streaming telemetry** — **gNMI** pushes structured (YANG-modeled) device state continuously instead of you polling SNMP OIDs. **Metrics** — **Prometheus exporters** (e.g. node_exporter, SNMP exporter, blackbox_exporter) scrape interface counters and probe results; Grafana graphs them. **Distributed tracing** — **OpenTelemetry** captures a request's journey across services, the application-layer view of network latency. **Kernel-level eBPF** — **Cilium/Hubble** gives identity-aware flow visibility in Kubernetes, and **bpftrace** lets you trace kernel network events ad hoc.\n\n```bash\n# bpftrace: count TCP retransmits live by PID\nbpftrace -e 'tracepoint:tcp:tcp_retransmit_skb { @[pid] = count(); }'\n```\n\n`nmap` (port/host discovery) and aggressive scans are **lab/authorized only** — never point them at networks you don't own. The throughline: methodology localizes, capture proves, and telemetry tells you the fault was coming before the pager went off.",
+          "difficulty": 1,
+          "content": "Before you blame the wider internet, look at what *your own* computer thinks it is. Two settings matter most, and one quick command shows both.\n\nThink of your home address. To get mail, you need an address (so others can reach you) and you need to know the way to the front door (so you can get out). On a network those are your **IP address** (your computer's number) and your **default gateway** (your router, the way out to everything else).\n\nThe command depends on your system:\n\n```\nipconfig          (Windows)\nip addr           (Linux / Mac)\n```\n\nLook for three things in the output:\n\n- **IPv4 Address** - your own number, often like `192.168.1.42`. If you have this, your computer was given an address.\n- **Subnet Mask** - this tells your computer which addresses count as \"local\" (right here on your network) versus \"far away\" (out on the internet).\n- **Default Gateway** - your router's address, like `192.168.1.1`. This is your door to the outside.\n\nNow the most useful warning sign for a beginner. If your IP address starts with **169.254**, that is a **self-assigned address**: your computer asked for a real address and got *no answer*. Normally a service called **DHCP (Dynamic Host Configuration Protocol)** hands out addresses automatically; a 169.254 address means DHCP did not respond. With no real IP and no gateway, nothing beyond your own machine will work - and you have found your problem without touching the internet at all.\n\n**Recap:** Run `ipconfig` or `ip addr` and read your IP, mask, and gateway. A normal IP plus a gateway means your local setup is healthy; a 169.254 address means no one gave you an address (a DHCP problem).",
           "items": [
             {
-              "id": "troubleshooting-l3-fc1",
-              "type": "flashcard",
-              "front": "In a capture, what does a burst of TCP retransmissions and duplicate ACKs indicate?",
-              "back": "Packet loss or congestion on the path: the receiver's ACKs/segments aren't arriving, so the sender retransmits. Correlate the loss to a hop with mtr."
-            },
-            {
-              "id": "troubleshooting-l3-fc2",
-              "type": "flashcard",
-              "front": "Differentiate a RST seen right after SYN from a RST seen mid-stream.",
-              "back": "RST after SYN = port closed / firewall actively rejecting the connection. Mid-stream RST = a peer or middlebox abruptly tore down an established connection (crash, timeout, policy)."
-            },
-            {
-              "id": "troubleshooting-l3-fc3",
-              "type": "flashcard",
-              "front": "A TLS handshake fails. What field in the capture tells you why?",
-              "back": "A TLS Alert record marked 'fatal' with a description such as handshake_failure, bad_certificate, or unknown_ca — read it alongside the ClientHello/ServerHello to see what was rejected."
-            },
-            {
-              "id": "troubleshooting-l3-fc4",
-              "type": "flashcard",
-              "front": "What capture signature points to an MTU / PMTUD problem?",
-              "back": "Small packets and the handshake succeed, but large data packets vanish and bulk transfer stalls, often with 'ICMP fragmentation needed' messages being dropped (common on VPNs/tunnels)."
-            },
-            {
-              "id": "troubleshooting-l3-fc5",
-              "type": "flashcard",
-              "front": "Contrast NetFlow/IPFIX with sFlow.",
-              "back": "NetFlow/IPFIX exports per-flow records (5-tuple, byte/packet counts) summarizing every conversation. sFlow exports statistically SAMPLED packets/counters. Flow = complete accounting; sFlow = scalable sampling for high-rate links."
-            },
-            {
-              "id": "troubleshooting-l3-fc6",
-              "type": "flashcard",
-              "front": "What problem do gNMI streaming telemetry and Prometheus exporters solve vs SNMP polling?",
-              "back": "They replace slow, device-centric SNMP polling with continuous push (gNMI, YANG-modeled) or frequent scrapes (Prometheus exporters) of fine-grained metrics, giving higher resolution and faster anomaly detection."
-            },
-            {
-              "id": "troubleshooting-l3-mc1",
+              "id": "troubleshooting-localconfig-mcq-001",
               "type": "mcq",
-              "prompt": "A site loads its login page but every large download stalls and dies. The capture shows the TLS handshake completing, then big packets disappearing. Most likely cause?",
+              "prompt": "Which command shows your own IP address and default gateway on Windows?",
               "choices": [
-                "DNS is returning NXDOMAIN",
-                "An MTU / Path MTU Discovery problem (large packets dropped, ICMP 'frag needed' filtered)",
-                "The TCP port is closed",
-                "A fatal TLS unknown_ca alert"
-              ],
-              "answerIndex": 1,
-              "explanation": "Small packets and the handshake succeed but large ones fail — the textbook MTU/PMTUD black hole, usually a tunnel/VPN dropping ICMP 'fragmentation needed'."
-            },
-            {
-              "id": "troubleshooting-l3-mc2",
-              "type": "mcq",
-              "prompt": "Which tool gives identity-aware network flow visibility inside a Kubernetes cluster using eBPF?",
-              "choices": [
-                "nmap",
-                "Cilium/Hubble",
+                "ping",
+                "ipconfig",
                 "traceroute",
-                "netstat"
+                "nslookup"
               ],
               "answerIndex": 1,
-              "explanation": "Cilium uses eBPF for datapath and policy; Hubble provides flow-level, identity-aware observability of pod-to-pod traffic. The others are host/path tools with no cluster identity awareness."
+              "explanation": "On Windows, ipconfig lists your own network settings, including your IPv4 address, subnet mask, and default gateway. (On Linux or Mac the equivalent is ip addr.)",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-4.svg"
             },
             {
-              "id": "troubleshooting-l3-mc3",
+              "id": "troubleshooting-localconfig-mcq-002",
               "type": "mcq",
-              "prompt": "OpenTelemetry distributed tracing is best described as:",
+              "prompt": "What is the \"default gateway\" in your settings?",
               "choices": [
-                "A packet capture format replacing pcap",
-                "A flow-export protocol like IPFIX",
-                "Application-layer observability that follows one request's path and latency across services",
-                "A kernel BPF program loader"
-              ],
-              "answerIndex": 2,
-              "explanation": "OpenTelemetry traces a request as spans across services, exposing where latency accrues at the application layer — complementary to packet/flow tools lower in the stack."
-            },
-            {
-              "id": "troubleshooting-l3-mc4",
-              "type": "mcq",
-              "prompt": "Why is `nmap` flagged as 'lab/authorized only' in this module?",
-              "choices": [
-                "It only runs on Linux",
-                "Active port/host scanning of networks you don't own is intrusive and often illegal/against policy",
-                "It cannot detect open ports",
-                "It is slower than nc"
+                "A website you visit often",
+                "Your router's address - the way out from your network to the internet",
+                "Your computer's own IP address",
+                "The speed of your connection"
               ],
               "answerIndex": 1,
-              "explanation": "nmap actively probes hosts; scanning networks without authorization can violate law and policy and trip security alerts. Use it only on systems you own or are explicitly authorized to test."
+              "explanation": "The default gateway is your router. It is the address your computer sends traffic to when the destination is not on your local network - your door to the outside world.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-4.svg"
             },
             {
-              "id": "troubleshooting-l3-mc5",
+              "id": "troubleshooting-localconfig-mcq-003",
               "type": "mcq",
-              "prompt": "A `dig` query returns SERVFAIL. What does this most directly mean?",
+              "prompt": "You run ipconfig and your IPv4 address starts with 169.254. What does that most likely mean?",
               "choices": [
-                "The name does not exist",
-                "The resolver tried to answer but failed (e.g. upstream/DNSSEC validation failure), distinct from NXDOMAIN",
-                "TCP port 53 is closed",
-                "The TLS certificate is invalid"
+                "Everything is working perfectly",
+                "Your computer asked for an address and got no answer - a DHCP problem",
+                "You are connected to a very fast network",
+                "Your DNS server is misconfigured"
               ],
               "answerIndex": 1,
-              "explanation": "SERVFAIL is a server-side failure (broken upstream, DNSSEC validation failure, misconfiguration), whereas NXDOMAIN means the name authoritatively does not exist. Reading the rcode tells you which."
+              "explanation": "A 169.254 address is self-assigned: it appears only when your computer requested a real address but nothing answered. That points at DHCP (the address-handout service) not responding, so you have no usable address.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-4.svg"
+            },
+            {
+              "id": "troubleshooting-localconfig-mcq-004",
+              "type": "mcq",
+              "prompt": "What does DHCP do?",
+              "choices": [
+                "It turns names like example.com into IP numbers",
+                "It automatically hands out IP addresses to devices on a network",
+                "It encrypts your web traffic",
+                "It measures your connection speed"
+              ],
+              "answerIndex": 1,
+              "explanation": "DHCP (Dynamic Host Configuration Protocol) automatically gives devices an IP address (and usually the gateway and DNS settings) when they join the network. Turning names into numbers is DNS, a different job.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-4.svg"
+            },
+            {
+              "id": "troubleshooting-localconfig-mcq-005",
+              "type": "mcq",
+              "prompt": "Why check your own IP and gateway BEFORE testing the outside world?",
+              "choices": [
+                "Because outside tests are illegal",
+                "Because if your own machine has no valid address or gateway, nothing further can work anyway",
+                "Because the gateway changes every second",
+                "Because your IP address is secret and must be hidden first"
+              ],
+              "answerIndex": 1,
+              "explanation": "Your own settings are the foundation. If you have no real IP or no gateway, you cannot reach anything beyond your machine, so there is no point testing far-off servers until that is fixed.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-4.svg"
+            },
+            {
+              "id": "troubleshooting-localconfig-mcq-006",
+              "type": "mcq",
+              "prompt": "What does the subnet mask tell your computer?",
+              "choices": [
+                "Which addresses are local (right here) versus far away (out on the internet)",
+                "How fast your connection is",
+                "The name of your internet provider",
+                "Which websites are safe to visit"
+              ],
+              "answerIndex": 0,
+              "explanation": "The subnet mask marks the boundary between \"local\" addresses your computer can talk to directly and \"far\" addresses it must send through the gateway. It is how your computer decides whether a destination is next door or out in the world.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-4.svg"
+            },
+            {
+              "id": "troubleshooting-localconfig-mcq-007",
+              "type": "mcq",
+              "prompt": "Your ipconfig shows a normal IP like 192.168.1.42 and a gateway of 192.168.1.1. What can you conclude?",
+              "choices": [
+                "Your local network setup looks healthy; the problem (if any) is likely further out",
+                "Your computer has no address",
+                "DHCP definitely failed",
+                "DNS is broken for sure"
+              ],
+              "answerIndex": 0,
+              "explanation": "A normal address plus a gateway means your computer got a proper address and knows its way out. The local foundation is fine, so you would move up the ladder (reaching the gateway, the internet, DNS) to find any remaining issue.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-4.svg"
+            },
+            {
+              "id": "troubleshooting-localconfig-mcq-008",
+              "type": "mcq",
+              "prompt": "Which command is the Linux/Mac equivalent for viewing your address and gateway?",
+              "choices": [
+                "ip addr",
+                "ping 1.1.1.1",
+                "curl example.com",
+                "tracert"
+              ],
+              "answerIndex": 0,
+              "explanation": "On Linux and Mac, ip addr shows your interfaces and addresses (with ip route showing the gateway). It is the counterpart to Windows ipconfig.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-4.svg"
+            },
+            {
+              "id": "troubleshooting-localconfig-mcq-009",
+              "type": "mcq",
+              "prompt": "A laptop has a 169.254 address and cannot reach anything. What is the most sensible next step?",
+              "choices": [
+                "Buy a new laptop",
+                "Fix why it is not getting a real address: recheck the cable/Wi-Fi and the DHCP source (router), then renew the address",
+                "Change the web browser",
+                "Lower the screen brightness"
+              ],
+              "answerIndex": 1,
+              "explanation": "A 169.254 address means the address-handout (DHCP) did not answer. The fix is to restore that: confirm you are actually connected, make sure the router/DHCP is working, and have the laptop request an address again.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-4.svg"
+            }
+          ]
+        },
+        {
+          "id": "troubleshooting-troubleshooting-traceroute",
+          "title": "traceroute: Where Along the Path Does It Stop?",
+          "order": 4,
+          "difficulty": 2,
+          "content": "Ping tells you *whether* you can reach a target. When you cannot, the next question is *where* along the way it breaks. That is what **traceroute** answers.\n\nYour data does not jump straight to a far-off server. It passes through a chain of routers, like a road trip through several towns. Each router it passes is called a **hop**. Traceroute lists every hop in order, from your router outward, and shows how long each one took.\n\nYou run it like this (the name differs by system):\n\n```\ntraceroute example.com     (Linux / Mac)\ntracert example.com        (Windows)\n```\n\nThe output is a numbered list:\n\n```\n1   192.168.1.1     1 ms     (your router)\n2   10.0.0.1        8 ms     (your provider)\n3   72.14.5.1      18 ms\n4   72.14.9.7      22 ms\n5   * * *          (no answer)\n6   * * *          (no answer)\n```\n\nRead it like a trail of footprints. Hops 1 through 4 answered, so the path was fine that far. At hop 5 the answers turn into `* * *` and never recover - that is **where it dies**. The break is at or just past that point, somewhere out in the path, *not* on your own computer (you clearly got several hops out). That single fact - \"it gets four hops out and then stops\" - is far more useful than \"the internet is down.\"\n\nOne caution: a single `* * *` in the middle that then continues is usually harmless - some routers simply choose not to reply but still pass traffic. What matters is where the list stops *for good*. The rising millisecond numbers also show you which leg of the journey is slow.\n\n**Recap:** Traceroute lists every router (hop) on the way to a target and where the replies stop. The point where it dies tells you the break is out in the path, and roughly how far along it is.",
+          "items": [
+            {
+              "id": "troubleshooting-traceroute-mcq-001",
+              "type": "mcq",
+              "prompt": "What does traceroute show you?",
+              "choices": [
+                "The list of routers (hops) your data passes through on the way to a target, and where it stops",
+                "Whether a name turns into an IP address",
+                "How much memory your computer has",
+                "The password for a website"
+              ],
+              "answerIndex": 0,
+              "explanation": "Traceroute maps the path: it lists each router (hop) between you and the destination, in order, and reveals the point where replies stop. It shows the route and where it breaks, not name lookups or memory.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-5.svg"
+            },
+            {
+              "id": "troubleshooting-traceroute-mcq-002",
+              "type": "mcq",
+              "prompt": "In traceroute, what is a \"hop\"?",
+              "choices": [
+                "A single website",
+                "One router along the path that your data passes through",
+                "A type of error message",
+                "The time of day"
+              ],
+              "answerIndex": 1,
+              "explanation": "A hop is one router (one stop) on the journey from your computer to the destination. Data hops from router to router, and traceroute lists each one in order.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-5.svg"
+            },
+            {
+              "id": "troubleshooting-traceroute-mcq-003",
+              "type": "mcq",
+              "prompt": "A traceroute lists hops 1-4 with normal times, then hops 5, 6, 7 all show \"* * *\" and it never recovers. What does this tell you?",
+              "choices": [
+                "The problem is definitely on your own computer",
+                "The path was fine to hop 4 and breaks at or just past hop 5, out in the network",
+                "The website's design is broken",
+                "Your IP address is wrong"
+              ],
+              "answerIndex": 1,
+              "explanation": "Getting clean replies through hop 4 means your computer and the early path are fine. The replies dying at hop 5 and staying dead show the break is out there at or beyond that hop - not on your machine.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-5.svg"
+            },
+            {
+              "id": "troubleshooting-traceroute-mcq-004",
+              "type": "mcq",
+              "prompt": "Which command is the Windows version of traceroute?",
+              "choices": [
+                "tracert",
+                "ipconfig",
+                "ping",
+                "nslookup"
+              ],
+              "answerIndex": 0,
+              "explanation": "Windows uses tracert (spelled without the 'route'). Linux and Mac use traceroute. They do the same job: list the hops to a destination.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-5.svg"
+            },
+            {
+              "id": "troubleshooting-traceroute-mcq-005",
+              "type": "mcq",
+              "prompt": "Which everyday picture best matches what traceroute does?",
+              "choices": [
+                "Weighing a package on a scale",
+                "Listing every town a road trip passes through and noticing where the road is blocked",
+                "Reading the last page of a book",
+                "Counting the money in your wallet"
+              ],
+              "answerIndex": 1,
+              "explanation": "Traceroute lists the stops (hops) along the journey in order and shows where progress halts, just like noting each town on a road trip and finding the spot where the road is blocked.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-5.svg"
+            },
+            {
+              "id": "troubleshooting-traceroute-mcq-006",
+              "type": "mcq",
+              "prompt": "You see ONE hop in the middle show \"* * *\" but the next hops answer normally and the trace reaches the destination. What is the likely meaning?",
+              "choices": [
+                "The whole path is broken",
+                "That one router just chose not to reply but still passed the traffic along - usually harmless",
+                "Your computer is infected",
+                "DNS has failed"
+              ],
+              "answerIndex": 1,
+              "explanation": "A single non-replying hop that is followed by normal hops is common and usually fine: some routers do not answer traceroute but still forward traffic. What matters is where the list stops for good, not one polite skip.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-5.svg"
+            },
+            {
+              "id": "troubleshooting-traceroute-mcq-007",
+              "type": "mcq",
+              "prompt": "Ping to a far-off server times out. Why run traceroute next?",
+              "choices": [
+                "To find out WHERE along the path the connection breaks, not just that it does",
+                "To change your password",
+                "To speed up your computer",
+                "To look up the server's name"
+              ],
+              "answerIndex": 0,
+              "explanation": "Ping only says \"no reply.\" Traceroute goes further and shows the path hop by hop, so you can see whether it fails at your router, your provider, or somewhere far away - turning \"it's down\" into \"it dies at hop 5.\"",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-5.svg"
+            },
+            {
+              "id": "troubleshooting-traceroute-mcq-008",
+              "type": "mcq",
+              "prompt": "In a traceroute, the millisecond numbers climb steadily from hop to hop. What does that suggest?",
+              "choices": [
+                "Each successive leg of the path adds more delay - useful for spotting a slow stretch",
+                "Your computer is broken",
+                "The numbers are random and mean nothing",
+                "You have run out of data"
+              ],
+              "answerIndex": 0,
+              "explanation": "The times show how long it took to reach each hop. Rising numbers mean later hops are further away or slower, which helps you spot which leg of the journey is adding the delay.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-5.svg"
+            },
+            {
+              "id": "troubleshooting-traceroute-mcq-009",
+              "type": "mcq",
+              "prompt": "A traceroute's FIRST hop fails immediately with no reply, and nothing after it answers. What does that point to?",
+              "choices": [
+                "A problem very close to you - reaching your own router/gateway",
+                "A problem on the far-off destination server only",
+                "A DNS-only problem",
+                "Nothing - first hops never matter"
+              ],
+              "answerIndex": 0,
+              "explanation": "The first hop is normally your own router. If you cannot even get past hop 1, the trouble is right at the start - reaching your gateway - so you would drop back down to the lower rungs (link, IP, gateway).",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-5.svg"
+            }
+          ]
+        },
+        {
+          "id": "troubleshooting-troubleshooting-dns",
+          "title": "Name Problem or Connection Problem? (DNS Checks)",
+          "order": 5,
+          "difficulty": 2,
+          "content": "Here is one of the most common and most confusing situations: a website \"won't load,\" but the connection is actually fine. The trick is to separate a **name problem** from a **connection problem**.\n\nRemember what **DNS (Domain Name System)** does: it turns a name like example.com into an IP number, the way a phone's contact list turns \"Mom\" into a phone number. If that lookup breaks, names fail even though the network underneath is perfectly healthy - it is like having a working phone but a scrambled contact list. You could still call if you dialed the actual number.\n\nThat gives you a beautifully simple test: **try the IP directly.**\n\n```\nping example.com       -> \"could not find host\"   (the NAME fails)\nping 93.184.216.34     -> replies just fine        (the NUMBER works)\n```\n\nIf the name fails but the raw number works, it is a **DNS problem**: the connection is fine; only the name-to-number step is broken. If the number fails too, it is a **connection problem**, and you drop back down the ladder (gateway, routing, link).\n\nTwo tools look up names on purpose, so you can see DNS working or failing:\n\n```\nnslookup example.com\ndig example.com\n```\n\nA good answer comes back with an IP address. A failure (no address, or an error like \"server can't find\") tells you the lookup itself is broken - perhaps your DNS server is unreachable or misconfigured. A common fix is to point your computer at a known public DNS server and try again.\n\n**Recap:** If a name fails but its IP works, it is a DNS (name) problem, not a connection problem. Use `nslookup` or `dig` to test name lookups directly, and try the IP to prove the connection is fine.",
+          "items": [
+            {
+              "id": "troubleshooting-dns-mcq-001",
+              "type": "mcq",
+              "prompt": "You can reach websites by typing their IP number, but typing their names always fails. What is broken?",
+              "choices": [
+                "The physical cable",
+                "DNS - the system that turns names into IP numbers",
+                "Your IP address",
+                "The website's payment system"
+              ],
+              "answerIndex": 1,
+              "explanation": "Reaching sites by number proves the connection works. If only names fail, the name-to-number step is broken - that is DNS. The cable and your IP are clearly fine since the numbers work.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-6.svg"
+            },
+            {
+              "id": "troubleshooting-dns-mcq-002",
+              "type": "mcq",
+              "prompt": "What is the single best test to tell a NAME problem from a CONNECTION problem?",
+              "choices": [
+                "Restart the computer",
+                "Try reaching the site by its raw IP number instead of its name",
+                "Clear the browser history",
+                "Unplug the router for 30 seconds"
+              ],
+              "answerIndex": 1,
+              "explanation": "If the IP number works but the name does not, it is a name (DNS) problem. If the number also fails, it is a connection problem. Trying the IP directly splits the two cases cleanly.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-6.svg"
+            },
+            {
+              "id": "troubleshooting-dns-mcq-003",
+              "type": "mcq",
+              "prompt": "Which everyday comparison fits a DNS problem?",
+              "choices": [
+                "A working phone with a scrambled contact list - you could still call by dialing the actual number",
+                "A phone with a dead battery",
+                "A phone with no signal anywhere",
+                "A phone that is switched off"
+              ],
+              "answerIndex": 0,
+              "explanation": "DNS is like your contact list (name -> number). If the contacts are scrambled, the phone still works fine - you just have to dial the real number. Likewise, with a DNS problem the network is fine; only the name lookup fails.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-6.svg"
+            },
+            {
+              "id": "troubleshooting-dns-mcq-004",
+              "type": "mcq",
+              "prompt": "Which commands are made specifically to look up a name and show its IP?",
+              "choices": [
+                "ipconfig and ping",
+                "nslookup and dig",
+                "tracert and curl",
+                "ip addr and ss"
+              ],
+              "answerIndex": 1,
+              "explanation": "nslookup and dig are built to query DNS directly: you give them a name and they show the IP (or an error). That lets you see whether name lookups are working, separate from everything else.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-6.svg"
+            },
+            {
+              "id": "troubleshooting-dns-mcq-005",
+              "type": "mcq",
+              "prompt": "You run `nslookup example.com` and it returns an IP address. What does that tell you?",
+              "choices": [
+                "DNS is failing",
+                "The name lookup worked - DNS resolved that name to an IP",
+                "Your cable is unplugged",
+                "The website is definitely offline"
+              ],
+              "answerIndex": 1,
+              "explanation": "Getting an IP back means DNS successfully turned the name into a number, so name lookups are working. If a site still will not load after that, the problem is somewhere else (such as the service or port), not DNS.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-6.svg"
+            },
+            {
+              "id": "troubleshooting-dns-mcq-006",
+              "type": "mcq",
+              "prompt": "`ping example.com` says \"could not find host,\" but `ping 93.184.216.34` replies normally. What is going on?",
+              "choices": [
+                "A connection problem between you and the server",
+                "A DNS (name) problem - the connection is fine, only the name lookup fails",
+                "Your computer has no IP address",
+                "The router is switched off"
+              ],
+              "answerIndex": 1,
+              "explanation": "The number replies, so the connection all the way to the server works. The name fails to even resolve, so the broken piece is purely DNS - turning that name into the number.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-6.svg"
+            },
+            {
+              "id": "troubleshooting-dns-mcq-007",
+              "type": "mcq",
+              "prompt": "BOTH `ping example.com` and `ping 93.184.216.34` fail. Is this most likely a DNS problem?",
+              "choices": [
+                "Yes - it is always DNS",
+                "No - the raw IP fails too, so it is a connection problem; go back down to gateway/routing/link",
+                "Yes - names and numbers are the same thing",
+                "No - ping never tests connections"
+              ],
+              "answerIndex": 1,
+              "explanation": "If even the raw number cannot be reached, the issue is the connection itself, not name lookup. DNS would only be suspect if the number worked while the name failed. Here you drop back to the lower rungs.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-6.svg"
+            },
+            {
+              "id": "troubleshooting-dns-mcq-008",
+              "type": "mcq",
+              "prompt": "Your `nslookup` returns an error like \"server can't find\" for every name. What is a sensible thing to suspect and try?",
+              "choices": [
+                "Your monitor is broken",
+                "Your DNS server is unreachable or misconfigured; try pointing at a known public DNS server",
+                "The website owner forgot to pay their bill",
+                "Your keyboard layout is wrong"
+              ],
+              "answerIndex": 1,
+              "explanation": "If every name fails to resolve, the lookup machinery is the problem - often a broken or unreachable DNS server. Switching your computer to a known public DNS server and retrying is a common, quick test and fix.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-6.svg"
+            },
+            {
+              "id": "troubleshooting-dns-mcq-009",
+              "type": "mcq",
+              "prompt": "What does DNS actually do?",
+              "choices": [
+                "It encrypts your traffic",
+                "It turns a name like example.com into an IP number so your computer can connect",
+                "It measures your latency",
+                "It assigns your computer its IP address"
+              ],
+              "answerIndex": 1,
+              "explanation": "DNS (Domain Name System) is the network's contact list: it translates human-friendly names into the IP numbers machines use. Assigning your address is DHCP; encrypting traffic is something else entirely.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-6.svg"
+            }
+          ]
+        },
+        {
+          "id": "troubleshooting-troubleshooting-ports",
+          "title": "The Host Is Up but the Service Won't Answer (Ports)",
+          "order": 6,
+          "difficulty": 3,
+          "content": "Sometimes the name resolves, the IP even replies to ping, and *still* the website won't load. This is the famous \"DNS works but the site won't load\" pattern, and it points one layer higher: the **service** and its **port**.\n\nRecall that a single machine can run many services at once - a website, email, a game server - and it keeps them apart using **ports**, numbered doors on the machine. A web page over a secure connection uses port **443**; plain web uses port **80**. Reaching the machine (ping) is not the same as a specific door being open. The building can be standing while one particular door is locked.\n\nSo after name and reachability both pass, you test the **port** itself:\n\n```\ncurl https://example.com       (try the real web service)\ntelnet example.com 443         (can this one door even open?)\n```\n\nWhat the results mean:\n\n- **curl** actually speaks to the web service. If it returns a page, the service is up. If it hangs or says \"connection refused,\" the door is shut even though the host answered ping.\n- **telnet host 443** just tries to open that one door. If it connects, the port is open. \"Connection refused\" means the host is there but nothing is listening on that port; a hang/timeout often means a firewall is silently blocking it.\n\nThere is also a tool to see which doors are open *on your own machine*: `ss` (or the older `netstat`) lists the ports your computer is listening on - handy when a service you started isn't reachable and you want to confirm it is actually running and listening.\n\n**Recap:** A reachable host can still have a closed or blocked port. When name and ping pass but the site fails, test the port with `curl` or `telnet host 443`: connected means open, \"refused\" means nothing is listening, a hang often means a firewall is blocking.",
+          "items": [
+            {
+              "id": "troubleshooting-ports-mcq-001",
+              "type": "mcq",
+              "prompt": "What is a \"port\" on a machine?",
+              "choices": [
+                "The machine's only IP address",
+                "A numbered door that lets one specific service (like a website) be reached separately from others",
+                "The speed of the connection",
+                "The name of the website"
+              ],
+              "answerIndex": 1,
+              "explanation": "A machine runs many services at once and keeps them apart with ports - numbered doors. Web traffic uses 443 (secure) or 80 (plain). Reaching the machine is not the same as a particular door being open.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-7.svg"
+            },
+            {
+              "id": "troubleshooting-ports-mcq-002",
+              "type": "mcq",
+              "prompt": "The name resolves and the IP replies to ping, but the website still will not load. What layer should you check next?",
+              "choices": [
+                "Whether you have an IP address",
+                "The service and its port (is the right door actually open?)",
+                "Whether the cable is plugged in",
+                "Your subnet mask"
+              ],
+              "answerIndex": 1,
+              "explanation": "Name and reachability already passed, so the lower layers are fine. The remaining suspect is the specific service/port: the host is up, but the door for that service may be closed or blocked.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-7.svg"
+            },
+            {
+              "id": "troubleshooting-ports-mcq-003",
+              "type": "mcq",
+              "prompt": "Which port does a secure (HTTPS) website normally use?",
+              "choices": [
+                "Port 25",
+                "Port 443",
+                "Port 53",
+                "Port 22"
+              ],
+              "answerIndex": 1,
+              "explanation": "Secure web traffic (HTTPS) uses port 443; plain web (HTTP) uses port 80. So to test whether a website's service is reachable, you check whether port 443 will open.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-7.svg"
+            },
+            {
+              "id": "troubleshooting-ports-mcq-004",
+              "type": "mcq",
+              "prompt": "You run `telnet example.com 443` and get \"connection refused.\" What does that most directly mean?",
+              "choices": [
+                "The name could not be looked up",
+                "The host is reachable, but nothing is listening on that port",
+                "Your computer has no IP",
+                "The download finished successfully"
+              ],
+              "answerIndex": 1,
+              "explanation": "\"Connection refused\" is an active no: the host is there and answered, but no service is listening on that port (so it actively rejects you). That is different from a silent timeout, which usually points to a firewall.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-7.svg"
+            },
+            {
+              "id": "troubleshooting-ports-mcq-005",
+              "type": "mcq",
+              "prompt": "Why is reaching a host with ping NOT the same as the website working?",
+              "choices": [
+                "Ping is always wrong",
+                "Ping shows the machine is up, but a specific service/port on it can still be closed or blocked",
+                "Ping only works on websites",
+                "Ping tests the password"
+              ],
+              "answerIndex": 1,
+              "explanation": "Ping confirms the machine answers, like a building standing. But the particular door (port 443 for the website) can still be locked. You need a port test to confirm the actual service is reachable.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-7.svg"
+            },
+            {
+              "id": "troubleshooting-ports-mcq-006",
+              "type": "mcq",
+              "prompt": "What does `curl https://example.com` let you do?",
+              "choices": [
+                "Look up the name only",
+                "Actually try to talk to the web service and see if it returns a page or fails",
+                "Measure your screen resolution",
+                "Assign yourself an IP address"
+              ],
+              "answerIndex": 1,
+              "explanation": "curl connects to the real web service and tries to fetch the page. If it returns content, the service is up; if it hangs or is refused, the service/port is the problem even though the host answered ping.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-7.svg"
+            },
+            {
+              "id": "troubleshooting-ports-mcq-007",
+              "type": "mcq",
+              "prompt": "`telnet example.com 443` just hangs and eventually times out (no \"refused\"). What is a common explanation?",
+              "choices": [
+                "The host actively rejected you",
+                "A firewall is silently blocking the port, so nothing answers at all",
+                "DNS is broken",
+                "You typed the name wrong"
+              ],
+              "answerIndex": 1,
+              "explanation": "A silent hang (versus a clear \"refused\") often means a firewall is quietly dropping the attempt, so no response comes back. \"Refused\" would mean the host answered but had nothing listening; a hang means no answer at all.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-7.svg"
+            },
+            {
+              "id": "troubleshooting-ports-mcq-008",
+              "type": "mcq",
+              "prompt": "You started a web service on your own computer but cannot reach it. Which tool shows which ports your machine is listening on?",
+              "choices": [
+                "ss (or the older netstat)",
+                "traceroute",
+                "nslookup",
+                "ping"
+              ],
+              "answerIndex": 0,
+              "explanation": "ss (and the older netstat) lists the ports your own machine is listening on. If your service is not in the list, it is not actually running/listening - which explains why nothing can connect to it.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-7.svg"
+            },
+            {
+              "id": "troubleshooting-ports-mcq-009",
+              "type": "mcq",
+              "prompt": "Summarize the \"DNS works but the site won't load\" pattern in one line.",
+              "choices": [
+                "The name and the host are fine, but the specific service/port is down or blocked",
+                "The cable is unplugged",
+                "You have no IP address",
+                "The whole internet is down"
+              ],
+              "answerIndex": 0,
+              "explanation": "In this pattern the lower layers all pass: the name resolves and the host replies. The break is up at the service/port - that one door is closed or blocked - which is why you reach for curl or a port test.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-7.svg"
+            }
+          ]
+        },
+        {
+          "id": "troubleshooting-troubleshooting-patterns",
+          "title": "Reading Common Symptoms at a Glance",
+          "order": 7,
+          "difficulty": 3,
+          "content": "Once you have used the tools a few times, certain symptoms become instantly recognizable - like a mechanic who hears a noise and already knows the part. This lesson collects the most common patterns so you can jump much of the ladder at once.\n\nHere are the classics. Each links a symptom you can see to the layer that is usually at fault:\n\n- **No IP address (or a 169.254 one).** Nobody handed your computer an address. This is a **DHCP problem** (or you are not really connected). Nothing beyond your machine can work until you have a real address.\n- **You can ping an IP, but names like example.com fail.** The connection is fine; the name-to-number step is broken. This is a **DNS problem**.\n- **You can reach your gateway (router), but nothing beyond it.** Your local side is healthy, but the path out is broken. This is a **routing or internet-provider problem**.\n- **The name resolves and the IP pings, but one site or app won't load.** The host is up; a specific service or port is down or blocked. This is a **port/service problem**.\n\nNotice how each pattern is just the bottom-up method in shorthand. \"No IP\" is the link/DHCP rung failing. \"Ping the number works but the name fails\" is the DNS rung failing while everything below it passes. \"Gateway yes, internet no\" is the routing rung. You are still climbing the same ladder - you have just learned to recognize the shape of each failure and start near the right rung.\n\nOne habit keeps you honest: when you change something, change **one thing at a time** and re-test. If you swap three settings at once and it starts working, you will never know which one mattered.\n\n**Recap:** Memorize the common shapes - no IP means DHCP, ping-the-number-but-not-the-name means DNS, gateway-works-but-nothing-beyond means routing, host-up-but-one-service-fails means a port. They are the ladder in shorthand. Change one thing at a time.",
+          "items": [
+            {
+              "id": "troubleshooting-patterns-mcq-001",
+              "type": "mcq",
+              "prompt": "A computer has NO IP address (or a 169.254 one). Which problem does this point to?",
+              "choices": [
+                "A DNS problem",
+                "A DHCP problem (or not really being connected) - nobody gave it an address",
+                "A port/service problem",
+                "A slow website"
+              ],
+              "answerIndex": 1,
+              "explanation": "No usable IP means the address-handout step failed. That is DHCP (or a dead link). Until the machine has a real address, nothing above that rung can work, so this is where you start.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-8.svg"
+            },
+            {
+              "id": "troubleshooting-patterns-mcq-002",
+              "type": "mcq",
+              "prompt": "You can ping an IP number, but every name like example.com fails. Which problem is it?",
+              "choices": [
+                "A DNS problem",
+                "A DHCP problem",
+                "A routing problem",
+                "A cable problem"
+              ],
+              "answerIndex": 0,
+              "explanation": "Pinging the number works, so the connection is healthy. Only names fail, which is the name-to-number step - DNS. This is one of the most common patterns you will see.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-8.svg"
+            },
+            {
+              "id": "troubleshooting-patterns-mcq-003",
+              "type": "mcq",
+              "prompt": "You can reach your gateway (router) but nothing beyond it. Which problem is most likely?",
+              "choices": [
+                "A DNS problem",
+                "A routing or internet-provider problem - the path out is broken",
+                "A port problem on one website",
+                "No IP address"
+              ],
+              "answerIndex": 1,
+              "explanation": "Reaching the gateway proves your local side works. Failing to get past it means the way out - routing or your provider - is broken. The fault is beyond your network, not on your machine.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-8.svg"
+            },
+            {
+              "id": "troubleshooting-patterns-mcq-004",
+              "type": "mcq",
+              "prompt": "A name resolves and its IP pings fine, but one particular app or site will not load. Which problem is it?",
+              "choices": [
+                "A DHCP problem",
+                "A port/service problem - the host is up but that service is down or blocked",
+                "A routing problem affecting everything",
+                "No IP address"
+              ],
+              "answerIndex": 1,
+              "explanation": "Everything below passes (name and host are fine) and only one service fails, so the issue is that service's port being closed or blocked. Other sites working confirms the rest of the stack is healthy.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-8.svg"
+            },
+            {
+              "id": "troubleshooting-patterns-mcq-005",
+              "type": "mcq",
+              "prompt": "Why are these symptom patterns just the bottom-up method in shorthand?",
+              "choices": [
+                "They replace the method entirely",
+                "Each pattern names which rung of the ladder is failing while the ones below it pass",
+                "They only work on Wi-Fi",
+                "They have nothing to do with the layers"
+              ],
+              "answerIndex": 1,
+              "explanation": "Every pattern is a snapshot of the ladder: \"no IP\" is the link/DHCP rung, \"number works, name fails\" is the DNS rung, and so on. Recognizing the shape just lets you jump to the right rung faster.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-8.svg"
+            },
+            {
+              "id": "troubleshooting-patterns-mcq-006",
+              "type": "mcq",
+              "prompt": "Why change only ONE thing at a time when fixing a network problem?",
+              "choices": [
+                "It is required by law",
+                "So that if it starts working, you know exactly which change fixed it",
+                "Because changing two things is impossible",
+                "To make the repair take longer"
+              ],
+              "answerIndex": 1,
+              "explanation": "If you change several settings at once and it works, you cannot tell which one mattered - and you might have left something broken. Changing one thing and re-testing keeps cause and effect clear.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-8.svg"
+            },
+            {
+              "id": "troubleshooting-patterns-mcq-007",
+              "type": "mcq",
+              "prompt": "Most websites load, but ONE specific site is unreachable from your computer. Which pattern fits best?",
+              "choices": [
+                "No IP address (DHCP)",
+                "A problem with that one site's service/port (or a block on it), since everything else works",
+                "Your whole connection is down",
+                "Your subnet mask is wrong"
+              ],
+              "answerIndex": 1,
+              "explanation": "If everything else works, your connection, DNS, and routing are fine. A single failing site points to that site's service/port being down or blocked, not to your machine's setup.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-8.svg"
+            },
+            {
+              "id": "troubleshooting-patterns-mcq-008",
+              "type": "mcq",
+              "prompt": "A laptop gets a normal IP and can ping the gateway, but cannot ping any outside IP like 1.1.1.1. Which pattern is this?",
+              "choices": [
+                "A DNS problem",
+                "A routing / provider problem - local side fine, path out broken",
+                "A DHCP problem",
+                "A port problem"
+              ],
+              "answerIndex": 1,
+              "explanation": "It has an address and reaches the router (local side healthy), but cannot reach anything beyond. That is the routing/provider pattern. It is not DNS, because the failing test used a raw number.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-8.svg"
+            },
+            {
+              "id": "troubleshooting-patterns-mcq-009",
+              "type": "mcq",
+              "prompt": "What is the main value of learning these common patterns?",
+              "choices": [
+                "They let you skip understanding the layers forever",
+                "They let you recognize a failure's shape quickly and start near the right rung instead of from the very bottom every time",
+                "They guarantee the problem is never your fault",
+                "They replace the need for any tools"
+              ],
+              "answerIndex": 1,
+              "explanation": "The patterns are a head start: like a mechanic recognizing a sound, you spot the failure's shape and begin near the right layer. You still rely on the same ladder and tools to confirm it.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-8.svg"
+            }
+          ]
+        },
+        {
+          "id": "troubleshooting-troubleshooting-capture",
+          "title": "Seeing the Actual Packets (tcpdump & Wireshark)",
+          "order": 8,
+          "difficulty": 3,
+          "content": "Most problems fall to the simple checks. But sometimes you need the truth, down to the exact messages on the wire. For those hard cases there is **packet capture**: recording the real packets as they go in and out.\n\nRemember a **packet** is one small chunk of data with addresses and a payload, the basic unit that travels across a network. Normally you never see packets; the computer handles them invisibly. A packet capture tool records them so you can read them - like putting a security camera on the wire and watching exactly what came and went.\n\nTwo tools dominate, and they pair up:\n\n```\ntcpdump            (command-line capture)\nWireshark          (capture + point-and-click viewer)\n```\n\n- **tcpdump** is the quick command-line recorder. You point it at your connection and it prints a line per packet: a timestamp, who sent it, who it went to, and what kind it was.\n- **Wireshark** does the same capture but shows it in a friendly window where you can click any packet and expand its details. It is the tool most people learn on.\n\nWhat does seeing the packets buy you? A single captured line can tell you exactly *who talked to whom and what they said*. For example, you might see your computer ask a server to connect, and see the server reply with a flat refusal. That is proof, not a guess: the conversation happened and you watched it fail. Captures are how you settle questions the simpler tools can only hint at.\n\nThis is a heavy tool, so save it for when the basics are not enough. Ninety percent of the time, ping, your own settings, traceroute, and a DNS check will already tell you the answer. But when they do not, packet capture is the ground truth - because the packets do not lie about what was actually sent and received.\n\n**Recap:** Packet capture (tcpdump on the command line, Wireshark in a window) records the real packets so you can see exactly who said what. Reach for it on hard cases, after the simple checks, when you need proof instead of a guess.",
+          "items": [
+            {
+              "id": "troubleshooting-capture-mcq-001",
+              "type": "mcq",
+              "prompt": "What does packet capture let you do?",
+              "choices": [
+                "Speed up your internet",
+                "Record the real packets going in and out so you can see exactly what was sent and received",
+                "Assign IP addresses to devices",
+                "Look up names faster"
+              ],
+              "answerIndex": 1,
+              "explanation": "Packet capture records the actual messages on the wire so you can read them. It does not speed anything up or hand out addresses - it shows you the truth of what crossed the connection.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-9.svg"
+            },
+            {
+              "id": "troubleshooting-capture-mcq-002",
+              "type": "mcq",
+              "prompt": "What is a \"packet\"?",
+              "choices": [
+                "A small chunk of data with addresses and a payload - the basic unit that travels across a network",
+                "A type of cable",
+                "A website's home page",
+                "The name of a router"
+              ],
+              "answerIndex": 0,
+              "explanation": "A packet is one small piece of data carrying addressing plus the actual content (payload). Networks move data as a stream of these packets, which is exactly what a capture tool records.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-9.svg"
+            },
+            {
+              "id": "troubleshooting-capture-mcq-003",
+              "type": "mcq",
+              "prompt": "Which everyday comparison fits packet capture best?",
+              "choices": [
+                "A thermometer measuring temperature",
+                "A security camera on the wire, recording exactly what came and went",
+                "A calculator adding numbers",
+                "A map of the world"
+              ],
+              "answerIndex": 1,
+              "explanation": "Capture is like a camera trained on the wire: it records every message so you can play it back and see precisely what happened, rather than guessing.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-9.svg"
+            },
+            {
+              "id": "troubleshooting-capture-mcq-004",
+              "type": "mcq",
+              "prompt": "Which tool is the command-line packet recorder, and which adds a friendly point-and-click window?",
+              "choices": [
+                "tcpdump records on the command line; Wireshark adds the point-and-click window",
+                "Wireshark records on the command line; tcpdump adds the window",
+                "ping records; traceroute shows the window",
+                "Both are only command-line tools"
+              ],
+              "answerIndex": 0,
+              "explanation": "tcpdump is the quick command-line capture; Wireshark captures too but presents packets in a clickable window where you can expand each one. They are commonly used together.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-9.svg"
+            },
+            {
+              "id": "troubleshooting-capture-mcq-005",
+              "type": "mcq",
+              "prompt": "When is packet capture the RIGHT tool to reach for?",
+              "choices": [
+                "Always, as the very first step for any problem",
+                "On hard cases, after the simple checks, when you need proof of what actually happened",
+                "Only when your computer is brand new",
+                "Never - it is not useful for troubleshooting"
+              ],
+              "answerIndex": 1,
+              "explanation": "Capture is powerful but heavy. Most issues are solved first by ping, your own settings, traceroute, and DNS checks. Capture is for the stubborn cases where you need ground truth, not a starting point.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-9.svg"
+            },
+            {
+              "id": "troubleshooting-capture-mcq-006",
+              "type": "mcq",
+              "prompt": "A single captured packet line typically tells you which of the following?",
+              "choices": [
+                "Your monthly bill",
+                "Who sent it, who it went to, when, and what kind of message it was",
+                "The brand of your laptop",
+                "Your screen brightness"
+              ],
+              "answerIndex": 1,
+              "explanation": "Each captured line shows the essentials: a timestamp, the sender, the receiver, and the type of packet. Read together, those lines reveal the whole conversation between two machines.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-9.svg"
+            },
+            {
+              "id": "troubleshooting-capture-mcq-007",
+              "type": "mcq",
+              "prompt": "Why is a capture called \"ground truth\" compared to the simpler tools?",
+              "choices": [
+                "Because it is the oldest tool",
+                "Because it shows the actual packets that were sent and received, instead of inferring from a reply or timeout",
+                "Because it always runs faster",
+                "Because it never needs to be installed"
+              ],
+              "answerIndex": 1,
+              "explanation": "Ping or a port test give you a clue (a reply, a refusal, a timeout). A capture shows the real messages themselves, so you can confirm exactly what happened rather than reasoning from a single outcome.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-9.svg"
+            },
+            {
+              "id": "troubleshooting-capture-mcq-008",
+              "type": "mcq",
+              "prompt": "In a capture you see your computer ask a server to connect, and the server immediately reply with a refusal. What have you learned?",
+              "choices": [
+                "Nothing - captures cannot show this",
+                "Proof that the connection attempt reached the server and the server actively rejected it",
+                "That your cable is unplugged",
+                "That DNS is the problem"
+              ],
+              "answerIndex": 1,
+              "explanation": "Seeing the request go out and a refusal come back is direct evidence: the server was reached and it said no. That settles the question - the host is up but is rejecting the connection - instead of leaving you to guess.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-9.svg"
+            },
+            {
+              "id": "troubleshooting-capture-mcq-009",
+              "type": "mcq",
+              "prompt": "Which statement about Wireshark is accurate for a beginner?",
+              "choices": [
+                "It hides packets so you cannot read them",
+                "It captures packets and shows them in a window where you can click each one and expand its details",
+                "It is only for assigning IP addresses",
+                "It replaces your web browser"
+              ],
+              "answerIndex": 1,
+              "explanation": "Wireshark captures the same packets tcpdump does but presents them visually: you can select any packet and open up its parts. That friendly view is why most people learn packet analysis on it.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-9.svg"
+            }
+          ]
+        },
+        {
+          "id": "troubleshooting-troubleshooting-quality",
+          "title": "Latency, Jitter, and Packet Loss: What the Numbers Mean",
+          "order": 9,
+          "difficulty": 2,
+          "content": "Sometimes the network is not down - it is just *bad*. Calls break up, video freezes, games lag. To describe \"bad\" precisely, you need three numbers, and ping shows all three.\n\nImagine a conversation across a long delay. **Latency** is the delay itself: how long a message takes to get there and a reply to come back (the round-trip time). Low latency feels instant; high latency feels sluggish, like talking over a satellite link where every reply lags. In ping output, the `time=` value is your latency.\n\n**Jitter** is how much that delay *wobbles*. If replies come back at 30, 31, 29, 30 milliseconds, the delay is steady - low jitter, which is good. If they come back at 12, 90, 20, 140, the delay is jumping around - high jitter, which wrecks calls and video because the audio and frames arrive unevenly. Jitter is about *consistency*, not raw speed.\n\n**Packet loss** is how many messages never arrive at all. Send 5 pings, get 4 replies, and one was lost - that is 20% packet loss. Lost packets cause stutters, freezes, and repeated retries as the data has to be sent again. Even a little loss can feel terrible on live calls.\n\nPing summarizes all three for you. A line like:\n\n```\n5 sent, 4 received, 20% loss, rtt min/avg/max = 12/40/140 ms\n```\n\ntells you the latency (around 40 ms average), the jitter (the spread from 12 to 140 ms is wide - jumpy), and the loss (20% - one in five gone). Read together, these say \"the connection works but is unstable,\" which points you toward a flaky link rather than a hard outage.\n\n**Recap:** Latency is the delay, jitter is how much that delay wobbles, and packet loss is how many messages vanish. Ping reports all three; high values explain a connection that is up but feels bad.",
+          "items": [
+            {
+              "id": "troubleshooting-quality-mcq-001",
+              "type": "mcq",
+              "prompt": "What does \"latency\" mean?",
+              "choices": [
+                "How many messages are lost",
+                "The delay - how long a message takes to get there and back (round-trip time)",
+                "How much the delay wobbles",
+                "The name of your router"
+              ],
+              "answerIndex": 1,
+              "explanation": "Latency is the round-trip delay, shown by ping's time= value. Low latency feels instant; high latency feels sluggish. It is about delay, not about losses or consistency.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-10.svg"
+            },
+            {
+              "id": "troubleshooting-quality-mcq-002",
+              "type": "mcq",
+              "prompt": "What does \"jitter\" measure?",
+              "choices": [
+                "The raw download speed",
+                "How much the delay varies from one message to the next (its consistency)",
+                "The number of websites you can reach",
+                "Your IP address"
+              ],
+              "answerIndex": 1,
+              "explanation": "Jitter is the wobble in latency. Steady delays (30, 31, 29 ms) mean low jitter; bouncing delays (12, 90, 140 ms) mean high jitter. It is about consistency, which matters a lot for calls and video.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-10.svg"
+            },
+            {
+              "id": "troubleshooting-quality-mcq-003",
+              "type": "mcq",
+              "prompt": "You send 5 pings and only 4 come back. What is the packet loss?",
+              "choices": [
+                "0%",
+                "20%",
+                "50%",
+                "80%"
+              ],
+              "answerIndex": 1,
+              "explanation": "One of five messages was lost, which is 1/5 = 20% packet loss. Lost packets cause stutters and retries because the data must be sent again.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-10.svg"
+            },
+            {
+              "id": "troubleshooting-quality-mcq-004",
+              "type": "mcq",
+              "prompt": "Replies to ping come back at 30, 31, 29, 30 ms. How would you describe this?",
+              "choices": [
+                "High packet loss",
+                "Low jitter - the delay is steady and consistent",
+                "No latency at all",
+                "A DNS failure"
+              ],
+              "answerIndex": 1,
+              "explanation": "The times barely change, so the delay is steady: that is low jitter, which is good. There is latency (about 30 ms) and no loss shown here - the point is that the delay is consistent.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-10.svg"
+            },
+            {
+              "id": "troubleshooting-quality-mcq-005",
+              "type": "mcq",
+              "prompt": "Why is high jitter especially bad for video calls?",
+              "choices": [
+                "It uses more electricity",
+                "Audio and video arrive unevenly, so the call breaks up even if the average speed seems fine",
+                "It changes your IP address",
+                "It deletes your files"
+              ],
+              "answerIndex": 1,
+              "explanation": "Live audio and video need a steady, predictable arrival. When the delay jumps around (high jitter), pieces arrive bunched up or late, causing stutter and freezes even when the average latency looks acceptable.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-10.svg"
+            },
+            {
+              "id": "troubleshooting-quality-mcq-006",
+              "type": "mcq",
+              "prompt": "A ping summary reads: \"5 sent, 4 received, 20% loss, rtt min/avg/max = 12/40/140 ms.\" What does the 12/40/140 part tell you?",
+              "choices": [
+                "Nothing useful",
+                "The fastest, average, and slowest round trips - a wide 12-to-140 spread means jumpy latency (high jitter)",
+                "Your download finished",
+                "The website's password"
+              ],
+              "answerIndex": 1,
+              "explanation": "min/avg/max are the fastest, average, and slowest round-trip times. Here the average is about 40 ms but the spread from 12 to 140 is wide, which signals high jitter - an unstable connection.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-10.svg"
+            },
+            {
+              "id": "troubleshooting-quality-mcq-007",
+              "type": "mcq",
+              "prompt": "Which set of numbers describes a connection that is UP but unstable rather than fully down?",
+              "choices": [
+                "100% loss, no replies at all",
+                "Some replies with high, jumpy times and partial packet loss (for example 20% loss, times from 12 to 140 ms)",
+                "0% loss and rock-steady times",
+                "No IP address"
+              ],
+              "answerIndex": 1,
+              "explanation": "Getting some replies (not zero) means the connection is up. Jumpy times and partial loss mean it is unstable. 100% loss would be a hard outage; perfectly steady times with no loss would be healthy.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-10.svg"
+            },
+            {
+              "id": "troubleshooting-quality-mcq-008",
+              "type": "mcq",
+              "prompt": "What is the difference between latency and packet loss?",
+              "choices": [
+                "They are the same thing",
+                "Latency is how long messages take; packet loss is how many never arrive",
+                "Latency is about names; packet loss is about cables",
+                "Latency is measured in dollars; packet loss in seconds"
+              ],
+              "answerIndex": 1,
+              "explanation": "Latency measures delay (how long the round trip takes). Packet loss measures how many messages vanish entirely. A link can have low latency but high loss, or high latency with no loss - they are separate problems.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-10.svg"
+            },
+            {
+              "id": "troubleshooting-quality-mcq-009",
+              "type": "mcq",
+              "prompt": "Which single tool conveniently reports latency, jitter (via the spread of times), and packet loss together?",
+              "choices": [
+                "nslookup",
+                "ping",
+                "ipconfig",
+                "curl"
+              ],
+              "answerIndex": 1,
+              "explanation": "Ping's summary line gives you the round-trip times (latency and, by their spread, jitter) and the percentage of replies lost (packet loss) all at once - which is why it is the go-to quick health check.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/troubleshooting-10.svg"
             }
           ]
         }
