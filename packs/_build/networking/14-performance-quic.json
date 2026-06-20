@@ -8,91 +8,147 @@
       "title": "The Performance Quantities: Bandwidth, Throughput, Latency, Jitter & Loss",
       "order": 1,
       "difficulty": 1,
-      "content": "Before you can reason about a network, separate five quantities that beginners blur together.\n\n**Bandwidth** is *capacity* — the maximum bits/second a link can carry, e.g. a 1 Gbps interface. It is a property of the pipe, not of your transfer. **Throughput** is what you actually *achieve* end-to-end, always ≤ bandwidth because of contention, protocol limits, and overhead. **Goodput** is narrower still: the application payload bits delivered per second, stripping out headers, retransmissions, and handshake bytes. A link can run at line-rate throughput while goodput sags under heavy header or retransmit overhead.\n\n**Latency** is delay. Two flavors matter: *one-way delay* and *round-trip time* (RTT), the there-and-back time a ping measures. Most interactive performance is governed by RTT, not bandwidth — a fact that surprises people who think \"faster internet\" means \"more Mbps.\" Loading a page that needs many round trips is RTT-bound; a bulk download is bandwidth-bound.\n\n**Jitter** is the *variation* in latency packet-to-packet. A VoIP or video call tolerates moderate latency but hates jitter, because the playout buffer must absorb the variance or you get dropouts. This is exactly the timing-stability intuition from radar PRF and clock recovery: a stable interval is worth more than a fast-but-erratic one.\n\n**Loss** is the fraction of packets that never arrive (drops from full queues, bit errors, or congestion). Even tiny loss devastates throughput on long paths because reliable transports interpret loss as a congestion signal and back off. Hold these five apart and most \"the network is slow\" arguments resolve into a specific, measurable cause.",
+      "content": "**Hook.** People say \"I want fast internet,\" as if fast were one number. It isn't. Two completely different things decide how a network feels, and mixing them up is the root of most confusion.\n\n**Build.** Picture your connection as a pipe carrying water.\n\n- **Bandwidth** is how *wide* the pipe is: how much data per second can flow through it. A wider pipe moves more at once. This is what a big download wants.\n- **Latency** is how *long* the pipe is: how long one single message takes to get to the other end. A long pipe feels laggy even if it is wide. This is what a video call or a game cares about.\n\nThese are different! A wide pipe does **not** fix a laggy call, and a short pipe does not magically speed up a huge download. Think of a wide highway (lots of cars at once = bandwidth) versus a short commute (you arrive quickly = low latency).\n\nThe everyday measure of latency is **round-trip time (RTT)**: the there-and-back time for a message to reach the far end and a reply to come back. When you \"ping\" something, RTT is the number you get. Here is the surprise that trips everyone up: a lot of slowness is really about **too many round trips**, not too little bandwidth. Every back-and-forth step (each handshake) adds one more RTT of waiting, and paying for more bandwidth does nothing to remove those waits.\n\nThree more words you will hear. **Throughput** is the speed you *actually* get, which is always a bit less than the bandwidth (the pipe's theoretical maximum) because of overhead and limits. **Jitter** is how *uneven* the delay is from one moment to the next; a call hates jitter even more than it hates plain delay. **Loss** is the fraction of packets that never arrive; even a little loss can quietly cap your speed.\n\n**Recap.** Bandwidth = pipe width (matters for downloads). Latency/RTT = pipe length (matters for calls and games). They are separate, and 'more bandwidth' won't fix a laggy call.",
       "items": [
-        {
-          "id": "performance-quic-l1-fc1",
-          "type": "flashcard",
-          "front": "Distinguish bandwidth from throughput.",
-          "back": "Bandwidth is the link's maximum capacity (bits/s, a property of the pipe). Throughput is what you actually achieve end-to-end, always ≤ bandwidth due to contention, overhead, and protocol limits.",
-          "hint": "Pipe size vs water actually flowing."
-        },
-        {
-          "id": "performance-quic-l1-fc2",
-          "type": "flashcard",
-          "front": "What is goodput and how does it differ from throughput?",
-          "back": "Goodput is the application payload bits/s delivered, excluding headers, retransmissions, and handshake bytes. Throughput counts all bits on the wire; goodput counts only useful ones."
-        },
-        {
-          "id": "performance-quic-l1-fc3",
-          "type": "flashcard",
-          "front": "Why is much interactive performance RTT-bound rather than bandwidth-bound?",
-          "back": "Work that needs many sequential round trips (DNS, handshakes, dependent requests) is paced by RTT, not Mbps. Adding bandwidth doesn't help if you're waiting on round trips.",
-          "hint": "Think page load with many small dependent requests."
-        },
-        {
-          "id": "performance-quic-l1-fc4",
-          "type": "flashcard",
-          "front": "Define jitter and name a workload that is especially sensitive to it.",
-          "back": "Jitter is the variation in latency from packet to packet. Real-time audio/video (VoIP, conferencing) is sensitive: the playout buffer must absorb the variance or audio drops out."
-        },
-        {
-          "id": "performance-quic-l1-fc5",
-          "type": "flashcard",
-          "front": "Why does even small packet loss hurt throughput badly on long paths?",
-          "back": "Reliable transports treat loss as a congestion signal and reduce their sending rate (back off). On a high-RTT path the recovery and window re-growth take many round trips, so a tiny loss rate caps achievable throughput."
-        },
         {
           "id": "performance-quic-l1-mc1",
           "type": "mcq",
-          "prompt": "A 1 Gbps link consistently delivers 600 Mbps of HTTP payload during a bulk download. Which statement is most accurate?",
+          "prompt": "Which everyday comparison best captures bandwidth versus latency?",
           "choices": [
-            "Bandwidth is 600 Mbps",
-            "Goodput is about 600 Mbps; bandwidth is 1 Gbps",
-            "Throughput equals bandwidth here",
-            "Latency must be 600 ms"
+            "Bandwidth is how wide the pipe is; latency is how long the pipe is",
+            "Bandwidth and latency are two names for the same thing",
+            "Bandwidth is the length of the pipe; latency is its width",
+            "Both only describe how reliable the connection is"
           ],
-          "answerIndex": 1,
-          "explanation": "Bandwidth (capacity) is 1 Gbps. The 600 Mbps of delivered payload is goodput, which sits below bandwidth because of overhead, contention, or window limits."
+          "answerIndex": 0,
+          "explanation": "Bandwidth is the width of the pipe (how much data per second can flow), while latency is its length (how long one message takes to get there). They are different ideas, which is why a wider pipe does not reduce delay. The reversed option swaps the two; they are not the same thing, and neither is mainly about reliability.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/performance-quic-2.svg"
         },
         {
           "id": "performance-quic-l1-mc2",
           "type": "mcq",
-          "prompt": "Which quantity does a standard ping primarily measure?",
+          "prompt": "You are downloading one enormous file. Which quantity matters most for finishing it quickly?",
           "choices": [
-            "Bandwidth",
-            "Goodput",
-            "Round-trip time (RTT)",
-            "Loss correction overhead"
+            "Bandwidth (how much data per second can flow)",
+            "Latency (how long one message takes)",
+            "Jitter (how uneven the delay is)",
+            "The number of round trips"
           ],
-          "answerIndex": 2,
-          "explanation": "Ping sends an ICMP echo and times the reply, giving round-trip time. It can also report loss, but its headline number is RTT."
+          "answerIndex": 0,
+          "explanation": "A big bulk download is about moving a large amount of data, so you want a wide pipe: bandwidth. Latency and jitter affect how responsive things feel moment to moment, but they do not set how fast a giant file streams down once it is flowing. This is the classic 'wide highway' case.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/performance-quic-2.svg"
         },
         {
           "id": "performance-quic-l1-mc3",
           "type": "mcq",
-          "prompt": "A video call has acceptable average latency but stutters badly. The most likely culprit is:",
+          "prompt": "Your video call keeps feeling laggy. A salesperson offers you a plan with much higher bandwidth. Will that fix the lag?",
           "choices": [
-            "High jitter overwhelming the playout buffer",
-            "Excess bandwidth",
-            "Goodput exceeding throughput",
-            "Too low an RTT"
+            "No - a laggy call is about latency (delay), and more bandwidth does not shorten the delay",
+            "Yes - more bandwidth always lowers latency",
+            "Yes - bandwidth and latency are the same measurement",
+            "No - because video calls do not use the network at all"
           ],
           "answerIndex": 0,
-          "explanation": "Stutter with acceptable average latency points to jitter — latency variation the playout buffer cannot smooth out."
+          "explanation": "Lag in a call is a latency problem: messages take too long to get there and back. Bandwidth is the width of the pipe, not its length, so adding bandwidth does not shorten the trip. A wide pipe with a long delay still feels laggy. Calls obviously do use the network; the point is that the bottleneck is delay, not capacity.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/performance-quic-2.svg"
         },
         {
           "id": "performance-quic-l1-mc4",
           "type": "mcq",
-          "prompt": "Which is the best one-line description of the relationship among the metrics?",
+          "prompt": "What does round-trip time (RTT) measure?",
           "choices": [
-            "goodput ≥ throughput ≥ bandwidth",
-            "bandwidth ≥ throughput ≥ goodput",
-            "latency ≥ bandwidth ≥ jitter",
-            "throughput ≥ bandwidth ≥ goodput"
+            "The there-and-back time for a message to reach the far end and a reply to return",
+            "How much data per second the link can carry",
+            "How many packets are lost on the path",
+            "The total size of a file you are downloading"
           ],
-          "answerIndex": 1,
-          "explanation": "Capacity (bandwidth) bounds achieved throughput, which in turn bounds useful payload (goodput): bandwidth ≥ throughput ≥ goodput."
+          "answerIndex": 0,
+          "explanation": "RTT is the time for a message to travel to the other side and for the reply to come back - the 'there and back' delay you see when you ping something. It is a measure of latency, not of capacity (bandwidth), not of loss, and not of file size.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/performance-quic-3.svg"
+        },
+        {
+          "id": "performance-quic-l1-mc5",
+          "type": "mcq",
+          "prompt": "Why can adding extra round trips make something feel slow even on a fast connection?",
+          "choices": [
+            "Each round trip forces you to wait one more RTT for a reply before continuing",
+            "Each round trip uses up all of your bandwidth permanently",
+            "Round trips only happen when packets are lost",
+            "Round trips make the pipe physically wider, which slows it down"
+          ],
+          "answerIndex": 0,
+          "explanation": "Every step that waits for a reply (like a handshake) costs one more RTT of waiting, and those waits add up no matter how much bandwidth you have. That is why many 'slow' experiences are really 'too many round trips.' Round trips are normal parts of conversations, not just loss events, and they do not change the pipe's width.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/performance-quic-3.svg"
+        },
+        {
+          "id": "performance-quic-l1-mc6",
+          "type": "mcq",
+          "prompt": "How do throughput and bandwidth differ?",
+          "choices": [
+            "Bandwidth is the theoretical maximum; throughput is the speed you actually achieve, which is a bit lower",
+            "Throughput is always larger than bandwidth",
+            "They are identical and interchangeable",
+            "Bandwidth changes second to second; throughput never changes"
+          ],
+          "answerIndex": 0,
+          "explanation": "Bandwidth is the pipe's top capacity; throughput is what you really get end to end, which is always somewhat less because of overhead and other limits. Throughput cannot exceed bandwidth. They are related but not the same, and in practice it is throughput (the achieved rate) that tends to vary.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/performance-quic-2.svg"
+        },
+        {
+          "id": "performance-quic-l1-mc7",
+          "type": "mcq",
+          "prompt": "A call has acceptable average delay but the audio keeps breaking up unevenly. What is the most likely cause?",
+          "choices": [
+            "Jitter - the delay is uneven from moment to moment",
+            "Too much bandwidth",
+            "The round-trip time is far too short",
+            "The download is too large"
+          ],
+          "answerIndex": 0,
+          "explanation": "Breaking up despite an okay average delay points to jitter: the delay keeps changing, so audio arrives in an uneven rhythm and the playback can't keep smooth. Excess bandwidth would not cause this, a very short RTT is good not bad, and download size is unrelated to a live call's smoothness.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/performance-quic-3.svg"
+        },
+        {
+          "id": "performance-quic-l1-mc8",
+          "type": "mcq",
+          "prompt": "Which statement about packet loss is correct?",
+          "choices": [
+            "Even a small amount of loss can hold back your speed, because lost data has to be noticed and sent again",
+            "Loss has no effect on speed as long as bandwidth is high",
+            "Loss means the pipe got physically wider",
+            "Loss only matters for downloads, never for calls"
+          ],
+          "answerIndex": 0,
+          "explanation": "Loss is the fraction of packets that never arrive. Even a little loss hurts, because the missing pieces must be detected and resent, which adds delay and can cap throughput - and on a call, lost audio is simply gone. High bandwidth does not make loss harmless, loss is unrelated to pipe width, and it affects both downloads and calls.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/performance-quic-3.svg"
+        },
+        {
+          "id": "performance-quic-l1-mc9",
+          "type": "mcq",
+          "prompt": "Bandwidth vs latency: which matters more for a VIDEO CALL, and which for a BIG DOWNLOAD?",
+          "choices": [
+            "Low latency matters most for the video call; high bandwidth matters most for the big download",
+            "High bandwidth matters most for the video call; low latency matters most for the big download",
+            "Latency matters most for both",
+            "Bandwidth matters most for both"
+          ],
+          "answerIndex": 0,
+          "explanation": "A live video call needs messages to arrive quickly and on time, so low latency (a short pipe) matters most. A big download just needs lots of data moved, so high bandwidth (a wide pipe) matters most. Swapping them is the common mistake; and it is not the same quantity that dominates in both cases.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/performance-quic-2.svg"
+        },
+        {
+          "id": "performance-quic-l1-mc10",
+          "type": "mcq",
+          "prompt": "Someone says: \"My internet is 1000 Mbps, so my game should never lag.\" What is wrong with this reasoning?",
+          "choices": [
+            "Mbps describes bandwidth (pipe width); game lag is about latency (pipe length), which is a separate thing",
+            "Nothing is wrong; high Mbps guarantees zero lag",
+            "Mbps already includes latency, so the claim is correct",
+            "Games do not send any data over the network"
+          ],
+          "answerIndex": 0,
+          "explanation": "Mbps is a bandwidth number - how wide the pipe is. Lag is a latency problem - how long each message takes there and back. They are different, so a big Mbps figure does not promise low lag. Mbps does not bundle in latency, and games very much rely on the network; they just need it to be low-latency.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/performance-quic-2.svg"
         }
       ]
     },
@@ -101,210 +157,296 @@
       "title": "Delay, Queues & the Bandwidth-Delay Product",
       "order": 2,
       "difficulty": 2,
-      "content": "Total latency is a *sum of four delays* at every hop. **Processing delay**: the router/host examines headers and makes a forwarding decision (usually tiny). **Queuing delay**: time spent waiting in a buffer behind other packets — the variable, load-dependent term that explodes under congestion. **Serialization (transmission) delay**: time to clock the packet's bits onto the link, $d_{serial} = L / R$ for $L$ bits at rate $R$. **Propagation delay**: time for the signal to travel the distance, $d_{prop} = d / v$, where in fiber $v \\approx \\tfrac{2}{3}c \\approx 2\\times10^8\\,\\text{m/s}$. That two-thirds-of-light figure is your radar/RF timing intuition reused: a packet to a server 3000 km away eats at least $\\approx 15\\,\\text{ms}$ one-way of pure propagation, before any queuing.\n\n**Little's Law** gives queue intuition: $L = \\lambda W$ — the average number of items in a system equals arrival rate times average time in system. Rearranged, if a queue holds many packets at a given drain rate, the time-in-queue (latency) is large. You cannot fix a persistently overfull queue by waiting; you must drop or slow arrivals.\n\nThe headline tool is the **bandwidth-delay product**: $BDP = BW \\times RTT$. It is the amount of data \"in flight\" filling the pipe end-to-end — the volume of a cylinder whose cross-section is bandwidth and length is RTT. To keep a link *fully utilized*, the sender's in-flight window must be at least the BDP; otherwise it sends a burst, then idles waiting for ACKs. This is why **TCP window scaling** (RFC 7323) exists: the original 16-bit window maxes at 64 KiB, far too small for a \"long fat network.\" On a 1 Gbps link with 80 ms RTT, $BDP = 10^9 \\times 0.08 / 8 \\approx 10\\,\\text{MB}$ — you need a ~10 MB window, not 64 KiB, to fill it.",
+      "content": "**Hook.** You now know bandwidth (pipe width) and latency (pipe length) are different. The next puzzle: why does a single download sometimes run *slower* than the pipe should allow - even with no one else using it? The answer is a mix of delay, loss, and how much data you are allowed to have 'in flight' at once.\n\n**Build.** First, separate the *theoretical* speed from the *real* one. **Bandwidth** is the pipe's maximum. **Throughput** is what you actually achieve, which is always a little lower because of overhead and the effects below. So if a '1 Gbps' link only delivers, say, 600 Mbps of useful data, that is normal: the bandwidth is 1 Gbps, the throughput is 600 Mbps.\n\nNow the key idea for a single connection. To be reliable, the sender can't just blast data forever; it sends a chunk, then waits for the receiver to confirm it arrived. The amount it is allowed to send before waiting is called the **window**. Here is the catch: on a pipe that is both **wide** (high bandwidth) and **long** (high latency), a small window empties out and then sits idle, waiting for a confirmation to travel all the way back. You send a little, then twiddle your thumbs, then send a little more. The wide pipe is mostly wasted.\n\nThe plain-language rule: **a long, fat pipe needs a big window to stay full.** The exact amount of data needed to keep such a pipe completely busy has a name - the **bandwidth-delay product** - but you don't need any formula. Just picture it: the bigger the pipe (more bandwidth) and the longer it is (more round-trip time), the more data must be in flight at once to fill it. If the window is too small, that one connection simply cannot use all the bandwidth, and its speed is capped - not by the pipe, but by how much you let yourself send before pausing.\n\nLoss makes this worse. When a reliable connection sees a lost packet, it assumes the network is congested and **slows down on purpose** to be polite. On a long pipe, climbing back up to full speed takes many round trips, so even a tiny bit of loss can keep throughput well below the bandwidth.\n\nFinally, the cousin problem: **head-of-line blocking**. If data must be delivered strictly in order, then one lost packet stalls everything that arrived behind it. Packets 2, 3, and 4 may already be sitting there, perfectly fine, but they all have to wait until packet 1 is resent. One stuck item holds up the whole line.\n\n**Recap.** Throughput is the real speed (always under bandwidth). A long, fat pipe needs a big window or it sits idle. Loss makes a connection back off. And in-order delivery means one lost packet can block everything behind it - the flaw we'll see QUIC fix next.",
       "items": [
-        {
-          "id": "performance-quic-l2-fc1",
-          "type": "flashcard",
-          "front": "Name the four components of per-hop delay.",
-          "back": "Processing delay (header inspection/forwarding), queuing delay (waiting in buffer), serialization/transmission delay (clocking bits onto the link), and propagation delay (signal travel time).",
-          "hint": "Two are fixed-ish, one is load-dependent, one depends on distance."
-        },
-        {
-          "id": "performance-quic-l2-fc2",
-          "type": "flashcard",
-          "front": "Give the formulas for serialization and propagation delay.",
-          "back": "Serialization: $d_{serial} = L / R$ (packet bits over link rate). Propagation: $d_{prop} = d / v$, with $v \\approx \\tfrac{2}{3}c \\approx 2\\times10^8$ m/s in fiber."
-        },
-        {
-          "id": "performance-quic-l2-fc3",
-          "type": "flashcard",
-          "front": "State Little's Law and its queuing intuition.",
-          "back": "$L = \\lambda W$: average number in system = arrival rate × average time in system. A persistently full queue means large time-in-queue (latency); you can't drain it by waiting, you must drop or slow arrivals."
-        },
-        {
-          "id": "performance-quic-l2-fc4",
-          "type": "flashcard",
-          "front": "Define the bandwidth-delay product and what it physically represents.",
-          "back": "$BDP = BW \\times RTT$. It is the amount of data 'in flight' that fills the path end-to-end — the pipe's volume. To fully utilize a link the in-flight window must be ≥ BDP."
-        },
-        {
-          "id": "performance-quic-l2-fc5",
-          "type": "flashcard",
-          "front": "Why does TCP need window scaling on a long fat network?",
-          "back": "TCP's base 16-bit receive window maxes at 64 KiB. On high-BDP paths that is far below the BDP, so the sender idles waiting for ACKs. Window scaling (RFC 7323) shifts the window field to allow much larger windows.",
-          "hint": "16-bit field caps at 65,535 bytes."
-        },
-        {
-          "id": "performance-quic-l2-fc6",
-          "type": "flashcard",
-          "front": "Why is propagation delay irreducible, and how does it tie to radar/RF?",
-          "back": "It is set by distance over signal speed ($\\approx 2/3\\,c$ in fiber) — no faster path exists. It's the same speed-of-propagation timing that sets radar range resolution and round-trip ranging."
-        },
         {
           "id": "performance-quic-l2-mc1",
           "type": "mcq",
-          "prompt": "A 1 Gbps link has an 80 ms RTT. Roughly what in-flight window is needed to fully utilize it?",
+          "prompt": "A link is sold as '1 Gbps' but your transfer reaches about 600 Mbps of useful data. Which description fits best?",
           "choices": [
-            "About 64 KiB",
-            "About 1 MB",
-            "About 10 MB",
-            "About 1 GB"
+            "Bandwidth is about 1 Gbps; throughput (the speed actually achieved) is about 600 Mbps",
+            "Bandwidth is 600 Mbps and throughput is 1 Gbps",
+            "Throughput can never be less than bandwidth, so something is broken",
+            "The two numbers must always be equal"
           ],
-          "answerIndex": 2,
-          "explanation": "$BDP = 10^9\\,\\text{bits/s} \\times 0.08\\,\\text{s} = 8\\times10^7$ bits = $10^7$ bytes ≈ 10 MB. A 64 KiB window would leave the link mostly idle, hence window scaling."
+          "answerIndex": 0,
+          "explanation": "Bandwidth is the theoretical maximum (1 Gbps here); throughput is what you actually achieve (about 600 Mbps), and it is normally a bit lower due to overhead and limits. Throughput is always less than or equal to bandwidth, so a gap is expected, not a fault. The two are not required to match.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/performance-quic-5.svg"
         },
         {
           "id": "performance-quic-l2-mc2",
           "type": "mcq",
-          "prompt": "Serialization delay for a 12,000-bit packet on a 100 Mbps link is closest to:",
+          "prompt": "In transport terms, what is the 'window'?",
           "choices": [
-            "0.12 ms",
-            "1.2 ms",
-            "12 ms",
-            "120 ms"
+            "How much data the sender may send before it must wait for the receiver to confirm it arrived",
+            "The width of the pipe in bits per second",
+            "The total size of the file being transferred",
+            "The number of different servers you can connect to"
           ],
           "answerIndex": 0,
-          "explanation": "$d_{serial} = L/R = 12000 / 10^8 = 1.2\\times10^{-4}$ s = 0.12 ms."
+          "explanation": "The window is how much data is allowed 'in flight' before the sender pauses to wait for confirmation. It is not the pipe's width (that's bandwidth), not the file size, and not a count of servers. The window size is what often limits a single connection on a long, fat pipe.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/performance-quic-5.svg"
         },
         {
           "id": "performance-quic-l2-mc3",
           "type": "mcq",
-          "prompt": "Which delay term is the one that spikes under congestion and causes load-dependent latency?",
+          "prompt": "Why does a single connection over a wide AND long pipe sometimes leave most of the bandwidth unused?",
           "choices": [
-            "Propagation delay",
-            "Serialization delay",
-            "Queuing delay",
-            "Processing delay"
+            "With a small window, the sender ships a little then sits idle waiting for a far-away confirmation, so the pipe stays mostly empty",
+            "Because a wide pipe automatically blocks long-distance traffic",
+            "Because high latency physically narrows the pipe",
+            "Because throughput is always larger than bandwidth"
           ],
-          "answerIndex": 2,
-          "explanation": "Queuing delay grows as buffers fill behind other traffic; the other three are roughly fixed for a given packet, distance, and link rate."
+          "answerIndex": 0,
+          "explanation": "On a long, fat pipe a small window empties quickly, then the sender waits a full round trip for confirmation before sending more - so the pipe idles and bandwidth is wasted. A wide pipe does not block long-distance traffic, latency does not change the pipe's width, and throughput never exceeds bandwidth.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/performance-quic-5.svg"
         },
         {
           "id": "performance-quic-l2-mc4",
           "type": "mcq",
-          "prompt": "A server is 3,000 km away over fiber. The minimum one-way propagation delay is closest to:",
+          "prompt": "What is the plain-language rule about long, fat pipes (the bandwidth-delay product idea)?",
           "choices": [
-            "1.5 ms",
-            "15 ms",
-            "150 ms",
-            "1.5 s"
+            "The wider and longer the pipe, the bigger the window must be to keep it full",
+            "The wider the pipe, the smaller the window you need",
+            "Latency has no effect on how much data must be in flight",
+            "You should keep the window as tiny as possible on fast links"
           ],
-          "answerIndex": 1,
-          "explanation": "$d_{prop} = d/v = 3\\times10^6\\,\\text{m} / (2\\times10^8\\,\\text{m/s}) = 0.015$ s = 15 ms one-way, regardless of bandwidth."
+          "answerIndex": 0,
+          "explanation": "More bandwidth (wider) and more round-trip time (longer) both increase how much data must be in flight at once to keep the pipe full - that combined amount is the bandwidth-delay product. A wider or longer pipe needs a bigger window, not a smaller one, and latency very much affects the needed in-flight amount.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/performance-quic-5.svg"
+        },
+        {
+          "id": "performance-quic-l2-mc5",
+          "type": "mcq",
+          "prompt": "If the window is too small for a long, fat pipe, what happens to that one connection's speed?",
+          "choices": [
+            "It is capped below the pipe's capacity, because the sender keeps pausing to wait for confirmations",
+            "It speeds up beyond the pipe's bandwidth",
+            "It is unaffected; window size never matters",
+            "It becomes exactly equal to the bandwidth"
+          ],
+          "answerIndex": 0,
+          "explanation": "A too-small window forces frequent pauses while confirmations travel back, so the connection cannot fill the pipe and its speed is capped below capacity. It cannot exceed the bandwidth, window size clearly does matter here, and it will not magically land exactly at the bandwidth.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/performance-quic-5.svg"
+        },
+        {
+          "id": "performance-quic-l2-mc6",
+          "type": "mcq",
+          "prompt": "When a reliable connection notices a lost packet, what does it typically do, and why?",
+          "choices": [
+            "It slows down on purpose, treating loss as a sign of congestion, to avoid making things worse",
+            "It speeds up to push the lost packet through faster",
+            "It ignores the loss entirely and changes nothing",
+            "It permanently disconnects"
+          ],
+          "answerIndex": 0,
+          "explanation": "Reliable transports read loss as a hint that the network is congested, so they back off and slow down to be good citizens. They do not speed up on loss, they do not ignore it (the data must be resent), and a single loss does not end the connection.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/performance-quic-5.svg"
+        },
+        {
+          "id": "performance-quic-l2-mc7",
+          "type": "mcq",
+          "prompt": "Why can even a small amount of loss keep throughput well below the bandwidth on a long path?",
+          "choices": [
+            "After backing off, the connection takes many round trips to climb back to full speed, and round trips are slow on a long path",
+            "Loss makes the bandwidth permanently smaller",
+            "A long path has no round trips, so loss is free",
+            "Loss only affects very short connections"
+          ],
+          "answerIndex": 0,
+          "explanation": "Each loss makes the connection slow down, and on a high-latency path it takes many slow round trips to ramp back up - so throughput stays below the bandwidth. Loss does not shrink the underlying bandwidth, long paths have especially costly round trips (not zero), and loss matters most exactly on these long paths.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/performance-quic-5.svg"
+        },
+        {
+          "id": "performance-quic-l2-mc8",
+          "type": "mcq",
+          "prompt": "What is head-of-line blocking?",
+          "choices": [
+            "When in-order delivery means one lost packet stalls all the packets that arrived behind it",
+            "When the pipe is too narrow to carry any data",
+            "When two people use the same connection at once",
+            "When a server is physically far away"
+          ],
+          "answerIndex": 0,
+          "explanation": "Head-of-line blocking is the queue problem: if data must be delivered strictly in order, a single missing packet holds up everything behind it until it is resent - even though those later packets already arrived. It is not about pipe width, sharing a connection, or distance; it is specifically about one stuck item blocking the line.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/performance-quic-4.svg"
+        },
+        {
+          "id": "performance-quic-l2-mc9",
+          "type": "mcq",
+          "prompt": "Packets 2, 3, and 4 have all arrived safely, but packet 1 was lost. Under strict in-order delivery, what happens?",
+          "choices": [
+            "Packets 2-4 must wait, unusable, until packet 1 is resent and arrives",
+            "Packets 2-4 are delivered immediately and packet 1 is skipped",
+            "All four packets are thrown away",
+            "Packet 1 is delivered out of the lost data automatically with no resend"
+          ],
+          "answerIndex": 0,
+          "explanation": "With in-order delivery, nothing past the gap can be handed over until the gap is filled, so 2-4 wait for packet 1 to be resent - the essence of head-of-line blocking. The later packets are not skipped ahead or discarded, and a lost packet genuinely has to be resent; it cannot be conjured back without one.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/performance-quic-4.svg"
+        },
+        {
+          "id": "performance-quic-l2-mc10",
+          "type": "mcq",
+          "prompt": "Two pipes carry the same bandwidth, but pipe B has a much longer round-trip time. To stay full, how do their window needs compare?",
+          "choices": [
+            "Pipe B needs a larger window, because more data must be in flight to cover the longer round trip",
+            "Pipe B needs a smaller window, because longer pipes need less data",
+            "They need exactly the same window, since bandwidth is equal",
+            "Neither pipe needs any window at all"
+          ],
+          "answerIndex": 0,
+          "explanation": "A longer round trip means data is 'on the road' longer before confirmation returns, so more must be in flight to keep the pipe full - pipe B needs the bigger window. Equal bandwidth does not make the window needs equal once latency differs, and a window is always needed for reliable sending.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/performance-quic-5.svg"
         }
       ]
     },
     {
       "id": "performance-quic-l3",
-      "title": "Bufferbloat, AQM, Congestion Control & QUIC",
+      "title": "QUIC, HTTP/3 & Cutting Latency in the Real World",
       "order": 3,
       "difficulty": 3,
-      "content": "**Bufferbloat** is the under-appreciated latency killer: vendors oversized buffers so big that a bulk flow fills them and every other packet waits behind a queue that may hold seconds of data. Latency under load balloons even though throughput looks fine — a saturated uplink can push ping from 20 ms to 1000 ms. The fix is **Active Queue Management (AQM)**: instead of a dumb tail-drop FIFO, the queue manages itself. **CoDel** targets *sojourn time* (how long a packet sat in queue) and drops when it stays high, signaling senders to slow before the buffer bloats. **FQ-CoDel** adds fair queuing so a bulk flow can't starve an interactive one; **CAKE** bundles FQ-CoDel with shaping and per-host fairness for home routers. **ECN** (Explicit Congestion Notification) lets a router *mark* a packet (set a bit) instead of dropping it, signaling congestion without a retransmit — a cleaner feedback channel.\n\n**Congestion control** then decides the sending rate. **CUBIC** (Linux default) is *loss-based*: it grows the window along a cubic curve and treats packet loss as the congestion signal, so it tends to fill (and bloat) buffers before backing off. **BBR** is *model-based*: it probes for the bottleneck **bandwidth** and minimum **RTT** and paces to that estimate, keeping queues short. BBR can win throughput on lossy paths but raises fairness debates when sharing links with CUBIC.\n\n**QUIC** (RFC 9000) is the modern transport: a reliable, congestion-controlled, encrypted protocol built *on UDP, in user space*. It folds the transport handshake and **TLS 1.3** into one exchange (**1-RTT** setup, **0-RTT** on resumption), multiplexes independent **streams** so one lost packet doesn't head-of-line-block the others (TCP's flaw under HTTP/2), and supports **connection migration** — a connection ID survives an IP change, so a phone moving from WiFi to cellular keeps its session. User-space implementation lets transport evolve without kernel upgrades. **MPTCP** and **multipath QUIC** extend this to use several paths (WiFi + cellular) at once for aggregation or seamless failover.",
+      "content": "**Hook.** You have met the two big costs: round trips (each handshake adds an RTT) and head-of-line blocking (one lost packet stalls the rest). **QUIC** is a modern transport built to attack exactly these problems - and it is what powers **HTTP/3**, the newest version of the web's main protocol.\n\n**Build.** QUIC is built **on UDP**. Recall UDP is the bare-bones, send-it-and-forget-it transport with no reliability of its own. QUIC adds back the good parts of TCP (reliability, ordering, being a polite network citizen) plus encryption, but in a fresh design. Four wins:\n\n1. **Fewer round trips to start.** With the old way you first do a handshake to set up the TCP connection, then a *separate* handshake to set up encryption (TLS) - two back-and-forths before any real data. QUIC merges connection setup and encryption setup into one step, so it is usually just **one round trip (1-RTT)**, and often **zero round trips (0-RTT)** when you reconnect to a site you visited recently. Fewer round trips is like combining several errands into a single trip.\n\n2. **Independent streams (no head-of-line blocking).** A web page is many things at once - text, images, scripts. QUIC carries each as its own **stream** with its own line. If one stream loses a packet, only that stream waits; the others keep flowing. This directly fixes TCP's flaw, where everything shared one line and one lost packet froze it all.\n\n3. **Connection migration.** A QUIC connection isn't tied to your exact network address, so it can *survive a network change*. When your phone walks out of Wi-Fi range and switches to cellular, the connection keeps going instead of dropping and starting over.\n\n4. **HTTP/3 = HTTP over QUIC.** That's the whole headline. HTTP/3 is just the web's familiar request-and-response protocol running on top of QUIC, so the web inherits all of the above.\n\n**Build (the rest of 'fast').** QUIC isn't the only way to cut latency, and these tricks don't change physics - they shorten the distance or shrink the data:\n\n- **CDNs** keep copies of content on servers near you. A nearby copy means a shorter round trip, so the page feels faster. (A CDN is a network of these nearby 'edge' servers.)\n- **Caching** means reusing a saved copy instead of fetching it again - no round trip needed at all if you already have it.\n- **Compression** sends fewer bytes, which helps especially on slower or narrower links.\n\n**Build (be a good citizen).** One recap from earlier: every sensible transport, QUIC included, does **congestion control** - it watches for signs of loss and **backs off** when the network looks overloaded, instead of bullying its way through. Politely slowing down on loss is what keeps the shared internet working for everyone.\n\n**Recap.** QUIC runs on UDP and merges connection + encryption setup into fewer round trips (1-RTT, often 0-RTT), gives each stream its own line so one loss doesn't block the rest, and can survive a Wi-Fi-to-cellular switch. HTTP/3 is simply HTTP over QUIC. CDNs, caching, and compression cut latency by shortening the path or shrinking the data, and good transports always back off politely when the network is congested.",
       "items": [
-        {
-          "id": "performance-quic-l3-fc1",
-          "type": "flashcard",
-          "front": "What is bufferbloat and what symptom reveals it?",
-          "back": "Oversized network buffers fill with a bulk flow, so all traffic waits behind seconds of queued data. Symptom: latency under load explodes (e.g. ping jumps from 20 ms to hundreds of ms) while throughput still looks fine.",
-          "hint": "Latency-under-load, not throughput."
-        },
-        {
-          "id": "performance-quic-l3-fc2",
-          "type": "flashcard",
-          "front": "How does CoDel decide to drop, and what does FQ-CoDel add?",
-          "back": "CoDel watches packet sojourn time (time spent in queue) and drops when it stays above target, signaling senders before the buffer bloats. FQ-CoDel adds fair queuing so a bulk flow can't starve interactive flows."
-        },
-        {
-          "id": "performance-quic-l3-fc3",
-          "type": "flashcard",
-          "front": "What does ECN do differently from a normal drop?",
-          "back": "ECN lets a router mark a packet (set a congestion bit) instead of dropping it. The sender learns of congestion and slows down without losing the packet or paying a retransmit."
-        },
-        {
-          "id": "performance-quic-l3-fc4",
-          "type": "flashcard",
-          "front": "Contrast CUBIC and BBR congestion control.",
-          "back": "CUBIC is loss-based: grows the window on a cubic curve and treats loss as the congestion signal, tending to fill buffers. BBR is model-based: estimates bottleneck bandwidth and min RTT and paces to it, keeping queues short."
-        },
-        {
-          "id": "performance-quic-l3-fc5",
-          "type": "flashcard",
-          "front": "What is QUIC, in one sentence, and on what does it run?",
-          "back": "QUIC (RFC 9000) is a reliable, congestion-controlled, TLS 1.3-encrypted transport with multiplexed streams, implemented in user space on top of UDP."
-        },
-        {
-          "id": "performance-quic-l3-fc6",
-          "type": "flashcard",
-          "front": "What does QUIC connection migration solve, and how?",
-          "back": "A QUIC connection is identified by a connection ID, not the IP/port 4-tuple, so it survives an IP change. A phone moving from WiFi to cellular keeps the same session without re-handshaking."
-        },
         {
           "id": "performance-quic-l3-mc1",
           "type": "mcq",
-          "prompt": "What does QUIC improve over TCP + TLS 1.3 + HTTP/2? (Pick the most complete answer.)",
+          "prompt": "What does QUIC improve over the old TCP + TLS approach? (Pick the most complete answer.)",
           "choices": [
-            "Nothing functional — it's only an encoding change",
-            "Combined transport+TLS handshake (1-RTT/0-RTT), per-stream multiplexing without transport head-of-line blocking, and connection migration across IP changes",
-            "It removes encryption to go faster",
-            "It runs in the kernel for lower latency than TCP"
+            "Fewer round trips to start (it merges connection and encryption setup), independent streams so one loss doesn't block the rest, and the ability to survive a network change",
+            "Nothing real - it is only a cosmetic rename of TCP",
+            "It removes encryption so it can go faster",
+            "It makes the pipe physically wider to add bandwidth"
           ],
-          "answerIndex": 1,
-          "explanation": "HTTP/2 multiplexes streams over one TCP connection, but a single lost segment stalls all streams (transport HOL blocking), and setup needs separate TCP then TLS round trips. QUIC merges the handshake (1-RTT, 0-RTT on resume), gives independent streams so loss affects only its own stream, and migrates connections via connection ID. It runs in user space, not kernel.",
-          "hint": "Think handshake RTTs, HOL blocking, mobility.",
-          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/performance-quic-1.svg"
+          "answerIndex": 0,
+          "explanation": "QUIC's wins are exactly these: it combines the connection and encryption handshakes into fewer round trips, gives each stream its own line to avoid head-of-line blocking, and can keep a connection alive across a network change. It is not a rename, it keeps encryption (it builds it in), and it does not change the underlying bandwidth of the link.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/performance-quic-6.svg"
         },
         {
           "id": "performance-quic-l3-mc2",
           "type": "mcq",
-          "prompt": "Why does a loss-based controller like CUBIC tend to worsen bufferbloat?",
+          "prompt": "QUIC is built on top of which transport?",
           "choices": [
-            "It paces strictly to estimated bandwidth",
-            "It keeps growing its window until a packet is dropped, which only happens after the buffer is full",
-            "It marks packets with ECN instead of dropping",
-            "It never retransmits"
+            "UDP",
+            "TCP",
+            "It replaces IP entirely",
+            "It uses no transport at all"
           ],
-          "answerIndex": 1,
-          "explanation": "CUBIC uses loss as its signal, so it must fill the buffer (often a bloated one) before it sees a drop and backs off — maximizing queue occupancy and latency."
+          "answerIndex": 0,
+          "explanation": "QUIC runs on UDP, the minimal send-and-forget transport, and adds reliability, ordering, and encryption back on top in its own design. It deliberately does not run on TCP (avoiding TCP's single-line head-of-line blocking), it still rides over IP rather than replacing it, and it absolutely uses a transport - that transport is UDP plus QUIC's own logic.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/performance-quic-6.svg"
         },
         {
           "id": "performance-quic-l3-mc3",
           "type": "mcq",
-          "prompt": "HTTP/2 over TCP still suffers head-of-line blocking because:",
+          "prompt": "Why does the old 'TCP, then TLS' sequence cost more round trips than QUIC's setup?",
           "choices": [
-            "TLS encrypts the stream identifiers",
-            "TCP delivers a single in-order byte stream, so one lost segment stalls every multiplexed stream until it is retransmitted",
-            "HPACK header compression serializes requests",
-            "UDP reorders packets"
+            "It does two separate handshakes (connect, then encrypt) before real data; QUIC merges them into one",
+            "TCP and TLS each take zero round trips, so QUIC must be slower",
+            "QUIC adds an extra handshake on top of TCP and TLS",
+            "TLS makes the pipe longer, adding latency"
           ],
-          "answerIndex": 1,
-          "explanation": "HTTP/2 multiplexes logical streams over one TCP connection, but TCP guarantees a single in-order byte stream, so a lost segment blocks delivery of all streams behind it. QUIC's per-stream delivery fixes this."
+          "answerIndex": 0,
+          "explanation": "The old way runs a connection handshake and then a separate encryption handshake - two back-and-forths before any data. QUIC folds those into a single combined step, usually 1-RTT and often 0-RTT on reconnect. TCP and TLS handshakes are not free, QUIC removes rather than adds handshakes, and TLS does not change the physical length of the path.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/performance-quic-6.svg"
         },
         {
           "id": "performance-quic-l3-mc4",
           "type": "mcq",
-          "prompt": "What advantage does implementing QUIC in user space (over UDP) provide?",
+          "prompt": "What do '1-RTT' and '0-RTT' mean for QUIC's connection setup?",
           "choices": [
-            "It bypasses congestion control entirely",
-            "Transport logic can evolve and deploy with the application, without waiting for OS kernel upgrades",
-            "It guarantees lower propagation delay",
-            "It eliminates the need for TLS"
+            "1-RTT means about one round trip to get going; 0-RTT means roughly none when reconnecting to a recently visited site",
+            "1-RTT means one gigabit per second; 0-RTT means no bandwidth",
+            "They describe how many packets are lost during setup",
+            "They are names for two different encryption ciphers"
           ],
-          "answerIndex": 1,
-          "explanation": "Because QUIC lives in user space atop UDP, browsers and servers ship transport improvements with app updates rather than depending on slow, fleet-wide kernel TCP-stack changes."
+          "answerIndex": 0,
+          "explanation": "RTT here counts round trips: 1-RTT is one there-and-back to establish the connection, and 0-RTT lets a returning client start sending almost immediately because some setup is remembered. They are not bandwidth figures (RTT is about time, not Mbps), not loss counts, and not cipher names.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/performance-quic-6.svg"
         },
         {
           "id": "performance-quic-l3-mc5",
           "type": "mcq",
-          "prompt": "MPTCP and multipath QUIC primarily enable:",
+          "prompt": "How do QUIC's independent streams fix head-of-line blocking?",
           "choices": [
-            "Encrypting the IP header",
-            "Using multiple network paths (e.g. WiFi + cellular) at once for aggregation or seamless failover",
-            "Removing the need for congestion control",
-            "Compressing application payloads"
+            "Each stream has its own line, so a lost packet stalls only that stream while the others keep flowing",
+            "They forbid any packet from ever being lost",
+            "They force all data onto one shared line for speed",
+            "They turn off ordering completely, so nothing is reliable"
           ],
-          "answerIndex": 1,
-          "explanation": "Multipath transports spread or fail over a single logical connection across several paths/interfaces, increasing throughput or resilience — valuable on mobile devices with both WiFi and cellular."
+          "answerIndex": 0,
+          "explanation": "QUIC gives each stream its own independent line, so a loss in one stream holds up only that stream - the rest keep moving. It cannot prevent loss from ever happening, it does the opposite of forcing one shared line (that shared line was TCP's problem), and it still delivers each stream reliably and in order.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/performance-quic-7.svg"
+        },
+        {
+          "id": "performance-quic-l3-mc6",
+          "type": "mcq",
+          "prompt": "What does QUIC's connection migration let you do?",
+          "choices": [
+            "Keep the same connection alive when your phone switches from Wi-Fi to cellular",
+            "Move your files to a different server automatically",
+            "Increase the bandwidth of your link on demand",
+            "Skip encryption to migrate faster"
+          ],
+          "answerIndex": 0,
+          "explanation": "Because a QUIC connection is not tied to one exact network address, it can survive a network change - so a phone moving from Wi-Fi to cellular keeps the same session instead of dropping it. It is about preserving the connection, not relocating files, not boosting bandwidth, and not removing encryption.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/performance-quic-7.svg"
+        },
+        {
+          "id": "performance-quic-l3-mc7",
+          "type": "mcq",
+          "prompt": "What is HTTP/3, in one line?",
+          "choices": [
+            "HTTP running over QUIC",
+            "A brand-new language that replaces HTTP entirely",
+            "HTTP running directly over raw TCP with no changes",
+            "A type of cable used in data centers"
+          ],
+          "answerIndex": 0,
+          "explanation": "HTTP/3 is simply the familiar HTTP request-and-response protocol carried over QUIC, so the web gains QUIC's fewer round trips and independent streams. It is not a replacement language for HTTP, it specifically does not run over plain TCP (that's what HTTP/1 and HTTP/2 do), and it is software, not hardware.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/performance-quic-6.svg"
+        },
+        {
+          "id": "performance-quic-l3-mc8",
+          "type": "mcq",
+          "prompt": "How does a CDN (content delivery network) make a website feel faster?",
+          "choices": [
+            "It keeps copies of content on servers near you, so the round trip is shorter",
+            "It increases the speed of light so packets travel faster",
+            "It deletes the website's images to save bandwidth",
+            "It forces every request to travel to one distant server"
+          ],
+          "answerIndex": 0,
+          "explanation": "A CDN places copies of content on 'edge' servers close to users, shortening the path and therefore the round-trip time, so pages load faster. It cannot change physics like the speed of light, it serves content rather than deleting it, and its whole point is to avoid sending every request to one far-away server.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/performance-quic-8.svg"
+        },
+        {
+          "id": "performance-quic-l3-mc9",
+          "type": "mcq",
+          "prompt": "Caching and compression both help speed, but in different ways. Which pairing is correct?",
+          "choices": [
+            "Caching reuses a saved copy (often no round trip needed); compression sends fewer bytes",
+            "Caching sends fewer bytes; compression makes the pipe wider",
+            "Both of them increase the round-trip time on purpose",
+            "Both of them only work on QUIC and never on TCP"
+          ],
+          "answerIndex": 0,
+          "explanation": "Caching means reusing a copy you already have, which can avoid a fetch entirely; compression means shrinking the data so fewer bytes travel. Caching is not the byte-shrinking one (that's compression), compression does not widen the pipe, neither aims to add delay, and both work regardless of the transport.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/performance-quic-8.svg"
+        },
+        {
+          "id": "performance-quic-l3-mc10",
+          "type": "mcq",
+          "prompt": "Congestion control is often summarized as 'be a good citizen.' What does that mean in practice?",
+          "choices": [
+            "When the network shows signs of being overloaded (like loss), the sender backs off and slows down instead of forcing data through",
+            "The sender always sends as fast as physically possible, ignoring everyone else",
+            "The sender stops using encryption when the network is busy",
+            "The sender speeds up whenever it detects loss"
+          ],
+          "answerIndex": 0,
+          "explanation": "Congestion control means reacting to signs of overload - especially loss - by slowing down, so the shared network keeps working for everyone. Blasting at full speed regardless of others is the opposite of good citizenship, encryption is unrelated to backing off, and a good citizen slows down on loss rather than speeding up.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/performance-quic-7.svg"
         }
       ]
     }
