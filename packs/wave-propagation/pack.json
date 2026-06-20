@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "id": "wave-propagation",
   "title": "Wave Propagation",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "Electromagnetic waves from scratch (beginner rework in progress): 13 sub-topics from fields and Maxwell through plane waves, transmission lines, the Smith chart, antennas, beamforming, propagation and link budgets. Physical intuition first with the heavy math turned into plain ideas; MCQ practice and diagrams, tiered easy to hard.",
   "requires": [
     "mathematics"
@@ -3174,407 +3174,969 @@
       "lessons": [
         {
           "id": "smith-chart-smith-chart-l1",
-          "title": "Why Match: Power Transfer, Reflections & VSWR",
+          "title": "What the Smith Chart Is and Why It Exists",
           "order": 1,
           "difficulty": 1,
-          "content": "Before any chart, fix *why* matching matters. Three reasons, all things you metered as a radar tech.\n\n**Maximum power transfer.** A source with internal impedance $Z_S$ delivers the most power into a load when $Z_L = Z_S^*$ (the complex conjugate). For a real $50\\,\\Omega$ system that just means $Z_L = 50\\,\\Omega$. Mismatch wastes power as reflection rather than delivering it to the antenna.\n\n**Minimize reflections.** On a line of characteristic impedance $Z_0$, a load reflects a wave with reflection coefficient $\\Gamma_L = \\frac{Z_L - Z_0}{Z_L + Z_0}$. A matched load ($Z_L = Z_0$) gives $\\Gamma_L = 0$: nothing comes back. Reflected power can desensitize receivers, cause amplitude/phase ripple, and at high power can damage the source.\n\n**VSWR.** The forward and reflected waves interfere to form a standing wave whose voltage swings between maxima and minima. The ratio is\n$$\\text{VSWR} = \\frac{1 + |\\Gamma|}{1 - |\\Gamma|}.$$\nA perfect match is VSWR $= 1{:}1$ ($|\\Gamma|=0$); a total reflection (open/short) is $\\infty{:}1$ ($|\\Gamma|=1$). Return loss in dB is $\\text{RL} = -20\\log_{10}|\\Gamma|$.\n\nRule-of-thumb anchors worth memorizing: VSWR $2{:}1 \\Rightarrow |\\Gamma| \\approx 0.33$, RL $\\approx 9.5$ dB, about $11\\%$ of power reflected. VSWR $1.5{:}1 \\Rightarrow |\\Gamma| = 0.2$, RL $\\approx 14$ dB. These four quantities — $Z$, $\\Gamma$, VSWR, RL — are interchangeable descriptions of one mismatch, and the whole point of the Smith chart is to read all of them off a single plot.",
+          "content": "**Hook.** Suppose you have a radio and an antenna, and you want all the signal to flow smoothly from one to the other. From the last topic you know the goal: the two should *match* (have the same impedance, around 50 ohms) so no signal bounces back. The hard part is figuring out *how mismatched* things are and *what to add* to fix it. The **Smith chart** is the clever picture engineers invented to answer both questions without doing heavy algebra.\n\n**Build.** A quick reminder of two words. **Impedance** (measured in ohms, symbol Ω) is how strongly a part pushes back on a signal. A **match** means the antenna's impedance equals the cable's (about 50 ohms), so the signal flows on cleanly with no reflection; a **mismatch** means they differ, so some signal bounces back as a wasteful echo.\n\nThe Smith chart is a special *circular* graph. Think of it as a **map you read positions off**, like a subway map: the subway map is distorted and not to scale, but you can still read where you are and which way to go. On the Smith chart, the **center of the circle means a perfect match** (the goal), and the **outer edge means total reflection** (the worst case, where all the signal bounces back). How far your situation sits *from the center* tells you how badly things are mismatched: dead center is perfect, near the edge is terrible.\n\nWhy does this picture exist? Before computers, the math of matching was slow and painful. The Smith chart let an engineer plot a single dot and simply *read off* how bad the mismatch was and how to improve it. It is still how modern radio tools *show* a match today.\n\n**Recap.** The Smith chart is a circular map for handling impedance matching by eye instead of by algebra: center means a perfect match, the edge means total reflection, and distance from center shows how mismatched you are.",
           "items": [
             {
-              "id": "smith-chart-l1-fc1",
-              "type": "flashcard",
-              "front": "For maximum power transfer, what should the load impedance equal?",
-              "back": "The complex conjugate of the source impedance, $Z_L = Z_S^*$. In a real $50\\,\\Omega$ system this is simply $Z_L = 50\\,\\Omega$.",
-              "hint": "It's a conjugate, not just equality."
-            },
-            {
-              "id": "smith-chart-l1-fc2",
-              "type": "flashcard",
-              "front": "Write the load reflection coefficient in terms of $Z_L$ and $Z_0$.",
-              "back": "$\\Gamma_L = \\dfrac{Z_L - Z_0}{Z_L + Z_0}$. It is zero when $Z_L = Z_0$ (matched) and has magnitude 1 for a pure open or short.",
-              "hint": "Difference over sum, normalized by $Z_0$."
-            },
-            {
-              "id": "smith-chart-l1-fc3",
-              "type": "flashcard",
-              "front": "Give the VSWR formula in terms of $|\\Gamma|$.",
-              "back": "$\\text{VSWR} = \\dfrac{1 + |\\Gamma|}{1 - |\\Gamma|}$. Range is $1$ (matched) to $\\infty$ (total reflection).",
-              "hint": "One plus over one minus."
-            },
-            {
-              "id": "smith-chart-l1-fc4",
-              "type": "flashcard",
-              "front": "How is return loss (dB) related to $|\\Gamma|$?",
-              "back": "$\\text{RL} = -20\\log_{10}|\\Gamma|$ dB. Larger RL means a better match (less reflected). RL $= \\infty$ for a perfect match.",
-              "hint": "It is a voltage ratio, so $20\\log$."
-            },
-            {
-              "id": "smith-chart-l1-fc5",
-              "type": "flashcard",
-              "front": "What |\\Gamma|, return loss, and reflected-power fraction correspond to VSWR 2:1?",
-              "back": "$|\\Gamma| \\approx 0.33$, return loss $\\approx 9.5$ dB, and about $11\\%$ ($|\\Gamma|^2$) of incident power reflected.",
-              "hint": "Reflected power fraction is $|\\Gamma|^2$."
-            },
-            {
-              "id": "smith-chart-l1-mcq1",
+              "id": "smith-chart-l1-mc1",
               "type": "mcq",
-              "prompt": "A $50\\,\\Omega$ line is terminated in $100\\,\\Omega$ (purely real). What is $|\\Gamma_L|$?",
+              "prompt": "In one sentence, what is the Smith chart FOR?",
               "choices": [
-                "0.50",
-                "0.33",
-                "0.67",
-                "0.20"
+                "It is a circular map for handling impedance matching by eye, instead of doing heavy algebra",
+                "It is a tool for measuring the length of a cable in meters",
+                "It is a graph of how much a battery's voltage drops over time",
+                "It is a chart that lists the colors used on different cables"
               ],
-              "answerIndex": 1,
-              "explanation": "$\\Gamma_L = (100-50)/(100+50) = 50/150 = 0.333$. This corresponds to VSWR $2{:}1$."
+              "answerIndex": 0,
+              "explanation": "The whole purpose of the Smith chart is visual impedance matching: it lets you see how mismatched something is and what to add to fix it, without grinding through equations. It has nothing to do with cable length, battery voltage, or cable colors.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-3.svg"
             },
             {
-              "id": "smith-chart-l1-mcq2",
+              "id": "smith-chart-l1-mc2",
               "type": "mcq",
-              "prompt": "Which condition gives the lowest VSWR?",
+              "prompt": "On the Smith chart, what does the CENTER of the circle represent?",
               "choices": [
-                "$|\\Gamma| = 1$",
-                "$Z_L = Z_0$",
-                "An open circuit",
-                "A shorted line"
+                "A perfect match (the goal)",
+                "Total reflection, the worst case",
+                "A broken or disconnected cable",
+                "The highest possible signal power"
               ],
-              "answerIndex": 1,
-              "explanation": "$Z_L = Z_0$ makes $\\Gamma = 0$ and VSWR $= 1{:}1$. Open, short, and $|\\Gamma|=1$ all give infinite VSWR."
+              "answerIndex": 0,
+              "explanation": "The center is the bullseye: a perfect match, where the signal flows on with no reflection. That is the spot every matching job is trying to reach. Total reflection is the opposite, and it sits out at the edge.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-3.svg"
             },
             {
-              "id": "smith-chart-l1-mcq3",
+              "id": "smith-chart-l1-mc3",
               "type": "mcq",
-              "prompt": "Roughly what fraction of incident power is reflected at VSWR $1.5{:}1$ ($|\\Gamma| = 0.2$)?",
+              "prompt": "On the Smith chart, what does the outer EDGE of the circle represent?",
               "choices": [
-                "About 20%",
-                "About 4%",
-                "About 11%",
-                "About 0.4%"
+                "Total reflection, where essentially all the signal bounces back",
+                "A perfect match with no reflection",
+                "The exact center value of 50 ohms",
+                "A point where the chart cannot be read"
               ],
-              "answerIndex": 1,
-              "explanation": "Reflected power fraction is $|\\Gamma|^2 = 0.2^2 = 0.04 = 4\\%$. Return loss is about 14 dB."
+              "answerIndex": 0,
+              "explanation": "The rim of the chart is the worst case: total reflection, where the signal cannot get through and bounces straight back. A perfect match is the opposite of this and sits at the center.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-3.svg"
             },
             {
-              "id": "smith-chart-l1-mcq4",
+              "id": "smith-chart-l1-mc4",
               "type": "mcq",
-              "prompt": "Why is reflected power a problem at the output of a high-power transmitter?",
+              "prompt": "What does the DISTANCE of a point from the center of the chart tell you?",
               "choices": [
-                "It increases antenna gain",
-                "It can overheat or damage the final stage and causes ripple",
-                "It improves the noise figure",
-                "It has no practical effect"
+                "How badly the load is mismatched: center is perfect, near the edge is terrible",
+                "The temperature of the cable",
+                "How many components are in the circuit",
+                "The exact frequency of the signal in hertz"
               ],
-              "answerIndex": 1,
-              "explanation": "Reflected energy returns to the source, stressing the final amplifier and creating amplitude/phase ripple; severe mismatch can destroy the device."
+              "answerIndex": 0,
+              "explanation": "Distance from center is the chart's mismatch meter. Right at the center means a perfect match; the farther out the point sits, the worse the mismatch, until the edge means total reflection. It does not measure temperature, component count, or frequency.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-3.svg"
+            },
+            {
+              "id": "smith-chart-l1-mc5",
+              "type": "mcq",
+              "prompt": "Why was the Smith chart so useful BEFORE computers were common?",
+              "choices": [
+                "It let an engineer plot one dot and read off the mismatch instead of doing slow, painful math",
+                "It could power a radio without any electricity",
+                "It automatically built the antenna for you",
+                "It replaced the need for any cables at all"
+              ],
+              "answerIndex": 0,
+              "explanation": "Before calculators and computers, the matching math was tedious. The chart turned it into plotting a dot and reading its position, which was far faster by hand. It does not generate power, build hardware, or remove the need for cables.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-3.svg"
+            },
+            {
+              "id": "smith-chart-l1-mc6",
+              "type": "mcq",
+              "prompt": "The lesson compares the Smith chart to a subway map. What is the point of that comparison?",
+              "choices": [
+                "It is a distorted-but-useful diagram you read positions off, not a literal scale drawing",
+                "It shows the exact real-world distance between every two points",
+                "It tells you what time the next train arrives",
+                "It proves the chart is only about transportation"
+              ],
+              "answerIndex": 0,
+              "explanation": "Like a subway map, the Smith chart is not drawn to true scale, but you can still read where you are and which way to move. That 'read your position off a useful diagram' idea is exactly how the chart is used. It is an analogy, not a claim about trains.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-3.svg"
+            },
+            {
+              "id": "smith-chart-l1-mc7",
+              "type": "mcq",
+              "prompt": "What does it mean for an antenna and its cable to be 'matched'?",
+              "choices": [
+                "Their impedances are equal (about 50 ohms), so the signal flows on with no reflection",
+                "They are painted the same color",
+                "They are exactly the same physical length",
+                "The antenna is turned off"
+              ],
+              "answerIndex": 0,
+              "explanation": "A match means equal impedance (around 50 ohms in most radio gear), so the signal passes cleanly with nothing bouncing back. Matching is about impedance, not color, length, or whether the device is on.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-3.svg"
+            },
+            {
+              "id": "smith-chart-l1-mc8",
+              "type": "mcq",
+              "prompt": "Is the Smith chart still used today now that computers are everywhere?",
+              "choices": [
+                "Yes, it is still how modern radio tools visually display a match",
+                "No, it was thrown out the moment calculators appeared",
+                "Only for decorating engineering offices",
+                "Only in cars, never in radios"
+              ],
+              "answerIndex": 0,
+              "explanation": "Computers do the arithmetic now, but the Smith chart survives because it is such a clear way to *see* a match. Modern RF instruments and software still draw it on screen. It was not discarded and it is genuinely used, not decorative.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-3.svg"
             }
           ]
         },
         {
           "id": "smith-chart-smith-chart-l2",
-          "title": "The Smith Chart as the Complex-Gamma Plane",
+          "title": "The Dartboard: Center, Edge, and Distance",
           "order": 2,
-          "difficulty": 2,
-          "content": "The Smith chart is nothing mysterious: it is the unit disk of the complex reflection-coefficient plane, with impedance contours printed on top. Everything follows from working in **normalized impedance** $z = Z/Z_0$ (so $z = 1$ is a perfect $50\\,\\Omega$ match) and the bilinear map\n$$\\Gamma = \\frac{z - 1}{z + 1}, \\qquad z = \\frac{1 + \\Gamma}{1 - \\Gamma}.$$\n\nBecause a passive load has $|\\Gamma| \\le 1$, every realizable impedance lands inside the outer circle, the $|\\Gamma| = 1$ boundary. Key landmarks: the **center** is $z = 1$ (matched), the **far right** on the real axis is $z = \\infty$ (open, $\\Gamma = +1$), the **far left** is $z = 0$ (short, $\\Gamma = -1$). The horizontal axis is purely real (resistive) impedance.\n\nThe genius of the chart is that the curves of constant normalized resistance $r$ and constant normalized reactance $x$ map to **circles and arcs**. Lines of constant $r$ are circles all tangent to the right-hand point ($z=\\infty$); larger $r$ gives smaller circles nested toward the right. Lines of constant $x$ are arcs emanating from that same right-hand point: the **upper half** is inductive ($+x$), the **lower half** is capacitive ($-x$). Their intersection is the point $z = r + jx$.\n\nA fixed-$|\\Gamma|$ circle centered on the chart is a **constant-VSWR circle**: rotating around it changes the phase of $\\Gamma$ (i.e. moves along the line) without changing VSWR. So one plotted point simultaneously tells you $z$, $\\Gamma$ (radius and angle), VSWR (radius), and return loss. That single-glance, four-quantities-at-once property is why the chart survived the calculator era.",
+          "difficulty": 1,
+          "content": "**Hook.** The single most important habit with a Smith chart is reading *position* the right way. The easiest way to lock that in is to picture a **dartboard**.\n\n**Build.** On a dartboard, the **bullseye** in the very middle is the best possible throw, and the **rim** at the outer edge is the worst. The Smith chart works the same way. The **center is the bullseye: a perfect match.** The **outer rim is the worst case: total reflection**, where the signal bounces straight back instead of getting through.\n\nEverything in between is judged by *how close to the bullseye* it lands. A point near the center is a good match. A point halfway out is a so-so match. A point hugging the rim is a bad mismatch. So the chart turns a fuzzy question ('how good is my match?') into a simple visual one: *how close is my dot to the middle?*\n\nTwo more everyday hooks reinforce the same idea. A **GPS** shows you how far off-target you are and which direction to move to get back; the Smith chart shows how far from a match you are and which way to head. And the chart is a bit like an **archery or shooting target**, where rings closer to the middle score better. In every case, *closer to center is better, and the edge is the worst.*\n\n**Recap.** Treat the Smith chart like a dartboard: the center is the bullseye (a perfect match), the rim is the worst (total reflection), and a good match is simply a dot close to the middle.",
           "items": [
             {
-              "id": "smith-chart-l2-fc1",
-              "type": "flashcard",
-              "front": "What is normalized impedance and why use it?",
-              "back": "$z = Z/Z_0$. Normalizing makes the chart universal: $z = 1$ is always the match regardless of whether $Z_0$ is 50, 75, or any other value.",
-              "hint": "Divide by the system reference impedance."
-            },
-            {
-              "id": "smith-chart-l2-fc2",
-              "type": "flashcard",
-              "front": "Give the two-way mapping between $z$ and $\\Gamma$.",
-              "back": "$\\Gamma = \\dfrac{z-1}{z+1}$ and $z = \\dfrac{1+\\Gamma}{1-\\Gamma}$. These are inverse bilinear (Mobius) transforms.",
-              "hint": "Use normalized $z$, not raw $Z$."
-            },
-            {
-              "id": "smith-chart-l2-fc3",
-              "type": "flashcard",
-              "front": "Where on the Smith chart are the matched point, the open, and the short?",
-              "back": "Center $= z = 1$ (matched, $\\Gamma=0$); far right $= z=\\infty$ (open, $\\Gamma=+1$); far left $= z=0$ (short, $\\Gamma=-1$).",
-              "hint": "All three lie on the horizontal real axis."
-            },
-            {
-              "id": "smith-chart-l2-fc4",
-              "type": "flashcard",
-              "front": "What shapes do constant-$r$ and constant-$x$ contours take on the chart?",
-              "back": "Constant-$r$ are circles all tangent at the right-hand ($z=\\infty$) point; constant-$x$ are arcs radiating from that same point. Upper half is inductive ($+x$), lower half capacitive ($-x$).",
-              "hint": "Circles for R, arcs for X."
-            },
-            {
-              "id": "smith-chart-l2-fc5",
-              "type": "flashcard",
-              "front": "What does a circle centered on the middle of the chart represent?",
-              "back": "A constant-$|\\Gamma|$ circle, i.e. a constant-VSWR circle. Moving along a transmission line rotates around it without changing VSWR.",
-              "hint": "Constant radius from center = constant magnitude."
-            },
-            {
-              "id": "smith-chart-l2-mcq1",
+              "id": "smith-chart-l2-mc1",
               "type": "mcq",
-              "prompt": "A normalized impedance $z = 1 + j1$ plots where on the chart?",
+              "prompt": "In the dartboard comparison, the bullseye stands for:",
               "choices": [
-                "At the center",
-                "On the $r=1$ circle, upper half (inductive)",
-                "On the real axis to the right",
-                "On the $r=1$ circle, lower half (capacitive)"
+                "A perfect match",
+                "Total reflection",
+                "A medium-quality match",
+                "A disconnected antenna"
               ],
-              "answerIndex": 1,
-              "explanation": "$r=1$ puts it on the unit-resistance circle; $+jx$ is reactance above the real axis (inductive). This is the plotted load point in the diagram.",
-              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-1.svg"
+              "answerIndex": 0,
+              "explanation": "The bullseye in the middle is the best result, which on the Smith chart is a perfect match at the center. Total reflection is the rim, the opposite of the bullseye.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-4.svg"
             },
             {
-              "id": "smith-chart-l2-mcq2",
+              "id": "smith-chart-l2-mc2",
               "type": "mcq",
-              "prompt": "What does the outer boundary circle of the Smith chart correspond to?",
+              "prompt": "On the dartboard picture of the chart, what does the outer RIM stand for?",
               "choices": [
-                "$z = 1$",
-                "$|\\Gamma| = 1$ (lossless, fully reflecting)",
-                "VSWR $= 1$",
-                "Infinite resistance"
+                "The worst case: total reflection",
+                "The best case: a perfect match",
+                "The average of all impedances",
+                "A point you are not allowed to plot"
               ],
-              "answerIndex": 1,
-              "explanation": "The rim is $|\\Gamma| = 1$: all reactive or fully reflecting (lossless) terminations. Passive loads lie on or inside it."
+              "answerIndex": 0,
+              "explanation": "The rim is as far from the bullseye as you can get, so it stands for the worst case: total reflection. The perfect match is the center, not the rim.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-4.svg"
             },
             {
-              "id": "smith-chart-l2-mcq3",
+              "id": "smith-chart-l2-mc3",
               "type": "mcq",
-              "prompt": "A point on the real axis halfway between center and the right edge has $\\Gamma = +0.5$. What is its normalized impedance?",
+              "prompt": "Your plotted dot sits very close to the center of the chart. What does that mean?",
               "choices": [
-                "$z = 0.5$",
-                "$z = 2$",
-                "$z = 3$",
-                "$z = 1.5$"
+                "You have a good match",
+                "You have a terrible mismatch",
+                "Your cable is too long",
+                "The signal frequency is too high"
               ],
-              "answerIndex": 2,
-              "explanation": "$z = (1+\\Gamma)/(1-\\Gamma) = 1.5/0.5 = 3$. Real positive $\\Gamma$ corresponds to $z>1$ (resistive)."
+              "answerIndex": 0,
+              "explanation": "Close to center means close to the bullseye, which means a good match. A terrible mismatch would push the dot out toward the rim. Distance from center is about matching, not cable length or frequency.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-4.svg"
             },
             {
-              "id": "smith-chart-l2-mcq4",
+              "id": "smith-chart-l2-mc4",
               "type": "mcq",
-              "prompt": "On the chart, the lower half of the disk represents loads that are predominantly:",
+              "prompt": "Your plotted dot sits right out near the rim. What does that mean?",
               "choices": [
-                "Inductive ($+jx$)",
-                "Capacitive ($-jx$)",
-                "Purely resistive",
-                "Negative resistance"
+                "A bad mismatch, with lots of signal bouncing back",
+                "A perfect match",
+                "The best possible result",
+                "That the chart is broken"
               ],
-              "answerIndex": 1,
-              "explanation": "By convention the upper half is inductive ($+x$) and the lower half is capacitive ($-x$); the real axis is purely resistive."
+              "answerIndex": 0,
+              "explanation": "Near the rim means far from the bullseye, so it is a bad mismatch with heavy reflection. The best result would be a dot at the very center.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-4.svg"
+            },
+            {
+              "id": "smith-chart-l2-mc5",
+              "type": "mcq",
+              "prompt": "Which everyday object best captures the chart's 'closer to center is better' idea?",
+              "choices": [
+                "A dartboard or target, where the middle scores best",
+                "A ruler, where every mark is equally good",
+                "A clock, where every hour is the same",
+                "A light switch, which is only on or off"
+              ],
+              "answerIndex": 0,
+              "explanation": "A dartboard or target rewards landing near the middle, exactly like the Smith chart rewards a dot near the center. A ruler or clock has no special 'best' middle point, and a switch has no middle at all.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-4.svg"
+            },
+            {
+              "id": "smith-chart-l2-mc6",
+              "type": "mcq",
+              "prompt": "How does the GPS comparison fit the Smith chart?",
+              "choices": [
+                "A GPS shows how far off-target you are and which way to move, like the chart shows how far from a match you are",
+                "A GPS proves the chart is only used in cars",
+                "A GPS measures the weight of the antenna",
+                "A GPS tells you the chart's exact color"
+              ],
+              "answerIndex": 0,
+              "explanation": "The useful part of the GPS analogy is 'how far off, and which way to go,' which mirrors reading distance-from-center and a direction to improve the match. It is an analogy, not a claim that the chart is for cars or weighing antennas.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-4.svg"
+            },
+            {
+              "id": "smith-chart-l2-mc7",
+              "type": "mcq",
+              "prompt": "Dot A is halfway out from the center; dot B is hugging the rim. Which is the better match?",
+              "choices": [
+                "Dot A, because it is closer to the center",
+                "Dot B, because it is closer to the rim",
+                "They are equally good",
+                "Neither can be a match"
+              ],
+              "answerIndex": 0,
+              "explanation": "Closer to center always means a better match, so dot A beats dot B. Being closer to the rim (dot B) means a worse mismatch, not a better one.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-4.svg"
+            },
+            {
+              "id": "smith-chart-l2-mc8",
+              "type": "mcq",
+              "prompt": "What fuzzy question does the dartboard view turn into a simple visual one?",
+              "choices": [
+                "'How good is my match?' becomes 'how close is my dot to the middle?'",
+                "'What time is it?' becomes 'where is the clock?'",
+                "'How long is my cable?' becomes 'what color is it?'",
+                "'How loud is the radio?' becomes 'how heavy is it?'"
+              ],
+              "answerIndex": 0,
+              "explanation": "The chart converts the vague 'how good is my match?' into the concrete, eyeball-able 'how close to center is my dot?' The other options are unrelated swaps that the chart does not address.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-4.svg"
             }
           ]
         },
         {
           "id": "smith-chart-smith-chart-l3",
-          "title": "Motion Along the Line & the Admittance Chart",
+          "title": "Every Impedance Becomes One Point",
           "order": 3,
           "difficulty": 2,
-          "content": "Plotting a point is only half the chart's value; the other half is *moving*. Because $\\Gamma(z) = \\Gamma_L\\, e^{-j2\\beta l}$ as you slide distance $l$ along a lossless line, motion along the line is pure **rotation** around the constant-VSWR circle.\n\n**Direction and amount.** Moving **toward the generator** (away from the load, back toward the source) rotates **clockwise**. Moving toward the load rotates counter-clockwise. The phase is $2\\beta l = 2(2\\pi/\\lambda)l = 4\\pi l/\\lambda$, so a half-wavelength of line ($l = \\lambda/2$) is a full $360^\\circ$ revolution — impedance repeats every $\\lambda/2$. A quarter-wavelength is $180^\\circ$, which flips a point straight across the center. The chart rims are scaled in 'wavelengths toward generator' and 'toward load' precisely to count these rotations. Classic rust-knocker pitfall: rotating the wrong way, or assuming one turn is $\\lambda$ instead of $\\lambda/2$.\n\n**The admittance chart.** Matching with *shunt* elements is far easier in admittance, $y = Y/Y_0 = g + jb$, because shunt elements add in admittance. The beautiful trick: on the Smith chart, the admittance $y$ corresponding to an impedance $z$ is found by a $180^\\circ$ rotation about the center (it is the $\\lambda/4$ point). So the *same* chart, mentally rotated half a turn, becomes a $g$-$b$ admittance chart. Many engineers overlay both — the **ZY (immittance) chart** — so series moves (constant-$r$/$x$) and shunt moves (constant-$g$/$b$) are both visible. Keep ruthless track of which chart you are on; mixing them up is the most common stub-matching error.",
+          "content": "**Hook.** So far the chart is just a circle with a good middle and a bad edge. The next idea is what makes it powerful: *any* impedance you can have turns into exactly **one point** on the chart.\n\n**Build.** Recall that **impedance** is how a part pushes back on a signal, measured in ohms. A real antenna or load has an impedance, and the Smith chart gives that impedance a home: a single dot. Change the load, and the dot moves to a new spot. So the chart is a way of *drawing a picture of an impedance* as a location.\n\nHow can one flat picture hold every possible impedance? Here is the honest, math-free answer: the Smith chart is **a clever re-plotting of all the possible reflections (echoes) onto one circle.** Every impedance produces a certain amount and 'flavor' of reflection, and the chart arranges all of those onto the disk so that no-reflection lands in the center and full-reflection lands on the rim. You do not need the equations behind that re-plotting; you only need to trust that *each impedance gets one and only one point.*\n\nOnce a load is a dot, you read its quality straight from where it sits: a dot near the center is nearly matched, a dot far out is badly mismatched, and a dot on the rim reflects everything. You will also notice points spread *around* the circle, not just along one line: the position carries more detail than a single number could, which is exactly why a picture beats a lone reading. The key beginner move is simply: **plot the point, then read its position.**\n\n**Recap.** Every impedance maps to a single point on the chart, because the chart is a re-plotting of all possible reflections onto one circle. Plot the dot, then judge the match by where it lands.",
           "items": [
             {
-              "id": "smith-chart-l3-fc1",
-              "type": "flashcard",
-              "front": "Which way do you rotate on the Smith chart to move toward the generator?",
-              "back": "Clockwise. Moving toward the load is counter-clockwise. This follows from $\\Gamma(l) = \\Gamma_L e^{-j2\\beta l}$.",
-              "hint": "Generator = clockwise (mnemonic: 'g' before 'l' going down the clock)."
-            },
-            {
-              "id": "smith-chart-l3-fc2",
-              "type": "flashcard",
-              "front": "How much line length equals one full revolution on the chart?",
-              "back": "$\\lambda/2$. The phase rotates by $2\\beta l = 4\\pi l/\\lambda$, so $l = \\lambda/2$ gives $360^\\circ$ and the impedance pattern repeats every half wavelength.",
-              "hint": "Not $\\lambda$ — half that."
-            },
-            {
-              "id": "smith-chart-l3-fc3",
-              "type": "flashcard",
-              "front": "What rotation corresponds to a quarter-wavelength of line, and what does it do?",
-              "back": "$180^\\circ$ (half a turn). A $\\lambda/4$ line flips a point straight across the center of the chart, transforming $z \\to 1/z$ (normalized).",
-              "hint": "Half of a full revolution."
-            },
-            {
-              "id": "smith-chart-l3-fc4",
-              "type": "flashcard",
-              "front": "How do you convert impedance $z$ to admittance $y$ on the Smith chart?",
-              "back": "Rotate $180^\\circ$ about the center (the $\\lambda/4$ point). The new point read on the impedance grid gives $y = g + jb$.",
-              "hint": "Same point, opposite side of center."
-            },
-            {
-              "id": "smith-chart-l3-fc5",
-              "type": "flashcard",
-              "front": "Why work in admittance for shunt matching elements?",
-              "back": "Shunt elements add in admittance ($y_{tot} = y_1 + y_2$), just as series elements add in impedance. The admittance chart makes shunt moves follow constant-$g$ and constant-$b$ contours.",
-              "hint": "Parallel = admittances add."
-            },
-            {
-              "id": "smith-chart-l3-mcq1",
+              "id": "smith-chart-l3-mc1",
               "type": "mcq",
-              "prompt": "You move $0.125\\lambda$ from the load toward the generator. How far around the chart, and which direction?",
+              "prompt": "How many points on the Smith chart does a given impedance correspond to?",
               "choices": [
-                "$45^\\circ$ counter-clockwise",
-                "$90^\\circ$ clockwise",
-                "$90^\\circ$ counter-clockwise",
-                "$180^\\circ$ clockwise"
+                "Exactly one point",
+                "Two points, one on each side",
+                "A whole line of points",
+                "None until you add a battery"
               ],
-              "answerIndex": 1,
-              "explanation": "$\\lambda/2$ is $360^\\circ$, so $0.125\\lambda = \\lambda/8$ is $90^\\circ$. Toward the generator is clockwise."
+              "answerIndex": 0,
+              "explanation": "Each impedance maps to one and only one point on the chart. That one-to-one rule is what lets you 'draw' an impedance as a single location and read it back later.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-5.svg"
             },
             {
-              "id": "smith-chart-l3-mcq2",
+              "id": "smith-chart-l3-mc2",
               "type": "mcq",
-              "prompt": "A normalized impedance $z = 0.5 + j0$ is converted to admittance by a $180^\\circ$ rotation. What is $y$?",
+              "prompt": "Without using any equations, how can one flat circle hold every possible impedance?",
               "choices": [
-                "$y = 0.5$",
-                "$y = 2$",
-                "$y = -0.5$",
-                "$y = j2$"
+                "It is a clever re-plotting of all possible reflections onto one circle",
+                "It only holds three or four special impedances",
+                "It stretches to infinite physical size",
+                "It stores them in a hidden computer chip"
               ],
-              "answerIndex": 1,
-              "explanation": "For a pure resistance the rotation gives $y = 1/z = 1/0.5 = 2$. Admittance is the reciprocal of impedance (normalized)."
+              "answerIndex": 0,
+              "explanation": "The plain-language answer is that the chart re-plots every possible reflection (echo) onto the disk, arranged so no-reflection is the center and full-reflection is the rim. You do not need the math, just the idea. It is not limited to a few values and there is no chip involved.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-5.svg"
             },
             {
-              "id": "smith-chart-l3-mcq3",
+              "id": "smith-chart-l3-mc3",
               "type": "mcq",
-              "prompt": "Why does a load's impedance repeat every half wavelength along a lossless line?",
+              "prompt": "On the chart, where does an impedance that causes NO reflection land?",
               "choices": [
-                "Because attenuation cancels",
-                "Because $\\Gamma$ rotates $360^\\circ$ per $\\lambda/2$ ($2\\beta l = 2\\pi$)",
-                "Because VSWR doubles",
-                "Because $Z_0$ changes"
+                "At the center",
+                "On the rim",
+                "Just outside the circle",
+                "It does not appear at all"
               ],
-              "answerIndex": 1,
-              "explanation": "The reflection coefficient phase advances by $2\\beta l$; at $l = \\lambda/2$ that is $2\\pi$, a full revolution, returning to the same point."
+              "answerIndex": 0,
+              "explanation": "No reflection is a perfect match, which is the center of the chart. The rim is reserved for full reflection. Every valid impedance lands somewhere on or inside the circle, never outside it.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-5.svg"
             },
             {
-              "id": "smith-chart-l3-mcq4",
+              "id": "smith-chart-l3-mc4",
               "type": "mcq",
-              "prompt": "What is the combined ZY (immittance) chart used for?",
+              "prompt": "You change the load on the line. What happens to its dot on the chart?",
               "choices": [
-                "Showing only admittance",
-                "Overlaying impedance and admittance grids so series and shunt moves are both visible",
-                "Plotting VSWR vs frequency",
-                "Measuring line loss directly"
+                "The dot moves to a new spot that represents the new impedance",
+                "The dot stays frozen forever",
+                "The whole chart disappears",
+                "The dot splits into many dots"
               ],
-              "answerIndex": 1,
-              "explanation": "The ZY chart superimposes the constant-$r$/$x$ (series) and constant-$g$/$b$ (shunt) grids, so you can switch between series and shunt element moves without re-plotting."
+              "answerIndex": 0,
+              "explanation": "Because each impedance has its own point, a different load means a different point: the dot moves. The chart is a live picture of whatever impedance you currently have, not a frozen or multiplying mark.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-5.svg"
+            },
+            {
+              "id": "smith-chart-l3-mc5",
+              "type": "mcq",
+              "prompt": "A load plots as a dot sitting far out from the center, near the rim. What does that say about it?",
+              "choices": [
+                "It is badly mismatched and reflects a lot of the signal",
+                "It is a perfect match",
+                "It has no impedance at all",
+                "It is the ideal target to aim for"
+              ],
+              "answerIndex": 0,
+              "explanation": "Far from center means a bad mismatch with heavy reflection. A perfect match would sit at the center, which is the spot you actually aim for. A point near the rim is the opposite of ideal.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-5.svg"
+            },
+            {
+              "id": "smith-chart-l3-mc6",
+              "type": "mcq",
+              "prompt": "What is the basic beginner move once you have a load's impedance?",
+              "choices": [
+                "Plot the point, then read its position",
+                "Throw the chart away and guess",
+                "Measure the cable's weight",
+                "Count how many wires are in the room"
+              ],
+              "answerIndex": 0,
+              "explanation": "The core skill is 'plot the point, then read its position.' Everything else (how matched, how to fix it) follows from where that dot lands. Guessing or weighing cables is not how the chart works.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-5.svg"
+            },
+            {
+              "id": "smith-chart-l3-mc7",
+              "type": "mcq",
+              "prompt": "Why is a point on a 2-D circle more informative than a single plain number?",
+              "choices": [
+                "Its position carries more detail than one number could, since points spread all around the circle",
+                "It is not; a single number is always better",
+                "Because the circle changes the impedance into a sound",
+                "Because circles cannot store numbers at all"
+              ],
+              "answerIndex": 0,
+              "explanation": "A spot on the disk encodes more than 'how far out' alone; its placement around the circle adds detail a lone number cannot. That richer picture is exactly why engineers prefer plotting a point. The chart does not turn impedance into sound.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-5.svg"
+            },
+            {
+              "id": "smith-chart-l3-mc8",
+              "type": "mcq",
+              "prompt": "Can a normal (passive) load ever plot OUTSIDE the outer circle?",
+              "choices": [
+                "No, every ordinary load lands on or inside the circle",
+                "Yes, strong mismatches land outside it",
+                "Yes, but only at night",
+                "Only if the cable is exactly 50 ohms"
+              ],
+              "answerIndex": 0,
+              "explanation": "The rim represents the worst case (total reflection), so ordinary loads land on or inside the circle and never beyond it. Even a severe mismatch only reaches the rim, not past it.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-5.svg"
             }
           ]
         },
         {
           "id": "smith-chart-smith-chart-l4",
-          "title": "Matching Networks: L-Networks, Stubs, Transformers & Q",
+          "title": "Normalized Impedance: Measuring Against 50 Ohms",
           "order": 4,
-          "difficulty": 3,
-          "content": "Now the payoff: dragging an arbitrary load to the center ($z=1$). Several standard tools, each a path on the chart.\n\n**Lumped L-network.** Two reactive elements (one series, one shunt) in an 'L'. On the chart you alternate a constant-$r$ move (series element) and a constant-$g$ move (shunt element) until you reach the center. There are generally **two solutions** per load. A useful split: if the load is *outside* the $r=1$ circle, start with a series element; if *inside*, start with a shunt element. Series $L$ moves up the reactance arc, series $C$ down; shunt $C$ moves up the susceptance arc, shunt $L$ down. The figure shows a series-$L$ / shunt-$C$ topology.\n\n**Single-stub tuning.** Run a length of line until the load admittance sits on the $g=1$ circle, then cancel the leftover susceptance $\\pm jb$ with a shorted or open stub of the right length. **Double-stub** uses two fixed-position stubs (no need to cut the main line), trading flexibility for a forbidden region.\n\n**Quarter-wave transformer.** To match two real impedances, insert a $\\lambda/4$ line of $Z_0' = \\sqrt{Z_0 Z_L}$ — the same $\\sqrt{\\eta_1\\eta_2}$ trick from optics. Simple but inherently narrowband.\n\n**Bandwidth and Q.** A match is exact at one frequency. The loaded $Q \\approx \\sqrt{(R_{high}/R_{low}) - 1}$ for an L-network; higher transformation ratio means higher $Q$ and *narrower* bandwidth. The **Bode-Fano limit** sets the fundamental ceiling on how broadband any passive match of a reactive load can be — you cannot match perfectly over all frequencies. For wider bandwidth, use multi-section transformers or lower-$Q$ multi-element networks. Modern workflow: confirm by hand on the chart, then verify in **scikit-rf** or on a **VNA**.",
+          "difficulty": 2,
+          "content": "**Hook.** Here is a small puzzle. Most radio gear is built around 50 ohms, but some video gear uses 75 ohms, and other systems use other values. If the center of the chart is supposed to mean 'a perfect match,' how can one chart work for all of them? The answer is a simple relabeling trick called **normalized impedance.**\n\n**Build.** *Normalizing* just means **measuring impedance as a multiple of the system's reference value** instead of in raw ohms. In a 50-ohm system, you divide every impedance by 50. So 50 ohms becomes **1** (the match), 100 ohms becomes **2** (twice the reference), and 25 ohms becomes **0.5** (half the reference). It is like quoting prices as 'times the normal price' instead of in dollars: 'double price' and 'half price' make sense in any currency.\n\nWhy bother? Because now **the number 1 always means a perfect match**, no matter whether the system is 50, 75, or anything else. The center of the Smith chart is simply the spot labeled '1.' A 75-ohm system uses the very same chart; you just divide by 75 instead of 50. This is what makes the Smith chart *universal*: one picture serves every system, because everyone agrees that '1' is home.\n\nSo when you hear someone say a load is '2' on the chart, they mean its impedance is twice the reference (for 50-ohm gear, that is 100 ohms). '0.5' means half the reference. And '1' always, always means matched.\n\n**Recap.** Normalized impedance relabels ohms as multiples of the system's reference value, so '1' always means a perfect match. That trick lets a single Smith chart serve 50-ohm, 75-ohm, or any other system.",
           "items": [
             {
-              "id": "smith-chart-l4-fc1",
-              "type": "flashcard",
-              "front": "What is an L-network and how many solutions usually exist?",
-              "back": "Two reactive elements (one series, one shunt) arranged in an 'L'. There are generally two valid topologies/solutions that match a given load to $Z_0$.",
-              "hint": "Two elements, two answers."
-            },
-            {
-              "id": "smith-chart-l4-fc2",
-              "type": "flashcard",
-              "front": "For an L-network, when do you start with a series vs a shunt element?",
-              "back": "If the load lies outside the $r=1$ circle, start with a series element; if inside, start with a shunt element. This gets you onto the $r=1$ or $g=1$ circle for the second element to finish.",
-              "hint": "Outside $r=1$ -> series first."
-            },
-            {
-              "id": "smith-chart-l4-fc3",
-              "type": "flashcard",
-              "front": "Describe the single-stub matching procedure on the chart.",
-              "back": "Move along the line (rotate) until the load admittance reaches the $g=1$ circle, then add a shorted/open stub whose susceptance cancels the residual $\\pm jb$, landing at the center.",
-              "hint": "Reach $g=1$, then cancel $b$."
-            },
-            {
-              "id": "smith-chart-l4-fc4",
-              "type": "flashcard",
-              "front": "Give the characteristic impedance of a quarter-wave transformer matching $Z_0$ to a real $Z_L$.",
-              "back": "$Z_0' = \\sqrt{Z_0 Z_L}$, a line exactly $\\lambda/4$ long. It is the transmission-line analog of the $\\sqrt{\\eta_1\\eta_2}$ optical matching layer; inherently narrowband.",
-              "hint": "Geometric mean of the two impedances."
-            },
-            {
-              "id": "smith-chart-l4-fc5",
-              "type": "flashcard",
-              "front": "How does the transformation ratio of a match relate to bandwidth?",
-              "back": "Higher ratio means higher loaded $Q$ (for an L-network $Q \\approx \\sqrt{R_{high}/R_{low} - 1}$) and therefore narrower bandwidth. The Bode-Fano limit caps how broadband any passive match can be.",
-              "hint": "Bigger jump -> higher Q -> narrower."
-            },
-            {
-              "id": "smith-chart-l4-fc6",
-              "type": "flashcard",
-              "front": "What is the Bode-Fano limit?",
-              "back": "A fundamental theoretical bound on the best reflection-coefficient bandwidth product achievable when matching a reactive (e.g. RC or RL) load with any passive lossless network. You cannot match a reactive load perfectly over all frequencies.",
-              "hint": "Sets the broadband matching ceiling."
-            },
-            {
-              "id": "smith-chart-l4-mcq1",
+              "id": "smith-chart-l4-mc1",
               "type": "mcq",
-              "prompt": "Match $Z_L = 100\\,\\Omega$ (real) to $50\\,\\Omega$ with a quarter-wave transformer. What $Z_0'$ is required?",
+              "prompt": "What does it mean to use 'normalized' impedance?",
               "choices": [
-                "$75\\,\\Omega$",
-                "$70.7\\,\\Omega$",
-                "$150\\,\\Omega$",
-                "$50\\,\\Omega$"
+                "Measuring impedance as a multiple of the system's reference value instead of in raw ohms",
+                "Rounding every impedance to the nearest whole number",
+                "Painting the impedance value on the cable",
+                "Doubling every impedance for safety"
               ],
-              "answerIndex": 1,
-              "explanation": "$Z_0' = \\sqrt{50 \\times 100} = \\sqrt{5000} \\approx 70.7\\,\\Omega$."
+              "answerIndex": 0,
+              "explanation": "Normalizing means expressing impedance relative to the reference (for example dividing by 50 in a 50-ohm system). It is a relabeling, not rounding, doubling, or anything physical on the cable.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-9.svg"
             },
             {
-              "id": "smith-chart-l4-mcq2",
+              "id": "smith-chart-l4-mc2",
               "type": "mcq",
-              "prompt": "In an L-network matching a load inside the $r=1$ circle to $50\\,\\Omega$, the correct first move is to add a:",
+              "prompt": "In a 50-ohm system, a load of 100 ohms normalizes to what value?",
               "choices": [
-                "Series element",
-                "Shunt element",
-                "Quarter-wave line",
-                "Resistor in series"
+                "2",
+                "0.5",
+                "50",
+                "100"
               ],
-              "answerIndex": 1,
-              "explanation": "Loads inside the $r=1$ circle are reached by a shunt element first (constant-$g$ move), then a series element completes the match.",
-              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-2.svg"
+              "answerIndex": 0,
+              "explanation": "You divide by the 50-ohm reference: 100 / 50 = 2, meaning twice the reference. (0.5 would be half the reference, which is 25 ohms.)",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-9.svg"
             },
             {
-              "id": "smith-chart-l4-mcq3",
+              "id": "smith-chart-l4-mc3",
               "type": "mcq",
-              "prompt": "A single-stub tuner uses the stub primarily to:",
+              "prompt": "In a 50-ohm system, what normalized value means a perfect match?",
               "choices": [
-                "Add real resistance",
-                "Cancel the residual susceptance once the line brings you to the $g=1$ circle",
-                "Increase VSWR",
-                "Change $Z_0$ of the main line"
+                "1",
+                "0",
+                "50",
+                "100"
               ],
-              "answerIndex": 1,
-              "explanation": "The line length moves the admittance onto the $g=1$ circle; the stub supplies a pure $\\pm jb$ to cancel the leftover susceptance and reach the center."
+              "answerIndex": 0,
+              "explanation": "After dividing by 50, the matched value (50 ohms) becomes 1. So '1' is the match and sits at the center of the chart. 0 and the raw ohm values are not the match point.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-9.svg"
             },
             {
-              "id": "smith-chart-l4-mcq4",
+              "id": "smith-chart-l4-mc4",
               "type": "mcq",
-              "prompt": "Which statement about quarter-wave transformer bandwidth is correct?",
+              "prompt": "Why is normalizing helpful for the Smith chart?",
               "choices": [
-                "It matches over all frequencies",
-                "It is inherently narrowband because the $\\lambda/4$ condition holds at only one frequency",
-                "Its bandwidth grows with transformation ratio",
-                "It works only for complex loads"
+                "It makes '1' always mean a match, so one chart works for any system",
+                "It makes the chart bigger",
+                "It removes the need to ever plot a point",
+                "It changes 50-ohm gear into 75-ohm gear"
               ],
-              "answerIndex": 1,
-              "explanation": "The $\\lambda/4$ electrical length is exact at the design frequency only, so the single-section transformer is inherently narrowband; larger ratios make it worse, and multi-section designs broaden it."
+              "answerIndex": 0,
+              "explanation": "Because everyone agrees that '1' is the match, the same chart serves a 50-ohm, 75-ohm, or any other system. Normalizing does not resize the chart, skip plotting, or physically convert hardware.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-9.svg"
             },
             {
-              "id": "smith-chart-l4-mcq5",
+              "id": "smith-chart-l4-mc5",
               "type": "mcq",
-              "prompt": "Which modern tool would you use to verify a hand Smith-chart match numerically, leveraging a software background?",
+              "prompt": "In a 50-ohm system, a load of 25 ohms normalizes to what value?",
               "choices": [
-                "LTspice transient only",
-                "scikit-rf (Python)",
-                "A spectrum analyzer",
-                "An oscilloscope"
+                "0.5",
+                "2",
+                "25",
+                "1"
               ],
-              "answerIndex": 1,
-              "explanation": "scikit-rf handles network/S-parameter analysis and Smith-chart plotting in Python, ideal for confirming a by-hand match; a VNA validates it on real hardware."
+              "answerIndex": 0,
+              "explanation": "25 / 50 = 0.5, meaning half the reference. A value of 2 would be twice the reference (100 ohms), and 1 would be the match (50 ohms).",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-9.svg"
+            },
+            {
+              "id": "smith-chart-l4-mc6",
+              "type": "mcq",
+              "prompt": "A 75-ohm video system wants to use a Smith chart. What changes?",
+              "choices": [
+                "Nothing about the chart; you just divide impedances by 75 instead of 50",
+                "You need a completely different, non-circular chart",
+                "The center stops meaning a match",
+                "You can no longer plot any points"
+              ],
+              "answerIndex": 0,
+              "explanation": "The chart is universal: you simply normalize against 75 ohms, and '1' (the center) still means matched. The chart shape and the meaning of the center do not change.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-9.svg"
+            },
+            {
+              "id": "smith-chart-l4-mc7",
+              "type": "mcq",
+              "prompt": "Someone says their load 'is a 2' on the chart in a 50-ohm system. What is its actual impedance?",
+              "choices": [
+                "100 ohms (twice the 50-ohm reference)",
+                "2 ohms",
+                "25 ohms",
+                "50 ohms"
+              ],
+              "answerIndex": 0,
+              "explanation": "'2' means two times the reference, and 2 x 50 = 100 ohms. It does not mean 2 ohms; the number is a multiple of the reference, not a raw ohm reading.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-9.svg"
+            },
+            {
+              "id": "smith-chart-l4-mc8",
+              "type": "mcq",
+              "prompt": "Which everyday comparison best fits normalizing?",
+              "choices": [
+                "Quoting prices as 'times the normal price' so the idea works in any currency",
+                "Measuring distance in different units every day",
+                "Choosing a random number for each load",
+                "Counting how many parts a circuit has"
+              ],
+              "answerIndex": 0,
+              "explanation": "Saying 'double price' or 'half price' makes sense regardless of the currency, just as normalized impedance makes '1 = match' work regardless of the system's ohms. The other options do not capture the 'relative to a reference' idea.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-9.svg"
+            }
+          ]
+        },
+        {
+          "id": "smith-chart-smith-chart-l5",
+          "title": "Distance From Center = VSWR; the Constant-VSWR Circle",
+          "order": 5,
+          "difficulty": 2,
+          "content": "**Hook.** You already know that distance from the center means *how mismatched* a load is. Engineers have a name and a number for that mismatch: **VSWR.** The Smith chart shows VSWR as something beautifully simple, a circle.\n\n**Build.** **VSWR** stands for Voltage Standing Wave Ratio. You met standing waves before: when a signal partly reflects, the forward and bounced-back waves overlap and create a bumpy pattern along the cable. VSWR is just a single number describing how bumpy that pattern is, and therefore how bad the mismatch is. A **perfect match is VSWR 1** (often written 1:1), meaning no bumps at all. Bigger numbers mean worse mismatches; **total reflection is an enormous VSWR** out at the edge.\n\nOn the chart, VSWR is read as **distance from the center.** Dead center is VSWR 1. The farther out your dot, the higher the VSWR. Right at the rim is the worst.\n\nNow the elegant part. Suppose you keep the *same amount* of mismatch but the dot moves around. All the spots with the **same VSWR sit on a circle centered on the middle of the chart.** This is the **constant-VSWR circle**: same distance from center, all the way around, equals the same amount of mismatch. A tiny circle hugging the center is a great match (low VSWR); a big circle near the rim is a poor match (high VSWR). So by drawing one circle through your dot, you can see your VSWR at a glance, no calculator needed.\n\n**Recap.** VSWR is one number for how mismatched a load is (1 is perfect, huge is total reflection). On the chart it is just distance from center, and all points sharing a VSWR form a circle around the middle: the constant-VSWR circle.",
+          "items": [
+            {
+              "id": "smith-chart-l5-mc1",
+              "type": "mcq",
+              "prompt": "What does VSWR measure?",
+              "choices": [
+                "How mismatched a load is (how strong the standing-wave bumps are)",
+                "How long the cable is",
+                "How many volts the battery supplies",
+                "The color temperature of the signal"
+              ],
+              "answerIndex": 0,
+              "explanation": "VSWR (Voltage Standing Wave Ratio) is a single number for the size of the standing-wave pattern, which reflects how bad the mismatch is. It is not a measure of cable length, battery voltage, or color.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-6.svg"
+            },
+            {
+              "id": "smith-chart-l5-mc2",
+              "type": "mcq",
+              "prompt": "What VSWR value means a perfect match?",
+              "choices": [
+                "VSWR 1 (often written 1:1)",
+                "VSWR 0",
+                "VSWR 50",
+                "VSWR 100"
+              ],
+              "answerIndex": 0,
+              "explanation": "A perfect match is VSWR 1, meaning no standing-wave bumps at all. Bigger numbers mean worse mismatches; there is no VSWR of 0 for a real match, and 50 or 100 would be severe mismatches.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-6.svg"
+            },
+            {
+              "id": "smith-chart-l5-mc3",
+              "type": "mcq",
+              "prompt": "On the Smith chart, how do you read VSWR from a point?",
+              "choices": [
+                "By its distance from the center",
+                "By its color",
+                "By how far above the chart it floats",
+                "By the time of day"
+              ],
+              "answerIndex": 0,
+              "explanation": "VSWR is distance from center: dead center is VSWR 1, and the farther out the dot, the higher the VSWR, up to the worst case at the rim. Position is the whole story.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-6.svg"
+            },
+            {
+              "id": "smith-chart-l5-mc4",
+              "type": "mcq",
+              "prompt": "What is a 'constant-VSWR circle'?",
+              "choices": [
+                "A circle centered on the middle of the chart; every point on it has the same VSWR",
+                "A straight line from center to edge",
+                "The outermost ring only",
+                "A circle that marks where the cable is broken"
+              ],
+              "answerIndex": 0,
+              "explanation": "Points with the same VSWR all sit the same distance from center, which forms a circle around the middle. That is the constant-VSWR circle. It is a circle, not a straight line, and not limited to the rim.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-6.svg"
+            },
+            {
+              "id": "smith-chart-l5-mc5",
+              "type": "mcq",
+              "prompt": "A small constant-VSWR circle hugging the center represents:",
+              "choices": [
+                "A good match (low VSWR)",
+                "A bad match (high VSWR)",
+                "A broken chart",
+                "Total reflection"
+              ],
+              "answerIndex": 0,
+              "explanation": "A small circle means the points stay close to center, which is a low VSWR and a good match. A big circle out near the rim would mean a high VSWR and a poor match.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-6.svg"
+            },
+            {
+              "id": "smith-chart-l5-mc6",
+              "type": "mcq",
+              "prompt": "Total reflection corresponds to what VSWR, and where on the chart?",
+              "choices": [
+                "A very large VSWR, out at the rim",
+                "VSWR 1, at the center",
+                "VSWR 0.5, halfway out",
+                "No VSWR at all"
+              ],
+              "answerIndex": 0,
+              "explanation": "Total reflection is the worst mismatch, an enormous VSWR, found at the rim. VSWR 1 at the center is the opposite: a perfect match.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-6.svg"
+            },
+            {
+              "id": "smith-chart-l5-mc7",
+              "type": "mcq",
+              "prompt": "Why does the same-VSWR set form a circle rather than a single point?",
+              "choices": [
+                "Because many different points can sit the same distance from center, and 'same distance from a center' is a circle",
+                "Because VSWR changes with the weather",
+                "Because the chart is square",
+                "Because VSWR has no fixed meaning"
+              ],
+              "answerIndex": 0,
+              "explanation": "Same distance from a center point traces out a circle, and since VSWR is exactly 'distance from center,' all equal-VSWR points form that circle. It has nothing to do with weather, and the chart is round, not square.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-6.svg"
+            },
+            {
+              "id": "smith-chart-l5-mc8",
+              "type": "mcq",
+              "prompt": "Why is the constant-VSWR circle handy in practice?",
+              "choices": [
+                "Drawing one circle through your dot shows your VSWR at a glance, with no calculator",
+                "It tells you the exact price of the antenna",
+                "It measures how heavy the cable is",
+                "It replaces the need to plot any dot"
+              ],
+              "answerIndex": 0,
+              "explanation": "The circle turns VSWR into something you can see instantly from the dot's distance, no arithmetic required. It does not report cost or weight, and you still need to plot the dot first.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-6.svg"
+            }
+          ]
+        },
+        {
+          "id": "smith-chart-smith-chart-l6",
+          "title": "Moving Along the Cable = Rotating on the Chart",
+          "order": 6,
+          "difficulty": 3,
+          "content": "**Hook.** Here is a fact that surprises beginners: the impedance you measure can *change depending on where along the cable you look.* The Smith chart turns that confusing idea into a simple motion: **moving along the cable means rotating around the chart.**\n\n**Build.** When a signal partly reflects, the forward and reflected waves combine differently at different spots along the line. So if you 'stand' at the load and then walk back toward the radio, the impedance you would measure keeps shifting. On the Smith chart, this walk shows up as the **dot swinging around the center** like a hand sweeping around a clock face.\n\nTwo things stay fixed and two things change. **What stays the same:** the *distance from center.* Walking along an ideal cable does not change how mismatched things fundamentally are, so the dot keeps the same distance out, gliding **along its constant-VSWR circle.** **What changes:** the *angle*, the dot's position around the circle. As you move along the cable, the dot rotates.\n\nThere is a neat rhythm to it. Moving back toward the source (the generator) rotates the dot **clockwise.** And a key landmark: traveling **half a wavelength** of cable carries the dot a **full turn** all the way around and back to where it started. (A wavelength is just the length of one cycle of the wave on the line.) That is why an impedance pattern *repeats* every half wavelength: one lap of the chart. A common beginner trip-up is assuming one full lap is a whole wavelength; it is only half.\n\n**Recap.** Sliding along the cable rotates the dot around the center while keeping its distance (its VSWR) fixed. Toward the source is clockwise, and half a wavelength of cable equals one full lap of the chart.",
+          "items": [
+            {
+              "id": "smith-chart-l6-mc1",
+              "type": "mcq",
+              "prompt": "On the Smith chart, moving along the cable shows up as what kind of motion?",
+              "choices": [
+                "Rotating around the center",
+                "Jumping straight off the chart",
+                "Shrinking the whole chart",
+                "Changing the chart's color"
+              ],
+              "answerIndex": 0,
+              "explanation": "Walking along the line makes the dot swing around the center like a clock hand. It rotates; it does not leave the chart or shrink it.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-7.svg"
+            },
+            {
+              "id": "smith-chart-l6-mc2",
+              "type": "mcq",
+              "prompt": "As the dot rotates around the chart, what stays the same?",
+              "choices": [
+                "Its distance from the center (its VSWR)",
+                "Its exact angle",
+                "Nothing at all",
+                "The number of components in the circuit"
+              ],
+              "answerIndex": 0,
+              "explanation": "On an ideal cable the mismatch level does not change, so the dot keeps its distance from center (its VSWR) and rides its constant-VSWR circle. It is the angle that changes, not the distance.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-7.svg"
+            },
+            {
+              "id": "smith-chart-l6-mc3",
+              "type": "mcq",
+              "prompt": "As you move along the cable, what about the dot actually changes?",
+              "choices": [
+                "Its angle, its position around the circle",
+                "Its distance from center",
+                "Its VSWR",
+                "The size of the chart"
+              ],
+              "answerIndex": 0,
+              "explanation": "Moving along the line changes the dot's angle (where it sits around the circle), while its distance from center, and therefore its VSWR, stays put.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-7.svg"
+            },
+            {
+              "id": "smith-chart-l6-mc4",
+              "type": "mcq",
+              "prompt": "Which way does the dot rotate as you move back toward the source (generator)?",
+              "choices": [
+                "Clockwise",
+                "Counter-clockwise",
+                "It does not move",
+                "Diagonally off the chart"
+              ],
+              "answerIndex": 0,
+              "explanation": "By convention, moving toward the generator rotates the dot clockwise around the chart. Moving the other way (toward the load) goes counter-clockwise.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-7.svg"
+            },
+            {
+              "id": "smith-chart-l6-mc5",
+              "type": "mcq",
+              "prompt": "How much cable length equals one full lap (a complete turn) around the chart?",
+              "choices": [
+                "Half a wavelength",
+                "A full wavelength",
+                "Two wavelengths",
+                "A quarter wavelength"
+              ],
+              "answerIndex": 0,
+              "explanation": "One complete lap of the chart corresponds to half a wavelength of cable. A common mistake is to assume it is a whole wavelength, but it is only half.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-7.svg"
+            },
+            {
+              "id": "smith-chart-l6-mc6",
+              "type": "mcq",
+              "prompt": "Why does the measured impedance repeat every half wavelength of cable?",
+              "choices": [
+                "Because half a wavelength carries the dot one full lap, back to where it started",
+                "Because the cable resets itself electrically",
+                "Because VSWR drops to zero each time",
+                "Because the wavelength keeps changing"
+              ],
+              "answerIndex": 0,
+              "explanation": "Half a wavelength equals one full rotation, so the dot returns to its original spot and the impedance repeats. It is the geometry of one lap, not the cable 'resetting' or VSWR vanishing.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-7.svg"
+            },
+            {
+              "id": "smith-chart-l6-mc7",
+              "type": "mcq",
+              "prompt": "A beginner thinks one full lap of the chart equals a whole wavelength of cable. What is the correction?",
+              "choices": [
+                "One full lap is only half a wavelength",
+                "One full lap is two wavelengths",
+                "Laps have nothing to do with wavelength",
+                "One full lap is a quarter wavelength"
+              ],
+              "answerIndex": 0,
+              "explanation": "The classic trip-up is doubling the length. A full lap is half a wavelength, not a whole one. Keeping this straight avoids reading the wrong impedance.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-7.svg"
+            },
+            {
+              "id": "smith-chart-l6-mc8",
+              "type": "mcq",
+              "prompt": "Why does the impedance you measure change as you move along the cable in the first place?",
+              "choices": [
+                "The forward and reflected waves combine differently at different spots",
+                "The cable changes its material as you walk",
+                "The radio changes frequency on its own",
+                "The chart physically rotates the cable"
+              ],
+              "answerIndex": 0,
+              "explanation": "Where reflection exists, the outgoing and returning waves add up differently along the line, so the impedance you would measure shifts with position. The cable and frequency are not changing; only the spot where you look is.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-7.svg"
+            }
+          ]
+        },
+        {
+          "id": "smith-chart-smith-chart-l7",
+          "title": "Matching: Sliding the Point to the Bullseye",
+          "order": 7,
+          "difficulty": 3,
+          "content": "**Hook.** Everything so far has been about *reading* the chart. Now comes the payoff: using it to *fix* a mismatch. The whole job of matching is one sentence: **navigate the dot to the center.** Adding the right components slides the point toward the bullseye.\n\n**Build.** Start with a mismatched load: a dot sitting somewhere off-center. Your goal is to drag that dot to the middle, where everything is matched. You do this by **adding small parts to the circuit**, the kind that store and release energy (you may know them as inductors and capacitors). Each part you add **nudges the dot along a curved path** on the chart. Add one part, the dot slides part of the way; add another, it slides the rest of the way, until it lands at the center.\n\nThink of it like the GPS idea again: you are off-target, and each component is a move that steers you closer to the destination. With one or two well-chosen parts, you can usually walk almost any off-center dot right into the bullseye. Engineers picked components precisely so that the resulting curved slides end exactly at the center.\n\nThe beauty of doing this on the chart is that you can *see* the route before you build anything. You watch the dot travel from its starting mismatch, along a curve or two, into the center, and you read off which parts produce that path. No heavy algebra: you are literally **navigating a point to the middle of a map.** That single picture, mismatch in, matched out, is what made the Smith chart the go-to matching tool for generations.\n\n**Recap.** Matching means sliding the off-center dot to the center by adding components; each part nudges the dot along a curve, and one or two of them can usually steer it right into the bullseye. It is navigation on a map, not algebra.",
+          "items": [
+            {
+              "id": "smith-chart-l7-mc1",
+              "type": "mcq",
+              "prompt": "In one phrase, what is the goal of impedance matching on the Smith chart?",
+              "choices": [
+                "Navigate the dot to the center (the bullseye)",
+                "Push the dot out to the rim",
+                "Erase the dot from the chart",
+                "Keep the dot exactly where it started"
+              ],
+              "answerIndex": 0,
+              "explanation": "Matching means steering the dot to the center, where the load is matched. Pushing it to the rim would be making things worse, and leaving it put solves nothing.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-8.svg"
+            },
+            {
+              "id": "smith-chart-l7-mc2",
+              "type": "mcq",
+              "prompt": "How do you move the dot toward the center?",
+              "choices": [
+                "By adding components, which nudge the dot along curved paths",
+                "By making the cable shorter only",
+                "By turning the radio's volume up",
+                "By repainting the chart"
+              ],
+              "answerIndex": 0,
+              "explanation": "Adding small energy-storing parts (inductors and capacitors) slides the dot along curves toward the center. Volume and paint do nothing, and matching is about the added parts, not just trimming cable.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-8.svg"
+            },
+            {
+              "id": "smith-chart-l7-mc3",
+              "type": "mcq",
+              "prompt": "When you add one matching component, what happens to the dot?",
+              "choices": [
+                "It slides part of the way toward the center along a curve",
+                "It instantly teleports to the rim",
+                "It vanishes",
+                "It changes into a square"
+              ],
+              "answerIndex": 0,
+              "explanation": "Each added part moves the dot a portion of the way along a curved path. Often one part gets you partway and a second finishes the trip to the center. The dot does not teleport or disappear.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-8.svg"
+            },
+            {
+              "id": "smith-chart-l7-mc4",
+              "type": "mcq",
+              "prompt": "Roughly how many well-chosen components does it usually take to match a typical off-center load?",
+              "choices": [
+                "One or two",
+                "At least fifty",
+                "Exactly zero",
+                "Hundreds"
+              ],
+              "answerIndex": 0,
+              "explanation": "Usually one or two well-chosen parts can steer almost any off-center dot into the center. It does not take dozens or hundreds, and zero parts would leave the mismatch in place.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-8.svg"
+            },
+            {
+              "id": "smith-chart-l7-mc5",
+              "type": "mcq",
+              "prompt": "What is the big advantage of planning a match on the chart first?",
+              "choices": [
+                "You can SEE the route to the center before building anything",
+                "It makes the antenna heavier",
+                "It guarantees the radio never needs power",
+                "It removes the need for any components"
+              ],
+              "answerIndex": 0,
+              "explanation": "The chart lets you watch the dot's path to the center and read off which parts create it, all before soldering anything. It does not change the antenna's weight or remove the need for parts or power.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-8.svg"
+            },
+            {
+              "id": "smith-chart-l7-mc6",
+              "type": "mcq",
+              "prompt": "Which everyday comparison best fits the matching process?",
+              "choices": [
+                "A GPS steering you closer to a destination with each move",
+                "A stopwatch counting seconds",
+                "A thermometer reading the weather",
+                "A scale weighing groceries"
+              ],
+              "answerIndex": 0,
+              "explanation": "Matching is like GPS navigation: you start off-target and each component is a move that steers you toward the destination (the center). A stopwatch, thermometer, or scale does not capture 'navigate toward a target.'",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-8.svg"
+            },
+            {
+              "id": "smith-chart-l7-mc7",
+              "type": "mcq",
+              "prompt": "A load starts as a dot far from the center. After adding two good components, where should the dot end up?",
+              "choices": [
+                "At the center, matched",
+                "Farther out, near the rim",
+                "Off the chart entirely",
+                "Back exactly where it started"
+              ],
+              "answerIndex": 0,
+              "explanation": "Successful matching lands the dot at the center, meaning a good match. Ending near the rim or back at the start would mean the matching did not work.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-8.svg"
+            },
+            {
+              "id": "smith-chart-l7-mc8",
+              "type": "mcq",
+              "prompt": "Why is the chart's matching method described as navigation rather than algebra?",
+              "choices": [
+                "You literally steer a point across a map to the middle, reading parts off the route",
+                "Because you must solve long equations for each step",
+                "Because it only works with a supercomputer",
+                "Because the chart does the soldering for you"
+              ],
+              "answerIndex": 0,
+              "explanation": "On the chart, matching is moving a dot across a picture to the center and reading which parts create that path, no equations needed. That visual steering is exactly why it is called navigation. It does not require a supercomputer and obviously cannot solder.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-8.svg"
+            }
+          ]
+        },
+        {
+          "id": "smith-chart-smith-chart-l8",
+          "title": "The Smith Chart Today: VNAs and RF Software",
+          "order": 8,
+          "difficulty": 3,
+          "content": "**Hook.** If computers can crunch the matching math instantly, why do engineers still stare at this old circular chart? Because the chart is the clearest way to *see* a match, and modern tools draw it for you automatically.\n\n**Build.** Picture two everyday tools of a radio engineer. The first is a **VNA** (Vector Network Analyzer), a test instrument you connect to a real antenna or cable. It measures how much signal reflects and **plots a dot on a Smith chart right on its screen.** You glance at the screen, see where the dot sits relative to the center, and instantly know how good the match is, the same reading skill from the earlier lessons, now done live on hardware.\n\nThe second is **RF software** on a computer. Programs let you describe a circuit and they **draw the Smith chart and place the points for you**, so you can try matching ideas and watch the dot slide toward the center without touching a soldering iron. (One popular free example is a Python library called scikit-rf, but the idea is general: software handles the arithmetic and shows you the picture.)\n\nSo the modern workflow is a partnership. The *computer* does the heavy number-crunching that used to be done painfully by hand. The *Smith chart* remains the shared visual language: a way for engineers and instruments to display 'here is your impedance, here is how matched you are, here is the path to the center.' You are not asked to compute the chart, you are asked to *read and navigate* the picture, which is exactly the skill this topic has been building.\n\n**Recap.** The Smith chart is alive and well: VNAs plot your real circuit as a dot on it, and RF software draws it for you. Computers do the math; the chart stays the universal picture of a match, and your job is to read and navigate it.",
+          "items": [
+            {
+              "id": "smith-chart-l8-mc1",
+              "type": "mcq",
+              "prompt": "What does a VNA (Vector Network Analyzer) do with the Smith chart?",
+              "choices": [
+                "It measures a real circuit and plots a dot on a Smith chart on its screen",
+                "It prints paper copies of blank charts",
+                "It charges the antenna's battery",
+                "It physically bends the cable into a circle"
+              ],
+              "answerIndex": 0,
+              "explanation": "A VNA connects to real hardware, measures the reflection, and shows the result as a dot on an on-screen Smith chart so you can read the match live. It is a measuring instrument, not a printer or charger.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-10.svg"
+            },
+            {
+              "id": "smith-chart-l8-mc2",
+              "type": "mcq",
+              "prompt": "How does RF software use the Smith chart?",
+              "choices": [
+                "It draws the chart and places the points for you so you can try matching ideas on screen",
+                "It deletes the chart to save space",
+                "It replaces the chart with a spreadsheet of colors",
+                "It only works without any computer"
+              ],
+              "answerIndex": 0,
+              "explanation": "RF software draws the chart and plots points automatically, letting you experiment with matching and watch the dot move toward the center, all before building anything. It does not remove the chart, and it obviously runs on a computer.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-10.svg"
+            },
+            {
+              "id": "smith-chart-l8-mc3",
+              "type": "mcq",
+              "prompt": "In the modern workflow, who does the heavy math and what does the chart provide?",
+              "choices": [
+                "The computer does the math; the chart provides the shared visual picture of the match",
+                "The chart does the math; the computer provides nothing",
+                "Both refuse to do anything",
+                "The engineer must do all the math by hand every time"
+              ],
+              "answerIndex": 0,
+              "explanation": "It is a partnership: computers crunch the numbers that used to be done painfully by hand, while the Smith chart stays the visual language for showing impedance and how matched it is. The chart itself does not compute.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-10.svg"
+            },
+            {
+              "id": "smith-chart-l8-mc4",
+              "type": "mcq",
+              "prompt": "Why is the Smith chart still used even though computers can do the math instantly?",
+              "choices": [
+                "It is the clearest way to SEE a match at a glance",
+                "Because computers cannot draw circles",
+                "Because it is required by law",
+                "Because it is faster than any computer at arithmetic"
+              ],
+              "answerIndex": 0,
+              "explanation": "The chart survives because it shows a match visually and instantly, which numbers alone do not. Computers handle the arithmetic faster than any human; the chart's value is the picture, not the calculation.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-10.svg"
+            },
+            {
+              "id": "smith-chart-l8-mc5",
+              "type": "mcq",
+              "prompt": "You hook a VNA to an antenna and see a dot sitting close to the center of the on-screen chart. What does that tell you?",
+              "choices": [
+                "The antenna is well matched",
+                "The antenna is badly mismatched",
+                "The VNA is broken",
+                "The antenna has no impedance"
+              ],
+              "answerIndex": 0,
+              "explanation": "The same reading skill applies on real hardware: close to center means a good match. A dot far out near the rim would signal a bad mismatch.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-10.svg"
+            },
+            {
+              "id": "smith-chart-l8-mc6",
+              "type": "mcq",
+              "prompt": "scikit-rf is mentioned as an example of what?",
+              "choices": [
+                "Free RF software that draws the Smith chart and handles the arithmetic for you",
+                "A type of antenna",
+                "A brand of cable",
+                "A kind of battery"
+              ],
+              "answerIndex": 0,
+              "explanation": "scikit-rf is a Python software library that plots Smith charts and does the number-crunching, used as one example of the general idea that software shows you the picture. It is not hardware like an antenna, cable, or battery.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-10.svg"
+            },
+            {
+              "id": "smith-chart-l8-mc7",
+              "type": "mcq",
+              "prompt": "What is the learner's job with a modern Smith chart, according to the lesson?",
+              "choices": [
+                "To read and navigate the picture, not to compute the chart by hand",
+                "To memorize every equation behind it",
+                "To rebuild the VNA from scratch",
+                "To avoid the chart completely"
+              ],
+              "answerIndex": 0,
+              "explanation": "The skill being built is reading and navigating the chart: knowing what the dot's position means and how to steer it. The computer handles the math, so memorizing equations or rebuilding instruments is not the point.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-10.svg"
+            },
+            {
+              "id": "smith-chart-l8-mc8",
+              "type": "mcq",
+              "prompt": "Why is the Smith chart called a 'shared visual language' for engineers and instruments?",
+              "choices": [
+                "Both people and tools use the same picture to show impedance and how matched it is",
+                "Because it is written in a foreign language",
+                "Because only one company is allowed to use it",
+                "Because it can only show text, never pictures"
+              ],
+              "answerIndex": 0,
+              "explanation": "Engineers, VNAs, and software all display results on the same chart, so it acts as a common picture everyone understands: here is the impedance, here is the match, here is the path to center. It is not literally a spoken language or company-restricted.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/smith-chart-10.svg"
             }
           ]
         }
