@@ -4,370 +4,556 @@
   "order": 11,
   "lessons": [
     {
-      "id": "tls-security-crypto-primitives",
-      "title": "CIA Triad & Crypto Primitives",
+      "id": "tls-security-why-tls",
+      "title": "Why We Need TLS: The Open Network Problem",
       "order": 1,
       "difficulty": 1,
-      "content": "Network security rests on the **CIA triad**: **Confidentiality** (only intended parties read the data), **Integrity** (data is not altered undetected), and **Availability** (the service stays reachable). TLS gives you confidentiality and integrity; availability is a separate fight against DoS. Authentication (proving who you're talking to) is the fourth pillar that PKI provides.\n\nThe toolkit has three families. **Symmetric ciphers** use one shared key for encrypt and decrypt — fast, but you must somehow agree on the key first (think AES). **Asymmetric (public-key) crypto** uses a keypair: anyone can encrypt with the public key or verify a signature, only the private key holder can decrypt or sign (RSA, elliptic-curve). It's slow, so it's used to bootstrap a symmetric session key, not to bulk-encrypt. **Hash functions** (SHA-256) are one-way fingerprints — fixed-size, collision-resistant, used for integrity.\n\nA bare hash proves nothing about *who* sent the data, so we add a key: an **HMAC** (hash-based message authentication code) mixes a secret key into the hash, proving integrity *and* authenticity to anyone holding the key. Modern protocols go further with **AEAD** (Authenticated Encryption with Associated Data) ciphers that encrypt and authenticate in one pass: **AES-GCM** (hardware-accelerated on most CPUs) and **ChaCha20-Poly1305** (fast in software, used on mobile). TLS 1.3 mandates AEAD and drops everything else.\n\n```bash\n# fingerprint a file (integrity)\nsha256sum firmware.bin\n# keyed MAC over a message\nopenssl dgst -sha256 -hmac \"secretkey\" message.txt\n```\n\nAs a radar tech: think of HMAC like a keyed checksum on a data frame, and AEAD as doing scrambling and the integrity check in a single coherent pass.",
+      "content": "## The problem: networks are open by default\n\nYou have used **HTTPS** and seen the little **padlock** in your browser. This lesson explains what that padlock actually buys you, starting from the problem it solves.\n\nHere is the uncomfortable truth: by default, data on a network travels **in the open**. When your laptop sends a message to a website, that message hops across cables, routers, and Wi-Fi on its way. Anyone sitting *in between* -- a snoop on the coffee-shop Wi-Fi, or your **ISP** (Internet Service Provider, the company that connects you to the internet) -- could read it, or even quietly change it. Plain text on a network is like a **postcard**: every mail handler along the way can read it.\n\n## Three things can go wrong\n\nOn an open network, an attacker in the middle could:\n\n- **Eavesdrop** -- read your private data (passwords, messages) as it passes by.\n- **Tamper** -- change the data in transit, so you receive something different from what was sent.\n- **Impersonate** -- pretend to be the bank you think you are talking to, and trick you into handing over secrets.\n\n## The fix: TLS wraps the connection in a secure tunnel\n\n**TLS (Transport Layer Security)** is the technology that wraps a normal connection in a secure **tunnel**. It is the **\"S\" in HTTPS** and the reason your browser shows a padlock. It sits on top of the ordinary connection (TCP) and protects whatever travels through it.\n\nTLS gives you **three guarantees**, each one defeating a threat above:\n\n- **Encryption** (also called *confidentiality*): the data is scrambled, so an eavesdropper sees only meaningless bytes. Think of **sealing a letter in an envelope** instead of mailing a postcard.\n- **Integrity**: if anyone changes the data along the way, the change is **detected** and the connection is rejected -- like a **tamper-evident seal** on a package.\n- **Authentication**: you can be sure you are really talking to the **real** website (the real bank), not an impostor. This is proven by a **certificate**, which works like checking someone's **passport or ID** before you trust them.\n\nA handy memory aid: TLS protects you from **eavesdropping** (with encryption), **tampering** (with integrity), and **impersonation** (with authentication).\n\n## Where TLS sits: HTTPS = HTTP over TLS\n\nThe web normally speaks **HTTP** (HyperText Transfer Protocol -- the language of web requests like \"get me this page\"). **HTTPS** is simply **HTTP running inside a TLS tunnel**. Same web request you already know, now wrapped so it is private and trustworthy. The padlock icon just means \"this page came over TLS.\"\n\n## Recap\n\nNetworks are open by default, so data can be eavesdropped, tampered with, or sent to an impostor. TLS wraps the connection in a secure tunnel and provides three guarantees -- **encryption, integrity, and authentication**. HTTPS is just HTTP carried over TLS, and the padlock is its sign.",
       "items": [
         {
-          "id": "tls-security-crypto-primitives-001",
-          "type": "flashcard",
-          "front": "Name the three properties of the CIA triad and what each means.",
-          "back": "Confidentiality (only intended parties can read the data), Integrity (data cannot be altered undetected), and Availability (the service remains reachable when needed). TLS delivers confidentiality and integrity; availability is defended separately.",
-          "hint": "Read, alter, reach."
-        },
-        {
-          "id": "tls-security-crypto-primitives-002",
-          "type": "flashcard",
-          "front": "Why is asymmetric crypto used only to set up a session, not to encrypt all traffic?",
-          "back": "Public-key operations are far slower than symmetric ones. So asymmetric crypto authenticates the peer and securely establishes a shared symmetric key; the fast symmetric cipher then does the bulk data encryption.",
-          "hint": "Slow to bootstrap the fast cipher."
-        },
-        {
-          "id": "tls-security-crypto-primitives-003",
-          "type": "flashcard",
-          "front": "What does an HMAC give you that a plain hash does not?",
-          "back": "A plain hash proves only that data is unchanged by anyone who can recompute it. An HMAC mixes in a secret key, so it proves both integrity AND authenticity: only a holder of the key could have produced or verified it.",
-          "hint": "A keyed hash."
-        },
-        {
-          "id": "tls-security-crypto-primitives-004",
-          "type": "flashcard",
-          "front": "What is an AEAD cipher, and name the two TLS 1.3 examples.",
-          "back": "Authenticated Encryption with Associated Data: it encrypts and authenticates in one operation, producing ciphertext plus an authentication tag. TLS 1.3 examples: AES-GCM (hardware-accelerated) and ChaCha20-Poly1305 (fast in software, common on mobile).",
-          "hint": "Encrypt + authenticate together."
-        },
-        {
-          "id": "tls-security-crypto-primitives-005",
-          "type": "flashcard",
-          "front": "Contrast symmetric vs asymmetric keys in one sentence each.",
-          "back": "Symmetric: a single shared secret key encrypts and decrypts (fast, e.g. AES). Asymmetric: a public/private keypair where the public key encrypts or verifies and only the private key decrypts or signs (slow, e.g. RSA/ECC).",
-          "hint": "One key vs a pair."
-        },
-        {
-          "id": "tls-security-crypto-primitives-006",
-          "type": "flashcard",
-          "front": "What three properties make a cryptographic hash useful for integrity?",
-          "back": "Deterministic fixed-size output, pre-image resistance (can't recover input from the digest), and collision resistance (can't find two inputs with the same digest). SHA-256 is the standard workhorse.",
-          "hint": "One-way, fixed-size, collision-resistant."
-        },
-        {
-          "id": "tls-security-crypto-primitives-007",
+          "id": "tls-security-why-tls-mcq-1",
           "type": "mcq",
-          "prompt": "A protocol encrypts a message with AES but appends only an unkeyed SHA-256 of the plaintext. What security property is still missing?",
+          "prompt": "Why is data on a network said to travel \"in the open\" by default?",
           "choices": [
-            "Authenticity/integrity against an active attacker who can recompute the hash",
-            "Confidentiality of the message body",
-            "Availability of the endpoint",
-            "Compression of the payload"
+            "Anyone positioned in between (like a Wi-Fi snoop or your ISP) could read or change it",
+            "The data is automatically deleted after it is sent",
+            "Only the sender and receiver can ever see it, with no exceptions",
+            "It can only travel over Wi-Fi, never over cables"
           ],
           "answerIndex": 0,
-          "explanation": "An unkeyed hash can be recomputed by anyone, so an attacker who alters the ciphertext and re-hashes their forged plaintext defeats it. You need a keyed MAC (HMAC) or, better, an AEAD cipher that authenticates the ciphertext."
+          "explanation": "Without protection, a message passes through cables, routers, and Wi-Fi where parties in the middle can read or alter it -- like a postcard every handler can read. The other options are wrong: the data is not auto-deleted, it is NOT private by default (that is the whole problem), and it travels over both cables and Wi-Fi.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-2.svg"
         },
         {
-          "id": "tls-security-crypto-primitives-008",
+          "id": "tls-security-why-tls-mcq-2",
           "type": "mcq",
-          "prompt": "Which cipher would you prefer on a phone CPU that lacks AES hardware acceleration?",
+          "prompt": "What are the THREE things TLS provides?",
           "choices": [
-            "ChaCha20-Poly1305",
-            "AES-256-GCM",
-            "Triple-DES",
-            "RC4"
+            "Encryption, integrity, and authentication",
+            "Speed, compression, and caching",
+            "A faster Wi-Fi signal, more range, and less battery use",
+            "A username, a password, and a backup"
           ],
           "answerIndex": 0,
-          "explanation": "ChaCha20-Poly1305 is an AEAD cipher designed to be fast and constant-time in pure software, so it outperforms AES-GCM on devices without AES-NI hardware. 3DES and RC4 are obsolete and insecure."
+          "explanation": "TLS gives encryption (eavesdroppers see only scramble), integrity (tampering is detected), and authentication (you are really talking to the real site). The other options describe performance features or login mechanics, which are not what TLS guarantees.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-3.svg"
         },
         {
-          "id": "tls-security-crypto-primitives-009",
+          "id": "tls-security-why-tls-mcq-3",
           "type": "mcq",
-          "prompt": "Which goal of the CIA triad does a DDoS attack primarily target?",
+          "prompt": "Which TLS guarantee stops an eavesdropper from reading your data?",
           "choices": [
-            "Availability",
-            "Confidentiality",
-            "Integrity",
-            "Authenticity"
+            "Encryption (confidentiality) -- the data is scrambled into meaningless bytes",
+            "Integrity -- it detects changes",
+            "Authentication -- it proves identity",
+            "Compression -- it shrinks the data"
           ],
           "answerIndex": 0,
-          "explanation": "A distributed denial-of-service floods a target to exhaust its resources, denying legitimate users access. It does not read or alter data; it attacks availability."
+          "explanation": "Encryption scrambles the data so a snoop sees only gibberish; that is what defeats eavesdropping. Integrity catches tampering and authentication proves who you are talking to -- both important, but neither is what hides the contents. Compression has nothing to do with secrecy.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-3.svg"
+        },
+        {
+          "id": "tls-security-why-tls-mcq-4",
+          "type": "mcq",
+          "prompt": "An attacker in the middle quietly changes a few bytes of your message as it passes. Which TLS guarantee is designed to catch this?",
+          "choices": [
+            "Integrity -- a change in transit is detected and the connection is rejected",
+            "Encryption -- it prevents anyone from changing the data at all",
+            "Authentication -- it speeds up the connection",
+            "Availability -- it keeps the server online"
+          ],
+          "answerIndex": 0,
+          "explanation": "Integrity is the guarantee that detects tampering, like a tamper-evident seal: if bytes are altered, TLS notices and rejects them. Encryption hides the data but does not by itself promise it was unchanged; that is a separate job. Authentication is about identity, and availability is unrelated.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-3.svg"
+        },
+        {
+          "id": "tls-security-why-tls-mcq-5",
+          "type": "mcq",
+          "prompt": "What does HTTPS actually stand for, in terms of how it is built?",
+          "choices": [
+            "HTTP carried inside a TLS tunnel (HTTP over TLS)",
+            "A completely different web language that replaced HTTP",
+            "HTTP sent twice for reliability",
+            "HTTP with the images removed to save data"
+          ],
+          "answerIndex": 0,
+          "explanation": "HTTPS is just ordinary HTTP running inside a TLS tunnel -- the 'S' is the TLS layer. It is not a new language, not HTTP duplicated, and not about stripping images. The web request you know is simply wrapped to make it private and trustworthy.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-7.svg"
+        },
+        {
+          "id": "tls-security-why-tls-mcq-6",
+          "type": "mcq",
+          "prompt": "The padlock icon in your browser's address bar means what?",
+          "choices": [
+            "The connection to this site is protected by TLS",
+            "The website is guaranteed to be a good company you can trust completely",
+            "Your device has antivirus software installed",
+            "The page will load faster than other pages"
+          ],
+          "answerIndex": 0,
+          "explanation": "The padlock means the page came over TLS, so the connection is encrypted, tamper-checked, and the site proved its identity. It does NOT vouch that the business is honest -- a scam site can still use TLS. It says nothing about antivirus or page speed.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-7.svg"
+        },
+        {
+          "id": "tls-security-why-tls-mcq-7",
+          "type": "mcq",
+          "prompt": "Which everyday object is the best analogy for TLS encryption?",
+          "choices": [
+            "Sealing a letter in an envelope only the recipient can open, instead of mailing a postcard",
+            "Writing in pencil so you can erase it",
+            "Mailing a postcard that everyone along the way can read",
+            "Speaking louder so more people hear you"
+          ],
+          "answerIndex": 0,
+          "explanation": "Encryption is like a sealed envelope: only the intended recipient can read the contents. A postcard is the OPPOSITE -- it is what an unprotected (plain HTTP) connection is like, readable by everyone in between. Pencil and speaking louder do not capture privacy.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-3.svg"
+        },
+        {
+          "id": "tls-security-why-tls-mcq-8",
+          "type": "mcq",
+          "prompt": "Without TLS, which of these is a real risk on a public coffee-shop Wi-Fi?",
+          "choices": [
+            "Someone on the same network could read the password you type into a plain-HTTP site",
+            "Nothing, because Wi-Fi passwords always encrypt everything end to end",
+            "Your laptop would refuse to connect to any website",
+            "The website would automatically switch itself to HTTPS for you"
+          ],
+          "answerIndex": 0,
+          "explanation": "On an open or shared network, traffic to a plain-HTTP site can be read by others in between, including passwords. A Wi-Fi password only protects the local radio link, not the whole path to the server, and sites do not automatically upgrade for you. This is exactly why TLS exists.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-2.svg"
+        },
+        {
+          "id": "tls-security-why-tls-mcq-9",
+          "type": "mcq",
+          "prompt": "Which TLS guarantee makes sure you are talking to the REAL bank and not an impostor?",
+          "choices": [
+            "Authentication -- proven by a certificate, like checking an ID",
+            "Encryption -- which scrambles the data",
+            "Integrity -- which detects edits",
+            "Compression -- which shrinks the data"
+          ],
+          "answerIndex": 0,
+          "explanation": "Authentication proves the server's identity using a certificate, much like checking a passport before trusting someone. Encryption and integrity protect the data itself but do not, on their own, prove WHO is on the other end. Compression is unrelated to security.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-3.svg"
         }
       ]
     },
     {
-      "id": "tls-security-tls13-handshake",
-      "title": "The TLS 1.3 Handshake",
+      "id": "tls-security-keys-and-hybrid",
+      "title": "Two Kinds of Keys, and Why TLS Uses Both",
       "order": 2,
       "difficulty": 2,
-      "content": "TLS sits between TCP and the application, turning a raw byte stream into an authenticated, encrypted channel. **TLS 1.3 (RFC 8446)** is a clean break from 1.2: legacy ciphers (RC4, 3DES, static-RSA key exchange, CBC MACs) are gone, and the handshake is **1-RTT** instead of two round trips.\n\nThe flow: the client sends **ClientHello** carrying its supported groups and a **key_share** — its ephemeral Diffie-Hellman public value — guessing the group the server will pick. The server replies with **ServerHello** containing its own ephemeral key_share. After this single exchange both sides can derive the shared secret, so *everything after ServerHello is encrypted*, including the server's **Certificate**, **CertificateVerify** (a signature proving it owns the private key), and **Finished**. The client sends its own **Finished** and can immediately send application data. One round trip to first byte.\n\nBecause the DH keys are **ephemeral** (fresh per connection, never reused), recording the traffic and later stealing the server's long-term private key still does *not* let you decrypt past sessions — that's **forward secrecy**, and TLS 1.3 makes it mandatory. In TLS 1.2, static-RSA key exchange lacked this; one stolen key decrypted years of captures.\n\n**0-RTT resumption** lets a returning client send data in its very first flight using a pre-shared key, saving the round trip — but that early data can be **replayed** by an attacker, so it must only carry idempotent requests.\n\n```bash\n# negotiate TLS 1.3 and watch the handshake\nopenssl s_client -connect example.com:443 -tls1_3\n```",
+      "content": "## The puzzle at the heart of secure connections\n\nTLS needs to scramble (encrypt) your data so a snoop cannot read it. To scramble and unscramble, both sides need a shared secret -- a **key**. But here is the puzzle: how do you and a website agree on a secret key when everything you send travels over an **open** line a snoop is already watching? You cannot just send the key in the clear; the snoop would grab it.\n\nThe answer is that there are **two different kinds of keys**, with different strengths, and TLS cleverly uses both.\n\n## Idea 1: Symmetric keys (one shared secret)\n\nA **symmetric key** is a single shared secret that both **locks** (encrypts) and **unlocks** (decrypts). It is like a **house key** two people both own: the same key locks and opens the door.\n\n- **Strength: it is very fast.** Symmetric encryption can scramble huge amounts of data quickly.\n- **Weakness: both sides must already share the same secret.** And we are back to the puzzle -- how do you both get the same key over an open line without a snoop copying it?\n\n## Idea 2: Public-key (asymmetric) keys -- a lock-and-key PAIR\n\nA **public/private key pair** (also called **asymmetric** crypto) is the clever fix. Instead of one key, you get **two matched keys** that work together:\n\n- A **public key**, which acts like a **padlock anyone can snap shut**. You can hand it out to the whole world.\n- A **private key**, which is the **only** thing that can open what that padlock closed. You keep it secret and never share it.\n\nThe magic: anyone can lock a message using your public padlock, but **only you**, holding the private key, can unlock it. So someone can send you a secret over a wide-open line -- they lock it with your public key, and even a snoop who sees everything cannot open it.\n\n- **Strength: it solves the puzzle** -- two strangers can agree on a secret over an open line.\n- **Weakness: it is slow,** so you would not want to encrypt all your data this way.\n\n## How TLS combines them (the hybrid trick)\n\nNotice the strengths are complementary: symmetric is **fast but hard to set up**; public-key is **easy to set up but slow**. So TLS uses each for what it is good at, in two phases:\n\n1. **Set-up phase (public-key):** the two sides use the slow public/private key idea to **safely agree on a brand-new shared secret** over the open line. A snoop watching cannot learn it.\n2. **Bulk phase (symmetric):** they switch to that fast shared **symmetric** key and use it to encrypt all the real data for the rest of the session.\n\nThis two-step combination is sometimes called a **hybrid** approach: public-key to agree on the secret, symmetric to do the heavy lifting. You get the best of both -- a secret agreed safely over an open line, then fast encryption afterward.\n\n## Recap\n\nA **symmetric** key is one shared secret (fast, but hard to share safely). A **public-key pair** is a public lock plus a private key (solves sharing a secret over an open line, but slow). TLS uses **public-key to agree on a shared symmetric key, then switches to the fast symmetric key** for the bulk of the data.",
       "items": [
         {
-          "id": "tls-security-tls13-handshake-001",
-          "type": "flashcard",
-          "front": "Walk through the TLS 1.3 1-RTT handshake message flow.",
-          "back": "ClientHello (with supported groups + ephemeral DH key_share + SNI) -> ServerHello (with its ephemeral DH key_share + chosen cipher). Both derive the shared secret; the server then sends ENCRYPTED EncryptedExtensions, Certificate, CertificateVerify, Finished. Client sends Finished and can send application data immediately. One round trip to first byte.",
-          "hint": "Hello, Hello, derive, encrypted server flight, client Finished.",
-          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-1.svg"
-        },
-        {
-          "id": "tls-security-tls13-handshake-002",
-          "type": "flashcard",
-          "front": "What is forward secrecy and how does TLS 1.3 guarantee it?",
-          "back": "Forward secrecy means a compromise of the server's long-term private key cannot decrypt previously recorded sessions. TLS 1.3 uses ephemeral Diffie-Hellman keys (fresh per connection, discarded after), so each session's secret is independent and is never recoverable from the static key.",
-          "hint": "Ephemeral DH, per-session keys."
-        },
-        {
-          "id": "tls-security-tls13-handshake-003",
-          "type": "flashcard",
-          "front": "Why does the client put a key_share in the very first ClientHello?",
-          "back": "To achieve 1-RTT, the client optimistically sends its ephemeral DH public value for the group it expects the server to choose. The server can then complete the key exchange in its single ServerHello reply, so keys are ready after one round trip.",
-          "hint": "Guess the group, send DH pub early."
-        },
-        {
-          "id": "tls-security-tls13-handshake-004",
-          "type": "flashcard",
-          "front": "What is the replay caveat of TLS 1.3 0-RTT (early data)?",
-          "back": "0-RTT data is sent before the handshake completes using a pre-shared key, so an on-path attacker can capture and resend it. The server has no anti-replay guarantee for that early data, so only idempotent requests (e.g. a safe GET) should ever be sent as 0-RTT.",
-          "hint": "Early data can be re-sent."
-        },
-        {
-          "id": "tls-security-tls13-handshake-005",
-          "type": "flashcard",
-          "front": "Name three things TLS 1.3 removed that TLS 1.2 still allowed.",
-          "back": "Static-RSA key exchange (no forward secrecy), legacy/weak ciphers like RC4 and 3DES, and CBC-mode MAC-then-encrypt constructions. TLS 1.3 also dropped renegotiation and compression. Only AEAD ciphers with (EC)DHE key exchange remain.",
-          "hint": "Static RSA, weak ciphers, CBC."
-        },
-        {
-          "id": "tls-security-tls13-handshake-006",
-          "type": "flashcard",
-          "front": "In TLS 1.3, is the server's certificate sent in the clear? Compare to 1.2.",
-          "back": "No. After ServerHello the keys are established, so the Certificate, CertificateVerify, and Finished are all encrypted. In TLS 1.2 the certificate was sent in plaintext, exposing the server identity to passive observers.",
-          "hint": "Encrypted after ServerHello."
-        },
-        {
-          "id": "tls-security-tls13-handshake-007",
+          "id": "tls-security-keys-and-hybrid-mcq-1",
           "type": "mcq",
-          "prompt": "How many round trips does a full (non-resumed) TLS 1.3 handshake add before the client can send application data?",
+          "prompt": "What is a symmetric key?",
           "choices": [
-            "1 RTT",
-            "2 RTT",
-            "0 RTT always",
-            "3 RTT"
+            "A single shared secret that both encrypts and decrypts the data",
+            "A pair of keys, one public and one private",
+            "A key that only the server is allowed to have",
+            "A password you type into a website"
           ],
           "answerIndex": 0,
-          "explanation": "A full TLS 1.3 handshake is 1-RTT: ClientHello out, ServerHello plus the encrypted server flight back, then the client sends Finished and application data. TLS 1.2 needed 2 RTT. 0-RTT applies only to resumption with a pre-shared key."
+          "explanation": "Symmetric means one shared secret used for both locking and unlocking, like a house key two people copy. A public/private pair is the OTHER kind (asymmetric). It is shared by both sides, not server-only, and it is not the same as a login password.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-4.svg"
         },
         {
-          "id": "tls-security-tls13-handshake-008",
+          "id": "tls-security-keys-and-hybrid-mcq-2",
           "type": "mcq",
-          "prompt": "An attacker records a TLS 1.3 session today and steals the server's RSA private key next year. What can they decrypt?",
+          "prompt": "In a public/private key pair, who can open a message that was locked with the PUBLIC key?",
           "choices": [
-            "Nothing from that recorded session",
-            "The entire recorded session",
-            "Only the ClientHello",
-            "Only the certificate"
+            "Only the holder of the matching private key",
+            "Anyone, because the public key is public",
+            "Only someone with the same public key",
+            "Nobody -- once locked it can never be opened"
           ],
           "answerIndex": 0,
-          "explanation": "TLS 1.3's mandatory ephemeral Diffie-Hellman provides forward secrecy: the per-session secret was derived from ephemeral keys that were discarded, and the long-term key only signed the handshake, never encrypted the session key. The recording stays opaque."
+          "explanation": "The public key is like a padlock anyone can snap shut, but only the matching private key opens it. That asymmetry is the whole point. If the public key could also unlock, there would be no secrecy. And it certainly can be opened -- by the private-key holder.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-4.svg"
         },
         {
-          "id": "tls-security-tls13-handshake-009",
+          "id": "tls-security-keys-and-hybrid-mcq-3",
           "type": "mcq",
-          "prompt": "What does the server's CertificateVerify message prove?",
+          "prompt": "What is the MAIN problem with symmetric keys on their own?",
           "choices": [
-            "That the server holds the private key matching the certificate it sent",
-            "That the certificate has not expired",
-            "That DNS resolved correctly",
-            "That the client trusts the CA"
+            "Both sides must somehow agree on the same secret over an open line first",
+            "They are far too slow to encrypt real data",
+            "They can only be used once and then thrown away",
+            "They reveal who you are talking to"
           ],
           "answerIndex": 0,
-          "explanation": "CertificateVerify is a signature over the handshake transcript made with the server's private key. It proves the server actually possesses the private key paired with the public key in its certificate, defeating an attacker who merely copied someone else's certificate."
+          "explanation": "Symmetric keys are fast, but both parties need the SAME secret, and sharing it over an open line risks a snoop copying it. That sharing problem is exactly what public-key crypto solves. Symmetric is fast (not slow), is not inherently single-use, and does not reveal identities.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-4.svg"
+        },
+        {
+          "id": "tls-security-keys-and-hybrid-mcq-4",
+          "type": "mcq",
+          "prompt": "Symmetric vs public-key: what is the key difference, and why does TLS use BOTH?",
+          "choices": [
+            "Symmetric is one fast shared key but hard to share safely; public-key is a slow public/private pair that lets you agree on a secret over an open line -- so TLS uses public-key to agree on a key, then symmetric for speed",
+            "Symmetric is more secure, so TLS uses only symmetric and never public-key",
+            "Public-key is faster, so TLS uses it for all the data and symmetric only for login",
+            "They are the same thing with different names, and TLS picks one at random"
+          ],
+          "answerIndex": 0,
+          "explanation": "The two have complementary strengths: symmetric is fast but hard to set up safely; public-key is easy to set up over an open line but slow. TLS uses public-key to safely agree on a shared symmetric key, then switches to the fast symmetric key for the bulk of the data. They are NOT the same, and the speeds are the reverse of options 2 and 3.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-5.svg"
+        },
+        {
+          "id": "tls-security-keys-and-hybrid-mcq-5",
+          "type": "mcq",
+          "prompt": "Why does TLS NOT just use public-key encryption for everything?",
+          "choices": [
+            "Public-key crypto is slow, so it is impractical for large amounts of data",
+            "Public-key crypto is not secure enough to use at all",
+            "Public-key crypto cannot be used over the internet",
+            "Browsers do not support public-key crypto"
+          ],
+          "answerIndex": 0,
+          "explanation": "Public-key operations are comparatively slow, so using them for all data would be sluggish. Instead TLS uses public-key just once to set up a fast shared key. Public-key crypto is secure, works fine over the internet, and is fully supported by browsers; speed is the reason.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-5.svg"
+        },
+        {
+          "id": "tls-security-keys-and-hybrid-mcq-6",
+          "type": "mcq",
+          "prompt": "In the hybrid approach, what is the role of the public/private key pair?",
+          "choices": [
+            "To safely agree on a shared symmetric secret over the open line",
+            "To encrypt every byte of the actual web page",
+            "To compress the data before sending",
+            "To store your passwords on the server"
+          ],
+          "answerIndex": 0,
+          "explanation": "The public/private pair is used in the set-up phase only: to agree on a fresh shared secret without a snoop learning it. The bulk data is then encrypted with the fast symmetric key, not the key pair. It is not for compression or password storage.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-5.svg"
+        },
+        {
+          "id": "tls-security-keys-and-hybrid-mcq-7",
+          "type": "mcq",
+          "prompt": "A public key is best compared to which everyday object?",
+          "choices": [
+            "An open padlock you can hand out, that only your private key can re-open once snapped shut",
+            "A house key that both locks and unlocks the same door",
+            "A secret password you must keep hidden",
+            "A photo ID card"
+          ],
+          "answerIndex": 0,
+          "explanation": "A public key works like a padlock anyone can snap shut, while only the private key reopens it -- so it is safe to share widely. The house key that does both is the SYMMETRIC analogy. A public key is meant to be shared (unlike a secret password), and an ID card is the analogy for a certificate, not a key.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-4.svg"
+        },
+        {
+          "id": "tls-security-keys-and-hybrid-mcq-8",
+          "type": "mcq",
+          "prompt": "After the set-up phase, which key does TLS use to encrypt the bulk of your data, and why?",
+          "choices": [
+            "The shared symmetric key, because it is fast",
+            "The server's public key, because it is fast",
+            "Your private key, because it is most secret",
+            "A brand-new public/private pair for every byte"
+          ],
+          "answerIndex": 0,
+          "explanation": "Once both sides share a symmetric key, TLS switches to it for all the real data precisely because symmetric encryption is fast. Public-key crypto is slow and is only used to set up that shared key. Making a new key pair per byte would be absurdly slow.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-5.svg"
+        },
+        {
+          "id": "tls-security-keys-and-hybrid-mcq-9",
+          "type": "mcq",
+          "prompt": "How can two strangers agree on a secret key even though a snoop sees every message they exchange?",
+          "choices": [
+            "By using public-key crypto: one side locks the secret with the other's public key, and only the matching private key can open it",
+            "By sending the secret key as plain text and hoping the snoop is not looking",
+            "By both choosing the same key by luck",
+            "It is impossible; a snoop can always learn the key"
+          ],
+          "answerIndex": 0,
+          "explanation": "Public-key crypto solves exactly this: a secret locked with the recipient's public key can only be opened by their private key, so a watching snoop learns nothing. Sending it as plain text would expose it, matching keys by luck is hopeless, and it is very much possible -- that is the breakthrough TLS relies on.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-5.svg"
         }
       ]
     },
     {
-      "id": "tls-security-certs-pki",
-      "title": "Certificates, PKI & Validation",
+      "id": "tls-security-certificates-cas",
+      "title": "Certificates & Certificate Authorities: The Chain of Trust",
       "order": 3,
       "difficulty": 3,
-      "content": "A handshake proves the peer holds a private key, but who says that key belongs to `example.com`? That's the job of **PKI** (Public Key Infrastructure). A server presents an **X.509 certificate**: a structured document binding a public key to a subject name (domain), with validity dates, allowed uses, and a **digital signature from a Certificate Authority (CA)**.\n\nTrust is delegated through a **chain**. The leaf (server) cert is signed by an intermediate CA, whose cert is signed by a **root CA**. Roots are self-signed and pre-installed in the OS/browser **root store** — that's the anchor you implicitly trust. Validation walks the chain leaf->intermediate->root, checking each signature, until it reaches a trusted root.\n\nA client validates a cert by checking: (1) **name match** — the requested hostname is in the Subject Alternative Name; (2) **validity period** — not expired, not yet valid; (3) **chain to a trusted root**; (4) **revocation** — was it cancelled early? Revocation uses **CRLs** (bulk revocation lists, clunky), **OCSP** (an online query per cert, but it leaks browsing to the CA and adds latency), or **OCSP stapling** where the server fetches and attaches a fresh signed OCSP response itself — faster and private.\n\n```bash\n# fetch and inspect the full chain to the root\nopenssl s_client -connect example.com:443 -showcerts </dev/null\n# decode a leaf certificate's fields\nopenssl x509 -in cert.pem -noout -text\n```\n\nMost real-world cert errors are mundane: expired certs, a missing intermediate the server forgot to send, or a name mismatch (cert for `www.` but you hit the apex).",
+      "content": "## A missing piece: who are you really talking to?\n\nIn the last lesson, the public/private key trick let two sides agree on a secret over an open line. But there is a gap. When a website hands you a public key and says \"lock your secret with this,\" how do you know that key really belongs to **bank.com** -- and not to an **impostor** who jumped in the middle and handed you *their* public key instead? If you trust the wrong key, you would happily set up a secure tunnel... straight to the attacker.\n\nThis is the **authentication** problem from Lesson 1. The solution is a **certificate**.\n\n## What a certificate is\n\nA **certificate** is a small digital document that says, in effect: **\"this public key belongs to bank.com.\"** It bundles together the site's name (the domain), its public key, and an expiry date. Think of it as an **ID card for a website**.\n\nBut an ID card is only useful if you trust whoever issued it. Anyone can print a fake badge that says \"I am the bank.\" So a certificate is only convincing because it is **vouched for by a trusted third party**.\n\n## Certificate Authorities (CAs)\n\nThat trusted third party is a **Certificate Authority (CA)** -- a well-known organization whose entire job is to verify identities and then **digitally sign** certificates. When a CA signs bank.com's certificate, it is putting its reputation behind the statement: **\"we checked, and this public key really does belong to bank.com.\"**\n\nIt is like a **passport**: you trust a passport not because the traveler printed it, but because a **government you trust** issued and stamped it. The CA is the government office of the web.\n\n## The chain of trust\n\nIn practice, trust is passed down a short **chain**:\n\n- At the top is a **root CA**, whose own certificate is **pre-installed** in your browser and operating system. These roots are the handful of authorities your device trusts from the start.\n- A root usually signs an **intermediate CA**.\n- The intermediate signs the actual **site certificate** (bank.com).\n\nSo the trust flows **root -> intermediate -> site**. Your browser starts at the site certificate and walks **up** the chain, checking each signature, until it reaches a root it already trusts. If the chain connects to a trusted root, the identity is accepted.\n\n## What your browser checks\n\nBefore showing the padlock, your browser validates the certificate by asking:\n\n1. **Does the name match?** The certificate must be for the exact site you visited (bank.com), not some other name.\n2. **Is it still valid (not expired)?** Certificates have an expiry date and must be current.\n3. **Does the chain reach a trusted root?** Following root -> intermediate -> site, does it end at a root your device trusts?\n4. **Has it been revoked?** Occasionally a certificate is cancelled early (for example, if its private key was stolen); the browser checks it is not on a cancelled list.\n\nIf every check passes, you get the padlock. If any check fails, the browser warns you instead -- which is the subject of the next lesson.\n\n## Recap\n\nA **certificate** is a signed document proving a public key belongs to a specific website -- a website's ID card. A **Certificate Authority (CA)** is the trusted third party that vouches for it, like a government issuing a passport. Trust flows down a **chain** from a pre-trusted **root** through intermediates to the site, and your browser walks that chain (checking name, expiry, chain, and revocation) before showing the padlock.",
       "items": [
         {
-          "id": "tls-security-certs-pki-001",
-          "type": "flashcard",
-          "front": "What does an X.509 certificate bind together, and who vouches for it?",
-          "back": "It binds a public key to a subject identity (domain name), along with validity dates and allowed key usages. A Certificate Authority (CA) signs it with its own private key, vouching that the key really belongs to that subject.",
-          "hint": "Key + name, signed by a CA."
-        },
-        {
-          "id": "tls-security-certs-pki-002",
-          "type": "flashcard",
-          "front": "Describe the chain of trust from a server cert up to a root.",
-          "back": "The leaf (server) certificate is signed by an intermediate CA; the intermediate is signed by a root CA. The root is self-signed and pre-installed in the OS/browser root store. Validation verifies each signature up the chain until it reaches a trusted root anchor.",
-          "hint": "Leaf -> intermediate -> root store."
-        },
-        {
-          "id": "tls-security-certs-pki-003",
-          "type": "flashcard",
-          "front": "List the four checks a client performs to validate a certificate.",
-          "back": "1) Name match: the hostname is in the Subject Alternative Name. 2) Validity period: current time is within not-before/not-after. 3) Chain: it links to a trusted root. 4) Revocation: it hasn't been revoked (via CRL, OCSP, or OCSP stapling).",
-          "hint": "Name, expiry, chain, revocation."
-        },
-        {
-          "id": "tls-security-certs-pki-004",
-          "type": "flashcard",
-          "front": "What is the root store and why is it the trust anchor?",
-          "back": "The root store is the set of self-signed root CA certificates pre-installed in your OS or browser. The whole PKI rests on trusting these roots implicitly; any cert that chains to one is accepted. Adding a malicious root is therefore a complete compromise of trust.",
-          "hint": "Pre-installed self-signed roots."
-        },
-        {
-          "id": "tls-security-certs-pki-005",
-          "type": "flashcard",
-          "front": "Contrast CRL, OCSP, and OCSP stapling for revocation.",
-          "back": "CRL: the CA publishes a bulk list of revoked serials the client downloads (large, stale). OCSP: the client queries the CA per certificate (fresh, but adds latency and leaks browsing to the CA). OCSP stapling: the server itself fetches a fresh signed OCSP response and attaches it to the handshake (fast and private).",
-          "hint": "List vs query vs server-attached."
-        },
-        {
-          "id": "tls-security-certs-pki-006",
-          "type": "flashcard",
-          "front": "Why is OCSP stapling preferred over plain OCSP?",
-          "back": "Plain OCSP makes the client contact the CA for every certificate, adding latency and leaking which sites the user visits to the CA. With stapling the server pre-fetches a time-stamped, CA-signed OCSP response and includes it in the handshake, so the client gets revocation status with no extra round trip and no privacy leak.",
-          "hint": "Server pre-fetches; no client-to-CA call."
-        },
-        {
-          "id": "tls-security-certs-pki-007",
+          "id": "tls-security-certificates-cas-mcq-1",
           "type": "mcq",
-          "prompt": "A browser shows NET::ERR_CERT_AUTHORITY_INVALID even though the cert is unexpired and the name matches. Most likely cause?",
+          "prompt": "What does a certificate prove?",
           "choices": [
-            "The chain does not reach a trusted root (e.g. a missing or untrusted intermediate)",
-            "The page used HTTP/2",
-            "The TCP handshake failed",
-            "DNS returned the wrong A record"
+            "That a particular public key really belongs to a particular website (its identity)",
+            "That the website's data has been compressed",
+            "That the connection is using the fastest possible speed",
+            "That you have an account on the website"
           ],
           "answerIndex": 0,
-          "explanation": "AUTHORITY_INVALID means validation could not build a chain to a root in the trust store. Commonly the server failed to send the intermediate CA cert, or the issuer is a private/untrusted CA. Name and expiry checks already passed."
+          "explanation": "A certificate binds a public key to a website's name -- it is the website's ID card, proving the key belongs to that site. It says nothing about compression, speed, or whether you personally have an account there.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-6.svg"
         },
         {
-          "id": "tls-security-certs-pki-008",
+          "id": "tls-security-certificates-cas-mcq-2",
           "type": "mcq",
-          "prompt": "What is verified when validating the signature on a leaf certificate?",
+          "prompt": "What is a Certificate Authority (CA)?",
           "choices": [
-            "That the issuing CA's public key correctly verifies the CA's signature over the leaf",
-            "That the server still holds the matching private key",
-            "That the domain currently resolves in DNS",
-            "That TLS 1.3 was negotiated"
+            "A trusted third party that verifies identities and signs certificates to vouch for them",
+            "A government agency that controls the entire internet",
+            "The company that sells you internet access",
+            "A piece of software that scans for viruses"
           ],
           "answerIndex": 0,
-          "explanation": "The leaf carries the CA's signature; you verify it using the CA (intermediate) certificate's public key. Proof of private-key possession is separate (CertificateVerify in the handshake). DNS and TLS version are unrelated to the signature check."
+          "explanation": "A CA is a trusted organization that checks who someone is and then digitally signs their certificate, vouching that the public key belongs to that site -- like a passport office. It is not a controller of the internet, not your ISP, and not antivirus software.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-6.svg"
         },
         {
-          "id": "tls-security-certs-pki-009",
+          "id": "tls-security-certificates-cas-mcq-3",
           "type": "mcq",
-          "prompt": "Which OpenSSL command shows you every certificate the server sends, so you can walk the chain to a root?",
+          "prompt": "What does a certificate AND its signing CA together prove to your browser?",
           "choices": [
-            "openssl s_client -connect host:443 -showcerts",
-            "openssl rand -hex 16",
-            "openssl genrsa 2048",
-            "openssl dgst -sha256 file"
+            "That a trusted authority has vouched the public key truly belongs to this website, so you are not talking to an impostor",
+            "That the website's business is honest and its prices are fair",
+            "That the website will never go offline",
+            "That your data will be delivered faster"
           ],
           "answerIndex": 0,
-          "explanation": "s_client opens a TLS connection and -showcerts prints the full certificate chain the server presents (leaf plus intermediates), which you can then verify links up to a trusted root."
+          "explanation": "A certificate states 'this key belongs to bank.com,' and a CA's signature means a trusted authority checked and vouches for that claim -- so an impostor cannot fake the real site's identity. It does NOT certify the business is honest, guarantee uptime, or affect speed.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-6.svg"
+        },
+        {
+          "id": "tls-security-certificates-cas-mcq-4",
+          "type": "mcq",
+          "prompt": "In the chain of trust, what is special about a ROOT CA?",
+          "choices": [
+            "Its certificate is pre-installed and trusted by your browser/operating system from the start",
+            "It is the website you are actually visiting",
+            "It changes every time you load a page",
+            "It is chosen by you each time you connect"
+          ],
+          "answerIndex": 0,
+          "explanation": "Root CAs are the handful of authorities whose certificates ship pre-installed in your device, forming the anchor of trust. The site certificate sits at the BOTTOM of the chain, not the top. Roots do not change per page and are not picked by the user.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-6.svg"
+        },
+        {
+          "id": "tls-security-certificates-cas-mcq-5",
+          "type": "mcq",
+          "prompt": "A certificate is most like which everyday object?",
+          "choices": [
+            "A passport: trusted because a trusted authority issued and stamped it, not because you printed it yourself",
+            "A house key that locks and unlocks a door",
+            "A postcard anyone can read",
+            "A receipt for a purchase"
+          ],
+          "answerIndex": 0,
+          "explanation": "A certificate is like a passport -- it proves identity because a trusted authority (the CA) issued it, just as a government issues a passport. A house key is the symmetric-key analogy, a postcard represents unprotected data, and a receipt is unrelated.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-6.svg"
+        },
+        {
+          "id": "tls-security-certificates-cas-mcq-6",
+          "type": "mcq",
+          "prompt": "Which direction does your browser walk the chain of trust to validate a site?",
+          "choices": [
+            "From the site certificate up through any intermediates until it reaches a trusted root",
+            "From the root downward, ignoring the site certificate",
+            "It checks only the site certificate and nothing above it",
+            "It picks one certificate in the chain at random to check"
+          ],
+          "answerIndex": 0,
+          "explanation": "The browser starts at the site (leaf) certificate and follows the signatures upward through intermediates until it reaches a root it already trusts. Checking only the leaf, or just one random link, would not establish trust; the whole point is connecting the site up to a pre-trusted root.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-6.svg"
+        },
+        {
+          "id": "tls-security-certificates-cas-mcq-7",
+          "type": "mcq",
+          "prompt": "Which of these is one of the checks your browser performs on a certificate?",
+          "choices": [
+            "That the certificate's name matches the site you actually visited",
+            "That the website loads in under one second",
+            "That you have visited the site before",
+            "That the site uses a popular programming language"
+          ],
+          "answerIndex": 0,
+          "explanation": "Name match is a core check: the certificate must be for the exact site you visited (other checks are expiry, chain-to-a-trusted-root, and revocation). Load speed, prior visits, and the site's programming language are not part of certificate validation.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-6.svg"
+        },
+        {
+          "id": "tls-security-certificates-cas-mcq-8",
+          "type": "mcq",
+          "prompt": "Why is it not enough for a website to simply present a public key on its own, without a certificate?",
+          "choices": [
+            "An impostor in the middle could hand you their own public key, and you would have no way to know it is not the real site's",
+            "Public keys are too large to send without a certificate",
+            "A public key cannot be used for encryption",
+            "Browsers cannot read a public key unless it is compressed"
+          ],
+          "answerIndex": 0,
+          "explanation": "A bare public key carries no proof of ownership, so an attacker could substitute their own and you would unknowingly secure a tunnel to them. The certificate, signed by a trusted CA, is what proves the key belongs to the real site. Size, encryption ability, and compression are not the issue.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-6.svg"
+        },
+        {
+          "id": "tls-security-certificates-cas-mcq-9",
+          "type": "mcq",
+          "prompt": "A typical chain might be root -> intermediate -> site. What does the intermediate CA do?",
+          "choices": [
+            "It is signed by the root and in turn signs the site's certificate, passing trust down the chain",
+            "It is the site you are visiting",
+            "It replaces the need for a root CA entirely",
+            "It is the symmetric key used for encryption"
+          ],
+          "answerIndex": 0,
+          "explanation": "The intermediate sits between the root and the site: the root signs the intermediate, and the intermediate signs the site certificate, so trust flows root -> intermediate -> site. It is not the site itself, it still relies on the root above it, and it is a certificate, not an encryption key.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-6.svg"
         }
       ]
     },
     {
-      "id": "tls-security-attacks-defenses",
-      "title": "Attacks, Tunnels & Defenses",
+      "id": "tls-security-handshake-and-pitfalls",
+      "title": "The Handshake, TLS 1.3, and Certificate Warnings",
       "order": 4,
       "difficulty": 4,
-      "content": "Encryption is necessary but not sufficient — and it doesn't hide everything. TLS protects the *content* of a connection, but **metadata leaks**: packet sizes and timing, the destination IP and port, and (pre-ECH) the **SNI** in the ClientHello, which names the host in plaintext. The DNS lookup that preceded the connection is also visible unless you use DoH/DoT. **Encrypted Client Hello (ECH)** is the modern fix: it encrypts the ClientHello (including SNI) under a public key published in DNS, closing the last big plaintext leak.\n\nKnow the **attack taxonomy**: **spoofing** (forging a source address/identity), **MITM** (relaying and reading/altering traffic between two parties — defeated by certificate authentication), **replay** (re-sending captured valid messages), **DoS/DDoS** (exhausting resources), **amplification/reflection** (sending a small spoofed query to a service like DNS or NTP that replies with a huge response aimed at the victim), and **TCP RST injection** (an on-path attacker forging a reset to tear down a connection).\n\n**Defenses** layer up. **Firewalls** filter traffic: a **stateless** firewall judges each packet in isolation by header fields; a **stateful** firewall tracks connection state (the conntrack table) so it can allow return traffic for connections it saw initiate. **Network segmentation** (VLANs, subnets) limits blast radius. **Zero-trust** discards the idea of a trusted interior: every request is authenticated and authorized regardless of network location. And **TLS everywhere** plus authenticated tunnels — **SSH** for admin sessions, **IPsec** for traditional site VPNs, and **WireGuard** (a minimal, fast, modern VPN using fixed modern crypto and a tiny codebase) — encrypt links end to end.\n\n```bash\n# stateful rule: allow established/related return traffic\nnft add rule inet filter input ct state established,related accept\n```",
+      "content": "## Putting it together: the handshake as a story\n\nYou now know the pieces -- a secure tunnel, two kinds of keys, and certificates. The moment they all come together, right when a secure connection begins, is called the **handshake**. It is a quick back-and-forth where two sides agree on how to talk securely, *before* any real data flows. Told as a plain story, it goes:\n\n1. **\"Hello.\"** Your browser says hello and lists what kinds of encryption it supports.\n2. **\"Hello -- here is my certificate.\"** The server replies and sends its **certificate**. Your browser checks it (name, expiry, chain to a trusted root, not revoked) to confirm the server is really who it claims to be. This is **authentication** happening.\n3. **\"Let's agree on keys.\"** Using the public/private key idea, the two sides agree on a shared **symmetric** key over the open line, without a snoop learning it.\n4. **\"Now we're encrypted.\"** From here on, everything is scrambled with that fast shared key. The real conversation (your web requests) begins, safely.\n\nThat is the whole idea: **hello -> server proves its identity with a certificate -> agree on keys -> encrypted**.\n\n## TLS 1.3 is the faster, modern version\n\nTLS has improved over the years. The current version, **TLS 1.3**, is **faster** than older versions: it completes the handshake in fewer round trips, so secure pages start loading sooner. It also drops a lot of old, weak options, keeping only strong, modern ones. You do not need the internal details -- just know that **TLS 1.3 = the modern, leaner, faster handshake**, and it is what most secure sites use today.\n\n## Forward secrecy, in one line\n\nModern TLS provides **forward secrecy**: it uses **fresh keys for every session**, so even if an attacker records your encrypted traffic today and *later* steals the server's long-term private key, they **still cannot unlock those old recordings**. Each conversation's key is thrown away when it ends.\n\n## When something is wrong: certificate warnings\n\nSometimes your browser interrupts with a scary full-page **certificate warning** instead of the padlock. That means one of the validation checks **failed**. The common reasons map directly to the checks from the last lesson:\n\n- **Expired certificate** -- the certificate's valid-until date has passed. Very common; the site owner simply forgot to renew it.\n- **Self-signed certificate** -- the certificate was not signed by a trusted CA, only by the site itself. It is like a homemade ID card no trusted authority vouches for, so your browser cannot confirm the identity.\n- **Name mismatch** -- the certificate is for a different name than the site you visited (for example, a certificate for `example.com` served on `shop.example.com`). The identity does not line up.\n\nThese warnings are **protecting you**: they mean \"I could not safely confirm who you are talking to.\" On a site handling anything sensitive, you should not click through them.\n\n## TLS is not the only tool: defense in depth\n\nTLS secures a single connection (one browser to one website). But security usually comes in **layers** -- an idea called **defense in depth**, meaning you do not rely on a single protection. For example, a **VPN (Virtual Private Network)** wraps *all* of your device's traffic in an encrypted tunnel to a trusted point, useful on untrusted Wi-Fi; **IPsec** is a common technology for building such tunnels between whole networks. TLS, VPNs, and other safeguards stack together so that if one layer is bypassed, others still protect you.\n\n## Recap\n\nThe **handshake** is the opening exchange: hello, the server proves identity with its **certificate**, both sides agree on keys, then everything is encrypted. **TLS 1.3** is the faster modern version, and **forward secrecy** means old recordings stay safe even if a key is stolen later. **Certificate warnings** (expired, self-signed, name mismatch) mean a safety check failed -- heed them. And TLS is one layer among many in **defense in depth** (alongside tools like VPNs/IPsec).",
       "items": [
         {
-          "id": "tls-security-attacks-defenses-001",
-          "type": "flashcard",
-          "front": "What can an attacker see, and NOT see, on a TLS-encrypted link?",
-          "back": "CANNOT see: the application payload (request bodies, responses, credentials) and cannot undetectably alter it. CAN see: source/destination IPs and ports, packet sizes and timing (traffic analysis), the preceding DNS query (unless DoH/DoT), and pre-ECH the SNI hostname in the ClientHello. TLS protects content, not metadata.",
-          "hint": "Content hidden; metadata + SNI leak."
-        },
-        {
-          "id": "tls-security-attacks-defenses-002",
-          "type": "flashcard",
-          "front": "What is SNI, why is it a privacy leak, and how does ECH fix it?",
-          "back": "Server Name Indication tells the server which hostname the client wants, so one IP can host many TLS sites. Historically it was sent in plaintext in the ClientHello, revealing the destination host to observers. Encrypted Client Hello (ECH) encrypts the ClientHello including SNI under a public key published in DNS, hiding it.",
-          "hint": "Plaintext hostname; ECH encrypts the ClientHello."
-        },
-        {
-          "id": "tls-security-attacks-defenses-003",
-          "type": "flashcard",
-          "front": "Define a reflection/amplification attack and name typical abused services.",
-          "back": "The attacker sends small requests with a spoofed source address (the victim's) to servers that reply with much larger responses, flooding the victim with amplified traffic. Commonly abused: DNS, NTP (monlist), and memcached, which can amplify by 50x or more.",
-          "hint": "Small spoofed query, huge reply at the victim."
-        },
-        {
-          "id": "tls-security-attacks-defenses-004",
-          "type": "flashcard",
-          "front": "How does TLS certificate authentication defeat a man-in-the-middle?",
-          "back": "A MITM relays traffic, but to impersonate the server it must present a certificate for that hostname signed by a trusted CA, and prove possession of the matching private key (CertificateVerify). Without the genuine key it cannot, so the client's validation fails and the connection aborts.",
-          "hint": "Attacker can't forge a CA-signed cert it owns the key for."
-        },
-        {
-          "id": "tls-security-attacks-defenses-005",
-          "type": "flashcard",
-          "front": "Contrast a stateless vs a stateful firewall.",
-          "back": "A stateless firewall evaluates each packet independently using header fields (IPs, ports, flags) against static rules. A stateful firewall tracks connection state in a conntrack table, so it can automatically permit return packets of connections it saw start, enabling rules like 'allow established,related'.",
-          "hint": "Per-packet vs connection-aware."
-        },
-        {
-          "id": "tls-security-attacks-defenses-006",
-          "type": "flashcard",
-          "front": "What is zero-trust networking and how does it differ from the old perimeter model?",
-          "back": "Zero-trust assumes no implicit trust based on network location: every request is authenticated and authorized individually, whether it comes from inside or outside. The old castle-and-moat model trusted anything inside the perimeter, so one breached host gave an attacker free interior movement.",
-          "hint": "Never trust the interior; authenticate every request."
-        },
-        {
-          "id": "tls-security-attacks-defenses-007",
-          "type": "flashcard",
-          "front": "What makes WireGuard different from traditional IPsec VPNs?",
-          "back": "WireGuard is a minimal, modern VPN: a tiny codebase (easy to audit), a fixed set of modern crypto primitives (no negotiation/cipher agility), runs in the kernel, and uses simple public-key peer config. It is faster and far simpler to configure than the sprawling, negotiation-heavy IPsec suite.",
-          "hint": "Small, fixed crypto, fast, simple."
-        },
-        {
-          "id": "tls-security-attacks-defenses-008",
+          "id": "tls-security-handshake-and-pitfalls-mcq-1",
           "type": "mcq",
-          "prompt": "An on-path attacker forges a TCP segment with the RST flag to a client. What is the effect, and is TLS a defense?",
+          "prompt": "What is the TLS handshake?",
           "choices": [
-            "The connection is torn down; TLS does not prevent it because RST acts at the transport layer below TLS",
-            "The attacker reads the plaintext; TLS prevents it",
-            "Nothing happens; RST is ignored on TLS connections",
-            "The certificate is revoked automatically"
+            "The opening back-and-forth where two sides agree on how to talk securely, before any real data flows",
+            "The moment you type your password into a website",
+            "The encryption of a single video frame",
+            "A physical cable connection between two computers"
           ],
           "answerIndex": 0,
-          "explanation": "RST injection operates on the TCP layer beneath TLS. A correctly guessed RST tears down the connection (a denial-of-service / censorship tool). TLS protects payload confidentiality and integrity but cannot stop a forged transport-layer reset; that's an availability attack."
+          "explanation": "The handshake is the setup conversation at the start of a secure connection: the sides greet, prove identity, and agree on keys before exchanging real data. It is not about typing a password, encrypting one frame, or any physical cabling.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-8.svg"
         },
         {
-          "id": "tls-security-attacks-defenses-009",
+          "id": "tls-security-handshake-and-pitfalls-mcq-2",
           "type": "mcq",
-          "prompt": "Even with TLS 1.3 and ECH deployed, what does a passive on-path observer still reliably learn?",
+          "prompt": "In the handshake story, how does the server prove it is really who it claims to be?",
           "choices": [
-            "The destination IP address, ports, and packet size/timing patterns",
-            "The full HTTP request body",
-            "The user's login password",
-            "The server's private key"
+            "It sends its certificate, which the browser checks against a trusted CA",
+            "It sends its private key for the browser to inspect",
+            "It asks the browser to trust it without any proof",
+            "It sends the user's password back"
           ],
           "answerIndex": 0,
-          "explanation": "ECH hides the SNI and TLS hides the payload, but the IP header is unavoidably visible: destination IP and port plus traffic-analysis signals (sizes, timing). Content and secrets remain protected; raw routing metadata cannot be hidden by TLS alone."
+          "explanation": "The server presents its certificate, and the browser validates it (name, expiry, chain to a trusted root). A server must NEVER send its private key -- that would destroy its security. Blind trust and echoing passwords are not how identity is proven.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-8.svg"
         },
         {
-          "id": "tls-security-attacks-defenses-010",
+          "id": "tls-security-handshake-and-pitfalls-mcq-3",
           "type": "mcq",
-          "prompt": "Which nftables match lets a stateful firewall accept return traffic without an explicit inbound rule per service?",
+          "prompt": "What is the correct order of the handshake story?",
           "choices": [
-            "ct state established,related",
-            "tcp flags syn",
-            "ip saddr 0.0.0.0/0",
-            "meta l4proto icmp"
+            "Hello -> server proves identity with its certificate -> agree on keys -> encrypted data",
+            "Encrypted data -> hello -> agree on keys -> certificate",
+            "Agree on keys -> encrypted data -> hello -> certificate",
+            "Certificate -> encrypted data -> hello -> agree on keys"
           ],
           "answerIndex": 0,
-          "explanation": "Connection tracking (ct state established,related) lets the firewall recognize packets belonging to a connection it already saw initiate, so replies are permitted automatically. This is the defining capability of a stateful firewall."
+          "explanation": "First the sides say hello, then the server proves its identity with a certificate, then they agree on a shared key, and only THEN does encrypted real data flow. You cannot encrypt before agreeing on keys, which rules out the other orderings.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-8.svg"
+        },
+        {
+          "id": "tls-security-handshake-and-pitfalls-mcq-4",
+          "type": "mcq",
+          "prompt": "What is the main practical benefit of TLS 1.3 over older versions?",
+          "choices": [
+            "It is faster -- it completes the handshake in fewer round trips and drops weak old options",
+            "It removes the need for any encryption",
+            "It works without certificates",
+            "It makes websites use more data"
+          ],
+          "answerIndex": 0,
+          "explanation": "TLS 1.3 streamlines the handshake (fewer round trips, so secure pages start sooner) and keeps only strong modern options. It does not remove encryption or certificates -- those are essential -- and it is about being leaner, not using more data.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-8.svg"
+        },
+        {
+          "id": "tls-security-handshake-and-pitfalls-mcq-5",
+          "type": "mcq",
+          "prompt": "What does forward secrecy protect against?",
+          "choices": [
+            "An attacker who recorded your encrypted traffic today and later steals the server's long-term private key -- they still cannot decrypt the old recording",
+            "An attacker who guesses your password",
+            "A website that loads too slowly",
+            "A virus on your own computer"
+          ],
+          "answerIndex": 0,
+          "explanation": "Forward secrecy uses fresh, throwaway keys per session, so a private key stolen LATER cannot unlock traffic recorded earlier. It is specifically about protecting past sessions; it does not address password guessing, slow loading, or local malware.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-8.svg"
+        },
+        {
+          "id": "tls-security-handshake-and-pitfalls-mcq-6",
+          "type": "mcq",
+          "prompt": "Your browser shows a warning that the certificate is EXPIRED. What does that most likely mean?",
+          "choices": [
+            "The certificate's valid-until date has passed -- often the site owner forgot to renew it",
+            "The website has been permanently shut down",
+            "Your internet connection is too slow",
+            "Your browser is out of date and must be reinstalled"
+          ],
+          "answerIndex": 0,
+          "explanation": "An expired-certificate warning means the certificate is past its valid-until date, commonly because it was not renewed in time. It does not mean the site is gone, that your connection is slow, or that your browser is broken.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-6.svg"
+        },
+        {
+          "id": "tls-security-handshake-and-pitfalls-mcq-7",
+          "type": "mcq",
+          "prompt": "A SELF-SIGNED certificate triggers a warning because:",
+          "choices": [
+            "It was signed only by the site itself, not by a trusted CA, so the browser cannot confirm the identity",
+            "It is encrypted too strongly for the browser to read",
+            "It belongs to a different website",
+            "It has the wrong file name"
+          ],
+          "answerIndex": 0,
+          "explanation": "A self-signed certificate is vouched for by no trusted authority -- like a homemade ID card -- so the browser cannot verify who you are talking to. That is different from a NAME MISMATCH (belonging to a different site) and has nothing to do with encryption strength or file names.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-6.svg"
+        },
+        {
+          "id": "tls-security-handshake-and-pitfalls-mcq-8",
+          "type": "mcq",
+          "prompt": "You visit shop.example.com but the certificate is issued for example.com only. What kind of warning is this?",
+          "choices": [
+            "A name mismatch -- the certificate's name does not match the site you actually visited",
+            "An expired certificate",
+            "A revoked certificate",
+            "A forward-secrecy error"
+          ],
+          "answerIndex": 0,
+          "explanation": "When the certificate's name does not cover the exact site you visited, the browser reports a name mismatch, because the identity does not line up. It is not about expiry, revocation, or forward secrecy -- those are different checks.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-6.svg"
+        },
+        {
+          "id": "tls-security-handshake-and-pitfalls-mcq-9",
+          "type": "mcq",
+          "prompt": "What is 'defense in depth,' and where does TLS fit?",
+          "choices": [
+            "Relying on multiple layers of protection rather than one; TLS secures a connection, while tools like a VPN or IPsec add further encrypted layers",
+            "Using one very strong password and nothing else",
+            "Turning off encryption to make the network simpler",
+            "Trusting any device once it is inside your home network"
+          ],
+          "answerIndex": 0,
+          "explanation": "Defense in depth means stacking protections so that if one is bypassed, others still help. TLS protects a single connection; a VPN (often built with IPsec) can wrap all of a device's traffic as an additional layer. Relying on a single password, disabling encryption, or blindly trusting the local network are the opposite of this idea.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-8.svg"
+        },
+        {
+          "id": "tls-security-handshake-and-pitfalls-mcq-10",
+          "type": "mcq",
+          "prompt": "Should you click through a certificate warning on your bank's website?",
+          "choices": [
+            "No -- the warning means the browser could not safely confirm who you are talking to, so sensitive data is at risk",
+            "Yes -- warnings are always just bugs and can be ignored",
+            "Yes -- clicking through makes the connection faster",
+            "It does not matter, because TLS protects you either way"
+          ],
+          "answerIndex": 0,
+          "explanation": "A certificate warning means a safety check failed and the site's identity could not be confirmed, so on anything sensitive like banking you should not proceed. Warnings are not mere bugs, clicking through does not speed anything up, and TLS cannot protect you if you have overridden the very check that proves who you are talking to.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/tls-security-6.svg"
         }
       ]
     }
