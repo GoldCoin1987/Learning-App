@@ -4,359 +4,598 @@
   "order": 12,
   "lessons": [
     {
-      "id": "application-protocols-http-basics-lesson-1",
+      "id": "application-protocols-http-basics",
       "title": "HTTP: Request/Response, Methods, Status, and State",
       "order": 1,
       "difficulty": 1,
-      "content": "HTTP is a **stateless, text-framed request/response** protocol that rides on top of a reliable transport (TCP, or QUIC for HTTP/3). The client sends a request; the server sends exactly one response. Nothing on the server inherently remembers you between requests — that is what *stateless* means, and it is the property that lets any server in a load-balanced pool answer any request.\n\nA request is a **request-line**, then **headers**, a blank line, then an optional **body**:\n\n```http\nGET /api/sensors/42 HTTP/1.1\nHost: example.com\nAccept: application/json\nUser-Agent: curl/8.4\n\n```\n\nA response mirrors it with a **status-line**, headers, blank line, body:\n\n```http\nHTTP/1.1 200 OK\nContent-Type: application/json\nContent-Length: 27\n\n{\"id\":42,\"temp_c\":21.4}\n```\n\n**Methods** carry intent: `GET` (read, safe/idempotent), `POST` (create/submit, not idempotent), `PUT` (replace, idempotent), `PATCH` (partial update), `DELETE`, plus `HEAD` and `OPTIONS`. **Status codes** group by first digit: 1xx informational, 2xx success, 3xx redirect, 4xx client error (400 bad request, 401 unauthorized, 404 not found), 5xx server error (500, 502 bad gateway, 503 unavailable).\n\nSince HTTP itself is stateless, applications layer state on top with **cookies**: the server sends `Set-Cookie: session=abc123`, and the browser echoes `Cookie: session=abc123` on every later request. The server maps that opaque token to a server-side session (or signs the state into the cookie itself, as with JWTs). This is the radar-tech analogy of a transponder code: the packet is anonymous on the wire; the tag is what re-associates it with a track.",
+      "content": "## The top of the stack: the language programs speak\n\nYou have built up a stack: **IP** gets a packet to the right computer, **TCP** delivers the bytes reliably and in order, and **ports** pick which program receives them. But once two programs are connected, what do they actually *say* to each other? That is the job of the **application layer** -- the very top of the stack.\n\nThe **application layer** is the set of **languages programs use to talk to each other** once the lower layers have set up delivery. The transport layer is like a phone line that connects two people; the application layer is the *language they speak* on the call. Different jobs use different languages: fetching a web page, sending an email, and moving a file each have their own.\n\n## The most important one: HTTP\n\nBy far the most common application-layer language is **HTTP** (HyperText Transfer Protocol) -- the **request/response language of the web**. Here is the whole idea:\n\n- Your **browser** is the **client** -- \"the one who asks.\" It sends a **request**, such as \"GET me the home page.\"\n- The **web server** is the **server** -- \"the one who answers.\" It sends back a **response**.\n\nOne request goes out; exactly one response comes back. A **response** has two parts: a **status code** (did it work?) and a **body** (the actual content -- the page, the image, the data).\n\n## The restaurant analogy\n\nThink of ordering at a restaurant. **You** are the client: you make a **request** from the menu. The **kitchen** is the server: it **responds** with your dish. The waiter's reply is like a **status code** -- \"here you go\" (success), \"we're out of that\" (your item doesn't exist), or \"there's a problem in the kitchen\" (the server broke). Same pattern as the web: ask, then receive an answer plus a short status.\n\n## Naming what you want: the URL\n\nHow does the browser say *what* it wants? With a **URL** (Uniform Resource Locator) -- a web address like `https://example.com/photos/cat.jpg`. It names the server (`example.com`) and the exact item on it (`/photos/cat.jpg`). You type or click a URL; the browser turns it into an HTTP request.\n\n## A couple of request types\n\nRequests carry an **intent**, called a **method**. The two you will meet first:\n\n- **GET** -- \"give me this\" (read something, like loading a page). GET just *fetches*; it doesn't change anything on the server.\n- **POST** -- \"here is some data, take it\" (submit something, like sending a form or posting a comment).\n\n(There are a few more, like **PUT** to replace an item and **DELETE** to remove one, but GET and POST are the everyday pair.)\n\n## Recap\n\nThe application layer is the **program-to-program language** that sits on top of TCP/IP. The most important one is **HTTP**, the web's **request/response** pattern: a **client** (browser) sends a request naming a **URL**; a **server** sends back a **status code** plus a **body**. Methods like **GET** (read) and **POST** (submit) say what the request is for.",
       "items": [
         {
-          "id": "application-protocols-1-fc-1",
-          "type": "flashcard",
-          "front": "What does it mean that HTTP is 'stateless', and why is that property useful?",
-          "back": "Each request/response is independent; the server keeps no inherent memory of prior requests from a client. This lets any server in a load-balanced pool handle any request, simplifying scaling and failover.",
-          "hint": "Think about a load balancer fanning requests across many identical servers."
-        },
-        {
-          "id": "application-protocols-1-fc-2",
-          "type": "flashcard",
-          "front": "List the three parts of an HTTP request message in order.",
-          "back": "1) Request-line (method, target, version, e.g. 'GET /path HTTP/1.1'); 2) Headers (one per line); 3) a blank line, then an optional body.",
-          "hint": "Line, lines, blank, payload."
-        },
-        {
-          "id": "application-protocols-1-fc-3",
-          "type": "flashcard",
-          "front": "Which common HTTP methods are idempotent, and what does idempotent mean here?",
-          "back": "GET, PUT, DELETE, HEAD, OPTIONS are idempotent — issuing the same request N times leaves the server in the same state as issuing it once. POST is NOT idempotent (it typically creates a new resource each time).",
-          "hint": "POST is the odd one out among create/replace/delete."
-        },
-        {
-          "id": "application-protocols-1-fc-4",
-          "type": "flashcard",
-          "front": "How do cookies add state on top of stateless HTTP?",
-          "back": "The server sends 'Set-Cookie: name=value'; the browser stores it and returns 'Cookie: name=value' on subsequent requests. The server maps that token to server-side session data (or verifies signed state in the cookie itself).",
-          "hint": "Set-Cookie out, Cookie back in."
-        },
-        {
-          "id": "application-protocols-1-mcq-1",
+          "id": "application-protocols-http-basics-mcq-1",
           "type": "mcq",
-          "prompt": "A client receives '502 Bad Gateway'. What does this most directly indicate?",
+          "prompt": "What is the application layer?",
           "choices": [
-            "The client sent a malformed request",
-            "A server acting as a gateway/proxy got an invalid response from an upstream server",
-            "The requested resource does not exist",
-            "The client is not authenticated"
-          ],
-          "answerIndex": 1,
-          "explanation": "502 is a 5xx server-side error meaning a gateway/reverse proxy received an invalid response from the upstream it relied on. 400 is a malformed request, 404 is not found, 401 is unauthenticated."
-        },
-        {
-          "id": "application-protocols-1-mcq-2",
-          "type": "mcq",
-          "prompt": "Which status-code class indicates the client should look at its own request for the problem?",
-          "choices": [
-            "2xx",
-            "3xx",
-            "4xx",
-            "5xx"
-          ],
-          "answerIndex": 2,
-          "explanation": "4xx codes (400, 401, 403, 404, ...) signal client errors — the request was bad, unauthorized, forbidden, or for a missing resource. 5xx are server-side faults; 2xx success; 3xx redirection."
-        },
-        {
-          "id": "application-protocols-1-mcq-3",
-          "type": "mcq",
-          "prompt": "You want to fetch a resource's headers (e.g., size, last-modified) WITHOUT downloading its body. Which method fits?",
-          "choices": [
-            "GET",
-            "HEAD",
-            "OPTIONS",
-            "TRACE"
-          ],
-          "answerIndex": 1,
-          "explanation": "HEAD returns the same headers a GET would but with no body — ideal for checking Content-Length or caching metadata cheaply. OPTIONS reports allowed methods; GET would also transfer the body."
-        },
-        {
-          "id": "application-protocols-1-mcq-4",
-          "type": "mcq",
-          "prompt": "Why can't the server simply remember which TCP connection a logged-in user is on to track their session?",
-          "choices": [
-            "TCP connections never close, so it would leak memory",
-            "Connections are short-lived/reused and a user's requests may land on different servers, so connection identity is not durable session identity",
-            "TCP has no source port to identify clients",
-            "HTTP forbids reading the connection's IP address"
-          ],
-          "answerIndex": 1,
-          "explanation": "Connections open and close, get pooled, and are spread across a server fleet by load balancers. A cookie/token carried IN the request is the durable, server-independent way to identify a session."
-        }
-      ]
-    },
-    {
-      "id": "application-protocols-http-evolution-lesson-2",
-      "title": "HTTP/1.0 → 1.1 → 2 → 3: Connections, Multiplexing, and HOL Blocking",
-      "order": 2,
-      "difficulty": 2,
-      "content": "The evolution of HTTP is the cleanest case study of how a *lower-layer* limitation drives *application* design.\n\n**HTTP/1.0** opened a fresh TCP connection per request and closed it after the response — paying a 3-way handshake (and TLS handshake) every time. **HTTP/1.1** added **persistent connections** (`Connection: keep-alive`) so many requests reuse one TCP connection. It also specified **pipelining** — sending several requests without waiting for each response — but pipelining *failed in practice*: responses had to return in request order, so one slow response blocked all the ones queued behind it (**application-layer head-of-line blocking**), and buggy proxies mishandled it. Browsers disabled it and instead opened ~6 parallel connections per origin.\n\n**HTTP/2** (RFC 7540) replaced the text protocol with a **binary framing layer**. Requests/responses become **streams**, each chopped into frames that are **multiplexed** over a *single* TCP connection and interleaved freely — so a slow response no longer blocks others at the application layer. It adds **HPACK** header compression (headers are hugely repetitive) and server push (now deprecated). Crucially, HTTP/2 fixed *application* HOL blocking but **not** *transport* HOL blocking: because all streams share one TCP byte-stream, a single lost TCP segment stalls *every* stream until retransmission, since TCP must deliver bytes in order.\n\n```http\nGET /a HTTP/2\nGET /b HTTP/2   ; both in flight, frames interleaved on one connection\n```\n\n**HTTP/3** (RFC 9114) solves transport HOL by abandoning TCP. It runs over **QUIC**, a reliable transport built on **UDP** with TLS 1.3 baked in. QUIC carries independent streams: a lost packet only stalls the stream(s) whose bytes it held — the others keep flowing. QUIC also folds transport + crypto setup into 1-RTT (0-RTT on resumption) and supports connection migration across IP changes (great for mobile). The diagram contrasts HTTP/1.1's sequential responses with HTTP/2's interleaved frames.",
-      "items": [
-        {
-          "id": "application-protocols-2-fc-1",
-          "type": "flashcard",
-          "front": "What did HTTP/1.1 add over 1.0, and why did its pipelining feature fail?",
-          "back": "1.1 added persistent (keep-alive) connections so many requests reuse one TCP connection. Pipelining (sending requests without waiting) failed because responses had to come back in order — one slow response blocked the rest (application HOL) — and proxies mishandled it. Browsers used ~6 parallel connections instead.",
-          "hint": "Responses had to return in the order requests were sent.",
-          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-1.svg"
-        },
-        {
-          "id": "application-protocols-2-fc-2",
-          "type": "flashcard",
-          "front": "What is HPACK and why does HTTP/2 need it?",
-          "back": "HPACK is HTTP/2's header-compression scheme. HTTP headers are large and highly repetitive across requests on a connection; HPACK uses static + dynamic indexed tables and Huffman coding to avoid resending identical headers, cutting overhead substantially.",
-          "hint": "Compresses the very repetitive part of every request."
-        },
-        {
-          "id": "application-protocols-2-fc-3",
-          "type": "flashcard",
-          "front": "Why does QUIC use UDP rather than TCP as its base?",
-          "back": "TCP's in-order byte-stream causes transport HOL blocking and its handshake/congestion logic is fixed in the kernel. UDP is a thin datagram layer, so QUIC can implement its own reliable, multiplexed, per-stream delivery plus integrated TLS 1.3 in user space — evolving without kernel/middlebox changes.",
-          "hint": "It needs to control streams and crypto itself, in user space."
-        },
-        {
-          "id": "application-protocols-2-fc-4",
-          "type": "flashcard",
-          "front": "What is connection migration in QUIC and why does it matter for mobile?",
-          "back": "QUIC identifies a connection by a Connection ID, not the 4-tuple of IPs/ports. When a phone switches WiFi↔cellular (changing its IP), the connection survives without a new handshake — the same QUIC connection continues.",
-          "hint": "A phone walking out the door changes IP."
-        },
-        {
-          "id": "application-protocols-2-mcq-1",
-          "type": "mcq",
-          "prompt": "HTTP/2 multiplexes many streams over ONE TCP connection. A single TCP segment is lost. What happens?",
-          "choices": [
-            "Only the stream whose data was in that segment stalls; others continue",
-            "Nothing — HTTP/2 has its own retransmission that bypasses TCP",
-            "ALL streams stall until TCP retransmits, because TCP must deliver bytes in order (transport HOL blocking)",
-            "The connection is reset and all streams restart"
-          ],
-          "answerIndex": 2,
-          "explanation": "This is the key point: HTTP/2 fixed APPLICATION-level HOL blocking via multiplexing, but because every stream shares one TCP byte-stream, a single lost segment forces TCP to hold ALL subsequent bytes (all streams) until retransmission. That transport-level HOL is exactly what HTTP/3 over QUIC eliminates."
-        },
-        {
-          "id": "application-protocols-2-mcq-2",
-          "type": "mcq",
-          "prompt": "Which statement best captures what HTTP/3 changes versus HTTP/2?",
-          "choices": [
-            "It re-introduces a separate TCP connection per request",
-            "It runs the same multiplexed streams over QUIC/UDP so a lost packet stalls only its own stream(s), eliminating transport HOL blocking",
-            "It removes header compression to simplify the protocol",
-            "It drops encryption to reduce handshake latency"
-          ],
-          "answerIndex": 1,
-          "explanation": "HTTP/3 keeps the stream-multiplexing idea but moves it onto QUIC over UDP, where streams are independently reliable — a lost packet only affects its own stream. It still encrypts (TLS 1.3 is integral) and still compresses headers (QPACK)."
-        },
-        {
-          "id": "application-protocols-2-mcq-3",
-          "type": "mcq",
-          "prompt": "Before HTTP/2, why did browsers open roughly 6 parallel TCP connections per origin?",
-          "choices": [
-            "To exhaust the server's file descriptors",
-            "To work around 1.1's lack of usable multiplexing and pipelining — parallel connections approximated concurrency",
-            "Because TLS requires a separate connection per certificate",
-            "To split DNS load across resolvers"
-          ],
-          "answerIndex": 1,
-          "explanation": "With pipelining unusable and only one request in flight per 1.1 connection, parallel connections were the only way to fetch many assets concurrently. HTTP/2's single-connection multiplexing made this hack unnecessary (and removed its per-connection congestion-control unfairness)."
-        },
-        {
-          "id": "application-protocols-2-mcq-4",
-          "type": "mcq",
-          "prompt": "What is the fundamental framing change from HTTP/1.1 to HTTP/2?",
-          "choices": [
-            "From binary to human-readable text",
-            "From human-readable text messages to a binary framing layer of streams and frames",
-            "From UDP datagrams to TCP segments",
-            "From compressed to uncompressed bodies"
-          ],
-          "answerIndex": 1,
-          "explanation": "HTTP/1.x messages are ASCII text parsed line by line. HTTP/2 introduces a binary framing layer: each message is a stream split into typed binary frames that can be interleaved over one connection, enabling multiplexing and HPACK."
-        }
-      ]
-    },
-    {
-      "id": "application-protocols-apis-realtime-lesson-3",
-      "title": "APIs and Real-Time: REST/JSON, gRPC, WebSockets, SSE, Caching & Proxies",
-      "order": 3,
-      "difficulty": 3,
-      "content": "On top of HTTP sit several application patterns a developer chooses between.\n\n**REST** treats your domain as **resources** addressed by URLs and manipulated with HTTP methods, typically exchanging **JSON**. It is human-readable, cache-friendly, and ubiquitous, but verbose and schema-loose. **gRPC** is an RPC framework over HTTP/2: you define services and messages in **Protobuf** (a compact binary schema), get generated client/server stubs in many languages, and gain streaming (client/server/bidirectional) and strong typing. The tradeoff: binary payloads aren't human-readable and browser support needs gRPC-Web. Rough instinct: REST/JSON for public, browser-facing, evolving APIs; gRPC/Protobuf for internal, high-throughput, low-latency service-to-service calls.\n\nFor *pushing* data the request/response model is awkward. **Server-Sent Events (SSE)** is a one-way server→client stream over a single long-lived HTTP response (`Content-Type: text/event-stream`); it auto-reconnects and is dead simple for live feeds. **WebSockets** upgrade an HTTP connection (`Upgrade: websocket`) into a **full-duplex** byte channel — both sides send anytime — ideal for chat, games, and trading. SSE is simpler and HTTP-native; WebSockets are bidirectional but bypass HTTP semantics after the upgrade.\n\n```http\nGET /stream HTTP/1.1\nUpgrade: websocket\nConnection: Upgrade\nSec-WebSocket-Key: dGhlIHNhbXBsZQ==\n```\n\n**Caching, CDNs, and proxies** shape performance. HTTP caching uses `Cache-Control` (max-age, no-store), `ETag`/`If-None-Match` (304 Not Modified), and `Last-Modified`. A **CDN** is a geographically distributed cache that serves content from an edge near the user. A **forward proxy** acts on behalf of clients; a **reverse proxy / load balancer** sits in front of servers. Load balancers operate at two layers: an **L4** balancer forwards by IP/port (fast, protocol-agnostic, no payload inspection), while an **L7** balancer understands HTTP — routing by path/host, terminating TLS, and applying caching — at higher CPU cost.",
-      "items": [
-        {
-          "id": "application-protocols-3-fc-1",
-          "type": "flashcard",
-          "front": "What does gRPC use for its message format and transport, and what's the main tradeoff vs REST/JSON?",
-          "back": "gRPC uses Protobuf (compact binary, schema-defined) over HTTP/2, with generated stubs and streaming. Tradeoff: payloads aren't human-readable and browsers need gRPC-Web. REST/JSON is readable and ubiquitous but verbose and loosely typed.",
-          "hint": "Binary schema + HTTP/2 streams vs text resources."
-        },
-        {
-          "id": "application-protocols-3-fc-2",
-          "type": "flashcard",
-          "front": "SSE vs WebSockets: how do they differ in direction and complexity?",
-          "back": "SSE is one-way (server→client) over a long-lived HTTP response, auto-reconnecting and HTTP-native — simple. WebSockets are full-duplex (both sides send anytime) via an HTTP Upgrade, then a raw bidirectional channel — more capable but bypasses HTTP semantics.",
-          "hint": "One direction and simple vs both directions and an upgrade."
-        },
-        {
-          "id": "application-protocols-3-fc-3",
-          "type": "flashcard",
-          "front": "How do ETag and If-None-Match produce a 304 Not Modified?",
-          "back": "The server sends an ETag (a content version tag) with a resource. On revalidation the client sends 'If-None-Match: <etag>'. If unchanged, the server replies '304 Not Modified' with no body, letting the client reuse its cached copy — saving bandwidth.",
-          "hint": "A version tag echoed back to ask 'still current?'"
-        },
-        {
-          "id": "application-protocols-3-fc-4",
-          "type": "flashcard",
-          "front": "Contrast an L4 vs an L7 load balancer.",
-          "back": "L4 balances by IP/port (transport layer): fast, protocol-agnostic, no payload inspection. L7 understands HTTP (application layer): can route by host/path, terminate TLS, and cache — more flexible but more CPU per request.",
-          "hint": "Transport-tuple routing vs HTTP-aware routing."
-        },
-        {
-          "id": "application-protocols-3-mcq-1",
-          "type": "mcq",
-          "prompt": "You need a browser dashboard that receives live server updates but never sends data back over that channel. Lowest-complexity fit?",
-          "choices": [
-            "WebSockets",
-            "Server-Sent Events (SSE)",
-            "gRPC bidirectional streaming",
-            "Long-polling with POST"
-          ],
-          "answerIndex": 1,
-          "explanation": "SSE is purpose-built for one-way server→client streaming over plain HTTP, with automatic reconnection and minimal code. WebSockets add full-duplex you don't need; gRPC bidi streaming isn't natively browser-friendly."
-        },
-        {
-          "id": "application-protocols-3-mcq-2",
-          "type": "mcq",
-          "prompt": "An internal microservice handles 50k RPC/s between services in your cluster, needs low latency, strong typing, and streaming. Best choice?",
-          "choices": [
-            "REST/JSON over HTTP/1.1",
-            "gRPC with Protobuf over HTTP/2",
-            "SOAP/XML",
-            "WebSockets carrying JSON"
-          ],
-          "answerIndex": 1,
-          "explanation": "gRPC/Protobuf over HTTP/2 gives compact binary encoding, multiplexed streams, generated typed stubs, and built-in streaming — ideal for high-throughput internal service-to-service calls. REST/JSON is fine for public APIs but heavier on the wire and loosely typed."
-        },
-        {
-          "id": "application-protocols-3-mcq-3",
-          "type": "mcq",
-          "prompt": "What is the primary benefit a CDN provides?",
-          "choices": [
-            "It encrypts traffic that was otherwise plaintext",
-            "It serves cached content from an edge location geographically close to the user, cutting latency and origin load",
-            "It compresses Protobuf into JSON",
-            "It replaces DNS resolution"
-          ],
-          "answerIndex": 1,
-          "explanation": "A CDN is a distributed cache near users; edge nodes answer requests with reduced round-trip latency and offload the origin. It doesn't inherently add encryption (though it often terminates TLS) and doesn't replace DNS — it's steered BY DNS/anycast."
-        },
-        {
-          "id": "application-protocols-3-mcq-4",
-          "type": "mcq",
-          "prompt": "Which task REQUIRES an L7 (application-aware) load balancer rather than an L4 one?",
-          "choices": [
-            "Spreading raw TCP connections evenly across backends",
-            "Routing requests for /api to one pool and /images to another based on the URL path",
-            "Forwarding UDP datagrams by destination port",
-            "Balancing connections by source IP hash"
-          ],
-          "answerIndex": 1,
-          "explanation": "Path-based routing requires parsing the HTTP request, which only an L7 balancer does. L4 balancers see just IP/port and cannot inspect the URL, headers, or host to make application-level routing decisions."
-        }
-      ]
-    },
-    {
-      "id": "application-protocols-messaging-iot-lesson-4",
-      "title": "Messaging & IoT: MQTT, CoAP, AMQP/Kafka, NTP/PTP, SNMP, SMTP/IMAP",
-      "order": 4,
-      "difficulty": 3,
-      "content": "Beyond request/response, much of the modern stack is **messaging** — decoupling senders from receivers — and it is the bridge to embedded/IoT.\n\n**MQTT** is the dominant IoT protocol: a lightweight **publish/subscribe** scheme over TCP. Clients don't talk to each other; they connect to a central **broker** and publish to hierarchical **topics** (`sensors/floor3/temp`); subscribers register topic filters (with `+` single-level and `#` multi-level wildcards) and the broker fans out matching messages. Two features matter operationally: a **retained** message is stored by the broker as the last-known value on a topic so new subscribers get it immediately, and a **last-will (LWT)** is a message the broker publishes automatically if a client drops uncleanly — instant disconnect detection. This is exactly your topic-04 voice-translator pub/sub instinct.\n\nMQTT's three **QoS** levels trade reliability for chatter. **QoS 0** ('at most once') is fire-and-forget: one PUBLISH, no ack. **QoS 1** ('at least once') is a *2-packet* handshake — PUBLISH then PUBACK; if the PUBACK is lost the sender re-sends, so the receiver may see **duplicates**. **QoS 2** ('exactly once') is a *4-packet* handshake — PUBLISH → PUBREC → PUBREL → PUBCOMP — that deduplicates so the message is delivered once and only once, at the cost of two round-trips.\n\n**CoAP** is REST for constrained devices: GET/POST/PUT/DELETE and URIs like HTTP, but over **UDP** (with **DTLS** for security) and a tiny binary header — ideal where TCP+HTTP is too heavy. **AMQP** (broker-based, rich routing/queues, e.g. RabbitMQ) and **Kafka** (a partitioned, replayable distributed log for high-throughput event streams) cover backend messaging. For time: **NTP** syncs clocks to ~ms over the Internet; **PTP** (IEEE 1588) reaches sub-microsecond with hardware timestamping — the precision instrumentation/radar world relies on it. **SNMP** polls/traps device management data via MIBs/OIDs. **SMTP** sends mail between servers; **IMAP** (and older POP3) let clients retrieve it.",
-      "items": [
-        {
-          "id": "application-protocols-4-fc-1",
-          "type": "flashcard",
-          "front": "Describe MQTT's architecture: who talks to whom, and how is addressing done?",
-          "back": "Publish/subscribe via a central broker over TCP. Publishers send to hierarchical topics (e.g. sensors/floor3/temp); subscribers register topic filters using wildcards (+ single-level, # multi-level). The broker fans out matching messages — clients never address each other directly.",
-          "hint": "A broker in the middle; topics, not addresses."
-        },
-        {
-          "id": "application-protocols-4-fc-2",
-          "type": "flashcard",
-          "front": "What are MQTT retained messages and the last-will (LWT), and what problem does each solve?",
-          "back": "Retained: the broker stores the last message on a topic so a new subscriber immediately gets the current value instead of waiting for the next publish. LWT: a message the broker publishes automatically if a client disconnects uncleanly — giving fast, automatic dead-client detection.",
-          "hint": "One is 'latest value on connect'; one is 'announce my death'."
-        },
-        {
-          "id": "application-protocols-4-fc-3",
-          "type": "flashcard",
-          "front": "What is CoAP and how does it differ from HTTP?",
-          "back": "CoAP is a RESTful protocol (GET/POST/PUT/DELETE, URIs) for constrained devices, but runs over UDP with a tiny binary header (and DTLS for security) instead of TCP+text HTTP. It suits low-power, lossy, memory-limited nodes where full HTTP is too heavy.",
-          "hint": "REST semantics, but over UDP with a binary header."
-        },
-        {
-          "id": "application-protocols-4-fc-4",
-          "type": "flashcard",
-          "front": "Why does PTP (IEEE 1588) achieve far better accuracy than NTP, and why does that matter for radar/instrumentation?",
-          "back": "PTP uses hardware timestamping at the NIC/PHY (removing OS/software jitter) and a master/boundary/transparent-clock hierarchy, reaching sub-microsecond sync; NTP is software-timestamped at ~millisecond. Phased-array radar, sensor fusion, and distributed measurement need tightly aligned clocks for coherent timing.",
-          "hint": "Where the timestamp is taken: in hardware vs in the OS."
-        },
-        {
-          "id": "application-protocols-4-mcq-1",
-          "type": "mcq",
-          "prompt": "On the wire, how do MQTT QoS 1 and QoS 2 differ?",
-          "choices": [
-            "QoS 1 sends no acknowledgement; QoS 2 sends one PUBACK",
-            "QoS 1 is a 2-packet exchange (PUBLISH, PUBACK) and may deliver duplicates; QoS 2 is a 4-packet exchange (PUBLISH, PUBREC, PUBREL, PUBCOMP) guaranteeing exactly-once",
-            "QoS 1 uses UDP and QoS 2 uses TCP",
-            "They are identical except QoS 2 compresses the payload"
-          ],
-          "answerIndex": 1,
-          "explanation": "QoS 1 ('at least once') = PUBLISH + PUBACK; a lost PUBACK triggers re-send, so the receiver can see duplicates. QoS 2 ('exactly once') adds a second round-trip — PUBLISH, PUBREC, PUBREL, PUBCOMP — to deduplicate and deliver once and only once. Both run over the same TCP connection."
-        },
-        {
-          "id": "application-protocols-4-mcq-2",
-          "type": "mcq",
-          "prompt": "A sensor publishes telemetry where losing an occasional reading is fine and minimizing battery/bandwidth is critical. Which MQTT QoS fits best?",
-          "choices": [
-            "QoS 0 (at most once)",
-            "QoS 1 (at least once)",
-            "QoS 2 (exactly once)",
-            "QoS 3 (ordered)"
+            "The set of languages programs use to talk to each other once the lower layers have set up delivery",
+            "The physical cable that carries the signal",
+            "The part of the network that assigns IP addresses",
+            "A backup copy of the data in case the connection drops"
           ],
           "answerIndex": 0,
-          "explanation": "QoS 0 is fire-and-forget: a single PUBLISH with no acknowledgement — lowest overhead and power, acceptable when occasional loss doesn't matter. QoS 1/2 add round-trips and state. (There is no QoS 3.)"
+          "explanation": "The application layer sits at the TOP of the stack: once IP and TCP have set up delivery, it is the language two programs actually speak (HTTP for the web, others for email or files). The cable is the physical layer, IP addressing is the network layer, and 'a backup copy' is not a layer at all.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-2.svg"
         },
         {
-          "id": "application-protocols-4-mcq-3",
+          "id": "application-protocols-http-basics-mcq-2",
           "type": "mcq",
-          "prompt": "Which backend messaging system is best described as a partitioned, replayable distributed commit log for high-throughput event streams?",
+          "prompt": "What is HTTP, in plain terms?",
           "choices": [
-            "MQTT",
-            "CoAP",
-            "Apache Kafka",
-            "SNMP"
+            "The request/response language of the web: a client asks for something and a server answers",
+            "A way to encrypt files before saving them to disk",
+            "The protocol that assigns each computer its IP address",
+            "A type of network cable used between routers"
           ],
-          "answerIndex": 2,
-          "explanation": "Kafka stores ordered records in partitioned topics on disk; consumers track their own offset and can replay history — the distributed-log model for event streaming. MQTT/CoAP are lightweight IoT messaging; SNMP is device management."
+          "answerIndex": 0,
+          "explanation": "HTTP (HyperText Transfer Protocol) is the web's request/response language: the browser (client) sends a request and the server sends back a response. It is not encryption (that is TLS), not address assignment (that is DHCP), and not hardware.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-2.svg"
         },
         {
-          "id": "application-protocols-4-mcq-4",
+          "id": "application-protocols-http-basics-mcq-3",
           "type": "mcq",
-          "prompt": "Match the protocol to its job: retrieving mail to a client from a mailbox server.",
+          "prompt": "In a web exchange, which side is the CLIENT and which is the SERVER?",
           "choices": [
+            "The browser is the client (it asks); the web server is the server (it answers)",
+            "The browser is the server; the web server is the client",
+            "Both are clients; there is no server in HTTP",
+            "Whichever computer is faster is always the server"
+          ],
+          "answerIndex": 0,
+          "explanation": "The client is 'the one who asks' -- your browser sending the request. The server is 'the one who answers' -- the machine sending back the page. The roles are about who requests and who responds, not about speed, and they are not interchangeable in a single exchange.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-2.svg"
+        },
+        {
+          "id": "application-protocols-http-basics-mcq-4",
+          "type": "mcq",
+          "prompt": "An HTTP response is made of which two parts?",
+          "choices": [
+            "A status code (did it work?) and a body (the actual content)",
+            "A username and a password",
+            "An IP address and a port number",
+            "A request method and a URL"
+          ],
+          "answerIndex": 0,
+          "explanation": "A response carries a status code that says whether the request succeeded, plus a body holding the content (the page, image, or data). Username/password and IP/port belong to other parts of networking; a method and URL are parts of the REQUEST, not the response.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-2.svg"
+        },
+        {
+          "id": "application-protocols-http-basics-mcq-5",
+          "type": "mcq",
+          "prompt": "In the restaurant analogy for HTTP, what plays the role of the SERVER?",
+          "choices": [
+            "The kitchen, which responds to your order with a dish",
+            "The menu you read",
+            "The front door of the restaurant",
+            "The money you pay at the end"
+          ],
+          "answerIndex": 0,
+          "explanation": "You (the client) make a request from the menu; the kitchen (the server) responds with your dish. The menu is more like the list of things you can request, and the door and the bill are not part of the request/response idea.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-3.svg"
+        },
+        {
+          "id": "application-protocols-http-basics-mcq-6",
+          "type": "mcq",
+          "prompt": "You click a link and your browser loads a page WITHOUT changing anything on the server. Which method is this?",
+          "choices": [
+            "GET -- 'give me this' (read something)",
+            "POST -- 'here is data, take it' (submit something)",
+            "DELETE -- remove an item",
+            "PUT -- replace an item"
+          ],
+          "answerIndex": 0,
+          "explanation": "GET means 'fetch this' and does not change anything on the server -- exactly what loading a page is. POST submits data (like a form), DELETE removes something, and PUT replaces something; all three are meant to change server state, unlike a plain page load.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-2.svg"
+        },
+        {
+          "id": "application-protocols-http-basics-mcq-7",
+          "type": "mcq",
+          "prompt": "You fill in a sign-up form and click Submit, sending your data to the server. Which method fits best?",
+          "choices": [
+            "POST -- it submits data to the server",
+            "GET -- it only reads, sending no data to change anything",
+            "HEAD -- it asks for just the headers",
+            "There is no method for sending form data"
+          ],
+          "answerIndex": 0,
+          "explanation": "POST is the method for submitting data (creating an account, posting a comment). GET is for reading and is not meant to carry data that changes the server. HTTP absolutely supports sending form data -- that is what POST is for.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-2.svg"
+        },
+        {
+          "id": "application-protocols-http-basics-mcq-8",
+          "type": "mcq",
+          "prompt": "In the address https://example.com/photos/cat.jpg , what is this whole string called and what does it do?",
+          "choices": [
+            "A URL -- it names the server (example.com) and the exact item (/photos/cat.jpg) to request",
+            "A status code -- it reports whether the request worked",
+            "A cookie -- it stores your login",
+            "A port number -- it picks which program receives the data"
+          ],
+          "answerIndex": 0,
+          "explanation": "A URL (Uniform Resource Locator) is the web address that names both the server and the specific resource on it; the browser turns it into an HTTP request. A status code is part of the response, a cookie stores session info, and a port number is a lower-layer detail -- none of those is the address itself.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-2.svg"
+        },
+        {
+          "id": "application-protocols-http-basics-mcq-9",
+          "type": "mcq",
+          "prompt": "How many responses come back for a single HTTP request?",
+          "choices": [
+            "Exactly one response per request",
+            "None -- HTTP requests are one-way and never answered",
+            "Always two: one to confirm and one with the data",
+            "As many as the server feels like sending, with no fixed number"
+          ],
+          "answerIndex": 0,
+          "explanation": "HTTP is a clean request/response pair: one request, exactly one response. It is not fire-and-forget (you do get an answer), and the basic model is not 'confirm then data' or an open-ended stream -- that single response carries the status and the body together.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-2.svg"
+        },
+        {
+          "id": "application-protocols-http-basics-mcq-10",
+          "type": "mcq",
+          "prompt": "Why does HTTP rely on the transport layer (TCP) underneath it?",
+          "choices": [
+            "TCP reliably delivers the bytes in order; HTTP is just the language spoken over that connection",
+            "TCP encrypts the page so no one can read it",
+            "TCP chooses which web page the user wants",
+            "HTTP does not use the transport layer at all"
+          ],
+          "answerIndex": 0,
+          "explanation": "The application layer sits on top of transport: TCP handles reliable, in-order delivery, and HTTP is the conversation carried over it. TCP does not encrypt (that is TLS) and does not decide content; and HTTP definitely depends on a transport layer to move its messages.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-5.svg"
+        }
+      ]
+    },
+    {
+      "id": "application-protocols-status-headers-https",
+      "title": "Status Codes, Headers, and HTTPS",
+      "order": 2,
+      "difficulty": 2,
+      "content": "## Reading the server's answer: status codes\n\nEvery HTTP response starts with a **status code** -- a three-digit number that tells you, at a glance, how the request went. You don't need to memorize hundreds of them. The trick is to **read the first digit**, which puts the code into one of a few **families**:\n\n- **2xx -- Success.** It worked. The classic is **200 OK**: \"here is what you asked for.\"\n- **3xx -- Redirect.** \"What you want lives somewhere else; go there.\" Example: **301 Moved Permanently**.\n- **4xx -- Your mistake (the client's).** You asked for something wrong or not allowed. The famous one is **404 Not Found**: \"there is no such page.\"\n- **5xx -- The server's fault.** Your request was fine, but the server broke trying to answer. The classic is **500 Internal Server Error**.\n\nSo **200 vs 404 vs 500** tells a quick story: 200 = it worked; 404 = *you* asked for something that isn't there; 500 = *the server* failed. (There is also a rare 1xx \"still working\" family, but you'll mostly see 2/3/4/5.)\n\n## Headers: extra info attached to the message\n\nBesides the status and the body, both requests and responses carry **headers** -- lines of **extra information** *about* the message. Think of them as notes on the envelope rather than the letter inside. A few you'll hear about:\n\n- **Content-Type** -- what kind of thing the body is. `text/html` means a web page; `image/png` means a picture; `application/json` means data. This is how your browser knows whether to draw a page or show an image.\n- **Content-Length** -- how big the body is.\n- **Cookie / Set-Cookie** -- small notes used to remember you between requests (the next lesson digs into these).\n\nYou rarely write headers by hand; the browser and server add them automatically. The point to remember is *headers = extra info about the message*.\n\n## HTTPS = HTTP over TLS\n\nYou met **TLS** last lesson: the secure tunnel that scrambles data and proves you're talking to the real site. **HTTPS is simply HTTP running inside that TLS tunnel** -- the **S** stands for **Secure**. Nothing about the requests and responses changes; the browser still sends `GET` and gets back `200 OK` plus a body. The whole conversation is just wrapped so a snoop can't read or change it. The **padlock** icon in the address bar means \"this page came over HTTPS.\"\n\nPicture the stack: **HTTP** sits on **TLS**, which sits on **TCP**, which sits on **IP**. Plain `http://` skips the TLS box; secure `https://` includes it. Today almost all real websites use HTTPS.\n\n## Recap\n\nA **status code**'s first digit gives the family: **2xx** success, **3xx** redirect, **4xx** your mistake, **5xx** server error -- with **200 / 301 / 404 / 500** as the everyday examples. **Headers** carry extra info about a message, like **Content-Type** (is the body a page, an image, or data?). And **HTTPS is just HTTP inside a TLS tunnel**, shown by the padlock.",
+      "items": [
+        {
+          "id": "application-protocols-status-headers-https-mcq-1",
+          "type": "mcq",
+          "prompt": "What is the quickest way to understand an HTTP status code?",
+          "choices": [
+            "Read the first digit -- it puts the code into a family (2xx, 3xx, 4xx, 5xx)",
+            "Read the last digit -- it tells you the exact error",
+            "Add the three digits together",
+            "Look up every code individually; there is no pattern"
+          ],
+          "answerIndex": 0,
+          "explanation": "The first digit groups codes into families: 2xx success, 3xx redirect, 4xx client error, 5xx server error. That single digit tells you most of the story. The other options miss the built-in pattern that makes status codes easy to read.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-4.svg"
+        },
+        {
+          "id": "application-protocols-status-headers-https-mcq-2",
+          "type": "mcq",
+          "prompt": "What does a 200 status code mean?",
+          "choices": [
+            "Success -- the request worked and here is what you asked for",
+            "The page was not found",
+            "The server crashed while handling the request",
+            "You must log in first"
+          ],
+          "answerIndex": 0,
+          "explanation": "200 OK is the most common success (2xx) code: the request worked and the body holds the result. 'Not found' is 404, a server crash is 500, and 'must log in' is a 401 -- all different families from a 2xx success.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-4.svg"
+        },
+        {
+          "id": "application-protocols-status-headers-https-mcq-3",
+          "type": "mcq",
+          "prompt": "You request a page that does not exist. Which status code do you get, and whose 'mistake' is it?",
+          "choices": [
+            "404 Not Found -- a 4xx, meaning the client asked for something that isn't there",
+            "500 Internal Server Error -- a 5xx, meaning the server failed",
+            "200 OK -- a 2xx, meaning success",
+            "301 Moved Permanently -- a 3xx redirect"
+          ],
+          "answerIndex": 0,
+          "explanation": "404 is a 4xx 'client error': you asked for a resource that doesn't exist. A 500 would mean the server itself broke, 200 means it worked, and 301 means the resource moved elsewhere. The key contrast: 4xx points at the request, 5xx points at the server.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-4.svg"
+        },
+        {
+          "id": "application-protocols-status-headers-https-mcq-4",
+          "type": "mcq",
+          "prompt": "A request is perfectly valid, but the server itself breaks while handling it. Which family of status code is that?",
+          "choices": [
+            "5xx -- a server error (e.g., 500)",
+            "4xx -- a client error (e.g., 404)",
+            "2xx -- success",
+            "3xx -- redirect"
+          ],
+          "answerIndex": 0,
+          "explanation": "5xx codes mean the server failed even though the request was fine -- 500 Internal Server Error is the classic. 4xx blames the request, 2xx is success, and 3xx sends you elsewhere. The 4xx-vs-5xx split is exactly 'your fault vs the server's fault'.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-4.svg"
+        },
+        {
+          "id": "application-protocols-status-headers-https-mcq-5",
+          "type": "mcq",
+          "prompt": "What does a 3xx status code (like 301) tell the browser to do?",
+          "choices": [
+            "The resource lives somewhere else -- go to the new location",
+            "The request succeeded and here is the content",
+            "The page does not exist",
+            "The server is overloaded and crashed"
+          ],
+          "answerIndex": 0,
+          "explanation": "3xx is the redirect family: '301 Moved Permanently' means the page has a new address and the browser should go there. Success is 2xx, a missing page is 404 (4xx), and a crash is 500 (5xx).",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-4.svg"
+        },
+        {
+          "id": "application-protocols-status-headers-https-mcq-6",
+          "type": "mcq",
+          "prompt": "What are HTTP headers?",
+          "choices": [
+            "Lines of extra information about the message -- like notes on the envelope, separate from the body",
+            "The main content of the page itself",
+            "The IP address the packet is going to",
+            "The encryption keys used by TLS"
+          ],
+          "answerIndex": 0,
+          "explanation": "Headers carry extra info ABOUT the message (its type, size, cookies), separate from the body, which is the actual content. They are not the page content itself, not the IP address (a lower layer), and not TLS keys.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-2.svg"
+        },
+        {
+          "id": "application-protocols-status-headers-https-mcq-7",
+          "type": "mcq",
+          "prompt": "The Content-Type header on a response says application/json. What does that tell the browser?",
+          "choices": [
+            "The body is data in JSON format, not a web page or an image",
+            "The body is a PNG image",
+            "The connection is encrypted with TLS",
+            "The request failed with an error"
+          ],
+          "answerIndex": 0,
+          "explanation": "Content-Type announces what kind of thing the body is; application/json means the body is JSON data. text/html would be a web page and image/png would be a picture. Content-Type is about the body's format, not about encryption or success.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-2.svg"
+        },
+        {
+          "id": "application-protocols-status-headers-https-mcq-8",
+          "type": "mcq",
+          "prompt": "What exactly is HTTPS?",
+          "choices": [
+            "HTTP running inside a TLS tunnel -- the same requests/responses, just encrypted and verified",
+            "A completely different protocol that replaces HTTP with new commands",
+            "HTTP that has been compressed to load faster",
+            "A protocol only used for sending email"
+          ],
+          "answerIndex": 0,
+          "explanation": "HTTPS is just HTTP carried over TLS: the same GET/200/body, wrapped so a snoop can't read or change it -- that is the 'S' for Secure, shown by the padlock. It does not change HTTP's commands, it is not merely compression, and it is for the web, not email.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-5.svg"
+        },
+        {
+          "id": "application-protocols-status-headers-https-mcq-9",
+          "type": "mcq",
+          "prompt": "In the layer stack, what sits directly between HTTP and TCP to make HTTPS?",
+          "choices": [
+            "TLS -- the secure tunnel that scrambles and verifies the data",
+            "IP -- the layer that addresses the packet",
+            "DNS -- the system that turns names into IP addresses",
+            "Nothing -- HTTPS connects HTTP straight to TCP with no extra layer"
+          ],
+          "answerIndex": 0,
+          "explanation": "HTTPS inserts TLS between HTTP and TCP: HTTP on TLS on TCP on IP. IP is further down the stack, DNS is a separate lookup service, and 'nothing' describes plain HTTP -- the TLS box is exactly what makes it HTTPS.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-5.svg"
+        },
+        {
+          "id": "application-protocols-status-headers-https-mcq-10",
+          "type": "mcq",
+          "prompt": "Which header would tell you how many bytes are in the response body?",
+          "choices": [
+            "Content-Length",
+            "Content-Type",
+            "Set-Cookie",
+            "Status-Code"
+          ],
+          "answerIndex": 0,
+          "explanation": "Content-Length reports the size of the body in bytes. Content-Type reports the KIND of body, Set-Cookie stores a small note for later requests, and 'Status-Code' is not a header -- the status code is the number on the response's first line.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-2.svg"
+        }
+      ]
+    },
+    {
+      "id": "application-protocols-state-other-protocols",
+      "title": "Statelessness, Cookies, and Other Protocols",
+      "order": 3,
+      "difficulty": 3,
+      "content": "## A surprising fact: the web has no memory\n\nHere is something odd about HTTP: it is **stateless**. That means **each request stands alone** -- by itself, the server does not remember anything about your previous requests. Every request arrives like a stranger walking up for the first time.\n\nThat sounds like a problem. If the server forgets you after every click, how does a website keep you **logged in** as you move from page to page? You don't re-type your password on every page, so something must be carrying your identity along.\n\n## Cookies and sessions: how the web remembers you\n\nThe fix is a **cookie**: a small note the server gives your browser to hold and show back later. The flow is simple:\n\n1. You log in. The server replies with a header: **`Set-Cookie: id=A7X9`** -- \"here is your ticket.\"\n2. Your browser stores that ticket and **automatically sends it back** on every later request: **`Cookie: id=A7X9`**.\n3. The server sees the ticket and thinks \"ah, that's you -- welcome back,\" without asking for your password again.\n\nThe matching record on the server's side is your **session** -- the server's memory of who `A7X9` is and what you're doing. It's exactly like a **coat-check ticket**: the coat (your session) stays with the attendant; the little numbered stub (the cookie) is what you carry to claim it. So even though HTTP itself forgets, cookies + sessions layer memory on top.\n\n## HTTP is just one application protocol\n\nHTTP rules the web, but it's only one language at the application layer. Many everyday tasks have their own. A quick tour, grouped by job:\n\n- **Names to IP addresses -- DNS.** You met **DNS** (Domain Name System) earlier: it turns a name like `example.com` into an IP address so the connection can be made. Almost every web action starts with a DNS lookup.\n- **Email -- SMTP, IMAP, POP.** **SMTP** (Simple Mail Transfer Protocol) is for **sending** mail. To **read** mail you've received, your app uses **IMAP** (keeps mail synced on the server) or the older **POP** (typically downloads it). Memory hook: **S**MTP to **S**end.\n- **Files -- FTP and SFTP.** **FTP** (File Transfer Protocol) moves files between machines; **SFTP** is the secure version (encrypted).\n- **Remote control -- SSH.** **SSH** (Secure Shell) gives you an encrypted command-line login to another computer -- like safely sitting at its keyboard from far away.\n- **Live, two-way -- WebSocket.** Plain HTTP is one-shot (ask, answer, done). A **WebSocket** keeps a connection open so **both sides can send messages anytime** -- perfect for chat, multiplayer games, and live dashboards.\n- **Tiny devices -- MQTT.** **MQTT** is a lightweight protocol for **IoT** (Internet of Things -- small connected gadgets like sensors). It uses a **publish/subscribe** style: devices publish readings to a central hub, and whoever is interested subscribes -- efficient for low-power, low-bandwidth gadgets.\n\nDon't memorize every detail. The skill is recognizing **which protocol does which job**, and that HTTP is the famous one among many.\n\n## Recap\n\nHTTP is **stateless** -- each request stands alone -- so the web uses **cookies** (a ticket your browser shows back) tied to a server-side **session** to remember you, especially for staying logged in. Beyond HTTP, other application protocols handle other jobs: **DNS** (names to IPs), **SMTP/IMAP/POP** (email send/read), **FTP/SFTP** (files), **SSH** (secure remote login), **WebSocket** (live two-way), and **MQTT** (tiny IoT devices).",
+      "items": [
+        {
+          "id": "application-protocols-state-other-protocols-mcq-1",
+          "type": "mcq",
+          "prompt": "What does it mean that HTTP is 'stateless'?",
+          "choices": [
+            "Each request stands alone; by itself the server does not remember your previous requests",
+            "The server permanently remembers everything every client has ever done",
+            "HTTP cannot carry any data at all",
+            "The connection can never be encrypted"
+          ],
+          "answerIndex": 0,
+          "explanation": "Stateless means every request is independent -- on its own, the server keeps no memory of earlier requests from you. That is the opposite of 'remembers everything', and it has nothing to do with whether HTTP carries data or can be encrypted.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-7.svg"
+        },
+        {
+          "id": "application-protocols-state-other-protocols-mcq-2",
+          "type": "mcq",
+          "prompt": "If HTTP forgets you after each request, how does a website keep you logged in across pages?",
+          "choices": [
+            "A cookie: the browser stores a small ticket and sends it back on every later request",
+            "The server memorizes your face",
+            "You must re-type your password on every single page",
+            "It keeps one TCP connection open forever for you alone"
+          ],
+          "answerIndex": 0,
+          "explanation": "A cookie is the standard fix: the server sends a ticket (Set-Cookie) and the browser returns it (Cookie) on later requests, so the server recognizes you without a fresh login. You do NOT re-type your password each page, and the trick is the cookie, not a single eternal connection.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-7.svg"
+        },
+        {
+          "id": "application-protocols-state-other-protocols-mcq-3",
+          "type": "mcq",
+          "prompt": "In the cookie flow, which header does the SERVER use to first hand the browser its ticket?",
+          "choices": [
+            "Set-Cookie",
+            "Cookie",
+            "Content-Type",
+            "User-Agent"
+          ],
+          "answerIndex": 0,
+          "explanation": "The server issues the ticket with Set-Cookie; the browser then echoes it back using the Cookie header on later requests. Content-Type describes the body and User-Agent identifies the browser -- neither hands out the ticket.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-7.svg"
+        },
+        {
+          "id": "application-protocols-state-other-protocols-mcq-4",
+          "type": "mcq",
+          "prompt": "The coat-check analogy compares the SESSION to the coat and the COOKIE to the stub. What does that capture?",
+          "choices": [
+            "The session (your data) stays on the server; the small cookie is what the browser carries to claim it",
+            "The cookie holds all your data and the server stores nothing",
+            "The session and cookie are the same single thing with two names",
+            "The coat and the stub are both kept by the attendant"
+          ],
+          "answerIndex": 0,
+          "explanation": "Like a coat (session) kept by the attendant and a numbered stub (cookie) you carry, the server holds your session data and the browser carries a small cookie to claim it. The cookie is usually just an ID, not all your data, and the session and cookie are two different things working together.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-7.svg"
+        },
+        {
+          "id": "application-protocols-state-other-protocols-mcq-5",
+          "type": "mcq",
+          "prompt": "Which protocol turns a name like example.com into an IP address?",
+          "choices": [
+            "DNS (Domain Name System)",
             "SMTP",
-            "IMAP",
-            "SNMP",
-            "NTP"
+            "FTP",
+            "MQTT"
           ],
-          "answerIndex": 1,
-          "explanation": "IMAP (and older POP3) retrieves mail from the server to a client and, for IMAP, keeps it synchronized on the server. SMTP sends/relays mail between servers; SNMP manages network devices; NTP synchronizes clocks."
+          "answerIndex": 0,
+          "explanation": "DNS is the name-to-IP lookup that almost every web action starts with. SMTP sends email, FTP transfers files, and MQTT is for IoT messaging -- none of those resolves names to addresses.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-6.svg"
+        },
+        {
+          "id": "application-protocols-state-other-protocols-mcq-6",
+          "type": "mcq",
+          "prompt": "You want to SEND an email. Which protocol does that job, versus reading mail you already have?",
+          "choices": [
+            "SMTP sends mail; IMAP or POP is used to read received mail",
+            "IMAP sends mail; SMTP reads it",
+            "HTTP sends mail; FTP reads it",
+            "POP sends mail; SMTP reads it"
+          ],
+          "answerIndex": 0,
+          "explanation": "SMTP (think 'S for Send') delivers outgoing mail, while IMAP or the older POP retrieves messages you've received. The other pairings reverse or mismatch the roles -- IMAP/POP are for reading, not sending.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-6.svg"
+        },
+        {
+          "id": "application-protocols-state-other-protocols-mcq-7",
+          "type": "mcq",
+          "prompt": "You need a secure, encrypted command-line login to another computer. Which protocol?",
+          "choices": [
+            "SSH (Secure Shell)",
+            "FTP (plain File Transfer Protocol)",
+            "SMTP",
+            "DNS"
+          ],
+          "answerIndex": 0,
+          "explanation": "SSH gives an encrypted remote command-line session -- like safely sitting at the far machine's keyboard. Plain FTP isn't encrypted and is for moving files, SMTP is for sending email, and DNS resolves names.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-6.svg"
+        },
+        {
+          "id": "application-protocols-state-other-protocols-mcq-8",
+          "type": "mcq",
+          "prompt": "A chat app needs the server to push messages to the user the instant they arrive, with both sides sending anytime. Which fits best?",
+          "choices": [
+            "WebSocket -- an open connection where both sides can send messages anytime",
+            "Plain HTTP request/response -- ask once, get one answer, done",
+            "FTP -- to transfer files",
+            "DNS -- to look up names"
+          ],
+          "answerIndex": 0,
+          "explanation": "A WebSocket keeps the connection open for live, two-way messaging -- ideal for chat and games. Plain HTTP is one-shot (one request, one response), so it can't naturally push messages; FTP and DNS solve entirely different problems.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-6.svg"
+        },
+        {
+          "id": "application-protocols-state-other-protocols-mcq-9",
+          "type": "mcq",
+          "prompt": "Tiny battery-powered sensors need a lightweight way to report readings to a central hub that interested apps can subscribe to. Which protocol is designed for this?",
+          "choices": [
+            "MQTT -- a lightweight publish/subscribe protocol for IoT devices",
+            "SMTP -- for sending email between servers",
+            "HTTP/2 -- a heavier web protocol for browsers",
+            "SSH -- for remote command-line login"
+          ],
+          "answerIndex": 0,
+          "explanation": "MQTT uses a lightweight publish/subscribe model built for low-power IoT gadgets: sensors publish, interested apps subscribe. SMTP is for email, HTTP is comparatively heavy for tiny devices, and SSH is for remote logins.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-6.svg"
+        },
+        {
+          "id": "application-protocols-state-other-protocols-mcq-10",
+          "type": "mcq",
+          "prompt": "Which statement about application protocols is correct?",
+          "choices": [
+            "HTTP is the most common, but different jobs (email, files, names, IoT) use their own protocols",
+            "HTTP is the only application-layer protocol; everything uses it",
+            "Email and web pages must both use FTP",
+            "DNS replaces the need for any other protocol"
+          ],
+          "answerIndex": 0,
+          "explanation": "HTTP dominates the web but is just one of many application protocols; email, file transfer, name lookup, and IoT each have their own. HTTP is not the only one, email/web don't run over FTP, and DNS only does name-to-IP lookups -- it doesn't replace the others.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-6.svg"
+        }
+      ]
+    },
+    {
+      "id": "application-protocols-apis-http-versions",
+      "title": "APIs, REST/JSON, and Faster HTTP",
+      "order": 4,
+      "difficulty": 3,
+      "content": "## When programs (not people) use the web: APIs\n\nSo far we've pictured a *person* browsing pages. But most web traffic is **programs talking to programs**. A weather app on your phone doesn't show you a web page from the weather service -- it quietly asks for the *data* and draws its own screen. The agreed way one program offers its services to another is called an **API** (Application Programming Interface): a defined set of requests a program promises to answer.\n\n## REST: APIs built on plain HTTP\n\nThe most common style of web API is **REST**. The idea is comforting because you already know it: a REST API uses **ordinary HTTP requests** to read and change data. Want today's weather for Reno? Your program sends `GET /weather?city=Reno`. The server replies `200 OK` with the data in the body. It's the same request/response and the same methods you learned -- **GET** to read, **POST** to add, **PUT** to replace, **DELETE** to remove -- just aimed at *data* instead of pages.\n\n## JSON: the modern data format\n\nWhat does that data *look* like? Almost always **JSON** (JavaScript Object Notation) -- a simple, human-readable text format of **labels and values**. A weather reply might be:\n\n```\n{ \"city\": \"Reno\", \"tempF\": 71, \"sky\": \"clear\" }\n```\n\nYou can practically *read* that: city is Reno, temperature is 71, sky is clear. JSON caught on because it's easy for humans to read *and* easy for any programming language to parse. When two programs exchange data over the web today, it's usually JSON riding inside HTTP responses.\n\n## Faster versions of HTTP: HTTP/2 and HTTP/3\n\nThe original web used **HTTP/1.1**, which mostly handles **one thing at a time** on a connection -- a slow item can hold up everything queued behind it, like a single checkout lane. As web pages grew to dozens of images and files, that got slow.\n\n**HTTP/2** speeds this up with **multiplexing**: many requests and responses travel over **one connection at the same time**, interleaved, so a slow item no longer blocks the rest. Crucially, it's the **same HTTP** -- still `GET`, still `200 OK`, still a body. Only the *delivery* got faster.\n\n**HTTP/3** goes further by running over **QUIC**, a newer transport built on **UDP** instead of TCP. The payoff: if one packet is lost, only its own item waits -- the others keep flowing -- and connections set up faster. Again, the requests and responses are unchanged; it's a faster *pipe*.\n\nThe takeaway: **HTTP/2 and HTTP/3 are faster versions of the same idea.** You almost never choose the version by hand -- your browser and the server quietly agree on the fastest both support. (The next sub-topic dives into **QUIC** and these speed-ups in detail.)\n\n## Recap\n\nAn **API** lets programs use each other's services; the common web style is **REST**, which is just **plain HTTP requests** aimed at data, usually exchanging **JSON** (readable labels-and-values text). **HTTP/2** (multiplexing over one connection) and **HTTP/3** (over QUIC/UDP) are **faster versions of the same request/response idea** -- the conversation doesn't change, only the speed.",
+      "items": [
+        {
+          "id": "application-protocols-apis-http-versions-mcq-1",
+          "type": "mcq",
+          "prompt": "What is an API, in plain terms?",
+          "choices": [
+            "A defined set of requests one program promises to answer, so other programs can use its services",
+            "A web page designed for humans to read in a browser",
+            "The physical port where a network cable plugs in",
+            "A type of cookie used to track logins"
+          ],
+          "answerIndex": 0,
+          "explanation": "An API (Application Programming Interface) is the agreed way one program offers its services to another -- a defined set of requests it will answer. It is meant for programs, not a human-facing page, and it is not hardware or a cookie.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-8.svg"
+        },
+        {
+          "id": "application-protocols-apis-http-versions-mcq-2",
+          "type": "mcq",
+          "prompt": "What is a REST API built on?",
+          "choices": [
+            "Ordinary HTTP requests (GET/POST/PUT/DELETE) aimed at data",
+            "A brand-new protocol unrelated to HTTP",
+            "Email delivery over SMTP",
+            "Direct database file copying with no protocol"
+          ],
+          "answerIndex": 0,
+          "explanation": "REST is the common web-API style that simply uses ordinary HTTP requests and methods to read and change data. It is not a separate protocol, not email, and not raw file copying -- its whole appeal is reusing the HTTP you already know.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-8.svg"
+        },
+        {
+          "id": "application-protocols-apis-http-versions-mcq-3",
+          "type": "mcq",
+          "prompt": "A program sends GET /weather?city=Reno to a REST API. What comes back?",
+          "choices": [
+            "A response with a status code (like 200) and the requested data in the body",
+            "Nothing -- REST APIs do not reply",
+            "A full styled web page meant for a human to look at",
+            "A new IP address for the program to use"
+          ],
+          "answerIndex": 0,
+          "explanation": "It's still HTTP request/response: the server answers with a status code and the data in the body. REST APIs do reply, they return data (typically JSON) rather than a styled page, and they don't hand back IP addresses.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-8.svg"
+        },
+        {
+          "id": "application-protocols-apis-http-versions-mcq-4",
+          "type": "mcq",
+          "prompt": "What is JSON?",
+          "choices": [
+            "A simple, human-readable text format of labels and values used to exchange data",
+            "A way to encrypt traffic so no one can read it",
+            "A programming language used only inside web servers",
+            "The header that reports a response's size"
+          ],
+          "answerIndex": 0,
+          "explanation": "JSON (JavaScript Object Notation) is a lightweight, readable text format of labeled values -- easy for humans to read and any language to parse. It is not encryption, not a server-only language, and not a header (Content-Length reports size).",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-8.svg"
+        },
+        {
+          "id": "application-protocols-apis-http-versions-mcq-5",
+          "type": "mcq",
+          "prompt": "Reading { \"city\": \"Reno\", \"tempF\": 71 } , what does this JSON say?",
+          "choices": [
+            "The city is Reno and the temperature in Fahrenheit is 71",
+            "It is an encrypted block that cannot be read",
+            "It is an image file's raw bytes",
+            "It is a status code meaning success"
+          ],
+          "answerIndex": 0,
+          "explanation": "JSON pairs labels with values, so this literally reads as city = Reno, tempF = 71. That readability is the point of JSON; it is plain text, not encryption, not image bytes, and not a status code.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-8.svg"
+        },
+        {
+          "id": "application-protocols-apis-http-versions-mcq-6",
+          "type": "mcq",
+          "prompt": "What problem does HTTP/2's multiplexing solve compared with HTTP/1.1?",
+          "choices": [
+            "It lets many requests/responses share one connection at once, so a slow item no longer blocks the rest",
+            "It encrypts the page for the first time",
+            "It changes GET and POST into brand-new commands",
+            "It removes the need for a server entirely"
+          ],
+          "answerIndex": 0,
+          "explanation": "HTTP/1.1 largely handles one thing at a time, so a slow item stalls the queue; HTTP/2 multiplexes many over one connection so they don't block each other. It does not introduce encryption (that's TLS), does not change the methods, and still needs a server.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-9.svg"
+        },
+        {
+          "id": "application-protocols-apis-http-versions-mcq-7",
+          "type": "mcq",
+          "prompt": "HTTP/3 runs over QUIC. What is QUIC built on?",
+          "choices": [
+            "UDP -- a newer transport that lets a lost packet stall only its own item",
+            "TCP, exactly like HTTP/1.1 and HTTP/2",
+            "Email's SMTP protocol",
+            "The physical network cable directly, with no transport layer"
+          ],
+          "answerIndex": 0,
+          "explanation": "QUIC is built on UDP, which lets independent items keep flowing when one packet is lost and speeds up connection setup. HTTP/1.1 and HTTP/2 use TCP; QUIC deliberately does not. It is not built on SMTP and still uses a transport layer.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-9.svg"
+        },
+        {
+          "id": "application-protocols-apis-http-versions-mcq-8",
+          "type": "mcq",
+          "prompt": "What is the BEST way to think about HTTP/2 and HTTP/3 versus HTTP/1.1?",
+          "choices": [
+            "Faster versions of the same request/response idea -- the conversation is unchanged, only the speed",
+            "Completely different protocols that replace GET, POST, and status codes",
+            "Protocols only for email and file transfer, not the web",
+            "Older, slower versions that came before HTTP/1.1"
+          ],
+          "answerIndex": 0,
+          "explanation": "HTTP/2 and HTTP/3 keep the same requests, methods, and status codes -- they just move the data faster. They don't replace HTTP's commands, they are for the web, and they are newer (faster), not older, than HTTP/1.1.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-9.svg"
+        },
+        {
+          "id": "application-protocols-apis-http-versions-mcq-9",
+          "type": "mcq",
+          "prompt": "Who usually decides whether a page loads over HTTP/1.1, HTTP/2, or HTTP/3?",
+          "choices": [
+            "The browser and server quietly agree on the fastest version both support",
+            "The user must manually pick the version every time",
+            "The version is fixed forever and can never change",
+            "DNS chooses the HTTP version during name lookup"
+          ],
+          "answerIndex": 0,
+          "explanation": "The client and server negotiate automatically, choosing the fastest version both support -- you almost never set it by hand. It is not a manual per-load choice, it can change as software updates, and DNS only resolves names, not HTTP versions.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-9.svg"
+        },
+        {
+          "id": "application-protocols-apis-http-versions-mcq-10",
+          "type": "mcq",
+          "prompt": "A phone weather app shows a custom screen instead of a web page. How does it most likely get its data?",
+          "choices": [
+            "By calling a REST API over HTTP and receiving JSON data it formats itself",
+            "By asking the user to read the weather website and type it in",
+            "By using SMTP to email itself the forecast",
+            "By opening an SSH command-line session to the weather company"
+          ],
+          "answerIndex": 0,
+          "explanation": "Apps typically call a REST API over HTTP and get back JSON, then draw their own interface. They don't make the user copy data manually, email isn't how live app data flows, and SSH is for remote command-line logins, not fetching app data.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/application-protocols-8.svg"
         }
       ]
     }
