@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "id": "wave-propagation",
   "title": "Wave Propagation",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Electromagnetic waves from scratch (beginner rework in progress): 13 sub-topics from fields and Maxwell through plane waves, transmission lines, the Smith chart, antennas, beamforming, propagation and link budgets. Physical intuition first with the heavy math turned into plain ideas; MCQ practice and diagrams, tiered easy to hard.",
   "requires": [
     "mathematics"
@@ -2483,466 +2483,685 @@
       "lessons": [
         {
           "id": "transmission-lines-transmission-lines-l1",
-          "title": "When a Wire Becomes a Transmission Line",
+          "title": "When a Cable Is More Than a Wire",
           "order": 1,
           "difficulty": 1,
-          "content": "You spent years treating wires as ideal nodes: voltage is the same everywhere on them, instantly. That model is a *lumped* approximation, and it quietly fails when the line gets **electrically long** — when its physical length is no longer tiny compared to the signal's wavelength.\n\nThe rule of thumb: treat a line as lumped only if its length $l \\lesssim \\lambda/10$. Once $l$ approaches $\\lambda$, the finite propagation speed matters. A signal launched at one end takes real time to reach the other; while it's in transit the voltage genuinely differs from point to point. The line now stores energy in distributed inductance and capacitance and must be modeled as a **distributed** structure.\n\nWavelength on the line is $\\lambda = v_p / f$, where $v_p$ is the phase velocity (often $\\sim 2/3\\,c$ on coax). So 'high frequency' isn't an absolute — a 1 m trace is lumped at 1 MHz ($\\lambda = 300$ m) but distributed at 1 GHz ($\\lambda = 30$ cm).\n\nThis is exactly why a fast digital edge on a long PCB trace *rings*: the edge has high-frequency content, the trace is electrically long for that content, and energy reflects off the unmatched far end and bounces back. The same physics you saw on radar feed cables governs a DDR clock line. The takeaway: **always compare $l$ to $\\lambda$ before deciding which model applies.** When in doubt, the distributed model is the safe choice — it reduces to the lumped one in the short-line limit.",
+          "content": "**Hook.** Think about the cable that runs from your wall to your TV, or from your Wi-Fi router to its antenna. You might picture it as 'just a wire' that carries a signal from one end to the other. For slow, everyday electricity that picture is fine. But for fast, high-frequency signals (the kind radios, TVs, and routers use) something more interesting happens.\n\n**Build.** A *signal* is a pattern of electrical energy. At high frequencies, the signal does not just appear at the far end of the cable instantly. It actually *travels along the cable as a wave* (a moving ripple of energy), the same way a ripple travels down a rope when you flick one end. Because of this, we stop calling the cable 'a wire' and call it a **transmission line**: a cable built to carry a signal cleanly as a traveling wave.\n\nEvery transmission line has a built-in number called its **characteristic impedance**. *Impedance* (measured in ohms, symbol Ω) describes how strongly the line pushes back on the signal as voltage (electrical 'pressure') and current (electrical 'flow') ride along it together. The characteristic impedance is set by the cable's *shape and materials* (how thick the inner wire is, how far the outer shield sits, what insulator fills the gap), not by its length. Two everyday values you will see printed on cables are **50 ohms** (common for radio and Wi-Fi gear) and **75 ohms** (common for TV and video coax). A '50-ohm cable' simply means a cable whose characteristic impedance is 50 ohms.\n\n**Recap.** At high frequency a cable is not just a wire: the signal travels along it as a wave, and the cable's shape gives it a characteristic impedance (a number in ohms, like 50 or 75) describing how the signal rides along it.",
           "items": [
-            {
-              "id": "transmission-lines-l1-fc1",
-              "type": "flashcard",
-              "front": "What makes a wire 'electrically long' enough to need a transmission-line model?",
-              "back": "Its physical length becomes a non-negligible fraction of the wavelength (rule of thumb $l \\gtrsim \\lambda/10$), so finite propagation delay makes voltage vary along the line.",
-              "hint": "Compare physical length to $\\lambda$."
-            },
-            {
-              "id": "transmission-lines-l1-fc2",
-              "type": "flashcard",
-              "front": "Write the relationship between wavelength on a line, phase velocity, and frequency.",
-              "back": "$\\lambda = v_p / f$. Higher frequency shrinks $\\lambda$, so the same physical line becomes electrically longer.",
-              "hint": "It's the same $v = f\\lambda$ you already know."
-            },
-            {
-              "id": "transmission-lines-l1-fc3",
-              "type": "flashcard",
-              "front": "Why does a fast digital edge ring on a long PCB trace?",
-              "back": "The edge contains high-frequency content for which the trace is electrically long; the unmatched far end reflects energy that travels back, producing overshoot and ringing.",
-              "hint": "Reflections plus an unterminated end."
-            },
-            {
-              "id": "transmission-lines-l1-fc4",
-              "type": "flashcard",
-              "front": "What four distributed (per-unit-length) parameters describe any transmission line?",
-              "back": "Series resistance $R$, series inductance $L$, shunt conductance $G$, and shunt capacitance $C$ — the R, L, G, C model.",
-              "hint": "Two series, two shunt."
-            },
             {
               "id": "transmission-lines-l1-mc1",
               "type": "mcq",
-              "prompt": "A 1 m trace carries a signal with $v_p = 2\\times10^8$ m/s. At roughly what frequency does it start behaving as a transmission line (using $l \\approx \\lambda/10$)?",
+              "prompt": "At high frequencies, how does a signal move along a transmission line?",
               "choices": [
-                "~2 MHz",
-                "~20 MHz",
-                "~200 MHz",
-                "~2 GHz"
+                "It travels along the cable as a wave, taking real time to reach the other end",
+                "It appears at the far end instantly, with no travel time",
+                "It stays still and only the cable moves",
+                "It only exists at the two ends, never in between"
               ],
-              "answerIndex": 1,
-              "explanation": "$\\lambda = 10l = 10$ m, so $f = v_p/\\lambda = 2\\times10^8 / 10 = 2\\times10^7$ Hz = 20 MHz. Above this the line is no longer safely lumped."
+              "answerIndex": 0,
+              "explanation": "The key shift in thinking: at high frequency the signal is a traveling wave moving down the cable, like a ripple down a rope. That is exactly why we treat the cable as a 'transmission line' rather than a plain wire. It does not arrive instantly."
             },
             {
               "id": "transmission-lines-l1-mc2",
               "type": "mcq",
-              "prompt": "The lumped-circuit model assumes:",
+              "prompt": "What is the 'characteristic impedance' of a cable?",
               "choices": [
-                "Voltage and current are uniform across the element at any instant",
-                "Signals propagate at exactly the speed of light",
-                "The line has no capacitance",
-                "Reflections always occur at both ends"
+                "A number (in ohms) describing how voltage and current ride along the line together",
+                "The total length of the cable in meters",
+                "The color of the cable's outer jacket",
+                "The amount of power the source produces"
               ],
               "answerIndex": 0,
-              "explanation": "Lumped analysis treats an element as a single node/pair where V and I are spatially uniform. That holds only when propagation delay across it is negligible versus the signal period."
+              "explanation": "Characteristic impedance, measured in ohms, describes how the line carries a signal as paired voltage and current. It is a property of the cable itself, not a measure of length, color, or source power."
             },
             {
               "id": "transmission-lines-l1-mc3",
               "type": "mcq",
-              "prompt": "Which statement about the distributed model is correct?",
+              "prompt": "Two common characteristic-impedance values printed on real-world cables are:",
               "choices": [
-                "It only applies above 1 GHz",
-                "It reduces to the lumped model in the short-line limit",
-                "It ignores propagation delay",
-                "It requires the line to be lossless"
+                "50 ohms and 75 ohms",
+                "1 ohm and 2 ohms",
+                "100 volts and 200 volts",
+                "5 meters and 10 meters"
               ],
-              "answerIndex": 1,
-              "explanation": "The distributed model is general; as $l/\\lambda \\to 0$ the delay vanishes and it collapses to the familiar lumped approximation. It is always the safe default."
+              "answerIndex": 0,
+              "explanation": "50-ohm cable is common for radio and Wi-Fi equipment; 75-ohm cable is common for TV and video. These are impedances in ohms, not volts or meters."
             },
             {
               "id": "transmission-lines-l1-mc4",
               "type": "mcq",
-              "prompt": "A 1 m coax line carries a 1 MHz signal with $\\lambda = 200$ m. The appropriate model is:",
+              "prompt": "What mainly sets a cable's characteristic impedance?",
               "choices": [
-                "Distributed, because all coax is distributed",
-                "Lumped, because $l \\ll \\lambda/10$",
-                "Neither model applies",
-                "Depends on the load only"
+                "Its shape and materials (wire thickness, shield spacing, insulator)",
+                "How long the cable is",
+                "How loud the signal is",
+                "The time of day it is used"
               ],
-              "answerIndex": 1,
-              "explanation": "$\\lambda/10 = 20$ m and $l = 1$ m $\\ll 20$ m, so the line is electrically short and a lumped model is fine at 1 MHz."
+              "answerIndex": 0,
+              "explanation": "Characteristic impedance comes from the cable's physical build: conductor sizes, spacing, and the insulator between them. A 50-ohm cable is 50 ohms whether it is short or long, because length does not change the impedance."
             },
             {
               "id": "transmission-lines-l1-mc5",
               "type": "mcq",
-              "prompt": "Why is 'high frequency' not an absolute threshold for needing a transmission-line model?",
+              "prompt": "Why is a high-frequency cable called a 'transmission line' instead of just 'a wire'?",
               "choices": [
-                "Because it depends only on the load impedance",
-                "Because what matters is the ratio of physical length to wavelength, not frequency alone",
-                "Because all lines are lossless below 100 MHz",
-                "Because phase velocity is always c"
+                "Because the signal travels along it as a wave, so the cable's wave behavior matters",
+                "Because it is always longer than a normal wire",
+                "Because it cannot carry electricity at all",
+                "Because it has no metal inside"
               ],
-              "answerIndex": 1,
-              "explanation": "The same frequency is 'low' on a short line and 'high' on a long one. The decisive quantity is $l/\\lambda$, which couples both length and frequency (via $v_p$)."
+              "answerIndex": 0,
+              "explanation": "The name reflects behavior: the signal rides the cable as a traveling wave, so we must think about how that wave moves and what the cable does to it, not just treat the cable as an instant connection."
+            },
+            {
+              "id": "transmission-lines-l1-mc6",
+              "type": "mcq",
+              "prompt": "A friend says, 'My cable is 50 ohms, so a longer one must be 100 ohms.' What is wrong with this?",
+              "choices": [
+                "Characteristic impedance does not depend on length; a longer 50-ohm cable is still 50 ohms",
+                "Longer cables are actually 25 ohms",
+                "Impedance is measured in volts, not ohms",
+                "Cables have no impedance at all"
+              ],
+              "answerIndex": 0,
+              "explanation": "Characteristic impedance is set by the cable's cross-section and materials, which do not change with length. Cutting or extending a 50-ohm cable keeps it 50 ohms."
+            },
+            {
+              "id": "transmission-lines-l1-mc7",
+              "type": "mcq",
+              "prompt": "In simple terms, what does 'impedance' (in ohms) describe for a transmission line?",
+              "choices": [
+                "How the line pushes back on the signal as voltage and current ride along it",
+                "How heavy the cable is",
+                "How brightly the cable glows",
+                "How far apart its two ends are"
+              ],
+              "answerIndex": 0,
+              "explanation": "Impedance, in ohms, captures the relationship between the electrical 'pressure' (voltage) and 'flow' (current) of the signal on the line. It is not about weight, glow, or distance."
+            },
+            {
+              "id": "transmission-lines-l1-mc8",
+              "type": "mcq",
+              "prompt": "The coax cable behind a TV is best described as:",
+              "choices": [
+                "A transmission line, typically 75 ohms, that carries the signal as a wave",
+                "A solid bar of metal with no insulation",
+                "A 12-volt power supply",
+                "A wire whose impedance changes with the weather"
+              ],
+              "answerIndex": 0,
+              "explanation": "TV coax is a real transmission line, usually 75 ohms, built to carry high-frequency signals cleanly as traveling waves. Its characteristic impedance is fixed by its construction.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/transmission-lines-5.svg"
             }
           ]
         },
         {
           "id": "transmission-lines-transmission-lines-l2",
-          "title": "The RLGC Model & Telegrapher's Equations",
+          "title": "The Golden Rule: Matching Impedance",
           "order": 2,
-          "difficulty": 2,
-          "content": "Model a line as an infinite ladder of identical sections, each of length $\\Delta z$: a series $R\\,\\Delta z$ and $L\\,\\Delta z$, then a shunt $G\\,\\Delta z$ and $C\\,\\Delta z$ to the return conductor. Applying Kirchhoff's laws to one section and letting $\\Delta z \\to 0$ gives the **telegrapher's equations**:\n\n$$\\frac{\\partial V}{\\partial z} = -\\left(R + j\\omega L\\right) I, \\qquad \\frac{\\partial I}{\\partial z} = -\\left(G + j\\omega C\\right) V$$\n\nDifferentiate one and substitute the other to decouple them into wave equations:\n\n$$\\frac{d^2 V}{dz^2} = \\gamma^2 V, \\qquad \\gamma = \\sqrt{(R + j\\omega L)(G + j\\omega C)} = \\alpha + j\\beta$$\n\nHere $\\gamma$ is the **complex propagation constant**: $\\alpha$ (Np/m) is attenuation, $\\beta$ (rad/m) is the phase constant, with $\\beta = 2\\pi/\\lambda$ and phase velocity $v_p = \\omega/\\beta$. The solution is a sum of forward and backward traveling waves, $V(z) = V_0^+ e^{-\\gamma z} + V_0^- e^{+\\gamma z}$.\n\nThe ratio of voltage to current in a single traveling wave defines the **characteristic impedance**:\n\n$$Z_0 = \\sqrt{\\frac{R + j\\omega L}{G + j\\omega C}}$$\n\nFor a **lossless** line ($R = G = 0$) this collapses to the clean result $Z_0 = \\sqrt{L/C}$, which is purely real and frequency-independent — the reason a well-made 50 $\\Omega$ coax looks like 50 $\\Omega$ across a huge band. For a **low-loss** line $Z_0 \\approx \\sqrt{L/C}$ still holds to good approximation, with loss appearing mainly as a small $\\alpha$.",
+          "difficulty": 1,
+          "content": "**Hook.** You have a source (something producing a signal, like a transmitter), a cable, and a load (something using the signal, like an antenna or speaker). You want *all* the signal's power to reach the load and none to be wasted. There is one simple rule that makes that happen.\n\n**Build.** The **golden rule of transmission lines**: to deliver all the power, the source, the cable, and the load should all have the *same* impedance. When they match, the signal flows smoothly from source to load and every bit of power is delivered. We call this an **impedance match** (or just 'matched').\n\nHere is the picture. A 50-ohm source feeds a 50-ohm cable, which feeds a 50-ohm load. Everything agrees on how voltage and current should ride along, so the wave glides straight into the load and is absorbed there. That is the goal: maximum power delivered, nothing bounced back.\n\nNow suppose the load is *wrong* (say a 150-ohm load on a 50-ohm line). The signal arrives expecting 50 ohms but meets 150 ohms, so it cannot all fit into the load. Part of the signal is turned around and sent *back* down the cable. This is a **mismatch**, and the part that comes back is a **reflection** (we explore reflections next lesson). Reflected power is wasted power: it never reaches the load.\n\nThis is why equipment is built around standard impedances. A 50-ohm radio, 50-ohm cable, and 50-ohm antenna are designed to match so the radio's power actually goes out the antenna.\n\n**Recap.** The golden rule: matching impedance (source = cable = load) delivers all the power. A mismatch sends part of the signal back as a wasteful reflection.",
           "items": [
-            {
-              "id": "transmission-lines-l2-fc1",
-              "type": "flashcard",
-              "front": "State the two telegrapher's equations (phasor form).",
-              "back": "$\\frac{dV}{dz} = -(R + j\\omega L) I$ and $\\frac{dI}{dz} = -(G + j\\omega C) V$. Decoupling them yields $\\frac{d^2V}{dz^2} = \\gamma^2 V$.",
-              "hint": "Series impedance acts on I; shunt admittance acts on V."
-            },
-            {
-              "id": "transmission-lines-l2-fc2",
-              "type": "flashcard",
-              "front": "Define the complex propagation constant $\\gamma$ and its parts.",
-              "back": "$\\gamma = \\sqrt{(R + j\\omega L)(G + j\\omega C)} = \\alpha + j\\beta$, where $\\alpha$ is attenuation (Np/m) and $\\beta$ is the phase constant (rad/m), with $\\beta = 2\\pi/\\lambda$.",
-              "hint": "Real part attenuates, imaginary part advances phase."
-            },
-            {
-              "id": "transmission-lines-l2-fc3",
-              "type": "flashcard",
-              "front": "Give the general and lossless expressions for characteristic impedance.",
-              "back": "General: $Z_0 = \\sqrt{(R + j\\omega L)/(G + j\\omega C)}$. Lossless ($R=G=0$): $Z_0 = \\sqrt{L/C}$, real and frequency-independent.",
-              "hint": "Set the loss terms to zero."
-            },
-            {
-              "id": "transmission-lines-l2-fc4",
-              "type": "flashcard",
-              "front": "What does the general line voltage solution $V(z) = V_0^+ e^{-\\gamma z} + V_0^- e^{+\\gamma z}$ represent physically?",
-              "back": "A superposition of a forward-traveling wave ($e^{-\\gamma z}$, toward the load) and a backward-traveling reflected wave ($e^{+\\gamma z}$, toward the source).",
-              "hint": "Two directions of travel."
-            },
-            {
-              "id": "transmission-lines-l2-fc5",
-              "type": "flashcard",
-              "front": "How is phase velocity obtained from the telegrapher's solution?",
-              "back": "$v_p = \\omega / \\beta$. For a lossless line $\\beta = \\omega\\sqrt{LC}$, giving $v_p = 1/\\sqrt{LC}$, independent of frequency (no dispersion).",
-              "hint": "Phase velocity = $\\omega$ over the phase constant."
-            },
-            {
-              "id": "transmission-lines-l2-diag1",
-              "type": "flashcard",
-              "front": "Identify the four elements in one section of the per-unit-length transmission-line model and their placement.",
-              "back": "Series branch: $R\\,\\Delta z$ then $L\\,\\Delta z$. Shunt branch (to return): $G\\,\\Delta z$ in parallel with $C\\,\\Delta z$. Cascading infinitely many such sections models the line.",
-              "hint": "Two series, two shunt — see the diagram.",
-              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/transmission-lines-1.svg"
-            },
             {
               "id": "transmission-lines-l2-mc1",
               "type": "mcq",
-              "prompt": "For a lossless line with $L = 250$ nH/m and $C = 100$ pF/m, $Z_0$ is approximately:",
+              "prompt": "What is the 'golden rule' for delivering all the power to a load?",
               "choices": [
-                "25 Ω",
-                "50 Ω",
-                "100 Ω",
-                "75 Ω"
+                "The source, cable, and load should all have matching impedance",
+                "The cable should be as long as possible",
+                "The load impedance should be much larger than the cable's",
+                "The source should be turned off briefly first"
               ],
-              "answerIndex": 1,
-              "explanation": "$Z_0 = \\sqrt{L/C} = \\sqrt{250\\times10^{-9}/100\\times10^{-12}} = \\sqrt{2500} = 50\\,\\Omega$."
+              "answerIndex": 0,
+              "explanation": "When source, cable, and load impedances all match, the signal flows smoothly and all the power is delivered. Mismatches, not length or large loads, are what cause wasted power."
             },
             {
               "id": "transmission-lines-l2-mc2",
               "type": "mcq",
-              "prompt": "Which condition makes $Z_0$ purely real and independent of frequency?",
+              "prompt": "On a 50-ohm line, what load gives a perfect match (all power delivered, nothing reflected)?",
               "choices": [
-                "$R = G = 0$ (lossless)",
-                "$L = C$",
-                "$\\omega \\to 0$",
-                "$R = L$ and $G = C$"
+                "A 50-ohm load",
+                "A 150-ohm load",
+                "A 5-ohm load",
+                "An open end (no load at all)"
               ],
               "answerIndex": 0,
-              "explanation": "With $R=G=0$, $Z_0 = \\sqrt{j\\omega L / j\\omega C} = \\sqrt{L/C}$ — the $\\omega$ cancels, leaving a real, frequency-independent value."
+              "explanation": "A load equal to the line's impedance (50 ohms here) is the matched case: the wave is fully absorbed and no power bounces back. The other choices are all mismatches."
             },
             {
               "id": "transmission-lines-l2-mc3",
               "type": "mcq",
-              "prompt": "In $\\gamma = \\alpha + j\\beta$, what are the units of $\\alpha$ and $\\beta$ respectively?",
+              "prompt": "What happens to the signal when a 150-ohm load sits on a 50-ohm line?",
               "choices": [
-                "dB/m and Hz",
-                "Np/m and rad/m",
-                "rad/m and Np/m",
-                "Ω/m and S/m"
+                "Part of the signal reflects back down the cable, wasting power",
+                "All the power is delivered, exactly as in a match",
+                "The cable's impedance changes to 150 ohms",
+                "The signal speeds up to make up the difference"
               ],
-              "answerIndex": 1,
-              "explanation": "$\\alpha$ is the attenuation constant in nepers per meter; $\\beta$ is the phase constant in radians per meter (1 Np = 8.686 dB)."
+              "answerIndex": 0,
+              "explanation": "A mismatch means the load cannot accept the whole wave on the line's terms, so part of the signal is sent back as a reflection. That reflected power never reaches the load and is wasted."
             },
             {
               "id": "transmission-lines-l2-mc4",
               "type": "mcq",
-              "prompt": "The telegrapher's equations are derived from the RLGC section by applying:",
+              "prompt": "Why is reflected power a problem?",
               "choices": [
-                "Maxwell's equations directly in 3D",
-                "Kirchhoff's voltage and current laws to a section as Δz → 0",
-                "The Smith chart construction",
-                "Snell's law at the section boundary"
+                "It is power that never reaches the load, so it is wasted",
+                "It makes the load run cooler and is helpful",
+                "It permanently destroys the cable",
+                "It increases the total power delivered"
               ],
-              "answerIndex": 1,
-              "explanation": "KVL around the series R-L and KCL at the shunt G-C node, then taking the limit $\\Delta z \\to 0$, yields the coupled first-order telegrapher's equations."
+              "answerIndex": 0,
+              "explanation": "Reflected power travels back toward the source instead of into the load, reducing the power actually delivered. It does not boost delivery or help the load."
             },
             {
               "id": "transmission-lines-l2-mc5",
               "type": "mcq",
-              "prompt": "On a low-loss line, what is the practical effect of small but nonzero $R$ and $G$?",
+              "prompt": "Why are radios, cables, and antennas often all built to 50 ohms?",
               "choices": [
-                "$Z_0$ becomes infinite",
-                "$Z_0 \\approx \\sqrt{L/C}$ still, but a small $\\alpha$ attenuates the wave",
-                "The line stops propagating waves",
-                "Phase velocity exceeds c"
+                "So they match each other and the radio's power actually reaches the antenna",
+                "Because 50 ohms is the only impedance that exists",
+                "To make the cables heavier",
+                "So the signal travels faster than light"
               ],
-              "answerIndex": 1,
-              "explanation": "For low loss, $Z_0$ stays close to $\\sqrt{L/C}$; the chief consequence of $R$ and $G$ is a nonzero attenuation constant $\\alpha$, slowly shrinking the wave amplitude with distance."
+              "answerIndex": 0,
+              "explanation": "Using a common standard impedance lets the parts match, satisfying the golden rule so power flows from source to antenna. It is a design choice, not the only possible value."
+            },
+            {
+              "id": "transmission-lines-l2-mc6",
+              "type": "mcq",
+              "prompt": "In a fully matched system, how much of the signal's power reaches the load (ideally)?",
+              "choices": [
+                "All of it, with nothing reflected back",
+                "Half of it, the other half always reflects",
+                "None of it",
+                "It depends on the cable's color"
+              ],
+              "answerIndex": 0,
+              "explanation": "A perfect match means the wave is fully absorbed by the load: maximum power delivered, no reflection. Half-loss or total loss describes mismatched, not matched, conditions."
+            },
+            {
+              "id": "transmission-lines-l2-mc7",
+              "type": "mcq",
+              "prompt": "Which describes an 'impedance mismatch'?",
+              "choices": [
+                "The load impedance differs from the line impedance, so part of the signal reflects",
+                "The source and load impedances are exactly equal",
+                "The cable is exactly one meter long",
+                "The signal has no voltage"
+              ],
+              "answerIndex": 0,
+              "explanation": "A mismatch is any case where impedances do not agree (for example a 150-ohm load on a 50-ohm line), which causes a reflection. Equal impedances are a match, not a mismatch."
+            },
+            {
+              "id": "transmission-lines-l2-mc8",
+              "type": "mcq",
+              "prompt": "A 50-ohm source, 50-ohm cable, and 50-ohm antenna are connected. What should you expect?",
+              "choices": [
+                "A good match: the wave flows into the antenna with no reflection",
+                "A bad mismatch with most power reflected",
+                "The antenna will refuse any power",
+                "The cable impedance will jump to 150 ohms"
+              ],
+              "answerIndex": 0,
+              "explanation": "All three parts agree at 50 ohms, satisfying the golden rule, so the signal is delivered cleanly with essentially no reflected power.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/transmission-lines-3.svg"
             }
           ]
         },
         {
           "id": "transmission-lines-transmission-lines-l3",
-          "title": "Reflections, Reflection Coefficient & VSWR",
+          "title": "Reflections from a Mismatched End",
           "order": 3,
           "difficulty": 2,
-          "content": "When a forward wave hits a load $Z_L$ that does not equal $Z_0$, it cannot satisfy the load's V/I ratio alone, so part of it reflects. The **load reflection coefficient** is\n\n$$\\Gamma_L = \\frac{Z_L - Z_0}{Z_L + Z_0}$$\n\nIt's complex, with $|\\Gamma_L| \\le 1$ for passive loads. Three terminations anchor your intuition:\n\n- **Matched** ($Z_L = Z_0$): $\\Gamma_L = 0$. All power delivered, no reflection — the goal.\n- **Open** ($Z_L \\to \\infty$): $\\Gamma_L = +1$. Full reflection, voltage doubles at the open.\n- **Short** ($Z_L = 0$): $\\Gamma_L = -1$. Full reflection with a $180^\\circ$ phase flip, voltage null at the short.\n\nA reflected wave interferes with the incident one to form a **standing wave**: a stationary pattern of voltage maxima and minima. Adjacent maxima (or minima) are spaced $\\lambda/2$ apart, and a maximum and the next minimum are $\\lambda/4$ apart. The severity is captured by the **voltage standing wave ratio**:\n\n$$\\text{VSWR} = \\frac{V_{\\max}}{V_{\\min}} = \\frac{1 + |\\Gamma|}{1 - |\\Gamma|}$$\n\nVSWR runs from 1 (perfect match) to $\\infty$ (total reflection). The related **return loss** is $RL = -20\\log_{10}|\\Gamma|$ dB — a large positive dB number means a good match. These are the first numbers any RF or radar tech reads off a meter: a VSWR of 2:1 ($|\\Gamma| = 1/3$, $RL \\approx 9.5$ dB) is a common 'still acceptable' threshold for an antenna feed.",
+          "content": "**Hook.** You already know that a wave partly bounces back when it meets a boundary (the same idea you met with waves at a barrier). A transmission line is no different: a mismatched load acts like a boundary, and the signal reflects off it. A simple rope makes this easy to feel.\n\n**Build.** Imagine flicking a wave down a rope.\n\n- **Rope tied tightly to a wall.** The wave hits the wall, can't go anywhere, and bounces straight back at you. The wall is a *total* mismatch.\n- **Rope blended smoothly into a perfectly matching rope.** The wave glides across the join and keeps going. There is nothing to bounce off; this is a *match*, and the wave passes through.\n\nA transmission line behaves the same way. The load is the 'far end' of the rope:\n\n- **Matched load** (load = line impedance): like the smooth join. No reflection; all power passes into the load.\n- **Open end** (the cable just stops, nothing connected): like a free, untied rope end. The wave reflects fully back.\n- **Short** (the two conductors touched together): also a full reflection, like tying the rope hard to the wall.\n- **Wrong-impedance load** (e.g. 150 ohms on a 50-ohm line): a *partial* reflection. Some power passes into the load, some bounces back.\n\nThe rule of thumb, stated plainly: **the reflection is zero when the load equals the line impedance, and the further the load is from that value, the bigger the reflection.** Open and short ends are the extreme mismatches, so they reflect everything; a load close to the line impedance reflects only a little.\n\n**Recap.** A mismatched end reflects the signal, just like a rope hitting a wall. Matched = no reflection; open or short = full reflection; a wrong-but-finite load = partial reflection. Bigger mismatch means bigger reflection.",
           "items": [
-            {
-              "id": "transmission-lines-l3-fc1",
-              "type": "flashcard",
-              "front": "Write the load reflection coefficient in terms of $Z_L$ and $Z_0$.",
-              "back": "$\\Gamma_L = \\dfrac{Z_L - Z_0}{Z_L + Z_0}$. It is complex; $|\\Gamma_L| \\le 1$ for a passive load.",
-              "hint": "Difference over sum."
-            },
-            {
-              "id": "transmission-lines-l3-fc2",
-              "type": "flashcard",
-              "front": "Give $\\Gamma_L$ for matched, open, and short terminations.",
-              "back": "Matched ($Z_L=Z_0$): $\\Gamma_L=0$. Open ($Z_L\\to\\infty$): $\\Gamma_L=+1$. Short ($Z_L=0$): $\\Gamma_L=-1$ (180° flip).",
-              "hint": "0, +1, -1."
-            },
-            {
-              "id": "transmission-lines-l3-fc3",
-              "type": "flashcard",
-              "front": "Relate VSWR to the magnitude of the reflection coefficient.",
-              "back": "$\\text{VSWR} = \\dfrac{1 + |\\Gamma|}{1 - |\\Gamma|}$, ranging from 1 (matched) to $\\infty$ (total reflection).",
-              "hint": "One plus over one minus."
-            },
-            {
-              "id": "transmission-lines-l3-fc4",
-              "type": "flashcard",
-              "front": "What is the spacing between adjacent voltage maxima on a standing-wave pattern, and between a max and the next min?",
-              "back": "Adjacent maxima (or minima) are $\\lambda/2$ apart; a maximum and the next minimum are $\\lambda/4$ apart.",
-              "hint": "Half a wavelength and a quarter."
-            },
-            {
-              "id": "transmission-lines-l3-fc5",
-              "type": "flashcard",
-              "front": "Define return loss and state what a large value means.",
-              "back": "$RL = -20\\log_{10}|\\Gamma|$ dB. A large positive dB value means small $|\\Gamma|$ — i.e. a good match (little reflected power).",
-              "hint": "It's $|\\Gamma|$ in dB, sign-flipped."
-            },
-            {
-              "id": "transmission-lines-l3-diag1",
-              "type": "flashcard",
-              "front": "On a standing-wave plot of $|V(z)|$, how do you read VSWR, and what spacing separates the minima?",
-              "back": "VSWR is the ratio of the envelope's maximum to its minimum, $V_{\\max}/V_{\\min}$. Successive minima (and maxima) are separated by $\\lambda/2$.",
-              "hint": "Ratio of the dashed envelope lines.",
-              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/transmission-lines-2.svg"
-            },
             {
               "id": "transmission-lines-l3-mc1",
               "type": "mcq",
-              "prompt": "A 75 Ω load terminates a 50 Ω line. What is $\\Gamma_L$?",
+              "prompt": "Flicking a wave down a rope tied tightly to a wall, what happens?",
               "choices": [
-                "0.2",
-                "0.5",
-                "0.33",
-                "-0.2"
+                "The wave reflects fully back toward you",
+                "The wave passes through the wall unchanged",
+                "The wave disappears with no reflection",
+                "The wave speeds up after the wall"
               ],
               "answerIndex": 0,
-              "explanation": "$\\Gamma_L = (75-50)/(75+50) = 25/125 = 0.2$. Real and positive because $Z_L > Z_0$ and both are real."
+              "explanation": "The wall is a hard boundary the wave cannot cross, so the wave bounces back. This is the everyday picture of a total reflection from a complete mismatch."
             },
             {
               "id": "transmission-lines-l3-mc2",
               "type": "mcq",
-              "prompt": "If $|\\Gamma| = 0.5$, the VSWR is:",
+              "prompt": "A rope blended smoothly into a perfectly matching rope is the analogy for what line condition?",
               "choices": [
-                "1.5",
-                "2",
-                "3",
-                "0.5"
+                "A matched load: the wave passes through with no reflection",
+                "A short circuit with full reflection",
+                "An open end with full reflection",
+                "A cable with no signal"
               ],
-              "answerIndex": 2,
-              "explanation": "$\\text{VSWR} = (1+0.5)/(1-0.5) = 1.5/0.5 = 3$, i.e. 3:1."
+              "answerIndex": 0,
+              "explanation": "A smooth join gives the wave nothing to bounce off, so it passes through. That mirrors a matched load (load = line impedance), where no power is reflected."
             },
             {
               "id": "transmission-lines-l3-mc3",
               "type": "mcq",
-              "prompt": "A shorted termination ($Z_L = 0$) produces a reflection coefficient of:",
+              "prompt": "When does a transmission line have zero reflection?",
               "choices": [
-                "+1 with no phase change",
-                "0",
-                "-1, a full reflection with 180° phase flip",
-                "0.5"
+                "When the load impedance equals the line's characteristic impedance",
+                "When the load is an open end",
+                "When the load is a short",
+                "When the cable is very long"
               ],
-              "answerIndex": 2,
-              "explanation": "$\\Gamma_L = (0 - Z_0)/(0 + Z_0) = -1$: total reflection with a $180^\\circ$ phase inversion, forcing a voltage null at the short."
+              "answerIndex": 0,
+              "explanation": "Zero reflection happens only when the load matches the line impedance. Open and short ends are extreme mismatches that reflect everything, and length does not set the reflection."
             },
             {
               "id": "transmission-lines-l3-mc4",
               "type": "mcq",
-              "prompt": "A VSWR of 2:1 corresponds to a return loss of approximately:",
+              "prompt": "An open end (cable just stops, nothing connected) causes:",
               "choices": [
-                "3 dB",
-                "6 dB",
-                "9.5 dB",
-                "20 dB"
+                "A full reflection of the signal back down the line",
+                "No reflection, like a matched load",
+                "A small partial reflection only",
+                "The signal to leave the cable into the air with no loss"
               ],
-              "answerIndex": 2,
-              "explanation": "VSWR 2 gives $|\\Gamma| = (2-1)/(2+1) = 1/3$. $RL = -20\\log_{10}(1/3) \\approx 9.54$ dB."
+              "answerIndex": 0,
+              "explanation": "An open end is an extreme mismatch (like a free rope end), so the wave reflects fully back. It is the opposite of a matched load."
             },
             {
               "id": "transmission-lines-l3-mc5",
               "type": "mcq",
-              "prompt": "What physically creates a standing wave on a mismatched line?",
+              "prompt": "A 150-ohm load on a 50-ohm line (a wrong-but-finite load) produces:",
               "choices": [
-                "Attenuation along the line",
-                "Interference between the incident and reflected traveling waves",
-                "Dispersion of the phase velocity",
-                "Skin effect in the conductor"
+                "A partial reflection: some power passes into the load, some bounces back",
+                "No reflection at all",
+                "A full reflection, like an open or short",
+                "More delivered power than a matched load"
               ],
-              "answerIndex": 1,
-              "explanation": "The forward and reflected waves superpose to form a stationary interference pattern of fixed maxima and minima — the standing wave."
+              "answerIndex": 0,
+              "explanation": "Because the load is mismatched but not extreme, part of the wave enters the load and part reflects. Only a matched load gives zero reflection; only open/short give full reflection."
+            },
+            {
+              "id": "transmission-lines-l3-mc6",
+              "type": "mcq",
+              "prompt": "How does the size of the reflection depend on the load?",
+              "choices": [
+                "The further the load is from the line impedance, the bigger the reflection",
+                "The reflection is the same for every load",
+                "Reflection shrinks as the mismatch grows",
+                "Reflection depends only on cable color"
+              ],
+              "answerIndex": 0,
+              "explanation": "Reflection is zero at a perfect match and grows as the load moves away from the line impedance. The biggest reflections come from the most extreme mismatches (open and short)."
+            },
+            {
+              "id": "transmission-lines-l3-mc7",
+              "type": "mcq",
+              "prompt": "Why is a mismatched load like a boundary that a wave meets?",
+              "choices": [
+                "Because the wave partly reflects there, just as it does at a boundary",
+                "Because it changes the cable's length",
+                "Because it makes the wave travel faster than light",
+                "Because it has no effect on the wave"
+              ],
+              "answerIndex": 0,
+              "explanation": "You already know waves partly reflect at a boundary. A mismatched load is exactly that kind of boundary for the signal on a line, so part of the wave bounces back."
+            },
+            {
+              "id": "transmission-lines-l3-mc8",
+              "type": "mcq",
+              "prompt": "Which pair of line endings both cause a FULL reflection?",
+              "choices": [
+                "An open end and a short",
+                "A matched load and an open end",
+                "A matched load and a short",
+                "Two matched loads"
+              ],
+              "answerIndex": 0,
+              "explanation": "Both an open end and a short are extreme mismatches, so each reflects the whole wave. A matched load, by contrast, reflects nothing.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/transmission-lines-4.svg"
             }
           ]
         },
         {
           "id": "transmission-lines-transmission-lines-l4",
-          "title": "Input Impedance, the λ/4 Transformer & Stubs",
+          "title": "Standing Waves & the VSWR Number",
           "order": 4,
-          "difficulty": 3,
-          "content": "Looking into a line of length $l$ terminated in $Z_L$, the impedance you see depends on how far you are from the load, because the reflected wave's phase rotates as it travels. For a lossless line:\n\n$$Z_{in}(l) = Z_0 \\frac{Z_L + jZ_0 \\tan\\beta l}{Z_0 + jZ_L \\tan\\beta l}$$\n\nThis single equation contains the most useful tricks in RF. **Quarter-wave** ($l = \\lambda/4$, so $\\beta l = \\pi/2$, $\\tan\\beta l \\to \\infty$): the formula reduces to\n\n$$Z_{in} = \\frac{Z_0^2}{Z_L}$$\n\nThe line *inverts* the load. This is the **quarter-wave transformer**: to match a real load $Z_L$ to a source $Z_S$, insert a $\\lambda/4$ section with $Z_0 = \\sqrt{Z_S Z_L}$. To match 100 $\\Omega$ to 50 $\\Omega$, use $Z_0 = \\sqrt{50\\cdot100} \\approx 70.7\\,\\Omega$. **Half-wave** ($l = \\lambda/2$): $\\tan\\beta l = 0$, so $Z_{in} = Z_L$ — the line repeats the load impedance every half wavelength, regardless of $Z_0$.\n\n**Stubs** exploit the open/short cases. A shorted line ($Z_L = 0$) gives $Z_{in} = jZ_0\\tan\\beta l$ — a pure reactance you can dial to any value (inductive or capacitive) by choosing $l$. An open line gives $Z_{in} = -jZ_0\\cot\\beta l$. So a stub is a lossless, tunable reactance: when you need a specific $+jX$ or $-jX$ to cancel a load's reactive part, you reach for a stub of the right length. This is the foundation of single- and double-stub matching networks, the topic of the next module's Smith-chart work.",
+          "difficulty": 2,
+          "content": "**Hook.** When a line is mismatched, you get two waves on it at once: the original wave heading toward the load, and the reflected wave heading back. What happens when two waves share the same cable? They add together, and the result is a surprisingly tidy, fixed pattern.\n\n**Build.** The wave going toward the load is the **incident wave**. The wave bouncing back is the **reflected wave**. At every point on the line these two waves add up. In some spots they reinforce each other (giving a strong signal); in other spots they cancel (giving a weak signal). Because both waves keep moving at a steady rate, these strong and weak spots sit at *fixed positions* along the cable. This locked-in pattern of high and low signal is called a **standing wave** (it appears to 'stand still' even though it is built from two moving waves).\n\nIf you could measure the signal strength all along the line, you'd see it rise and fall: high points (maxima) and low points (minima) repeating. The bigger the reflection, the deeper the dips and the taller the peaks.\n\nWe summarize 'how bad is the mismatch' with one number, the **VSWR** (Voltage Standing Wave Ratio). Plainly, it is the ratio of the strongest spot to the weakest spot on the line:\n\n$$\\text{VSWR} = \\frac{\\text{biggest signal}}{\\text{smallest signal}}$$\n\nVSWR is always a number **1 or greater**. A VSWR of **1 means a perfect match** (no reflection, so the signal is the same everywhere, with no peaks or dips). A **higher VSWR means a worse mismatch** (2 is some mismatch, 5 is bad, very large means almost everything is reflected). When a technician checks an antenna, VSWR is the first number they read: close to 1 is the goal.\n\n**Recap.** Incident and reflected waves add to make a standing wave (fixed high and low spots). VSWR is one simple number for how bad the mismatch is: 1 is perfect, higher is worse.",
           "items": [
-            {
-              "id": "transmission-lines-l4-fc1",
-              "type": "flashcard",
-              "front": "Write the lossless input-impedance formula for a line of length $l$ terminated in $Z_L$.",
-              "back": "$Z_{in}(l) = Z_0 \\dfrac{Z_L + jZ_0 \\tan\\beta l}{Z_0 + jZ_L \\tan\\beta l}$.",
-              "hint": "$Z_0$ times (load + j Z0 tan) over (Z0 + j load tan)."
-            },
-            {
-              "id": "transmission-lines-l4-fc2",
-              "type": "flashcard",
-              "front": "What does a quarter-wave ($\\lambda/4$) line do to the load impedance?",
-              "back": "It inverts it: $Z_{in} = Z_0^2 / Z_L$. A high load looks low and vice versa.",
-              "hint": "$\\tan(\\pi/2) \\to \\infty$ in the formula."
-            },
-            {
-              "id": "transmission-lines-l4-fc3",
-              "type": "flashcard",
-              "front": "How do you size a quarter-wave transformer to match real impedances $Z_S$ and $Z_L$?",
-              "back": "Choose the section's characteristic impedance $Z_0 = \\sqrt{Z_S Z_L}$ (geometric mean) and make it $\\lambda/4$ long.",
-              "hint": "Geometric mean of the two impedances."
-            },
-            {
-              "id": "transmission-lines-l4-fc4",
-              "type": "flashcard",
-              "front": "What is the input impedance of a half-wavelength ($\\lambda/2$) line?",
-              "back": "$Z_{in} = Z_L$. A half-wave line repeats the load impedance exactly, independent of $Z_0$. Impedance repeats every $\\lambda/2$.",
-              "hint": "$\\tan(\\pi) = 0$."
-            },
-            {
-              "id": "transmission-lines-l4-fc5",
-              "type": "flashcard",
-              "front": "Give the input reactance of a shorted stub and an open stub of length $l$.",
-              "back": "Shorted: $Z_{in} = jZ_0\\tan\\beta l$ (inductive/capacitive by length). Open: $Z_{in} = -jZ_0\\cot\\beta l$. Both are pure reactances on a lossless line.",
-              "hint": "Short uses tan, open uses cot (with a minus sign)."
-            },
-            {
-              "id": "transmission-lines-l4-fc6",
-              "type": "flashcard",
-              "front": "Why is a stub useful in a matching network?",
-              "back": "It is a lossless, length-tunable reactance. By choosing its length you produce exactly the $+jX$ or $-jX$ needed to cancel a load's reactive part.",
-              "hint": "Tunable reactance with no resistor needed."
-            },
             {
               "id": "transmission-lines-l4-mc1",
               "type": "mcq",
-              "prompt": "To match a 100 Ω load to a 50 Ω line with a quarter-wave transformer, the section's $Z_0$ should be:",
+              "prompt": "What two waves combine to make a standing wave on a mismatched line?",
               "choices": [
-                "50 Ω",
-                "75 Ω",
-                "70.7 Ω",
-                "150 Ω"
+                "The incident wave (toward the load) and the reflected wave (coming back)",
+                "Two waves both heading toward the load",
+                "Sound waves and light waves",
+                "A wave and its echo from a different cable"
               ],
-              "answerIndex": 2,
-              "explanation": "$Z_0 = \\sqrt{Z_S Z_L} = \\sqrt{50\\cdot100} = \\sqrt{5000} \\approx 70.7\\,\\Omega$."
+              "answerIndex": 0,
+              "explanation": "A standing wave forms when the incident wave and the reflected wave share the line and add together. It needs both directions of travel; without a reflection there is no standing wave."
             },
             {
               "id": "transmission-lines-l4-mc2",
               "type": "mcq",
-              "prompt": "A 25 Ω load is seen through a $\\lambda/4$ section of 50 Ω line. The input impedance is:",
+              "prompt": "Why is the pattern called a 'standing' wave?",
               "choices": [
-                "25 Ω",
-                "50 Ω",
-                "75 Ω",
-                "100 Ω"
+                "The high and low spots sit at fixed positions and appear to stand still",
+                "The cable physically stands upright",
+                "The wave stops moving energy entirely",
+                "It only happens when the equipment is standing on a table"
               ],
-              "answerIndex": 3,
-              "explanation": "$Z_{in} = Z_0^2/Z_L = 50^2/25 = 2500/25 = 100\\,\\Omega$. The quarter-wave line inverts the load about $Z_0$."
+              "answerIndex": 0,
+              "explanation": "Although it is built from two moving waves, the resulting peaks and dips stay at fixed places along the line, so the pattern looks stationary, hence 'standing wave'."
             },
             {
               "id": "transmission-lines-l4-mc3",
               "type": "mcq",
-              "prompt": "Looking into a $\\lambda/2$ line terminated in a complex load $Z_L = 30 + j40\\ \\Omega$ on a 50 Ω line, the input impedance is:",
+              "prompt": "In plain terms, what is VSWR?",
               "choices": [
-                "50 Ω",
-                "$30 + j40\\ \\Omega$",
-                "$30 - j40\\ \\Omega$",
-                "$Z_0^2/Z_L$"
+                "The ratio of the strongest signal spot to the weakest signal spot on the line",
+                "The total length of the cable",
+                "The speed of the wave",
+                "The color code of the connector"
               ],
-              "answerIndex": 1,
-              "explanation": "A half-wave line repeats the load exactly: $Z_{in} = Z_L = 30 + j40\\ \\Omega$, regardless of $Z_0$."
+              "answerIndex": 0,
+              "explanation": "VSWR (Voltage Standing Wave Ratio) compares the biggest signal on the line to the smallest. A large ratio means deep peaks and dips, signaling a strong reflection."
             },
             {
               "id": "transmission-lines-l4-mc4",
               "type": "mcq",
-              "prompt": "A shorted lossless stub presents what kind of input impedance?",
+              "prompt": "What does a VSWR of exactly 1 mean?",
               "choices": [
-                "A pure resistance equal to $Z_0$",
-                "A pure reactance $jZ_0\\tan\\beta l$",
-                "Always an open circuit",
-                "A complex impedance with equal real and imaginary parts"
+                "A perfect match: no reflection, signal the same everywhere",
+                "The worst possible mismatch",
+                "Half the power is reflected",
+                "The cable is broken"
               ],
-              "answerIndex": 1,
-              "explanation": "With $Z_L = 0$, the formula gives $Z_{in} = jZ_0\\tan\\beta l$ — a purely imaginary (reactive) input, tunable via length."
+              "answerIndex": 0,
+              "explanation": "VSWR = 1 means the biggest and smallest spots are equal, so there is no standing-wave ripple at all. That only happens with a perfect match and zero reflection."
             },
             {
               "id": "transmission-lines-l4-mc5",
               "type": "mcq",
-              "prompt": "A shorted stub one-eighth wavelength long ($\\beta l = \\pi/4$) on a 50 Ω line presents:",
+              "prompt": "A line shows a VSWR of 5. Compared with a VSWR of 1.2, this means:",
               "choices": [
-                "$-j50\\ \\Omega$",
-                "$+j50\\ \\Omega$",
-                "$+j25\\ \\Omega$",
-                "0 Ω"
+                "A worse mismatch, with more of the signal reflected",
+                "A better match",
+                "Exactly the same match",
+                "No signal on the line"
               ],
-              "answerIndex": 1,
-              "explanation": "$Z_{in} = j50\\tan(\\pi/4) = j50\\cdot1 = +j50\\ \\Omega$ — an inductive reactance."
+              "answerIndex": 0,
+              "explanation": "Higher VSWR means a worse mismatch and more reflected power. A VSWR of 1.2 is close to perfect; 5 indicates a serious mismatch."
             },
             {
               "id": "transmission-lines-l4-mc6",
               "type": "mcq",
-              "prompt": "Why does input impedance vary with position along a mismatched line?",
+              "prompt": "Can VSWR ever be less than 1?",
               "choices": [
-                "Because $Z_0$ changes with distance",
-                "Because the reflected wave's phase rotates as it travels, changing the V/I ratio",
-                "Because attenuation dominates",
-                "Because the load value changes"
+                "No. VSWR is always 1 or greater",
+                "Yes, a good match gives 0.5",
+                "Yes, it can be negative",
+                "Yes, it ranges from -1 to +1"
               ],
-              "answerIndex": 1,
-              "explanation": "The incident and reflected waves combine with a position-dependent relative phase ($\\beta l$), so their voltage-to-current ratio — the input impedance — rotates with distance."
+              "answerIndex": 0,
+              "explanation": "VSWR is the ratio of the largest spot to the smallest, so it cannot drop below 1 (the best case, a perfect match). Values below 1 or negative values are not possible."
+            },
+            {
+              "id": "transmission-lines-l4-mc7",
+              "type": "mcq",
+              "prompt": "How does a bigger reflection change the standing-wave pattern?",
+              "choices": [
+                "The peaks get taller and the dips get deeper (the ripple is stronger)",
+                "The pattern flattens out completely",
+                "The peaks and dips swap places randomly",
+                "Nothing changes"
+              ],
+              "answerIndex": 0,
+              "explanation": "A larger reflection makes the incident and reflected waves reinforce and cancel more strongly, deepening the dips and raising the peaks, which shows up as a higher VSWR."
+            },
+            {
+              "id": "transmission-lines-l4-mc8",
+              "type": "mcq",
+              "prompt": "When a technician tests an antenna, why is VSWR the first number they check?",
+              "choices": [
+                "It quickly tells how well the antenna is matched (close to 1 is good)",
+                "It tells how long the cable is",
+                "It measures the room temperature",
+                "It shows the antenna's color"
+              ],
+              "answerIndex": 0,
+              "explanation": "VSWR is a fast, single-number health check of the match. A value near 1 means little reflected power and good delivery; a high value warns of a mismatch to fix.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/transmission-lines-2.svg"
+            }
+          ]
+        },
+        {
+          "id": "transmission-lines-transmission-lines-l5",
+          "title": "Where the Power Goes: Return Loss",
+          "order": 5,
+          "difficulty": 3,
+          "content": "**Hook.** When a line is mismatched and part of the signal reflects, where does that power actually go, and how do engineers describe how much comes back? There is a second common number, alongside VSWR, that answers this.\n\n**Build.** Think of the power leaving the source as splitting into two parts at a mismatched load:\n\n- **Delivered power** goes into the load and does its job (drives the antenna, the speaker, and so on).\n- **Reflected power** bounces back toward the source. It is the wasted part, and on a badly matched line it can even cause an *echo*: the signal returns to the source like a shout coming back off a canyon wall.\n\nThe better the match, the more goes into 'delivered' and the less into 'reflected'. A perfect match (VSWR = 1) sends everything into the load and reflects nothing.\n\nEngineers often describe the reflected part with a number called **return loss**. In plain words, return loss tells you *how much smaller the reflected signal is than the original*. A **large return loss is good**: it means only a tiny fraction comes back (a good match). A **small return loss is bad**: a big fraction returns (a poor match). So the two everyday numbers point in opposite directions: for a good match you want **VSWR close to 1** and **return loss large**. They are just two ways of saying the same thing, 'how much is reflected'.\n\nA quick sanity check: a perfect match means no reflected signal, the largest possible return loss, and VSWR = 1. A total reflection (open or short end) means everything comes back, the smallest return loss, and a huge VSWR.\n\n**Recap.** At a mismatch, power splits into delivered (useful) and reflected (wasted, possibly an echo). Return loss measures the reflected part: large return loss = good match; it always agrees with a VSWR near 1.",
+          "items": [
+            {
+              "id": "transmission-lines-l5-mc1",
+              "type": "mcq",
+              "prompt": "At a mismatched load, the source's power splits into which two parts?",
+              "choices": [
+                "Delivered power (into the load) and reflected power (back to the source)",
+                "Red power and blue power",
+                "Power that vanishes and power that doubles",
+                "Only delivered power, nothing else"
+              ],
+              "answerIndex": 0,
+              "explanation": "A mismatch lets some power into the load (delivered) and sends the rest back (reflected). The reflected portion is the wasted part."
+            },
+            {
+              "id": "transmission-lines-l5-mc2",
+              "type": "mcq",
+              "prompt": "In plain terms, what does 'return loss' describe?",
+              "choices": [
+                "How much smaller the reflected signal is than the original",
+                "How long the cable is",
+                "How fast the wave travels",
+                "How heavy the connector is"
+              ],
+              "answerIndex": 0,
+              "explanation": "Return loss is a measure of the reflected signal's size compared with the original. A bigger return loss means a smaller reflection, which is a better match."
+            },
+            {
+              "id": "transmission-lines-l5-mc3",
+              "type": "mcq",
+              "prompt": "Is a LARGE return loss good or bad?",
+              "choices": [
+                "Good: only a tiny fraction of the signal reflects",
+                "Bad: almost all the signal reflects",
+                "Neither: return loss does not relate to matching",
+                "Bad: it means the cable is too long"
+              ],
+              "answerIndex": 0,
+              "explanation": "Large return loss means the reflected signal is much smaller than the original, so little power comes back. That is exactly what a good match looks like."
+            },
+            {
+              "id": "transmission-lines-l5-mc4",
+              "type": "mcq",
+              "prompt": "For a GOOD match, what should the two everyday numbers look like?",
+              "choices": [
+                "VSWR close to 1 and return loss large",
+                "VSWR very large and return loss small",
+                "VSWR close to 1 and return loss small",
+                "Both numbers equal to zero"
+              ],
+              "answerIndex": 0,
+              "explanation": "A good match reflects little power, which shows as VSWR near 1 and a large return loss. The two numbers always agree because they both describe how much is reflected."
+            },
+            {
+              "id": "transmission-lines-l5-mc5",
+              "type": "mcq",
+              "prompt": "What can reflected power cause on a badly matched line?",
+              "choices": [
+                "An echo, where the signal returns toward the source",
+                "The cable to get longer",
+                "The signal to leave the cable as light",
+                "More power delivered to the load"
+              ],
+              "answerIndex": 0,
+              "explanation": "Reflected power travels back toward the source, which can act like an echo (a returned signal). It reduces, rather than increases, the power delivered to the load."
+            },
+            {
+              "id": "transmission-lines-l5-mc6",
+              "type": "mcq",
+              "prompt": "A perfect match (VSWR = 1) corresponds to which return loss situation?",
+              "choices": [
+                "The largest possible return loss (essentially no signal reflected)",
+                "The smallest possible return loss",
+                "A negative cable length",
+                "Half the power reflected"
+              ],
+              "answerIndex": 0,
+              "explanation": "With a perfect match, nothing reflects, so the reflected signal is as small as it can be, which is the largest return loss. VSWR = 1 and large return loss go together."
+            },
+            {
+              "id": "transmission-lines-l5-mc7",
+              "type": "mcq",
+              "prompt": "A total reflection (an open or short end) means:",
+              "choices": [
+                "Everything reflects: smallest return loss and a huge VSWR",
+                "Nothing reflects: largest return loss and VSWR = 1",
+                "Half reflects and half is delivered",
+                "The power is delivered perfectly"
+              ],
+              "answerIndex": 0,
+              "explanation": "An open or short end sends the whole wave back, so the reflected signal is as large as possible (smallest return loss) and the VSWR is very large. No power reaches the load."
+            },
+            {
+              "id": "transmission-lines-l5-mc8",
+              "type": "mcq",
+              "prompt": "Why do VSWR and return loss 'point in opposite directions' for a good match?",
+              "choices": [
+                "A good match makes VSWR small (near 1) but return loss large; both still mean little reflection",
+                "Because they measure completely unrelated things",
+                "Because one is in meters and the other in seconds",
+                "Because a good match makes both numbers large"
+              ],
+              "answerIndex": 0,
+              "explanation": "They describe the same reflection from two angles: less reflection lowers VSWR toward 1 and raises return loss. Different directions, same meaning.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/transmission-lines-6.svg"
+            }
+          ]
+        },
+        {
+          "id": "transmission-lines-transmission-lines-l6",
+          "title": "Kinds of Lines, Speed & What's Next",
+          "order": 6,
+          "difficulty": 3,
+          "content": "**Hook.** Transmission lines come in several shapes, and the signal on them has one more surprising property: it travels a bit *slower* than light. This lesson rounds out the picture and points to where the story continues.\n\n**Build.** Three common line types you'll meet:\n\n- **Coax** (coaxial cable): a center wire surrounded by an insulator and an outer shield (the round cable behind a TV or on a radio). The shield keeps the signal in and interference out.\n- **Twisted pair**: two wires twisted together (think of the cable in a wired internet/Ethernet connection or an old phone line). The twisting helps cancel out noise.\n- **Microstrip**: a flat copper strip running over a ground layer on a circuit board. This is how signals are routed *inside* electronics, printed right onto the board.\n\nEach is still a transmission line with its own characteristic impedance, set by its shape and materials.\n\nNext, **speed**. A signal in empty space travels at the speed of light, but inside a cable it goes *slower*, because the insulator around the conductors slows the wave. We capture this with the **velocity factor**: a fraction telling you what portion of light-speed the signal travels at. A velocity factor of 0.66, for example, means the signal moves at about 66% of the speed of light. This also causes a small **propagation delay**: the signal takes a tiny but real time to get from one end to the other.\n\nFinally, **what's next**. When a load doesn't match the line, we don't always replace it; instead we add a small circuit called a **matching network** that nudges the impedance back to a match (the details come later). The classic tool for designing those matches is the **Smith chart**, a clever circular graph that makes matching visual. That is the very next sub-topic.\n\n**Recap.** Common lines are coax, twisted pair, and microstrip, each with its own impedance. Signals travel slower than light (the velocity factor) with a small delay. Matching networks fix mismatches, and the Smith chart, coming next, is the tool for designing them.",
+          "items": [
+            {
+              "id": "transmission-lines-l6-mc1",
+              "type": "mcq",
+              "prompt": "Which describes a coaxial (coax) cable?",
+              "choices": [
+                "A center wire surrounded by an insulator and an outer shield",
+                "Two bare wires twisted together",
+                "A flat strip printed on a circuit board",
+                "A hollow metal pipe with nothing inside"
+              ],
+              "answerIndex": 0,
+              "explanation": "Coax has a center conductor, an insulating dielectric, and an outer shield. The shield contains the signal and blocks interference. Twisted pair and microstrip are different line types."
+            },
+            {
+              "id": "transmission-lines-l6-mc2",
+              "type": "mcq",
+              "prompt": "A wired Ethernet cable, with wires twisted together, is an example of:",
+              "choices": [
+                "Twisted pair",
+                "Coax",
+                "Microstrip",
+                "A waveguide pipe"
+              ],
+              "answerIndex": 0,
+              "explanation": "Twisting two wires together forms a twisted pair; the twist helps cancel noise. Coax uses a shield, and microstrip is a flat trace on a board."
+            },
+            {
+              "id": "transmission-lines-l6-mc3",
+              "type": "mcq",
+              "prompt": "What is 'microstrip'?",
+              "choices": [
+                "A flat copper strip over a ground layer, printed on a circuit board",
+                "A round cable with a braided shield",
+                "A pair of twisted wires",
+                "A glass optical fiber"
+              ],
+              "answerIndex": 0,
+              "explanation": "Microstrip is a printed flat conductor over a ground plane on a circuit board, used to route high-frequency signals inside electronics. It is still a transmission line with its own impedance."
+            },
+            {
+              "id": "transmission-lines-l6-mc4",
+              "type": "mcq",
+              "prompt": "How fast does a signal travel inside a typical cable, compared with the speed of light?",
+              "choices": [
+                "A bit slower than light",
+                "Exactly the speed of light",
+                "Faster than light",
+                "It does not move at all"
+              ],
+              "answerIndex": 0,
+              "explanation": "The insulator around the conductors slows the wave, so the signal travels somewhat slower than light in empty space. Nothing carries the signal faster than light."
+            },
+            {
+              "id": "transmission-lines-l6-mc5",
+              "type": "mcq",
+              "prompt": "What does a 'velocity factor' of 0.66 mean?",
+              "choices": [
+                "The signal travels at about 66% of the speed of light in that cable",
+                "The cable is 66 meters long",
+                "66% of the power is reflected",
+                "The cable works only 66% of the time"
+              ],
+              "answerIndex": 0,
+              "explanation": "Velocity factor is the fraction of light-speed at which the signal travels in the cable. 0.66 means about 66% of c. It is not a length, a reflection, or a reliability rating."
+            },
+            {
+              "id": "transmission-lines-l6-mc6",
+              "type": "mcq",
+              "prompt": "Because the signal travels slower than light, a cable also has a small:",
+              "choices": [
+                "Propagation delay (the signal takes real time to cross)",
+                "Increase in the speed of light",
+                "Negative length",
+                "Color shift"
+              ],
+              "answerIndex": 0,
+              "explanation": "Finite travel speed means a real, if tiny, delay from one end to the other, the propagation delay. It does not change the speed of light or the cable's length."
+            },
+            {
+              "id": "transmission-lines-l6-mc7",
+              "type": "mcq",
+              "prompt": "If a load doesn't match the line, what is a common fix besides replacing it?",
+              "choices": [
+                "Add a matching network to nudge the impedance back to a match",
+                "Make the cable a different color",
+                "Cool the cable down",
+                "Cut the cable in half"
+              ],
+              "answerIndex": 0,
+              "explanation": "A small matching network adjusts the impedance so the system matches and power is delivered, without swapping the load itself. Color, temperature, and length are not the fix."
+            },
+            {
+              "id": "transmission-lines-l6-mc8",
+              "type": "mcq",
+              "prompt": "What is the Smith chart, mentioned as the next sub-topic?",
+              "choices": [
+                "A circular graph that makes impedance matching visual",
+                "A type of coax connector",
+                "A brand of cable",
+                "A unit for measuring power"
+              ],
+              "answerIndex": 0,
+              "explanation": "The Smith chart is a circular plotting tool used to design impedance matches visually. It is the focus of the next sub-topic; here we just point forward to it.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/transmission-lines-5.svg"
             }
           ]
         }
