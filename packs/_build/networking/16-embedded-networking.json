@@ -5,296 +5,462 @@
   "lessons": [
     {
       "id": "embedded-networking-l1",
-      "title": "Lightweight TCP/IP Stacks & MCU Networking Hardware",
+      "title": "Tiny Devices, Tiny Budgets: Why the Normal Internet Stack Doesn't Fit",
       "order": 1,
       "difficulty": 1,
-      "content": "On a desktop the kernel hides the network stack from you. On a microcontroller with tens of kilobytes of RAM, the stack *is* your problem, and **lwIP** (lightweight IP) is the canonical answer. lwIP is built so you can pick your trade-off. Its **raw / callback API** is the fastest and smallest: you register callbacks the stack invokes when data arrives, with no threads and no copies. The **sequential (netconn) API** wraps that in a thread-friendly message-passing interface, and the **socket API** emulates Berkeley sockets so ported code compiles unchanged — each step up costs RAM and copies. Memory is managed with fixed **pools** (deterministic, no fragmentation) rather than a general heap, and packets live in **pbufs**: chained buffers designed for **zero-copy**, so a payload can sit in DMA-filled memory and never be copied as headers are prepended. Other stacks make different bets: **uIP/Contiki** is even smaller (a single packet buffer, great for sensor motes), **FreeRTOS+TCP** integrates with that RTOS, and **Zephyr**'s net stack is a modern, modular option.\n\nUnderneath, an MCU Ethernet port splits into a **MAC** (on-chip, does framing and DMA) and an external **PHY** (the analog/line-coding chip on the magnetics). They connect over **MII** (wide, more pins) or the reduced **RMII** (fewer pins, 50 MHz reference clock) — the same MAC/PHY split you would have probed on radar line cards. The MAC moves frames via **DMA descriptor** rings so the CPU is not copying bytes per packet, and **offload engines** can compute IP/TCP **checksums** in hardware. When a board has no Ethernet MAC at all, you tunnel IP over a serial line with **SLIP** (trivial framing) or **PPP** (adds negotiation and auth).",
+      "content": "**Hook.** You already know the normal internet: phones and laptops use IP to find each other, TCP or UDP to carry data, HTTP to fetch web pages, and DNS to turn names into addresses. All of that quietly assumes a *powerful* computer: plenty of memory, a charger or wall socket nearby, and a fat, fast connection. But the internet now also includes billions of **tiny** gadgets: a door sensor, a smart light bulb, a soil-moisture probe in a field. This world of small everyday objects that talk over a network is called the **Internet of Things (IoT)**.\n\n**Build.** These tiny devices live on a shoestring budget in three ways. *Memory:* a normal computer has gigabytes; a tiny sensor may have only **kilobytes** (thousands, not billions, of bytes). *Power:* instead of a wall socket, many run for *years* on a single coin-cell battery, so every bit of work costs precious energy. *Data:* they usually send only a tiny reading now and then (\"temperature is 21 degrees\"), not a video stream.\n\nNow the problem. The heavyweight web protocols we learned were built for powerful machines. TCP keeps a live connection open and constantly checks in, which is **too chatty** and keeps the radio awake, draining the battery. HTTP messages carry lots of text headers, which is **too big** for kilobytes of memory. Running them is simply **too power-hungry** for a coin cell. Think of it like postage: a thick parcel with lots of packaging is fine for a big shipper, but to send one short note you want a **postcard**. Or like vehicles: you would not drive a heavy truck to deliver a single envelope when a moped does the job using far less fuel.\n\nSo for constrained devices we use **lightweight, low-power** alternatives, purpose-built for little memory, little energy, and small, occasional messages. A handy mental image: a desktop streams video all day, while a tiny sensor **whispers briefly, then sleeps**.\n\n**Recap.** \"Embedded\" or **constrained** networking means doing networking on devices with very little memory, battery power, and data to send. Normal web protocols are too big, too chatty, and too power-hungry for them, so the IoT world reaches for slimmer, sleep-friendly tools. The next lessons show which tools and why.",
       "items": [
-        {
-          "id": "embedded-networking-l1-fc1",
-          "type": "flashcard",
-          "front": "Name lwIP's three API styles from smallest/fastest to most portable.",
-          "back": "Raw/callback API (no threads, no copies, smallest) → sequential/netconn API (thread-friendly message passing) → socket API (Berkeley-sockets emulation for porting). Each step up costs more RAM and copies."
-        },
-        {
-          "id": "embedded-networking-l1-fc2",
-          "type": "flashcard",
-          "front": "What is a pbuf and why is it designed for zero-copy?",
-          "back": "A pbuf is lwIP's packet buffer, a chainable structure. By chaining buffers and reserving header room, a payload sitting in DMA memory can have headers prepended without copying the data — critical on RAM-starved MCUs.",
-          "hint": "p = packet; chains let headers attach without moving data."
-        },
-        {
-          "id": "embedded-networking-l1-fc3",
-          "type": "flashcard",
-          "front": "Why do embedded stacks use fixed memory pools instead of a general heap?",
-          "back": "Pools give deterministic, bounded allocation with no fragmentation — essential when a long-running device cannot tolerate heap fragmentation or unpredictable malloc latency."
-        },
-        {
-          "id": "embedded-networking-l1-fc4",
-          "type": "flashcard",
-          "front": "On an MCU Ethernet port, what is the split between MAC and PHY?",
-          "back": "The MAC is on-chip and handles framing, FCS, and DMA to memory; the external PHY does line coding and the analog interface to the magnetics/cable. They connect over MII or RMII."
-        },
-        {
-          "id": "embedded-networking-l1-fc5",
-          "type": "flashcard",
-          "front": "What do DMA descriptor rings and checksum offload save the CPU from doing?",
-          "back": "Descriptor rings let the MAC move frames to/from RAM without the CPU copying bytes per packet; checksum/TCP offload computes IP/TCP checksums in hardware instead of the CPU walking every byte."
-        },
-        {
-          "id": "embedded-networking-l1-fc6",
-          "type": "flashcard",
-          "front": "When an MCU has no Ethernet MAC, how do you still run IP? SLIP vs PPP?",
-          "back": "Tunnel IP over a serial UART. SLIP is minimal framing (just byte stuffing, no negotiation). PPP adds link negotiation (LCP), authentication, and multi-protocol support."
-        },
         {
           "id": "embedded-networking-l1-mc1",
           "type": "mcq",
-          "prompt": "A team ports a Linux socket application to an STM32 running lwIP with minimal code changes. Which lwIP API did they most likely use, and what is the cost?",
+          "prompt": "What does the \"Internet of Things\" (IoT) refer to?",
           "choices": [
-            "Raw/callback API; it copies every packet twice",
-            "Socket API; it costs more RAM and data copies than the raw API",
-            "DMA API; it bypasses the stack entirely",
-            "PPP API; it requires a second MCU"
+            "A faster replacement for the normal internet used only by data centers",
+            "Billions of small everyday objects (sensors, bulbs, locks) that connect and talk over a network",
+            "A new programming language for web servers",
+            "The set of undersea cables that carry internet traffic between continents"
           ],
           "answerIndex": 1,
-          "explanation": "The socket API emulates Berkeley sockets so existing code compiles, but the abstraction and threading cost more RAM and copies than the raw/callback path."
+          "explanation": "IoT is the world of small, everyday physical objects (a door sensor, a smart bulb, a soil probe) connected to a network. It is not a different internet or a language; it is ordinary things made network-aware, usually on very tight resource budgets.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/embedded-networking-2.svg"
         },
         {
           "id": "embedded-networking-l1-mc2",
           "type": "mcq",
-          "prompt": "RMII is chosen over MII on a pin-constrained MCU primarily because RMII:",
+          "prompt": "A \"constrained\" device in networking is one that:",
           "choices": [
-            "Encrypts the MAC-to-PHY link",
-            "Uses fewer signal pins by running a shared 50 MHz reference clock",
-            "Eliminates the need for an external PHY",
-            "Doubles the line rate to 200 Mbps"
+            "Is locked down by a firewall and cannot reach the internet",
+            "Has very limited memory, battery power, and data to send",
+            "Can only use IPv6 and never IPv4",
+            "Is physically chained to a wall for security"
           ],
           "answerIndex": 1,
-          "explanation": "RMII (Reduced MII) cuts the pin count of the MAC–PHY interface by using a single 50 MHz reference clock and narrower data buses; it does not remove the PHY or change the wire rate."
+          "explanation": "\"Constrained\" describes the device's tight resource budget: tiny memory (kilobytes), limited energy (often a small battery), and small, occasional data. The word is about scarce resources, not about firewalls, address versions, or physical security.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/embedded-networking-2.svg"
         },
         {
           "id": "embedded-networking-l1-mc3",
           "type": "mcq",
-          "prompt": "Which stack is the best match for an extremely RAM-limited sensor mote that handles one packet at a time?",
+          "prompt": "Why can't a typical battery-powered IoT sensor just use the same heavyweight web protocols (full TCP, big HTTP messages) that a laptop uses?",
           "choices": [
-            "lwIP socket API with full TCP",
-            "FreeRTOS+TCP with multiple sockets",
-            "uIP/Contiki with a single shared packet buffer",
-            "A desktop Linux kernel stack"
+            "Those protocols are illegal to use on small devices",
+            "They are too big for kilobytes of memory, too chatty to keep a battery alive, and too power-hungry overall",
+            "Small devices cannot understand the English text in HTTP headers",
+            "Web protocols only work over fiber-optic cables, which sensors lack"
           ],
-          "answerIndex": 2,
-          "explanation": "uIP/Contiki is designed for the smallest devices, using a single global packet buffer and processing one packet at a time to fit in kilobytes of RAM."
+          "answerIndex": 1,
+          "explanation": "The mismatch is about resources. Big HTTP headers do not fit comfortably in kilobytes of RAM, TCP's constant checking-in keeps the radio awake and drains the battery, and the overall work is too power-hungry for a coin cell. The protocols are perfectly legal and understandable; they are simply too heavy for the budget.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/embedded-networking-2.svg"
         },
         {
           "id": "embedded-networking-l1-mc4",
           "type": "mcq",
-          "prompt": "Why are fixed pbuf pools preferable to malloc/free on a device meant to run for months unattended?",
+          "prompt": "Roughly how much memory might a tiny IoT sensor have, compared with a normal computer?",
           "choices": [
-            "malloc is illegal in C on microcontrollers",
-            "Pools guarantee bounded, fragmentation-free allocation and predictable latency",
-            "Pools automatically encrypt packet contents",
-            "malloc cannot allocate buffers larger than 64 bytes"
+            "About the same: both have gigabytes",
+            "Far less: only kilobytes, versus gigabytes on a normal computer",
+            "Far more, because sensors store years of readings",
+            "Sensors have no memory at all"
           ],
           "answerIndex": 1,
-          "explanation": "Long-running embedded systems cannot tolerate heap fragmentation or unpredictable allocation latency; fixed pools give deterministic, bounded behavior."
+          "explanation": "A defining trait of constrained devices is tiny memory measured in kilobytes (thousands of bytes), while a normal computer has gigabytes (billions). They do have some memory, but it is a small fraction of a laptop's, which is exactly why bulky protocols do not fit.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/embedded-networking-2.svg"
+        },
+        {
+          "id": "embedded-networking-l1-mc5",
+          "type": "mcq",
+          "prompt": "The postcard-versus-thick-parcel analogy is meant to illustrate that constrained-device protocols favor:",
+          "choices": [
+            "Slow delivery over fast delivery",
+            "Small, low-overhead messages over bulky, heavily-packaged ones",
+            "Paper mail over electronic communication",
+            "Encrypting everything twice for safety"
+          ],
+          "answerIndex": 1,
+          "explanation": "A postcard carries a short note with almost no packaging; a thick parcel adds lots of wrapping suited to big shipments. Likewise, IoT protocols keep messages small and overhead low to fit tiny memory and save power. It is about message size and overhead, not speed or paper.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/embedded-networking-2.svg"
+        },
+        {
+          "id": "embedded-networking-l1-mc6",
+          "type": "mcq",
+          "prompt": "Which everyday picture best matches how a battery-powered sensor uses its network connection?",
+          "choices": [
+            "A desktop streaming video all day, constantly using the network",
+            "A device that whispers a brief message now and then, then sleeps to save power",
+            "A phone on a continuous voice call for hours",
+            "A server answering thousands of requests every second"
+          ],
+          "answerIndex": 1,
+          "explanation": "Constrained sensors send small, occasional data and spend most of their time asleep to conserve battery. The streaming desktop, the long call, and the busy server all describe heavy, continuous use, the opposite of the \"whisper briefly, then sleep\" pattern.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/embedded-networking-2.svg"
+        },
+        {
+          "id": "embedded-networking-l1-mc7",
+          "type": "mcq",
+          "prompt": "Why is keeping a TCP connection constantly open a problem for a coin-cell sensor in particular?",
+          "choices": [
+            "TCP connections cost money per minute from the internet provider",
+            "Staying connected means checking in often, which keeps the radio awake and drains the battery",
+            "TCP refuses to work on devices smaller than a phone",
+            "Open connections expose the sensor's exact location to attackers"
+          ],
+          "answerIndex": 1,
+          "explanation": "A live TCP connection involves regular back-and-forth to stay alive. For a coin-cell device, every moment the radio is awake costs scarce energy, so that constant chatter is the real cost. It is not about per-minute fees, a size limit, or location exposure.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/embedded-networking-2.svg"
+        },
+        {
+          "id": "embedded-networking-l1-mc8",
+          "type": "mcq",
+          "prompt": "Which of these is the clearest example of an IoT device with a tight resource budget?",
+          "choices": [
+            "A rack-mounted database server in a data center",
+            "A gaming PC with a powerful graphics card",
+            "A coin-cell door sensor that reports \"open/closed\" once in a while",
+            "A laptop streaming a movie over Wi-Fi"
+          ],
+          "answerIndex": 2,
+          "explanation": "The coin-cell door sensor has tiny memory, runs on a small battery, and sends only a small status now and then, the textbook constrained device. The server, gaming PC, and streaming laptop are all powerful, plugged-in machines with plenty of resources.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/embedded-networking-2.svg"
+        },
+        {
+          "id": "embedded-networking-l1-mc9",
+          "type": "mcq",
+          "prompt": "What is the main reason IoT designers reach for \"lightweight\" protocols instead of the usual web ones?",
+          "choices": [
+            "Lightweight protocols are newer, so they must be better",
+            "They are designed to fit tiny memory, send small messages, and use very little power",
+            "They are the only protocols that can be encrypted",
+            "They make web pages load faster on laptops"
+          ],
+          "answerIndex": 1,
+          "explanation": "Lightweight protocols exist specifically to match the constrained budget: small footprint in memory, small messages on the wire, and low energy use. Newness alone is not the point, they are not the only encryptable option, and they are not aimed at speeding up laptop browsing.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/embedded-networking-2.svg"
         }
       ]
     },
     {
       "id": "embedded-networking-l2",
-      "title": "Constrained Protocols: MQTT-SN, CoAP/DTLS, 6LoWPAN & Thread/Matter",
+      "title": "Lightweight Messaging: MQTT, CoAP, and Why UDP Beats TCP Here",
       "order": 2,
       "difficulty": 2,
-      "content": "Once IP reaches a tiny device, the *application* protocols also have to shrink. Plain MQTT runs over TCP, which is heavy for the smallest radios, so **MQTT-SN** (for Sensor Networks) maps the same publish/subscribe model onto **UDP** (or even non-IP links), shortens topic names to two-byte IDs, and adds gateways and sleep-aware semantics. **CoAP** takes a different route: a compact, binary, RESTful protocol (GET/POST/PUT/DELETE with response codes that mirror HTTP) running over **UDP**, secured by **DTLS** (TLS adapted for datagrams). The reason **pub/sub and UDP fit lossy, constrained links** is structural: UDP has no handshake, no connection state to keep alive, and no head-of-line blocking, so a device can wake, send one datagram, and sleep — while the broker decouples senders from receivers so a sleeping node misses nothing it subscribes to. Reliability, when needed, is added lightly (CoAP confirmable messages, MQTT QoS) rather than baked into a stream.\n\nAt the link layer, **802.15.4** radios carry only ~127-byte frames, far too small for a 40-byte IPv6 header. **6LoWPAN** is the adaptation layer that makes IPv6 fit: it **compresses** the IPv6/UDP headers (eliding fields derivable from link context, e.g. deriving the interface ID from the L2 address) and fragments larger packets. On top of 6LoWPAN sits **Thread**, a self-healing IPv6 mesh for the home, and **Matter**, the application/data-model layer that runs over Thread (and WiFi) to unify smart-home devices across vendors — the modern convergence point. Net effect: a coin-cell sensor speaks real IPv6 end-to-end, just heavily squeezed.",
+      "content": "**Hook.** We have seen *why* tiny devices need slim protocols. Now meet the two most common ones, and learn why these devices often prefer **UDP** over **TCP**. Both names sound technical, but each is just a small, friendly way to move tiny messages.\n\n**Build.** First, a quick reminder. **TCP** sets up a reliable, ordered connection and keeps confirming that every byte arrived, like a phone call you must keep open. **UDP** just fires off a single small packet and forgets it, like dropping a postcard in a mailbox: less guaranteed, but almost no overhead and no connection to keep awake. For a sensor that wakes, sends one reading, and sleeps, UDP's lightness is a perfect fit, so it is often preferred over TCP on constrained devices.\n\n**MQTT** is a tiny **publish/subscribe** messaging protocol. Instead of devices talking directly to each other, they all connect to a middleman called a **broker**. A sensor *publishes* a message to a named **topic** (say, `home/temperature`). Any app that has *subscribed* to that topic automatically receives the message from the broker. The sensor never needs to know who is listening; it just publishes and goes back to sleep. This decoupling is great for sensors: many publishers and many subscribers, all matched up by the broker.\n\n**CoAP** (Constrained Application Protocol) takes a different angle: it is a **tiny, HTTP-like protocol** built for small devices. It uses the same familiar ideas as the web (asking to GET a value, or PUT a new setting, with short response codes), but in a compact form that runs over **UDP** instead of TCP. So a device can request or update a value with a single small exchange, no heavy connection required.\n\nWhy UDP/CoAP over TCP/HTTP here? Because UDP has **less overhead**: no handshake to start, no connection to keep alive, no constant checking-in. The device wakes, sends one small datagram, and sleeps, saving memory and battery. When some reliability is genuinely needed, these protocols add it *lightly* (for example, a small \"please confirm\" flag) rather than baking in TCP's heavy machinery.\n\n**Recap.** MQTT is tiny publish/subscribe messaging through a broker; CoAP is a tiny HTTP-like protocol over UDP. Both lean on UDP's low overhead so a constrained device can speak briefly and sleep, instead of paying TCP's always-on cost.",
       "items": [
-        {
-          "id": "embedded-networking-l2-fc1",
-          "type": "flashcard",
-          "front": "How does MQTT-SN differ from MQTT for constrained devices?",
-          "back": "MQTT-SN runs the same pub/sub model over UDP (or non-IP links) instead of TCP, uses short 2-byte topic IDs instead of strings, adds gateways, and includes sleep-aware semantics for battery nodes."
-        },
-        {
-          "id": "embedded-networking-l2-fc2",
-          "type": "flashcard",
-          "front": "What is CoAP, what transport does it use, and how is it secured?",
-          "back": "CoAP is a compact binary RESTful protocol (GET/POST/PUT/DELETE with HTTP-like response codes) for constrained devices. It runs over UDP and is secured with DTLS (TLS adapted for datagrams)."
-        },
-        {
-          "id": "embedded-networking-l2-fc3",
-          "type": "flashcard",
-          "front": "Why do pub/sub plus UDP fit lossy, low-power links so well?",
-          "back": "UDP has no handshake, no kept-alive connection state, and no head-of-line blocking, so a node can wake, fire one datagram, and sleep. Pub/sub decouples senders from receivers via a broker, so a sleeping subscriber misses nothing.",
-          "hint": "No connection to babysit; broker buffers the decoupling."
-        },
-        {
-          "id": "embedded-networking-l2-fc4",
-          "type": "flashcard",
-          "front": "What problem does 6LoWPAN solve, and how?",
-          "back": "802.15.4 frames are only ~127 bytes — too small for a 40-byte IPv6 header. 6LoWPAN is an adaptation layer that compresses IPv6/UDP headers (eliding context-derivable fields) and fragments larger packets so IPv6 fits."
-        },
-        {
-          "id": "embedded-networking-l2-fc5",
-          "type": "flashcard",
-          "front": "How does header compression derive the IPv6 interface identifier on 802.15.4?",
-          "back": "It can be elided and reconstructed from the link-layer (L2) address, since the interface ID is derivable from context — so those bytes need not travel in the compressed header."
-        },
-        {
-          "id": "embedded-networking-l2-fc6",
-          "type": "flashcard",
-          "front": "Distinguish Thread from Matter.",
-          "back": "Thread is a self-healing low-power IPv6 mesh network (built on 802.15.4/6LoWPAN). Matter is the application/data-model layer that runs over Thread or WiFi to make smart-home devices interoperate across vendors."
-        },
         {
           "id": "embedded-networking-l2-mc1",
           "type": "mcq",
-          "prompt": "A battery sensor on an 802.15.4 mesh must report once a minute and sleep otherwise. Why is CoAP-over-UDP a better fit than HTTP-over-TCP?",
+          "prompt": "In MQTT's publish/subscribe model, how do a sensor and a phone app exchange data?",
           "choices": [
-            "TCP cannot carry sensor data",
-            "UDP avoids a connection handshake and kept-alive state, so the node can fire one datagram and sleep",
-            "HTTP cannot be secured at all",
-            "CoAP guarantees delivery without any acknowledgements"
+            "The sensor opens a direct connection straight to the phone app",
+            "The sensor publishes to a topic on a broker, and the app subscribes to that topic to receive it",
+            "The phone app must poll the sensor every second to pull readings",
+            "They email the data to each other"
           ],
           "answerIndex": 1,
-          "explanation": "TCP's handshake and connection keep-alive cost energy and RAM for a node that mostly sleeps. UDP is stateless; CoAP adds optional confirmable reliability only when needed."
+          "explanation": "MQTT puts a broker in the middle. The sensor publishes a message to a named topic; any app subscribed to that topic gets it from the broker. The two never connect directly, which is exactly what lets a sensor publish and then sleep without knowing who is listening.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/embedded-networking-3.svg"
         },
         {
           "id": "embedded-networking-l2-mc2",
           "type": "mcq",
-          "prompt": "DTLS exists rather than plain TLS for CoAP because:",
+          "prompt": "What is the role of the broker in MQTT?",
           "choices": [
-            "DTLS uses stronger ciphers than TLS",
-            "TLS assumes a reliable, ordered byte stream; DTLS adapts the handshake/record layer to unreliable UDP datagrams",
-            "DTLS is unencrypted but authenticated",
-            "CoAP devices cannot do public-key cryptography"
+            "It generates the sensor readings on behalf of the devices",
+            "It is a middleman that receives published messages and delivers them to the subscribers of each topic",
+            "It encrypts the Wi-Fi password for the network",
+            "It is the physical radio chip inside the sensor"
           ],
           "answerIndex": 1,
-          "explanation": "TLS depends on TCP's reliable ordered stream. DTLS modifies the record and handshake layers to tolerate loss, reordering, and the datagram model of UDP."
+          "explanation": "The broker is the central middleman that sorts messages by topic: it accepts what publishers send and forwards each message to everyone subscribed to that topic. It does not invent readings, manage Wi-Fi passwords, or live inside the sensor as hardware.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/embedded-networking-3.svg"
         },
         {
           "id": "embedded-networking-l2-mc3",
           "type": "mcq",
-          "prompt": "An IPv6 packet must cross an 802.15.4 link with a ~127-byte MTU. What does 6LoWPAN do?",
+          "prompt": "In MQTT, what is a \"topic\"?",
           "choices": [
-            "Drops the packet because IPv6 is incompatible with 802.15.4",
-            "Compresses the IPv6/UDP headers and fragments the packet to fit the small frame",
-            "Converts the packet to IPv4 to save space",
-            "Disables addressing to make room for payload"
+            "A subject label (like home/temperature) that messages are published to and subscribed from",
+            "The password used to log in to the broker",
+            "A physical wire connecting the sensor to the broker",
+            "The amount of battery a device has left"
           ],
-          "answerIndex": 1,
-          "explanation": "6LoWPAN is the adaptation layer that header-compresses and fragments IPv6 so it physically fits the tiny 802.15.4 frame while remaining real IPv6 end-to-end."
+          "answerIndex": 0,
+          "explanation": "A topic is a named label, often written like a path such as home/temperature, that organizes messages. Publishers send to a topic and subscribers ask for a topic, and the broker matches them. It is not a password, a wire, or a battery measure.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/embedded-networking-3.svg"
         },
         {
           "id": "embedded-networking-l2-mc4",
           "type": "mcq",
-          "prompt": "In the modern smart-home stack, what is Matter's role relative to Thread?",
+          "prompt": "Why is the publish/subscribe pattern especially convenient for a sleepy battery sensor?",
           "choices": [
-            "Matter is the radio PHY; Thread is the cipher suite",
-            "Matter is the cross-vendor application/data-model layer; Thread is the underlying low-power IPv6 mesh transport",
-            "They are competing radios and cannot coexist",
-            "Thread replaces IPv6 entirely with a proprietary scheme"
+            "It forces the sensor to stay awake so it never misses a message",
+            "The sensor just publishes to the broker and sleeps; it never needs to know who is listening",
+            "It removes the need for any network connection at all",
+            "It guarantees the sensor's battery will recharge itself"
           ],
           "answerIndex": 1,
-          "explanation": "Thread provides the IPv6 mesh network; Matter sits above it (and WiFi) as the interoperable application/data model so devices from different vendors work together."
+          "explanation": "With pub/sub, the sensor's only job is to hand a message to the broker, then it can sleep. The broker takes care of delivering to whatever apps subscribed. The sensor is freed from tracking listeners, but it still needs a connection and certainly cannot recharge itself.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/embedded-networking-3.svg"
+        },
+        {
+          "id": "embedded-networking-l2-mc5",
+          "type": "mcq",
+          "prompt": "What is CoAP, in plain terms?",
+          "choices": [
+            "A tiny, HTTP-like protocol for small devices that runs over UDP",
+            "A type of battery used in IoT sensors",
+            "A replacement for Wi-Fi radios",
+            "A programming language for microcontrollers"
+          ],
+          "answerIndex": 0,
+          "explanation": "CoAP (Constrained Application Protocol) borrows familiar web ideas, like GET and PUT with short response codes, but in a compact form that runs over UDP for tiny devices. It is a protocol, not a battery, a radio, or a programming language.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/embedded-networking-4.svg"
+        },
+        {
+          "id": "embedded-networking-l2-mc6",
+          "type": "mcq",
+          "prompt": "CoAP is often described as \"HTTP-like.\" What does that mean?",
+          "choices": [
+            "It can only be used to load full web pages in a browser",
+            "It reuses familiar web ideas such as asking to GET a value or PUT a setting, but in a small, compact form",
+            "It is written in the exact same code as a web server",
+            "It must run on the same powerful hardware that web servers use"
+          ],
+          "answerIndex": 1,
+          "explanation": "\"HTTP-like\" means CoAP keeps the friendly request style of the web (GET to read, PUT to update, with short status codes) while shrinking everything to suit tiny devices. It is not limited to browser pages, is not literally the same code, and is designed for small hardware.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/embedded-networking-4.svg"
+        },
+        {
+          "id": "embedded-networking-l2-mc7",
+          "type": "mcq",
+          "prompt": "Why is UDP often preferred over TCP on constrained devices?",
+          "choices": [
+            "UDP encrypts data automatically while TCP does not",
+            "UDP has less overhead: no handshake and no connection to keep alive, so a device can send one small packet and sleep",
+            "UDP always delivers data more reliably than TCP",
+            "TCP cannot carry sensor data of any kind"
+          ],
+          "answerIndex": 1,
+          "explanation": "UDP's appeal here is lightness: it skips TCP's setup handshake and the work of keeping a connection alive, so a sleepy device wakes, fires one datagram, and sleeps, saving memory and power. UDP does not add encryption, and it is actually less reliable than TCP, that trade is accepted for the energy savings.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/embedded-networking-4.svg"
+        },
+        {
+          "id": "embedded-networking-l2-mc8",
+          "type": "mcq",
+          "prompt": "A battery sensor reports a reading once a minute and sleeps the rest of the time. Why is sending a single UDP datagram a better fit than opening a TCP connection each time?",
+          "choices": [
+            "TCP is not allowed on battery devices",
+            "A TCP connection needs a setup handshake and keep-alive chatter that waste energy; a UDP datagram is fire-and-forget and lets the device sleep sooner",
+            "UDP packets travel faster than the speed of light",
+            "TCP can only send text, not numbers"
+          ],
+          "answerIndex": 1,
+          "explanation": "For a device that mostly sleeps, TCP's handshake and ongoing keep-alive cost extra awake-time and energy. A single UDP datagram avoids all that, so the radio is on for the shortest possible moment. TCP is allowed and can carry numbers; the difference is purely the energy cost of the connection.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/embedded-networking-4.svg"
+        },
+        {
+          "id": "embedded-networking-l2-mc9",
+          "type": "mcq",
+          "prompt": "When a constrained-device protocol like CoAP does need some reliability, how does it usually handle it?",
+          "choices": [
+            "It switches to full TCP for that one message",
+            "It adds reliability lightly, for example a small \"please confirm\" flag, rather than baking in TCP's heavy machinery",
+            "It gives up and never confirms anything",
+            "It sends the same message a thousand times to be safe"
+          ],
+          "answerIndex": 1,
+          "explanation": "These protocols add just enough reliability when required, such as marking a message confirmable so the receiver acknowledges it, keeping the lightweight UDP base. They do not fall back to full TCP, do not abandon reliability entirely, and certainly do not blast endless copies.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/embedded-networking-4.svg"
+        },
+        {
+          "id": "embedded-networking-l2-mc10",
+          "type": "mcq",
+          "prompt": "How does TCP differ from UDP in everyday terms?",
+          "choices": [
+            "TCP is like an open phone call you keep confirming; UDP is like dropping a single postcard and moving on",
+            "TCP is wireless and UDP is wired",
+            "TCP is for small devices and UDP is only for servers",
+            "They are two names for exactly the same thing"
+          ],
+          "answerIndex": 0,
+          "explanation": "TCP maintains a reliable, ordered connection with constant confirmation (the phone call), while UDP just sends a small packet with no setup and no follow-up (the postcard). The distinction is about connection style and overhead, not wired-versus-wireless, and they are genuinely different protocols.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/embedded-networking-4.svg"
         }
       ]
     },
     {
       "id": "embedded-networking-l3",
-      "title": "Edge Security, Power-vs-Connectivity & the End-to-End Trace",
+      "title": "Radios, Gateways, and Staying Safe on Tiny Devices",
       "order": 3,
       "difficulty": 3,
-      "content": "A networked sensor is only useful if it is **trustworthy** and **lives on its battery**, and those two goals fight each other. Security on a constrained device starts at boot: **secure boot** verifies a cryptographic signature on the firmware before running it, so an attacker cannot swap in malicious code; a hardware **root of trust** anchors that chain. Link confidentiality comes from **DTLS** (for UDP/CoAP) or TLS (for TCP/MQTT), but public-key math is expensive, so devices lean on **hardware crypto** — AES/SHA accelerators and a secure element holding keys that never leave the chip. The pattern is: do the costly key exchange rarely, then ride a cheap symmetric session.\n\nThe **power-vs-connectivity** trade-off dominates everything else. A radio that is always listening drains a coin cell in days, so devices **duty-cycle**: the MCU and radio sleep most of the time and wake on a timer to sample and transmit. To stay reachable while asleep, designs use **wake-on-radio** — a low-power receiver that listens for a wake-up pattern and only then powers the main radio — or they accept latency and poll. More radio time means more reachability but less battery; this is the central design dial. **Edge/fog computing** eases it: pushing aggregation, filtering, and inference onto a nearby gateway means the device sends less, and sends it less often.\n\nPut it together by tracing one reading. The MCU samples the **sensor** over I2C; lwIP builds a **pbuf**, wraps it in **UDP/TCP**, applies **DTLS/TLS**, and forms an MQTT **PUBLISH**; the **802.11 (or 802.15.4) PHY** transmits it; the **AP/router** bridges WiFi to Ethernet and NATs it; the **MQTT broker** receives the PUBLISH and fans it out to every matching **subscriber** — every layer from Module 1 crossed in one hop of telemetry.",
+      "content": "**Hook.** A tiny device still needs a way to actually send its bits through the air, a way to reach the wider internet, and a way to stay reasonably safe, all without a big battery or a big computer. This lesson sketches those pieces as plain ideas.\n\n**Build.** First, the **radio**. There is no single best low-power radio; each trades **range** against **how much data** it can carry against **power use**. *Bluetooth Low Energy (BLE)* is for short range, like a fitness band talking to your phone nearby. *Zigbee* and *Thread* are built for home automation as a **mesh**: devices relay messages for one another, so a signal can hop from bulb to bulb to reach a far room, no single device needs to reach everything. *LoRaWAN* and *cellular-IoT (NB-IoT)* go the other way: very **long range** (across a town, or via cell towers) but only **tiny amounts of data**, perfect for a meter that reports once an hour. The rule of thumb: more range usually means less data.\n\nSaving power is mostly about **sleeping**. The radio is the hungriest part, so a device keeps it off and the whole device asleep most of the time, waking briefly to send, then sleeping again. Short bursts plus long sleep is how a coin cell lasts for years.\n\nThese tiny radios usually do not speak the normal internet directly. So we use a **gateway** (also called a hub): a small always-on box that listens to the low-power devices on one side and connects to the real internet (Wi-Fi or Ethernet) on the other. The gateway **translates and relays**, bridging the little devices to the cloud. This is the **edge/gateway pattern**, and doing some work right there at the edge (filtering or summarizing readings) means the tiny devices can send even less.\n\n**Security** still matters: a smart lock or camera is a tempting target. We still want **encryption** so messages cannot be read or forged, but it is **harder** on tiny devices because strong cryptography takes memory and power they barely have, so they often use small hardware crypto helpers and do the expensive setup rarely. Two other challenges: many devices are deployed and forgotten, so getting **security updates** onto them later is tricky, and they must be built to accept trusted updates safely. Finally, to keep messages small, IoT devices favor **lightweight data formats**: compact ways of writing the data (small binary formats) instead of long, verbose text.\n\n**Recap.** Low-power radios trade range, data, and power (BLE short-range; Zigbee/Thread home mesh; LoRaWAN/NB-IoT long-range tiny-data). Devices save power by sleeping, reach the internet through a gateway, still need encryption (just harder to do) plus a safe way to update, and keep data compact. That completes the picture of how tiny things join the modern internet.",
       "items": [
-        {
-          "id": "embedded-networking-l3-fc1",
-          "type": "flashcard",
-          "front": "What does secure boot guarantee, and what anchors it?",
-          "back": "Secure boot verifies a cryptographic signature on the firmware before executing it, so only authentic code runs. It is anchored by a hardware root of trust (immutable boot ROM / keys fused into silicon)."
-        },
-        {
-          "id": "embedded-networking-l3-fc2",
-          "type": "flashcard",
-          "front": "Why do constrained devices rely on hardware crypto and a secure element?",
-          "back": "Public-key and bulk-cipher math is slow and power-hungry in software. AES/SHA accelerators speed it up, and a secure element stores keys that never leave the chip — protecting them even if firmware is compromised."
-        },
-        {
-          "id": "embedded-networking-l3-fc3",
-          "type": "flashcard",
-          "front": "State the duty-cycling strategy for battery sensors in one line.",
-          "back": "Keep the MCU and radio asleep most of the time; wake periodically on a timer to sample and transmit, then sleep again — radio-on time is the dominant power cost."
-        },
-        {
-          "id": "embedded-networking-l3-fc4",
-          "type": "flashcard",
-          "front": "What is wake-on-radio and what trade-off does it manage?",
-          "back": "A low-power receiver listens for a wake-up pattern and only then powers the main radio. It keeps a sleeping device reachable without the battery cost of a fully-on receiver — balancing reachability vs power."
-        },
-        {
-          "id": "embedded-networking-l3-fc5",
-          "type": "flashcard",
-          "front": "How does edge/fog computing ease the power-vs-connectivity dial?",
-          "back": "Pushing aggregation, filtering, and inference onto a nearby gateway lets the device transmit less data, less often — saving radio energy and reducing bandwidth and latency to the cloud."
-        },
-        {
-          "id": "embedded-networking-l3-fc6",
-          "type": "flashcard",
-          "front": "Trace one sensor reading from sensor -> MCU stack -> wireless PHY -> AP -> broker -> subscriber.",
-          "back": "MCU samples the sensor (I2C/SPI/ADC) -> lwIP builds a pbuf, adds UDP/TCP, applies DTLS/TLS, forms an MQTT PUBLISH -> 802.11/802.15.4 PHY transmits -> AP/router bridges WiFi->Ethernet and NATs -> MQTT broker receives PUBLISH and fans out to every matching subscriber.",
-          "hint": "Read, encapsulate, radiate, bridge, publish, fan-out.",
-          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/embedded-networking-1.svg"
-        },
         {
           "id": "embedded-networking-l3-mc1",
           "type": "mcq",
-          "prompt": "Why is it standard to do the DTLS/TLS key exchange rarely and then reuse a symmetric session on a constrained device?",
+          "prompt": "Across low-power radio options, what is the general trade-off?",
           "choices": [
-            "Symmetric keys are more secure than asymmetric ones",
-            "Asymmetric/public-key operations are far more CPU- and energy-expensive, so you amortize them over a cheap symmetric session",
-            "Datagram protocols forbid repeated handshakes",
-            "The secure element can only run one handshake in its lifetime"
+            "More range usually means you can also carry much more data for free",
+            "More range usually means less data, and the right choice depends on the job",
+            "All low-power radios reach the same distance and speed",
+            "Shorter range always uses more power than longer range"
           ],
           "answerIndex": 1,
-          "explanation": "Public-key math (the handshake) is the costly part; once a symmetric session key is established, bulk encryption is cheap, so you handshake infrequently and resume sessions."
+          "explanation": "Low-power radios balance range against data rate against power. Pushing for long range typically forces tiny data rates, so designers pick the radio that fits the task. The options are not interchangeable, and longer range does not come with more data for free.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/embedded-networking-5.svg"
         },
         {
           "id": "embedded-networking-l3-mc2",
           "type": "mcq",
-          "prompt": "A coin-cell sensor must remain remotely commandable but lasts only days with its receiver always on. Which approach best balances reachability and battery life?",
+          "prompt": "Which low-power radio is the best fit for a fitness band talking to a phone a few feet away?",
           "choices": [
-            "Keep the main radio receiving continuously",
-            "Disable all networking after boot",
-            "Use wake-on-radio: a low-power receiver listens for a wake pattern and only then powers the main radio",
-            "Switch from IPv6 to IPv4 to save power"
+            "LoRaWAN, because it reaches across a whole town",
+            "Bluetooth Low Energy (BLE), made for short-range, low-power links",
+            "NB-IoT cellular, because it uses distant cell towers",
+            "A wired Ethernet cable"
           ],
-          "answerIndex": 2,
-          "explanation": "Wake-on-radio keeps a tiny receiver listening cheaply and powers the energy-hungry main radio only when summoned, preserving reachability without continuous receive current."
+          "answerIndex": 1,
+          "explanation": "BLE is designed for short-range, low-power connections like a wearable to a nearby phone. LoRaWAN and NB-IoT are long-range technologies aimed at devices that report small data over large distances, and a wired cable defeats the purpose of a wearable.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/embedded-networking-5.svg"
         },
         {
           "id": "embedded-networking-l3-mc3",
           "type": "mcq",
-          "prompt": "In the end-to-end trace, where is the MQTT PUBLISH first turned into something an 802.11 radio can transmit, and what does the AP do next?",
+          "prompt": "In a Zigbee or Thread \"mesh\" network for home automation, what does \"mesh\" mean?",
           "choices": [
-            "The broker frames it; the AP decrypts the payload",
-            "The MCU's stack encapsulates PUBLISH in TCP/IP and the 802.11 MAC/PHY frames it; the AP bridges WiFi to Ethernet and NATs the egress",
-            "The subscriber frames it; the AP routes with BGP",
-            "The sensor itself emits 802.11 frames directly over I2C"
+            "Every device must connect directly to the internet router",
+            "Devices relay messages for one another, so a signal can hop device-to-device to reach a far room",
+            "All devices share a single physical cable",
+            "Only one device is allowed to be on at a time"
           ],
           "answerIndex": 1,
-          "explanation": "The MCU stack builds the TCP/IP encapsulation and the 802.11 MAC/PHY puts it on the air; the AP/router then bridges the WiFi frame onto Ethernet and performs NAT for the upstream path to the broker."
+          "explanation": "In a mesh, devices pass messages along for each other, so coverage extends by hopping from one device to the next rather than every device needing to reach the router alone. It is not a shared cable, and many devices operate at once.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/embedded-networking-5.svg"
         },
         {
           "id": "embedded-networking-l3-mc4",
           "type": "mcq",
-          "prompt": "What security guarantee does secure boot provide that DTLS alone does not?",
+          "prompt": "A water meter buried in a field must report a small reading once an hour from far away. Which option fits best?",
           "choices": [
-            "It encrypts data in transit",
-            "It authenticates the firmware image at startup so only signed code runs, defending against tampered/malicious firmware",
-            "It compresses IPv6 headers",
-            "It hides the device's MAC address from the AP"
+            "Bluetooth Low Energy, because it is the lowest power",
+            "A long-range, tiny-data technology like LoRaWAN or NB-IoT cellular-IoT",
+            "Wi-Fi, because it is in every home",
+            "A wired connection to the nearest house"
           ],
           "answerIndex": 1,
-          "explanation": "DTLS protects data on the wire; secure boot protects the integrity of the code itself, verifying the firmware signature before execution — complementary, not redundant."
+          "explanation": "A distant meter sending tiny, infrequent data is the classic case for long-range, low-data technologies such as LoRaWAN or NB-IoT. BLE and Wi-Fi are short-range, and running a wire to a field meter is impractical.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/embedded-networking-5.svg"
+        },
+        {
+          "id": "embedded-networking-l3-mc5",
+          "type": "mcq",
+          "prompt": "What is the single biggest way a battery IoT device saves power?",
+          "choices": [
+            "Keeping its radio on at all times so it never misses anything",
+            "Sleeping most of the time and waking only briefly to send, because the radio is the hungriest part",
+            "Sending its data as large, frequent video clips",
+            "Using a bigger antenna"
+          ],
+          "answerIndex": 1,
+          "explanation": "The radio dominates power use, so the winning strategy is to keep the device asleep and wake only for short bursts to transmit. Always-on radios, large frequent transmissions, and bigger antennas all increase energy use rather than saving it.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/embedded-networking-4.svg"
+        },
+        {
+          "id": "embedded-networking-l3-mc6",
+          "type": "mcq",
+          "prompt": "What is the job of a gateway (hub) in an IoT setup?",
+          "choices": [
+            "To generate electricity for the sensors",
+            "To listen to low-power devices on one side and bridge them to the normal internet (Wi-Fi/Ethernet) on the other",
+            "To replace the broker so MQTT is no longer needed",
+            "To store every reading forever so the cloud is unnecessary"
+          ],
+          "answerIndex": 1,
+          "explanation": "A gateway is an always-on box that translates and relays between the tiny low-power radios and the regular internet, letting constrained devices reach the cloud without running the full internet stack themselves. It does not supply power, replace messaging protocols, or remove the need for cloud services.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/embedded-networking-6.svg"
+        },
+        {
+          "id": "embedded-networking-l3-mc7",
+          "type": "mcq",
+          "prompt": "Why do many tiny devices need a gateway instead of connecting straight to the internet themselves?",
+          "choices": [
+            "The internet is full and has no room for more devices",
+            "Their low-power radios do not speak the normal internet directly, so the gateway translates and bridges for them",
+            "Gateways are required by law for all electronics",
+            "Tiny devices are too fast for the internet to keep up with"
+          ],
+          "answerIndex": 1,
+          "explanation": "Low-power radios like Zigbee or LoRa are not the same as Wi-Fi or Ethernet, so a gateway translates between them and the internet. It is not about the internet being full, a legal rule, or devices being too fast.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/embedded-networking-6.svg"
+        },
+        {
+          "id": "embedded-networking-l3-mc8",
+          "type": "mcq",
+          "prompt": "Doing some work at the \"edge\" (on or near the gateway), such as filtering or summarizing readings, mainly helps because:",
+          "choices": [
+            "It makes the sensors physically larger",
+            "The tiny devices can then send less data, saving radio time and power",
+            "It deletes all the data so nothing has to be stored",
+            "It forces every device to stay awake longer"
+          ],
+          "answerIndex": 1,
+          "explanation": "Processing near the source means only the useful or summarized data travels onward, so devices transmit less and use less energy. It does not change device size, it summarizes rather than discards everything, and it reduces (not increases) awake time.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/embedded-networking-6.svg"
+        },
+        {
+          "id": "embedded-networking-l3-mc9",
+          "type": "mcq",
+          "prompt": "Why is security (like encryption) harder on tiny IoT devices than on a laptop?",
+          "choices": [
+            "Tiny devices never need security because no one targets them",
+            "Strong cryptography takes memory and power that tiny devices barely have, so it must be done carefully and sparingly",
+            "Encryption is illegal on small devices",
+            "Laptops cannot do encryption, so there is nothing to compare"
+          ],
+          "answerIndex": 1,
+          "explanation": "We still want encryption on IoT devices, but heavy crypto strains their tiny memory and battery, so they lean on small hardware helpers and do the expensive parts rarely. They are absolutely targeted (think smart locks and cameras), encryption is legal, and laptops handle it easily.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/embedded-networking-6.svg"
+        },
+        {
+          "id": "embedded-networking-l3-mc10",
+          "type": "mcq",
+          "prompt": "Why are security updates a special challenge for IoT devices?",
+          "choices": [
+            "Updates are unnecessary because tiny devices never have bugs",
+            "Many devices are deployed and then forgotten, so safely getting trusted updates onto them later is difficult",
+            "Updates would make the devices too fast",
+            "Only the gateway ever needs updates, never the devices"
+          ],
+          "answerIndex": 1,
+          "explanation": "IoT gadgets are often installed and left alone for years, so delivering and safely applying trusted updates afterward is hard, yet still important for fixing security flaws. Devices do have bugs, updates are about safety rather than speed, and the devices themselves often need patching too.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/embedded-networking-6.svg"
+        },
+        {
+          "id": "embedded-networking-l3-mc11",
+          "type": "mcq",
+          "prompt": "Why do IoT devices favor \"lightweight data formats\"?",
+          "choices": [
+            "To make the data look prettier on screen",
+            "To keep messages small (compact binary instead of long verbose text), saving memory, bandwidth, and power",
+            "Because they cannot represent numbers any other way",
+            "To make the data impossible for the cloud to read"
+          ],
+          "answerIndex": 1,
+          "explanation": "Compact formats shrink each message, which fits tiny memory, uses less airtime, and saves power, all critical for constrained devices. It is about size, not appearance, and the cloud is still able to read the agreed compact format.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/embedded-networking-6.svg"
+        },
+        {
+          "id": "embedded-networking-l3-mc12",
+          "type": "mcq",
+          "prompt": "Put it together: a battery soil sensor reports moisture over a low-power radio. Which path correctly reaches a cloud app?",
+          "choices": [
+            "Sensor sleeps forever and the cloud guesses the reading",
+            "Sensor wakes, sends a small message over its low-power radio to a gateway, which bridges it to the internet and on to the cloud app, then the sensor sleeps",
+            "Sensor streams continuous video directly to the cloud over Wi-Fi",
+            "Sensor mails a paper report to the data center"
+          ],
+          "answerIndex": 1,
+          "explanation": "The realistic flow is: brief wake, small transmission over the low-power radio to a gateway, gateway bridges to the internet and the cloud app, then back to sleep. Sleeping forever sends nothing, continuous video would drain the battery instantly, and there is no paper involved.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/networking/images/embedded-networking-6.svg"
         }
       ]
     }
