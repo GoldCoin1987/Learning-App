@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "id": "wave-propagation",
   "title": "Wave Propagation",
-  "version": "1.11.0",
+  "version": "1.12.0",
   "description": "Electromagnetic waves from scratch (beginner rework in progress): 13 sub-topics from fields and Maxwell through plane waves, transmission lines, the Smith chart, antennas, beamforming, propagation and link budgets. Physical intuition first with the heavy math turned into plain ideas; MCQ practice and diagrams, tiered easy to hard.",
   "requires": [
     "mathematics"
@@ -6547,299 +6547,462 @@
       "lessons": [
         {
           "id": "link-budgets-noise-link-budgets-noise-l1",
-          "title": "Friis & the dB Link Budget",
+          "title": "What a Link Budget Is",
           "order": 1,
           "difficulty": 1,
-          "content": "A **link budget** is just bookkeeping: every gain adds and every loss subtracts until you arrive at the received power. The physics behind it is the **Friis transmission equation**, which for free space gives received power as\n\n$$P_r = P_t G_t G_r \\left(\\frac{\\lambda}{4\\pi d}\\right)^2.$$\n\nThe term $\\left(\\frac{\\lambda}{4\\pi d}\\right)^2$ is the inverse of **free-space path loss** (FSPL). Note it scales with $\\lambda^2$, not $\\lambda$ — higher frequencies suffer more loss for a fixed antenna *gain*, a fact mmWave planners live with.\n\nMultiplying ratios is tedious, so RF engineers work in **decibels**, where multiplication becomes addition. Taking $10\\log_{10}$ of Friis turns it into a clean sum and difference:\n\n$$P_r(\\text{dBm}) = \\underbrace{P_t + G_t}_{\\text{EIRP}} + G_r - \\text{FSPL} - L_{\\text{misc}}.$$\n\nHere **EIRP** (effective isotropic radiated power) bundles transmit power and transmit antenna gain; $L_{\\text{misc}}$ collects connector, feedline, atmospheric, and pointing losses. FSPL in dB is\n\n$$\\text{FSPL(dB)} = 20\\log_{10}(d) + 20\\log_{10}(f) + 32.45,\\quad d\\text{ in km}, f\\text{ in MHz}.$$\n\nThe key dB unit discipline: $\\text{dBm}$ and $\\text{dBW}$ are *absolute* power references; $\\text{dBi}$ is gain over isotropic; plain $\\text{dB}$ is a *ratio*. You can add a dB to a dBm but never two dBm together. As a radar tech you read VSWR and power off meters in these units daily — this is the same arithmetic scaled up to a whole link.",
+          "content": "Imagine you send a radio signal across town. It leaves the transmitter strong, but along the way it gets weaker. Will it still arrive **strong enough to be understood**? A **link budget** answers exactly that one question. It is simply a tally: you start with the power you send out, **add** anything that helps, **subtract** anything that hurts, and see what power is left at the receiver.\n\nThink of a **household budget**. Your income is money coming in; your expenses are money going out; what is left over is what you can spend. A link budget works the same way. The **gains** (helpers) are like income. The **losses** (things that weaken the signal) are like expenses. The signal **left over** at the receiver is like the money in your pocket at the end of the month.\n\nWhat are the gains and losses on a signal's journey? You begin with the **transmit power** (how loud you shout). You **add antenna gain** — an antenna that focuses energy into a beam, instead of spraying it everywhere, makes the signal effectively stronger in the useful direction (you met this idea in the antennas sub-topic: *gain = focusing*). Then you **subtract the losses**: the signal spreads out and thins as it travels (this is **path loss**, which grows with distance — you met it in the propagation sub-topic), plus smaller losses from cables, walls and other obstacles, and bad weather like rain.\n\nAdd it all up and you get the **received power** — the strength of the signal arriving at the far end. If that number is large enough, the link works and the message gets through. If it is too small, the signal is buried and the link fails, just as a household \"goes broke\" when expenses beat income.\n\n**Recap:** a link budget = transmit power + gains − losses = received power, and the whole point is to check whether that received power is *enough to be received*.",
           "items": [
-            {
-              "id": "link-budgets-noise-l1-fc1",
-              "type": "flashcard",
-              "front": "Write the Friis transmission equation in its power-ratio form.",
-              "back": "$P_r = P_t G_t G_r \\left(\\frac{\\lambda}{4\\pi d}\\right)^2$. The bracketed term is the reciprocal of free-space path loss.",
-              "hint": "It contains $(\\lambda / 4\\pi d)^2$."
-            },
-            {
-              "id": "link-budgets-noise-l1-fc2",
-              "type": "flashcard",
-              "front": "What is EIRP and how is it computed in dB?",
-              "back": "Effective Isotropic Radiated Power: the power an isotropic radiator would need to match your transmitter's peak gain. $\\text{EIRP} = P_t(\\text{dBm}) + G_t(\\text{dBi}) - L_{\\text{feed}}$."
-            },
-            {
-              "id": "link-budgets-noise-l1-fc3",
-              "type": "flashcard",
-              "front": "Why does free-space path loss increase with frequency at fixed antenna gain?",
-              "back": "Friis carries a $\\lambda^2$ factor in the received power. As $f$ rises, $\\lambda$ shrinks, so the effective aperture of a fixed-gain antenna shrinks and FSPL (proportional to $(4\\pi d/\\lambda)^2$) grows."
-            },
-            {
-              "id": "link-budgets-noise-l1-fc4",
-              "type": "flashcard",
-              "front": "Distinguish dBm, dBW, dBi, and dB.",
-              "back": "dBm/dBW are absolute power (ref 1 mW / 1 W). dBi is antenna gain relative to an isotropic radiator. Plain dB is a dimensionless ratio (gain or loss). Add dB to dBm; never add two dBm."
-            },
             {
               "id": "link-budgets-noise-l1-mc1",
               "type": "mcq",
-              "prompt": "Worked budget: $P_t = 10$ dBW, $G_t = 20$ dBi, feed loss 2 dB, FSPL = 162 dB, $G_r = 40$ dBi, atmospheric loss 3 dB. What is $P_r$?",
+              "prompt": "In one sentence, what is a link budget?",
               "choices": [
-                "-97 dBW",
-                "-107 dBW",
-                "-87 dBW",
-                "-117 dBW"
+                "A running tally of all the gains and losses on a signal's journey, used to find the power that arrives at the receiver",
+                "The exact price in dollars of building a radio transmitter",
+                "A list of the radio channels a device is allowed to use",
+                "The maximum number of users a network can support at once"
               ],
               "answerIndex": 0,
-              "explanation": "EIRP = 10 + 20 - 2 = 28 dBW. $P_r$ = EIRP + $G_r$ - FSPL - atmos = 28 + 40 - 162 - 3 = -97 dBW."
+              "explanation": "A link budget adds up everything that helps a signal (gains) and subtracts everything that weakens it (losses) to find the received power, so you can judge whether the signal arrives strong enough. It is about signal strength, not money, channel lists, or user counts.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/link-budgets-noise-2.svg"
             },
             {
               "id": "link-budgets-noise-l1-mc2",
               "type": "mcq",
-              "prompt": "Doubling the link distance $d$ changes FSPL by approximately:",
+              "prompt": "What single question is a link budget designed to answer?",
               "choices": [
-                "+6 dB",
-                "+3 dB",
-                "+12 dB",
-                "+20 dB"
+                "Will the signal arrive strong enough to be understood?",
+                "How much does the antenna weigh?",
+                "What color should the antenna be painted?",
+                "How fast does the radio wave travel?"
               ],
               "answerIndex": 0,
-              "explanation": "FSPL $\\propto d^2$, so doubling $d$ multiplies loss by 4, and $10\\log_{10}(4) \\approx 6$ dB."
+              "explanation": "The entire purpose of a link budget is to check whether enough signal survives the trip to be received and understood. The speed of the wave is essentially fixed and is not what the budget is for.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/link-budgets-noise-2.svg"
             },
             {
               "id": "link-budgets-noise-l1-mc3",
               "type": "mcq",
-              "prompt": "Which operation is INVALID in dB bookkeeping?",
+              "prompt": "In the household-budget comparison, what plays the role of your monthly income?",
               "choices": [
-                "Adding two dBm power levels together",
-                "Adding a dBi gain to a dBm power",
-                "Subtracting a dB loss from a dBm power",
-                "Adding a dB gain to a dBW power"
+                "The gains: transmit power and antenna focusing that strengthen the signal",
+                "The losses: distance, cables, and rain that weaken the signal",
+                "The receiver's background hiss",
+                "The price of the radio equipment"
               ],
               "answerIndex": 0,
-              "explanation": "dBm is a logarithmic absolute power; adding two of them implies multiplying two powers, which is meaningless. Gains/losses (dB, dBi) add to or subtract from an absolute level."
+              "explanation": "Income is what comes in and helps, so it matches the gains (transmit power plus antenna gain). Losses are the expenses; the leftover signal is what is 'in your pocket' at the receiver.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/link-budgets-noise-3.svg"
             },
             {
               "id": "link-budgets-noise-l1-mc4",
               "type": "mcq",
-              "prompt": "In the dB form $P_r = \\text{EIRP} + G_r - \\text{FSPL} - L_{\\text{misc}}$, what does $L_{\\text{misc}}$ typically include?",
+              "prompt": "In the same comparison, what plays the role of your monthly expenses?",
               "choices": [
-                "Connector, feedline, atmospheric, rain, and pointing losses",
-                "Only the transmit antenna gain",
-                "Thermal noise power",
-                "The receiver's required SNR"
+                "The losses: distance spreading, cable loss, obstacles, and rain",
+                "The transmit power you start with",
+                "The gain of the transmit antenna",
+                "The received signal that is left over"
               ],
               "answerIndex": 0,
-              "explanation": "$L_{\\text{misc}}$ collects all the incidental losses beyond free-space spreading. Noise and required SNR enter later, when comparing $P_r$ against sensitivity."
+              "explanation": "Expenses are what drain the budget, matching the losses that weaken the signal. Transmit power and antenna gain are income (gains); the leftover signal is what remains after expenses.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/link-budgets-noise-3.svg"
             },
             {
               "id": "link-budgets-noise-l1-mc5",
               "type": "mcq",
-              "prompt": "FSPL(dB) = $20\\log_{10} d + 20\\log_{10} f + 32.45$ (d in km, f in MHz). At 2400 MHz over 10 km, FSPL is approximately:",
+              "prompt": "Where does a link budget START before adding and subtracting anything?",
               "choices": [
-                "120 dB",
-                "100 dB",
-                "140 dB",
-                "90 dB"
+                "With the transmit power (how strongly the signal is sent out)",
+                "With the receiver's noise floor",
+                "With the rain loss for the day",
+                "With the distance between the antennas"
               ],
               "answerIndex": 0,
-              "explanation": "$20\\log_{10}(10)=20$; $20\\log_{10}(2400)\\approx 67.6$; sum $+32.45 \\approx 120$ dB."
+              "explanation": "You begin with the transmit power, then add gains and subtract losses from there. The distance and rain are losses you subtract later; the noise floor is compared against the final received power.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/link-budgets-noise-2.svg"
+            },
+            {
+              "id": "link-budgets-noise-l1-mc6",
+              "type": "mcq",
+              "prompt": "Why does antenna gain count as a GAIN (a helper) in the budget?",
+              "choices": [
+                "Focusing the energy into a beam makes the signal effectively stronger in the useful direction",
+                "It physically adds more electrical power to the transmitter",
+                "It removes all the rain in the path",
+                "It makes the radio wave travel faster"
+              ],
+              "answerIndex": 0,
+              "explanation": "Gain means focusing: aiming the same energy into a narrower beam so it is stronger where you want it, like a flashlight reflector. It does not create new power from nothing, clear the weather, or change the wave's speed.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/link-budgets-noise-2.svg"
+            },
+            {
+              "id": "link-budgets-noise-l1-mc7",
+              "type": "mcq",
+              "prompt": "Which of these is a LOSS that you subtract in a link budget?",
+              "choices": [
+                "Path loss from the signal spreading out as it travels farther",
+                "The transmit antenna focusing the beam",
+                "The receive antenna focusing the beam",
+                "The transmit power coming out of the radio"
+              ],
+              "answerIndex": 0,
+              "explanation": "Path loss is the steady weakening as the signal spreads over distance, so it is subtracted. The two antenna focusing terms are gains, and transmit power is the starting amount you add to.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/link-budgets-noise-3.svg"
+            },
+            {
+              "id": "link-budgets-noise-l1-mc8",
+              "type": "mcq",
+              "prompt": "After you add gains and subtract losses, the number you get is called the received power. What does it tell you?",
+              "choices": [
+                "How strong the signal is when it arrives at the far-end receiver",
+                "How much power the transmitter draws from the wall outlet",
+                "How many antennas the system uses",
+                "How long the cable between radio and antenna is"
+              ],
+              "answerIndex": 0,
+              "explanation": "Received power is the strength of the signal at the destination, after the whole journey. You then check whether it is large enough for the link to work.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/link-budgets-noise-2.svg"
+            },
+            {
+              "id": "link-budgets-noise-l1-mc9",
+              "type": "mcq",
+              "prompt": "In the household-budget picture, what does it mean when the link \"goes broke\"?",
+              "choices": [
+                "Too little signal is left at the receiver, so the link fails",
+                "The transmitter runs out of electrical power forever",
+                "The antenna physically breaks apart",
+                "The signal arrives too early to be useful"
+              ],
+              "answerIndex": 0,
+              "explanation": "Going broke means the losses overwhelmed the gains, leaving too little signal to be understood, so the link drops. It is about signal strength running out, not hardware breaking.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/link-budgets-noise-3.svg"
+            },
+            {
+              "id": "link-budgets-noise-l1-mc10",
+              "type": "mcq",
+              "prompt": "Two ideas from earlier sub-topics feed straight into a link budget. Which pair is it?",
+              "choices": [
+                "Antenna gain (focusing) as a helper, and path loss (signals weaken with distance) as a loss",
+                "The color of the antenna and the brand of the radio",
+                "The speed of light and the price of cable",
+                "The number of buttons on the radio and its weight"
+              ],
+              "answerIndex": 0,
+              "explanation": "You already learned that antenna gain focuses energy (a gain) and that signals weaken as they spread over distance (path loss, a loss). The budget simply adds these up together with transmit power and other losses.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/link-budgets-noise-2.svg"
             }
           ]
         },
         {
           "id": "link-budgets-noise-link-budgets-noise-l2",
-          "title": "Thermal Noise, Noise Figure & Sensitivity",
+          "title": "Decibels: Adding Instead of Multiplying",
           "order": 2,
           "difficulty": 2,
-          "content": "A signal is only useful relative to the **noise floor**. The fundamental floor is **thermal (Johnson-Nyquist) noise**, the available noise power from any resistor:\n\n$$N = kTB,$$\n\nwhere $k = 1.38\\times10^{-23}$ J/K is Boltzmann's constant, $T$ the temperature in kelvin, and $B$ the bandwidth in Hz. At the standard reference $T_0 = 290$ K, the floor in dBm is the number every receiver engineer memorizes:\n\n$$N(\\text{dBm}) = -174 + 10\\log_{10}B.$$\n\nSo a 1 Hz bandwidth floor is $-174$ dBm, and a 1 MHz channel is $-174 + 60 = -114$ dBm.\n\nReal receivers add their own noise. **Noise figure** $F$ is the factor by which a stage degrades SNR: $F = \\text{SNR}_{\\text{in}}/\\text{SNR}_{\\text{out}}$, equivalently expressed as an **equivalent noise temperature** $T_e = (F-1)T_0$. For a cascade, the **Friis noise formula** gives the system noise figure:\n\n$$F_{\\text{sys}} = F_1 + \\frac{F_2-1}{G_1} + \\frac{F_3-1}{G_1 G_2} + \\cdots$$\n\nThe lesson is decisive: once the **first stage (the LNA)** has high gain $G_1$, later stages are divided down and contribute little. This is *why* the LNA sits first, right at the antenna — exactly the front-end logic of a radar receiver.\n\nPutting it together, the **receiver sensitivity** (minimum detectable signal) is\n\n$$S_{\\min}(\\text{dBm}) = -174 + 10\\log_{10}B + F(\\text{dB}) + \\text{SNR}_{\\min}.$$\n\nThe link only closes if $P_r > S_{\\min}$.",
+          "content": "Signals get *enormously* stronger and weaker on their journey — sometimes by factors of millions or billions. Writing those huge multiply-and-divide numbers is clumsy. So engineers use a friendlier unit called the **decibel (dB)**. The decibel is just **a compact way to write very big or very small ratios**, and it comes with one wonderful trick: in decibels you **add and subtract instead of multiplying and dividing**.\n\nHere is the whole idea in a few anchors worth memorizing:\n\n- **+3 dB ≈ double** (×2). The signal is twice as strong.\n- **−3 dB ≈ half** (÷2). The signal is half as strong.\n- **+10 dB = ten times** (×10).\n- **−10 dB = one tenth** (÷10).\n- **0 dB = no change** (×1).\n\nBecause dB add up, a big multiply turns into a small sum. Two +3 dB steps make +6 dB, which means ×2 then ×2 = **×4**. Add +10 and +10 to get +20 dB, meaning ×10 then ×10 = **×100**. A handful of decibels can stand for a gigantic change in real strength.\n\nNow the payoff: a link budget done in decibels is **pure addition and subtraction**. Watch one simple add-up in words. Suppose you start with a transmit signal at **+20**. The two antennas focus the beam, adding **+6** of gain, bringing you to **+26**. Then distance steals a big **−100** of path loss, dropping you to **−74**. The cable nibbles another **−2**, leaving a **received level of −76**. That is the entire calculation: +20, then +6, then −100, then −2 — no multiplying anywhere, just a tidy running total.\n\nThis is why every link budget is written in dB. **Gains are positive numbers you add; losses are negative numbers you subtract**, and the final total is the received level you care about.\n\n**Recap:** decibels turn painful multiplication into easy addition. Remember +3 = double, −3 = half, +10 = ten times, −10 = one tenth, and a link budget becomes one clean column of plus-and-minus.",
           "items": [
-            {
-              "id": "link-budgets-noise-l2-fc1",
-              "type": "flashcard",
-              "front": "State the thermal noise power equation and the value of $k$.",
-              "back": "$N = kTB$, with $k = 1.38\\times10^{-23}$ J/K, $T$ in kelvin, $B$ in Hz. It is independent of frequency (white) and of the resistor value.",
-              "hint": "Three letters, all multiplied."
-            },
-            {
-              "id": "link-budgets-noise-l2-fc2",
-              "type": "flashcard",
-              "front": "What is the thermal noise floor in dBm at 290 K?",
-              "back": "$N(\\text{dBm}) = -174 + 10\\log_{10}B$. The $-174$ dBm/Hz is $10\\log_{10}(kT_0)$ converted to dBm at $T_0 = 290$ K."
-            },
-            {
-              "id": "link-budgets-noise-l2-fc3",
-              "type": "flashcard",
-              "front": "Define noise figure F and its relation to equivalent noise temperature.",
-              "back": "$F = \\text{SNR}_{\\text{in}}/\\text{SNR}_{\\text{out}}$ (the SNR degradation of a stage). Equivalent noise temperature $T_e = (F-1)T_0$, with $T_0 = 290$ K."
-            },
-            {
-              "id": "link-budgets-noise-l2-fc4",
-              "type": "flashcard",
-              "front": "Write the Friis cascade noise formula and state its main implication.",
-              "back": "$F_{\\text{sys}} = F_1 + \\frac{F_2-1}{G_1} + \\frac{F_3-1}{G_1 G_2} + \\cdots$. With a high-gain low-noise first stage, the first stage (LNA) dominates the system noise figure."
-            },
             {
               "id": "link-budgets-noise-l2-mc1",
               "type": "mcq",
-              "prompt": "kTB calc: compute the thermal noise floor in a $B = 10$ MHz bandwidth at 290 K.",
+              "prompt": "What is the main everyday reason engineers use decibels (dB)?",
               "choices": [
-                "-104 dBm",
-                "-114 dBm",
-                "-94 dBm",
-                "-174 dBm"
+                "They turn huge multiply-and-divide ratios into simple adding and subtracting",
+                "They make radio waves travel faster",
+                "They measure the temperature of the receiver",
+                "They count how many antennas are in use"
               ],
               "answerIndex": 0,
-              "explanation": "$N = -174 + 10\\log_{10}(10^7) = -174 + 70 = -104$ dBm."
+              "explanation": "Decibels are a compact way to write very big or very small ratios, and their key benefit is that you add and subtract instead of multiplying and dividing. They are not about speed, temperature, or counting hardware.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/link-budgets-noise-4.svg"
             },
             {
               "id": "link-budgets-noise-l2-mc2",
               "type": "mcq",
-              "prompt": "Cascade: $F_1 = 2$ dB, $G_1 = 20$ dB LNA; $F_2 = 10$ dB mixer. Why is system NF only slightly above 2 dB?",
+              "prompt": "Roughly what does +3 dB mean for the strength of a signal?",
               "choices": [
-                "The mixer's excess noise (F2-1) is divided by the LNA gain G1=100",
-                "Noise figures simply average",
-                "The mixer noise is added directly with no scaling",
-                "Bandwidth cancels the mixer noise"
+                "About double (twice as strong)",
+                "About half as strong",
+                "Exactly ten times stronger",
+                "No change at all"
               ],
               "answerIndex": 0,
-              "explanation": "Friis: $F_{\\text{sys}} = F_1 + (F_2-1)/G_1$. In linear terms $F_1 \\approx 1.58$, $(F_2-1)/G_1 = (10-1)/100 = 0.09$, so $F_{\\text{sys}} \\approx 1.67$ (≈2.2 dB). The high LNA gain suppresses later stages."
+              "explanation": "+3 dB is the anchor for doubling. Half is −3 dB, ten times is +10 dB, and no change is 0 dB.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/link-budgets-noise-4.svg"
             },
             {
               "id": "link-budgets-noise-l2-mc3",
               "type": "mcq",
-              "prompt": "A receiver has NF = 5 dB, $B = 1$ MHz, and needs $\\text{SNR}_{\\min} = 12$ dB. Its sensitivity is:",
+              "prompt": "Roughly what does −3 dB mean for a signal?",
               "choices": [
-                "-97 dBm",
-                "-114 dBm",
-                "-85 dBm",
-                "-107 dBm"
+                "About half as strong",
+                "About double as strong",
+                "One tenth as strong",
+                "One hundred times as strong"
               ],
               "answerIndex": 0,
-              "explanation": "$S_{\\min} = -174 + 10\\log_{10}(10^6) + 5 + 12 = -174 + 60 + 5 + 12 = -97$ dBm."
+              "explanation": "−3 dB is the anchor for halving. Doubling is +3 dB, one tenth is −10 dB, and one hundred times would be +20 dB.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/link-budgets-noise-4.svg"
             },
             {
               "id": "link-budgets-noise-l2-mc4",
               "type": "mcq",
-              "prompt": "If you halve the receiver bandwidth, the thermal noise floor changes by:",
+              "prompt": "What does +10 dB mean?",
               "choices": [
-                "-3 dB (3 dB lower)",
-                "-6 dB",
-                "+3 dB",
-                "No change"
+                "Ten times stronger (×10)",
+                "Twice as strong (×2)",
+                "Half as strong (÷2)",
+                "One tenth as strong (÷10)"
               ],
               "answerIndex": 0,
-              "explanation": "$N \\propto B$, so halving $B$ gives $10\\log_{10}(0.5) \\approx -3$ dB. Narrower bandwidth = lower noise floor = better sensitivity (at the cost of data rate or pulse resolution)."
+              "explanation": "+10 dB is the anchor for ten times. Double is +3 dB, half is −3 dB, and one tenth is −10 dB.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/link-budgets-noise-4.svg"
             },
             {
               "id": "link-budgets-noise-l2-mc5",
               "type": "mcq",
-              "prompt": "Why is the LNA placed first in the chain, right at the antenna?",
+              "prompt": "What does −10 dB mean?",
               "choices": [
-                "Its gain divides down the noise contribution of every following stage",
-                "It increases the available bandwidth",
-                "It eliminates free-space path loss",
-                "It converts dBm to dBW"
+                "One tenth as strong (÷10)",
+                "Ten times stronger (×10)",
+                "Half as strong (÷2)",
+                "No change (×1)"
               ],
               "answerIndex": 0,
-              "explanation": "By the Friis cascade formula, only the first stage's noise enters undivided; a high-gain low-noise first stage sets the system noise figure and minimizes signal degradation before lossy stages."
+              "explanation": "−10 dB is the anchor for one tenth. Ten times is +10 dB, half is −3 dB, and no change is 0 dB.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/link-budgets-noise-4.svg"
+            },
+            {
+              "id": "link-budgets-noise-l2-mc6",
+              "type": "mcq",
+              "prompt": "You add two +3 dB steps to get +6 dB total. In real strength, what multiply does that stand for?",
+              "choices": [
+                "×4 (double, then double again)",
+                "×6 (add the two factors)",
+                "×2 (still just doubled once)",
+                "×10 (because the dB add up past 5)"
+              ],
+              "answerIndex": 0,
+              "explanation": "Adding decibels means multiplying the real ratios: +3 dB is ×2, so +3 and +3 is ×2 then ×2 = ×4. You do not add the factors (that would give 6), and it is more than a single doubling.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/link-budgets-noise-4.svg"
+            },
+            {
+              "id": "link-budgets-noise-l2-mc7",
+              "type": "mcq",
+              "prompt": "Adding +10 dB and another +10 dB gives +20 dB. What real-strength change is that?",
+              "choices": [
+                "×100 (ten times, then ten times again)",
+                "×20 (just add the two tens)",
+                "×10 (still only ten times)",
+                "×2 (because anything over 10 dB is a doubling)"
+              ],
+              "answerIndex": 0,
+              "explanation": "+10 dB is ×10, so +20 dB is ×10 then ×10 = ×100. Adding decibels multiplies the underlying factors, so a small dB sum can mean a giant change.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/link-budgets-noise-4.svg"
+            },
+            {
+              "id": "link-budgets-noise-l2-mc8",
+              "type": "mcq",
+              "prompt": "Work the budget add-up: start at +20, add +6 of antenna gain, subtract 100 of path loss, subtract 2 of cable loss. What is the received level?",
+              "choices": [
+                "−76",
+                "−80",
+                "−72",
+                "+128"
+              ],
+              "answerIndex": 0,
+              "explanation": "Just add and subtract: 20 + 6 − 100 − 2 = −76. There is no multiplying; that is the whole convenience of working in decibels.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/link-budgets-noise-5.svg"
+            },
+            {
+              "id": "link-budgets-noise-l2-mc9",
+              "type": "mcq",
+              "prompt": "In a link budget written in dB, how do gains and losses appear?",
+              "choices": [
+                "Gains are positive numbers you add; losses are negative numbers you subtract",
+                "Gains are subtracted and losses are added",
+                "Both gains and losses are always added",
+                "Gains and losses are multiplied together"
+              ],
+              "answerIndex": 0,
+              "explanation": "The point of decibels is to make the budget a clean running total: helpers add (positive), things that weaken the signal subtract (negative). Nothing is multiplied.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/link-budgets-noise-5.svg"
+            },
+            {
+              "id": "link-budgets-noise-l2-mc10",
+              "type": "mcq",
+              "prompt": "A signal is boosted by +3 dB and then later cut by −3 dB. What is the net result?",
+              "choices": [
+                "No overall change — doubling then halving returns to the start",
+                "Four times stronger",
+                "One tenth as strong",
+                "Twice as strong"
+              ],
+              "answerIndex": 0,
+              "explanation": "+3 dB doubles and −3 dB halves, and they cancel: +3 − 3 = 0 dB, which means ×1 (no change). This is the elegance of dB — opposite steps simply add to zero.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/link-budgets-noise-4.svg"
             }
           ]
         },
         {
           "id": "link-budgets-noise-link-budgets-noise-l3",
-          "title": "SNR, Margin, Interference & the Radar Range Equation",
+          "title": "Noise, SNR & Fade Margin",
           "order": 3,
           "difficulty": 3,
-          "content": "With $P_r$ and the noise floor in hand, the deliverable metric is **signal-to-noise ratio**, $\\text{SNR} = P_r - N$ in dB. For digital links the cleaner figure is **energy-per-bit to noise-density**, $E_b/N_0$, related to SNR by\n\n$$\\frac{E_b}{N_0} = \\text{SNR}\\cdot\\frac{B}{R_b},$$\n\nwhere $R_b$ is the bit rate. Each modulation/coding scheme needs a minimum $E_b/N_0$ to hit a target BER (e.g. BPSK needs about 9.6 dB for $10^{-5}$ uncoded). The amount by which the actual SNR exceeds the required value is the **link margin**; the slice reserved specifically for fading and rain is the **fade margin**. Margin buys availability — the fraction of time the link stays up.\n\nSignals also compete with other signals. **C/N** is carrier-to-noise; **C/I** is carrier-to-interference. When $I \\gg N$ the link is **interference-limited** (adding transmit power helps nobody, since interferers scale too); when $N \\gg I$ it is **noise-limited** (more power or lower NF helps). Co-channel and adjacent-channel interference, intermod, and jamming all enter through C/I — in radar this is the **jamming-to-signal ratio J/S**, countered by spread-spectrum processing gain.\n\nFinally, the payoff for the radar tech: the **radar range equation** is a Friis link budget folded on itself with a target in the middle:\n\n$$P_r = \\frac{P_t G^2 \\lambda^2 \\sigma}{(4\\pi)^3 R^4}.$$\n\nThe one-way $1/R^2$ spreading happens twice (out and back), giving $1/R^4$; the antenna gain appears squared (same aperture transmits and receives); and the target's radar cross-section $\\sigma$ replaces the receive antenna. Set $P_r = S_{\\min}$ and solve for $R$ to get detection range — the same sensitivity arithmetic from Lesson 2.",
+          "content": "So far we found the received power. But strength alone does not decide whether a link works. Every receiver also has a faint, ever-present **background hiss** called **noise**. It comes from heat jiggling the electrons in the circuits and from the electronics themselves. You can never get rid of it completely. This hiss sets a **noise floor** — the lowest level beneath which a weak signal simply gets lost in the murmur.\n\nTwo things make the hiss louder, and it helps to know them in words: noise **grows with temperature** (hotter electronics, more jiggling, more hiss) and noise **grows with bandwidth** (the wider the range of frequencies you listen to, the more hiss you let in). No formula needed — just remember: *warmer and wider both mean more noise*.\n\nHere is the key insight. What matters is **not** how strong the signal is on its own, but how far it **stands above the hiss**. That comparison is the **signal-to-noise ratio (SNR)**: how much louder the signal is than the noise floor. Picture hearing a friend in a **noisy restaurant**. Their voice is the signal; the crowd din is the noise. You can follow them only if their voice rises clearly above the din — raw loudness is useless if everyone else is just as loud. SNR is that gap, and **SNR, not raw signal power, is what decides whether the link works**. Plenty of gap → the message is clear. Too little gap → errors creep in, and if the signal sinks below the noise, the link drops.\n\nEvery receiver has a **sensitivity** (also called its threshold): the smallest signal — enough above the noise — that it can still make sense of. Your received power must beat this threshold for the link to close.\n\nFinally, real conditions change. Rain, moving vehicles, and shifting reflections can all weaken the signal for a while. So good designers leave a cushion of extra signal above the threshold called the **fade margin**. On a clear day the signal sits comfortably high; when a rainstorm eats into the margin, the signal dips but stays above threshold, so your call does not drop. This same thinking scales everywhere: **Wi-Fi** (move closer or reduce interference for more margin), **cellular** (towers placed so phones keep enough margin while moving), and **satellite** links (large dishes and healthy rain margin because the path is so long).\n\n**Recap:** noise is the floor of hiss (worse when warmer and wider); SNR — how far the signal stands above that floor — is the real decider; sensitivity is the threshold to beat; and fade margin is the cushion that keeps the link alive on a bad day.",
           "items": [
-            {
-              "id": "link-budgets-noise-l3-fc1",
-              "type": "flashcard",
-              "front": "How does SNR relate to $E_b/N_0$?",
-              "back": "$\\frac{E_b}{N_0} = \\text{SNR}\\cdot\\frac{B}{R_b}$, where $B$ is bandwidth and $R_b$ the bit rate. $E_b/N_0$ normalizes out bandwidth and rate so modulations can be compared at a fixed BER."
-            },
-            {
-              "id": "link-budgets-noise-l3-fc2",
-              "type": "flashcard",
-              "front": "Define link margin and fade margin.",
-              "back": "Link margin = actual SNR (or $E_b/N_0$) minus the required value. Fade margin is the portion of that margin set aside to ride out fading/rain, which directly sets link availability."
-            },
-            {
-              "id": "link-budgets-noise-l3-fc3",
-              "type": "flashcard",
-              "front": "Contrast a noise-limited and an interference-limited link.",
-              "back": "Noise-limited ($N \\gg I$): performance set by thermal noise; more TX power or lower NF helps. Interference-limited ($I \\gg N$): set by C/I; raising power doesn't help because interferers scale too — you need filtering, spatial nulling, or coordination."
-            },
-            {
-              "id": "link-budgets-noise-l3-fc4",
-              "type": "flashcard",
-              "front": "Why does the radar range equation have $1/R^4$ and $G^2$?",
-              "back": "The wave spreads as $1/R^2$ outbound and again $1/R^2$ on the echo return, giving $1/R^4$. The same antenna transmits and receives, so its gain enters squared ($G^2$). RCS $\\sigma$ replaces the receive antenna's capture.",
-              "hint": "Two-way path; one shared aperture."
-            },
             {
               "id": "link-budgets-noise-l3-mc1",
               "type": "mcq",
-              "prompt": "$P_r = -97$ dBm and the noise floor $N = -104$ dBm. The SNR is:",
+              "prompt": "What is noise in a radio receiver?",
               "choices": [
-                "7 dB",
-                "-7 dB",
-                "201 dB",
-                "97 dB"
+                "A faint background hiss from heat and the electronics that is always present",
+                "A loud signal sent on purpose by the transmitter",
+                "The useful message after it has been decoded",
+                "The focusing effect of the antenna"
               ],
               "answerIndex": 0,
-              "explanation": "SNR = $P_r - N$ = $-97 - (-104) = 7$ dB."
+              "explanation": "Noise is the unavoidable background hiss produced by heat (jiggling electrons) and the receiver's own electronics. It is not a wanted signal, not the decoded message, and not antenna gain.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/link-budgets-noise-6.svg"
             },
             {
               "id": "link-budgets-noise-l3-mc2",
               "type": "mcq",
-              "prompt": "A link needs $\\text{SNR}_{\\min} = 12$ dB and achieves 18 dB. The link margin is:",
+              "prompt": "Two things make the noise hiss louder. Which pair is correct?",
               "choices": [
-                "6 dB",
-                "30 dB",
-                "1.5 dB",
-                "-6 dB"
+                "Higher temperature and wider bandwidth",
+                "Lower temperature and narrower bandwidth",
+                "A longer cable and a shorter antenna",
+                "A faster wave and a brighter screen"
               ],
               "answerIndex": 0,
-              "explanation": "Margin = achieved - required = 18 - 12 = 6 dB. This is the headroom against fades before the link drops below threshold."
+              "explanation": "Noise grows with temperature (more heat, more electron jiggle) and with bandwidth (a wider range of frequencies lets in more hiss). Warmer and wider both mean more noise.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/link-budgets-noise-6.svg"
             },
             {
               "id": "link-budgets-noise-l3-mc3",
               "type": "mcq",
-              "prompt": "In the radar range equation $P_r = \\frac{P_t G^2 \\lambda^2 \\sigma}{(4\\pi)^3 R^4}$, doubling range $R$ reduces $P_r$ by:",
+              "prompt": "What does signal-to-noise ratio (SNR) measure?",
               "choices": [
-                "12 dB",
-                "6 dB",
-                "3 dB",
-                "24 dB"
+                "How far the signal stands above the background noise",
+                "How fast the radio wave is moving",
+                "How many decibels of cable loss there are",
+                "How hot the transmitter gets"
               ],
               "answerIndex": 0,
-              "explanation": "$P_r \\propto 1/R^4$, so doubling $R$ divides power by 16, i.e. $10\\log_{10}(16) \\approx 12$ dB. Detection range is hard-won in radar."
+              "explanation": "SNR is the gap between the signal and the noise floor — how much the signal stands out above the hiss. It is not about wave speed, cable loss, or transmitter temperature.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/link-budgets-noise-6.svg"
             },
             {
               "id": "link-budgets-noise-l3-mc4",
               "type": "mcq",
-              "prompt": "An adjacent transmitter raises interference far above the thermal floor. To improve this link you should FIRST:",
+              "prompt": "Why does SNR — rather than raw signal strength — decide whether a link works?",
               "choices": [
-                "Improve C/I via filtering, antenna nulling, or frequency coordination",
-                "Increase your own transmit power",
-                "Lower the receiver noise figure",
-                "Narrow bandwidth to cut kTB"
+                "A signal can only be understood if it stands clearly above the noise; if the noise rises to match it, even a strong signal is lost",
+                "Raw strength is impossible to measure, but SNR is easy",
+                "SNR makes the radio wave travel farther",
+                "Strong signals always fail, so weaker ones are preferred"
               ],
               "answerIndex": 0,
-              "explanation": "The link is interference-limited ($I \\gg N$). Raising power or lowering NF addresses noise, not interference — and power increases may worsen the shared environment. Reject the interferer instead."
+              "explanation": "What matters is the gap above the noise, not the absolute level. Like a voice in a loud crowd, a strong signal is useless if the hiss is just as strong; enough SNR is what lets the receiver pull the message out.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/link-budgets-noise-6.svg"
             },
             {
               "id": "link-budgets-noise-l3-mc5",
               "type": "mcq",
-              "prompt": "What single change turns a one-way Friis link budget into the two-way radar range equation?",
+              "prompt": "In the noisy-restaurant analogy, what plays the role of the noise?",
               "choices": [
-                "Replace the receive antenna with a target RCS and apply the spreading loss twice",
-                "Add 3 dB for polarization mismatch",
-                "Convert all dBm values to dBW",
-                "Double the bandwidth"
+                "The crowd din around you",
+                "Your friend's voice",
+                "The words your friend is saying",
+                "The table you are sitting at"
               ],
               "answerIndex": 0,
-              "explanation": "The radar re-radiates off a target of cross-section $\\sigma$ and the energy travels out and back, so spreading ($1/R^2$) applies twice ($1/R^4$) and the shared antenna gain squares.",
-              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/link-budgets-noise-1.svg"
+              "explanation": "The crowd din is the background noise, your friend's voice is the signal, and you can follow along only if the voice rises above the din — that gap is the SNR.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/link-budgets-noise-6.svg"
+            },
+            {
+              "id": "link-budgets-noise-l3-mc6",
+              "type": "mcq",
+              "prompt": "What is a receiver's sensitivity (its threshold)?",
+              "choices": [
+                "The smallest signal, far enough above the noise, that it can still make sense of",
+                "The largest signal it can ever receive without breaking",
+                "The amount of power the transmitter puts out",
+                "The speed at which it changes channels"
+              ],
+              "answerIndex": 0,
+              "explanation": "Sensitivity is the weakest usable signal — the threshold the received power must beat for the link to close. It is a minimum, not a maximum, and has nothing to do with transmit power or channel speed.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/link-budgets-noise-7.svg"
+            },
+            {
+              "id": "link-budgets-noise-l3-mc7",
+              "type": "mcq",
+              "prompt": "For a link to work, the received power must be compared against what?",
+              "choices": [
+                "The receiver's sensitivity threshold — it must land above it with enough SNR",
+                "The transmitter's weight",
+                "The length of the antenna in meters",
+                "The color of the cable"
+              ],
+              "answerIndex": 0,
+              "explanation": "The final received power is checked against sensitivity: it must clear that threshold (with enough margin above the noise) for the message to get through. The other options are unrelated to whether the link closes.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/link-budgets-noise-7.svg"
+            },
+            {
+              "id": "link-budgets-noise-l3-mc8",
+              "type": "mcq",
+              "prompt": "What is fade margin?",
+              "choices": [
+                "Extra signal kept above the threshold as a cushion for bad conditions like rain or movement",
+                "The total number of channels a radio supports",
+                "The hiss produced by the receiver's electronics",
+                "The gain added by focusing the antenna"
+              ],
+              "answerIndex": 0,
+              "explanation": "Fade margin is a safety cushion of extra signal above the threshold, so that when conditions worsen (rain, moving vehicles, shifting reflections) the signal dips but stays usable. It is not a channel count, the noise itself, or antenna gain.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/link-budgets-noise-7.svg"
+            },
+            {
+              "id": "link-budgets-noise-l3-mc9",
+              "type": "mcq",
+              "prompt": "A rainstorm rolls in and weakens the signal. Why might the call still NOT drop?",
+              "choices": [
+                "The fade margin gives enough extra signal that the dip stays above the threshold",
+                "Rain has no effect at all on any radio signal",
+                "The receiver's noise disappears in the rain",
+                "The transmitter automatically moves closer to you"
+              ],
+              "answerIndex": 0,
+              "explanation": "Designers plan a fade margin precisely for events like rain: the signal weakens but, thanks to the cushion, it stays above the sensitivity threshold, so the link keeps working. Rain does weaken signals, and noise does not vanish.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/link-budgets-noise-7.svg"
+            },
+            {
+              "id": "link-budgets-noise-l3-mc10",
+              "type": "mcq",
+              "prompt": "Why do satellite links usually need large dishes and a healthy fade margin?",
+              "choices": [
+                "The path is extremely long, so big focusing gain and a weather cushion are needed to keep enough signal above the noise",
+                "Satellites have no noise, so the dish is only for decoration",
+                "Short distances make signals too strong to handle",
+                "Rain makes satellite signals stronger, so margin is wasted"
+              ],
+              "answerIndex": 0,
+              "explanation": "A satellite path is enormous, so a lot of path loss must be overcome with large high-gain dishes, and extra margin guards against rain. The same balancing of gains, losses, noise, and margin appears in Wi-Fi and cellular too, just at smaller scales.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/link-budgets-noise-7.svg"
+            },
+            {
+              "id": "link-budgets-noise-l3-mc11",
+              "type": "mcq",
+              "prompt": "Putting it together: a complete link check is best summed up as which sequence?",
+              "choices": [
+                "Add gains and subtract losses to get received power, then compare it to the noise (SNR) and the threshold, keeping a fade margin",
+                "Multiply all the gains and losses together, then ignore the noise",
+                "Measure only the transmit power and stop there",
+                "Count the antennas and pick the heaviest one"
+              ],
+              "answerIndex": 0,
+              "explanation": "The full picture is: tally gains minus losses for received power, then judge it against the noise floor via SNR and the sensitivity threshold, with a fade margin for bad days. Raw transmit power or hardware counts alone never tell you if the link closes.",
+              "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/link-budgets-noise-6.svg"
             }
           ]
         }
