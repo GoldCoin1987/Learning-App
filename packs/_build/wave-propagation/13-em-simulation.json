@@ -5,289 +5,378 @@
   "lessons": [
     {
       "id": "em-simulation-l1",
-      "title": "Why Numerical EM, and the Three Workhorse Methods",
+      "title": "Why Simulate, and the Idea of a Mesh",
       "order": 1,
       "difficulty": 1,
-      "content": "You spent earlier modules deriving fields by hand: plane waves, Friis, the array factor. Those closed-form solutions exist only for idealized geometry. The moment a structure has a finite ground plane, a fillet, a dielectric inhomogeneity, or mutual coupling, the integrals stop being analytic. **Numerical EM** discretizes Maxwell's equations and solves them on a computer, so you can model the real thing and then check your hand analysis against it.\n\nThree method families dominate, and naming the right one for a problem is a concrete interview signal:\n\n- **FDTD (Finite-Difference Time-Domain).** Steps Maxwell's curl equations forward in *time* on a staggered grid. One run is inherently **broadband** (excite a pulse, FFT the response). Great for antennas, transients, and wideband S-parameters. Tools: openEMS, Meep.\n- **FEM (Finite Element Method).** Solves in the **frequency domain** by meshing the volume into tetrahedra. Shines on **complex, inhomogeneous geometry** and resonant structures. Tools: HFSS, COMSOL.\n- **MoM (Method of Moments).** Discretizes only the conducting **surfaces/wires** and solves for currents; free space is handled by the Green's function, so unbounded radiation is natural. Ideal for wire antennas and open radiators. Tools: NEC2, FEKO.\n\nThe practical takeaway: FDTD for broadband and transients, FEM for messy enclosed geometry, MoM for open metallic radiators. Each trades compute cost differently against the analytic methods you already trust, and you use simulation to *validate*, not replace, the physics.",
+      "content": "Imagine you want to design a new antenna, or check how a radio signal flows around a phone or a radar part. The exact physics of electric and magnetic fields (the invisible push-and-pull that carries radio waves) is described by a famous set of rules called **Maxwell's equations**. For a perfect, simple shape you can solve those rules with pencil and paper. But real hardware is messy: odd shapes, bends, different materials, parts sitting near each other. For shapes like that, the hand math has no neat answer.\n\nSo what do engineers do? Two slow options exist: give up on math and just build a physical prototype to test (expensive and slow, and you may build many before one works), or find another way. The other way is **EM simulation**: software that solves the field physics for you, on a computer, for the exact shape you draw. Think of it as a **virtual lab** or a wind tunnel for radio waves. You try a design on screen, see how it behaves, tweak it, and try again, all before building anything.\n\nHow can a computer solve something the hand math can't? The core trick is called **discretization**: chop the object and the space around it into a grid of many tiny boxes called **cells** (the whole grid is the **mesh**). The computer can't solve one big smooth problem, but it *can* solve the simple interaction between each little cell and its neighbors, then add it all up. It is the same idea as building a smooth-looking picture out of tiny square pixels.\n\n**Recap:** Real shapes are too complicated to solve by hand, and building prototypes is slow and costly, so we simulate first. The key move is discretization: break space into a mesh of tiny cells and let the computer solve cell by cell.",
       "items": [
-        {
-          "id": "em-simulation-l1-fc1",
-          "type": "flashcard",
-          "front": "Why do we need numerical EM solvers at all?",
-          "back": "Closed-form (analytic) solutions to Maxwell's equations exist only for idealized geometries. Real structures with finite ground planes, inhomogeneous dielectrics, fillets, or mutual coupling have no closed form, so the fields must be solved numerically.",
-          "hint": "Think about how often the hand-derivations assumed infinite or perfectly symmetric structures."
-        },
-        {
-          "id": "em-simulation-l1-fc2",
-          "type": "flashcard",
-          "front": "Which domain does FDTD work in, and what is its signature advantage?",
-          "back": "FDTD works in the time domain, stepping the curl equations forward in time. Its signature advantage is broadband results from a single run: excite with a pulse, then FFT the time response to get the whole frequency band at once.",
-          "hint": "Time stepping plus a pulse excitation."
-        },
-        {
-          "id": "em-simulation-l1-fc3",
-          "type": "flashcard",
-          "front": "What does the Method of Moments (MoM) discretize, and why is that efficient for antennas?",
-          "back": "MoM discretizes only the conducting surfaces or wires and solves for the currents on them. Free space (the radiation) is handled analytically by the Green's function, so unbounded open problems need no volume mesh, making it efficient for wire antennas and open radiators.",
-          "hint": "It meshes metal, not air."
-        },
-        {
-          "id": "em-simulation-l1-fc4",
-          "type": "flashcard",
-          "front": "Name a representative tool for each of FDTD, FEM, and MoM.",
-          "back": "FDTD: openEMS or Meep. FEM: HFSS or COMSOL. MoM: NEC2 or FEKO.",
-          "hint": "One open-source FDTD, the dominant commercial FEM solver, and the classic wire-antenna code."
-        },
-        {
-          "id": "em-simulation-l1-fc5",
-          "type": "flashcard",
-          "front": "What role should EM simulation play relative to your hand analysis?",
-          "back": "Simulation validates the hand analysis, it does not replace it. You use it to check closed-form results (gain, impedance, S-parameters) and to extend to geometries that have no analytic solution.",
-          "hint": "Trust but verify."
-        },
         {
           "id": "em-simulation-l1-mcq1",
           "type": "mcq",
-          "prompt": "You need wideband S-parameters of an antenna across an octave from a single excitation. Which method is the most natural fit?",
+          "prompt": "Why do engineers use EM simulation software instead of just solving the physics by hand?",
           "choices": [
-            "FEM, because it meshes the full volume",
-            "FDTD, because a single time-domain pulse gives broadband results via FFT",
-            "MoM, because it only meshes surfaces",
-            "Closed-form Friis analysis"
+            "Hand math gives neat answers only for simple, ideal shapes; real hardware is too complicated to solve on paper",
+            "Maxwell's equations are secret and cannot be written down",
+            "Computers are always more fun than pencils",
+            "Simulation removes the need to ever understand the physics"
           ],
-          "answerIndex": 1,
-          "explanation": "FDTD is a time-domain method; one pulse excitation contains all frequencies, so an FFT of the response yields the entire band in a single run. FEM and MoM are frequency-domain and require sweeping (or interpolating) frequency points."
+          "answerIndex": 0,
+          "explanation": "The exact field rules (Maxwell's equations) can be solved by hand only for clean, idealized shapes. Real antennas and parts have messy geometry and mixed materials with no tidy hand solution, so we let a computer handle it. It does not mean the physics is unknown, just that the shape is too complex for paper.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/em-simulation-2.svg"
         },
         {
           "id": "em-simulation-l1-mcq2",
           "type": "mcq",
-          "prompt": "Which problem is the classic best case for the Method of Moments?",
+          "prompt": "Why not just build a physical prototype and test it instead of simulating?",
           "choices": [
-            "A thin-wire Yagi-Uda antenna radiating into free space",
-            "A multilayer dielectric resonator with graded permittivity",
-            "A broadband transient pulse on a complex 3D enclosure",
-            "Heat diffusion in a metal block"
+            "Prototypes always give wrong answers",
+            "Building and testing real prototypes is slow and expensive, and you may need many tries; simulating lets you test designs first on screen",
+            "Prototypes are illegal for antennas",
+            "A prototype cannot be measured in any way"
           ],
-          "answerIndex": 0,
-          "explanation": "MoM discretizes conducting surfaces/wires and treats unbounded free space analytically, making thin-wire antennas like a Yagi its canonical strength. Graded dielectric volumes favor FEM; broadband transients favor FDTD."
+          "answerIndex": 1,
+          "explanation": "You can build a real prototype, but each one costs money and time, and a design often needs many rounds of changes. Simulation lets you try and refine many designs cheaply before committing to building hardware. It is a virtual lab that comes before, not instead of, real testing.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/em-simulation-2.svg"
         },
         {
           "id": "em-simulation-l1-mcq3",
           "type": "mcq",
-          "prompt": "Why are FEM solvers like HFSS preferred for complex, inhomogeneous enclosed geometry?",
+          "prompt": "What is a 'mesh' in EM simulation?",
           "choices": [
-            "They step fields forward in time on a uniform grid",
-            "They only mesh conducting surfaces",
-            "They mesh the full volume with tetrahedra, conforming well to arbitrary shapes and material variation",
-            "They require no meshing at all"
+            "A single large box that holds the whole design",
+            "The grid of many tiny cells the object and surrounding space are chopped into",
+            "The metal screen on a microwave oven door",
+            "A list of the materials used in the design"
           ],
-          "answerIndex": 2,
-          "explanation": "FEM tessellates the solution volume into tetrahedra that conform to curved boundaries and material interfaces, handling inhomogeneous, complex geometry well. FDTD uses a structured time-domain grid; MoM meshes only surfaces."
+          "answerIndex": 1,
+          "explanation": "A mesh is the grid of small cells created when the software divides up the object and the space around it. Splitting the problem into cells is called discretization. The computer then solves the fields cell by cell rather than all at once.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/em-simulation-2.svg"
         },
         {
           "id": "em-simulation-l1-mcq4",
           "type": "mcq",
-          "prompt": "A teammate says 'just solve it in closed form.' For which structure is that genuinely impossible analytically?",
+          "prompt": "What does 'discretization' mean here?",
           "choices": [
-            "A uniform plane wave in free space",
-            "A lossless infinite parallel-plate line",
-            "A microstrip patch on a finite FR-4 board with a real connector",
-            "An ideal Hertzian dipole far-field pattern"
+            "Keeping the design a secret",
+            "Approximating smooth, continuous space by splitting it into many small pieces (cells)",
+            "Throwing away the parts of the design you do not like",
+            "Measuring the antenna with a ruler"
           ],
-          "answerIndex": 2,
-          "explanation": "Finite, layered, lossy, connector-fed real hardware has no closed-form solution and is exactly what numerical EM exists for. The other three are textbook analytic cases."
+          "answerIndex": 1,
+          "explanation": "Discretization means replacing a smooth, continuous thing with many small discrete pieces. Instead of one impossible smooth problem, you get many tiny, simple ones the computer can solve and add up. It is the central trick behind all EM simulation.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/em-simulation-2.svg"
+        },
+        {
+          "id": "em-simulation-l1-mcq5",
+          "type": "mcq",
+          "prompt": "A good everyday comparison for chopping space into a mesh of tiny cells is:",
+          "choices": [
+            "Building a smooth-looking picture out of many small square pixels",
+            "Pouring water into a single glass",
+            "Folding a paper airplane",
+            "Tuning a guitar string"
+          ],
+          "answerIndex": 0,
+          "explanation": "Pixels are the perfect analogy: a screen approximates a smooth image using many tiny squares. A mesh approximates smooth space using many tiny cells. More, smaller pieces give a closer match to the real smooth thing.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/em-simulation-2.svg"
+        },
+        {
+          "id": "em-simulation-l1-mcq6",
+          "type": "mcq",
+          "prompt": "Why is calling EM simulation a 'virtual lab' or 'wind tunnel for radio waves' a fair description?",
+          "choices": [
+            "Because it uses real wind to test antennas",
+            "Because you can try a design, see how it behaves, and improve it on screen before building anything real",
+            "Because it only works for airplanes",
+            "Because it replaces the laws of physics with guesses"
+          ],
+          "answerIndex": 1,
+          "explanation": "Like a wind tunnel lets you test a car or plane shape before production, EM simulation lets you test how radio fields behave around a design before you build it. You experiment, observe, and refine, all virtually. That is exactly what a lab is for.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/em-simulation-2.svg"
+        },
+        {
+          "id": "em-simulation-l1-mcq7",
+          "type": "mcq",
+          "prompt": "Once the space is meshed, how does the computer actually make progress on the problem?",
+          "choices": [
+            "It solves the entire smooth shape in one giant calculation",
+            "It solves the simple interactions between each small cell and its neighbors, then combines them",
+            "It guesses the answer at random",
+            "It asks a physical prototype for the answer"
+          ],
+          "answerIndex": 1,
+          "explanation": "The whole point of meshing is that each cell only has to deal with its immediate neighbors, which is a simple calculation. Doing that for all cells and combining the results approximates the full solution. Many simple steps replace one impossible one.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/em-simulation-2.svg"
+        },
+        {
+          "id": "em-simulation-l1-mcq8",
+          "type": "mcq",
+          "prompt": "Which kind of design is the BEST reason to reach for EM simulation rather than a textbook formula?",
+          "choices": [
+            "A perfectly straight, infinitely long ideal wire in empty space",
+            "A real antenna with an odd shape, mounted near other parts and different materials",
+            "A single point with nothing around it",
+            "A problem the textbook already gives an exact formula for"
+          ],
+          "answerIndex": 1,
+          "explanation": "Simulation earns its keep exactly when the shape is realistic and messy, where no clean formula exists. Idealized cases (infinite wires, single points) often have tidy textbook answers and do not need a solver. Match the tool to the difficulty of the shape.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/em-simulation-2.svg"
         }
       ]
     },
     {
       "id": "em-simulation-l2",
-      "title": "Setting Up a Solve: Mesh, Boundaries, Ports, Stability",
+      "title": "The Workflow, the Results, and the Speed-vs-Accuracy Trade-off",
       "order": 2,
       "difficulty": 2,
-      "content": "Choosing a method is half the job; setting up a *trustworthy* solve is the other half. Four knobs matter most.\n\n**Meshing & convergence.** The discretization must resolve the geometry and the field gradients. A common rule is roughly 10-20 cells per wavelength, refined at edges and high-curvature features. You confirm the answer by **convergence**: refine the mesh until the quantity of interest (e.g. $S_{11}$) stops changing within tolerance. An unconverged mesh gives a confident-looking but wrong number.\n\n**Boundary conditions.** A simulation domain is finite, so its outer walls must mimic the surroundings. **PEC** (perfect electric conductor) models metal: tangential $E=0$. **PML** (perfectly matched layer) and other absorbing boundaries emulate open space by absorbing outgoing waves with negligible reflection, so the antenna 'sees' infinity. To get a far-field pattern from a finite box, the solver applies a **near-to-far-field transformation** over a surface enclosing the structure.\n\n**Ports & excitation.** You inject power through a **port** (lumped, waveguide, or wave port) at a known reference impedance. From the steady-state response the solver extracts **S-parameters**, $\\mathrm{VSWR}=\\frac{1+|\\Gamma|}{1-|\\Gamma|}$, gain, and current distributions, the same quantities your VNA and Smith-chart work produce.\n\n**Stability (FDTD-specific).** Explicit time stepping is only stable if the **Courant condition** holds: the time step cannot let energy cross a cell in under one step. In 3D, $c\\,\\Delta t \\le \\left(\\sqrt{\\frac{1}{\\Delta x^2}+\\frac{1}{\\Delta y^2}+\\frac{1}{\\Delta z^2}}\\right)^{-1}$. Violate it and the run blows up to infinity. FDTD's grid is the staggered **Yee grid**, which interleaves E and H in space and time so the curls are naturally centered.",
+      "content": "Now that you know simulation chops space into a mesh of cells, let's see how you actually use it and what you get out. The workflow is a simple loop. First you **draw the model**: the shape of your part and what materials it is made of. Then the software **meshes** it (chops it into cells). Then you **run** it, and the computer solves the fields. Then you **read the results**. If the design needs improvement, you **refine** it (change the shape or the mesh) and go around again. Draw, mesh, run, read, refine, repeat.\n\nWhat do the results actually tell you? Common outputs include the **radiation pattern** (a map of which directions an antenna sends or receives energy strongly), how well the part is **matched** (whether energy flows in smoothly or bounces back, often reported as numbers called **S-parameters**), and **field maps** that show where the energy is strong or weak, so you can spot hot spots and trouble areas. These are the same kinds of answers you would eventually measure on real hardware, but you get them on screen first.\n\nThe single most important trade-off to understand is **mesh fineness versus speed**. A **finer mesh** (more, smaller cells) follows the true shape and the true fields more closely, so the answer is more **accurate**. But more cells means the computer has more to calculate and more to remember, so the run is **slower** and uses more **memory**. A **coarser mesh** (fewer, bigger cells) runs fast but gives a rougher, less trustworthy answer. It is the pixel trade-off again: smaller pixels look sharper but the file is heavier.\n\n**Recap:** The workflow is draw, mesh, run, read, refine. You read out patterns, match (S-parameters), and field maps. And always remember the core tension: finer mesh means more accurate but slower and hungrier for memory.",
       "items": [
-        {
-          "id": "em-simulation-l2-fc1",
-          "type": "flashcard",
-          "front": "What is a mesh convergence study and why run one?",
-          "back": "You progressively refine the mesh and re-solve until the output of interest (e.g. S11, resonant frequency) stops changing within tolerance. It is run because a coarse, unconverged mesh produces a confident-looking but incorrect answer.",
-          "hint": "Refine until the answer stops moving."
-        },
-        {
-          "id": "em-simulation-l2-fc2",
-          "type": "flashcard",
-          "front": "What does a PML (perfectly matched layer) boundary do, and why is it needed?",
-          "back": "A PML is an absorbing boundary that soaks up outgoing waves with negligible reflection, emulating open free space at the edge of a finite simulation domain. Without it, waves would reflect off the box walls and corrupt the result, especially for radiating antennas.",
-          "hint": "It makes the box edge look like infinity."
-        },
-        {
-          "id": "em-simulation-l2-fc3",
-          "type": "flashcard",
-          "front": "State the Courant stability condition for explicit FDTD and what happens if it is violated.",
-          "back": "The time step must satisfy c*dt <= 1/sqrt(1/dx^2 + 1/dy^2 + 1/dz^2) in 3D, i.e. a wave cannot cross a cell in less than one time step. If violated, the explicit time-stepping scheme becomes numerically unstable and the fields diverge to infinity.",
-          "hint": "Tie the time step to the cell size and c."
-        },
-        {
-          "id": "em-simulation-l2-fc4",
-          "type": "flashcard",
-          "front": "What is the Yee grid?",
-          "back": "The staggered spatial/temporal grid used by FDTD that interleaves the E-field and H-field components by half a cell (and half a time step). This centering makes the finite-difference curl operations second-order accurate and satisfies the divergence conditions naturally.",
-          "hint": "E and H are offset by half a cell."
-        },
-        {
-          "id": "em-simulation-l2-fc5",
-          "type": "flashcard",
-          "front": "How does a solver produce a far-field radiation pattern from a finite simulation box?",
-          "back": "It applies a near-to-far-field transformation: it records the tangential fields on a closed surface around the structure (in the near field) and uses equivalence/Green's-function integration to compute the far-field pattern, gain, and directivity.",
-          "hint": "Integrate the near fields over a closed surface."
-        },
         {
           "id": "em-simulation-l2-mcq1",
           "type": "mcq",
-          "prompt": "Your FDTD run produces field values that grow without bound until they overflow. What is the most likely cause?",
+          "prompt": "What is the basic order of steps in a simulation workflow?",
           "choices": [
-            "The PML is too thick",
-            "The time step violates the Courant stability condition",
-            "The port impedance is set to 50 ohms",
-            "The mesh has too many cells per wavelength"
+            "Run, draw, refine, mesh, read",
+            "Draw the model, mesh it, run the solve, read the results, then refine and repeat",
+            "Read results, then draw the model, then never change anything",
+            "Build a prototype, then delete the software"
           ],
           "answerIndex": 1,
-          "explanation": "Explicit FDTD is conditionally stable; a time step larger than the Courant limit causes exponential numerical blow-up. The fix is to reduce dt (or coarsen the smallest cells driving the limit)."
+          "explanation": "You draw the shape and materials, the tool meshes it into cells, you run the solve, you read what came out, and if needed you refine and loop. It is a cycle, because the first design is rarely the best one.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/em-simulation-4.svg"
         },
         {
           "id": "em-simulation-l2-mcq2",
           "type": "mcq",
-          "prompt": "Which boundary condition correctly models a solid metal wall in a simulation?",
+          "prompt": "If you make the mesh finer (more, smaller cells), what is the trade-off?",
           "choices": [
-            "PML (perfectly matched layer)",
-            "PEC (perfect electric conductor), forcing tangential E to zero",
-            "A wave port",
-            "A periodic boundary"
+            "More accurate, but slower and using more memory",
+            "Less accurate, but slower",
+            "More accurate AND faster, with no downside",
+            "It changes nothing at all"
           ],
-          "answerIndex": 1,
-          "explanation": "A PEC boundary forces the tangential electric field to zero, which is the idealized behavior of a perfect conductor. PML emulates open space; ports inject excitation; periodic boundaries model infinite arrays."
+          "answerIndex": 0,
+          "explanation": "This is the central trade-off. Smaller cells follow the real shape and fields more closely, so accuracy improves, but there are more cells to compute and store, so the run is slower and needs more memory. There is no free lunch: accuracy costs time.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/em-simulation-3.svg"
         },
         {
           "id": "em-simulation-l2-mcq3",
           "type": "mcq",
-          "prompt": "After a solve, you read S11 = -20 dB at the design frequency. What does this tell you?",
+          "prompt": "A 'radiation pattern' from a simulation tells you:",
           "choices": [
-            "The antenna radiates almost no power",
-            "The match is excellent; only 1% of incident power is reflected, so VSWR is near 1.2",
-            "The mesh has not converged",
-            "The port impedance is wrong"
+            "What color the antenna is",
+            "Which directions an antenna sends or receives energy strongly, and which it does not",
+            "How heavy the antenna is",
+            "The price of the antenna"
           ],
           "answerIndex": 1,
-          "explanation": "S11 = -20 dB means |Gamma| = 0.1, so reflected power is |Gamma|^2 = 1% and VSWR = (1+0.1)/(1-0.1) approx 1.22. This is a well-matched port, the same interpretation you would give a VNA reading."
+          "explanation": "A radiation pattern is a map of an antenna's strength in different directions, showing where it beams energy and where it is weak. It is one of the headline results you read from an antenna simulation, telling you if the antenna points energy where you want it.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/em-simulation-4.svg"
         },
         {
           "id": "em-simulation-l2-mcq4",
           "type": "mcq",
-          "prompt": "A reasonable starting mesh density for resolving fields in a full-wave solver is approximately:",
+          "prompt": "Why is the workflow drawn as a loop (a cycle) rather than a straight line?",
           "choices": [
-            "1 cell per wavelength",
-            "10 to 20 cells per wavelength, refined at edges",
-            "100 cells per millimeter regardless of frequency",
-            "One cell for the whole structure"
+            "Because the computer enjoys repetition",
+            "Because the first design is rarely the best; you read the results and refine, going around again to improve it",
+            "Because you must run it exactly three times",
+            "Because the mesh deletes itself after each run"
           ],
           "answerIndex": 1,
-          "explanation": "Roughly 10-20 cells per wavelength captures the field variation, with local refinement at sharp edges and high-curvature regions where gradients are steep. Convergence testing then confirms sufficiency."
+          "explanation": "Design is iterative. You look at the results, change the shape or mesh, and re-run to make it better. That refine-and-repeat loop is the whole value of a fast virtual lab: cheap tries until the design is good.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/em-simulation-4.svg"
+        },
+        {
+          "id": "em-simulation-l2-mcq5",
+          "type": "mcq",
+          "prompt": "S-parameters reported by a simulation mainly tell you about:",
+          "choices": [
+            "How well energy flows into the part versus how much bounces back (the quality of the match)",
+            "The exact temperature of the room",
+            "How many cells are in the mesh",
+            "The brand of the simulation software"
+          ],
+          "answerIndex": 0,
+          "explanation": "S-parameters are numbers describing how signals flow into and out of a part, including how much energy goes in smoothly versus reflects back. A good match means little reflection. They are a standard way simulations summarize how well a part accepts and passes energy.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/em-simulation-4.svg"
+        },
+        {
+          "id": "em-simulation-l2-mcq6",
+          "type": "mcq",
+          "prompt": "Why might an engineer deliberately START with a coarse (rough) mesh?",
+          "choices": [
+            "Because a coarse mesh is always the most accurate",
+            "Because it runs fast, giving a quick rough check before spending time on a slow, fine run",
+            "Because coarse meshes use the most memory",
+            "Because fine meshes are never allowed"
+          ],
+          "answerIndex": 1,
+          "explanation": "A coarse mesh trades accuracy for speed, so it is great for a quick first look to catch obvious problems cheaply. Once the design looks promising, you refine the mesh for a trustworthy final answer. It is a sensible fast-then-careful approach.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/em-simulation-3.svg"
+        },
+        {
+          "id": "em-simulation-l2-mcq7",
+          "type": "mcq",
+          "prompt": "A 'field map' output is most useful for:",
+          "choices": [
+            "Seeing where the energy concentrates (hot spots) and where it is weak across the design",
+            "Listing the price of every component",
+            "Counting how many people will use the device",
+            "Choosing the font for your report"
+          ],
+          "answerIndex": 0,
+          "explanation": "A field map shows the strength of the fields across the structure, so you can see where energy piles up or thins out. Spotting hot spots and weak regions helps you understand and fix a design. It is a picture of what the invisible fields are doing.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/em-simulation-4.svg"
+        },
+        {
+          "id": "em-simulation-l2-mcq8",
+          "type": "mcq",
+          "prompt": "Comparing a mesh to pixels in a photo, a finer mesh is like:",
+          "choices": [
+            "Bigger pixels: blurrier but a smaller file",
+            "Smaller pixels: sharper picture but a heavier file",
+            "Removing all the pixels",
+            "Printing the photo in black and white"
+          ],
+          "answerIndex": 1,
+          "explanation": "Smaller pixels capture more detail and look sharper, but the image file gets bigger and heavier to handle. A finer mesh likewise captures more detail and is more accurate, but takes more time and memory. Same trade-off, different setting.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/em-simulation-3.svg"
         }
       ]
     },
     {
       "id": "em-simulation-l3",
-      "title": "The Open-Source Stack, Validation, and Compute Cost",
+      "title": "Three Methods, Absorbing Edges, and Trusting the Answer",
       "order": 3,
       "difficulty": 3,
-      "content": "Modern antenna/array and radar front-end design is simulation-first, and you can build a capable **open-source ladder** that leans on your software background:\n\n- **NEC2 / nec2c**, driven via **4nec2** or **xnec2c** — MoM for wire antennas. Fastest path to dipole/Yagi intuition; reads impedance, pattern, and gain directly.\n- **openEMS** — general-purpose FDTD for antennas and microstrip; scriptable from Python/Octave for patches, planar structures, and arrays.\n- **Meep** — MIT's FDTD engine, strong for photonics and general broadband EM.\n- **scikit-rf** (Python) — not a field solver but the post-processing spine: load Touchstone/S-parameter files, plot on a Smith chart, de-embed, cascade networks, and compare against VNA measurements.\n- **KiCad / Sonnet** — planar/PCB EM for microstrip and stripline layouts.\n\nCommercial awareness still matters: **HFSS** (FEM), **CST** (time-domain/FIT), **FEKO** (MoM/hybrid), and **ADS** (circuit + EM co-sim) are the industry standards; know what each is *for* even if you only touch trials.\n\n**Validation is the whole point.** A simulation is a hypothesis until checked. Reconcile against (1) **analytic results** — a half-wave dipole should land near $73+j42.5\\ \\Omega$ and $\\approx 2.15$ dBi; (2) **measurement** — sweep the real hardware on a **VNA** and overlay $S_{11}$ in scikit-rf. Discrepancies usually trace to mutual coupling, a finite/real ground plane, connector parasitics, or material loss the analytic model ignored — each a teaching moment, not a failure.\n\n**Compute cost** is the eternal tradeoff. Analytic formulas are instant and give insight; full-wave solves can run minutes to days, scaling with mesh count and (FDTD) time steps. The engineering judgment is to use the cheapest model that answers the question: closed-form first for sanity and design, simulation to capture the effects formulas cannot, measurement as the final arbiter.",
+      "content": "Different problems suit different solving styles, so there are a few big **method families**. You do not need any of their math, just the plain idea of each.\n\n**FDTD** marches the fields forward in time across a grid, like a **stop-motion movie** of a wave spreading: each tiny time step, every cell nudges its neighbors, and replaying the steps shows the wave move. It is a natural fit for antennas and for signals that contain many frequencies at once. **FEM** breaks a shape into many small **triangles** (or, in 3D, little pyramid-like pieces) that can hug curves and fine detail, so it shines on **complex, detailed geometry**. **MoM** is clever for **metal antennas**: instead of filling all the surrounding space with cells, it puts cells only on the metal **surfaces** and solves for the **currents** flowing on them, letting the open air around it take care of itself. So: FDTD for time-stepping broadband problems, FEM for intricate shapes, MoM for metal radiators sitting in open space.\n\nA simulation has to fit in a finite box, but real antennas radiate into open, endless space. If the box walls reflected the waves back like mirrors, the result would be wrong. So solvers use **absorbing boundaries**: special edges that soak up outgoing waves so the box behaves as if it opened onto infinity, with nothing bouncing back.\n\nFinally, never trust a simulation blindly. **'Garbage in, garbage out'** means if your shape, materials, or settings are wrong, the pretty result is still wrong. So you do two things. You **validate**: compare against a known simple case or a real measurement to confirm the setup is sound. And you check **convergence**: keep refining the mesh and re-running until the answer stops changing. If it has stopped moving, the mesh is fine enough. Modern tools run faster on powerful graphics chips (**GPUs**) and increasingly use AI to help speed things up, but the rule never changes: validate against reality.\n\n**Recap:** FDTD time-marches a grid, FEM uses triangles for complex shapes, MoM solves currents on metal surfaces. Absorbing edges stop fake reflections. Always validate against reality and refine until the answer settles, because garbage in means garbage out.",
       "items": [
-        {
-          "id": "em-simulation-l3-fc1",
-          "type": "flashcard",
-          "front": "What is scikit-rf used for in an EM workflow, and what is it NOT?",
-          "back": "scikit-rf is a Python library for RF network post-processing: loading Touchstone/S-parameter files, plotting on a Smith chart, de-embedding, cascading networks, and comparing against VNA data. It is NOT a full-wave field solver; it processes results, it does not compute fields.",
-          "hint": "It is the post-processing spine, not a solver."
-        },
-        {
-          "id": "em-simulation-l3-fc2",
-          "type": "flashcard",
-          "front": "Which open-source tools map to MoM and to FDTD for the hands-on antenna work?",
-          "back": "MoM: NEC2/nec2c, driven by 4nec2 or xnec2c (wire antennas). FDTD: openEMS (antennas and microstrip) and Meep (general/photonics).",
-          "hint": "One wire-antenna code, two FDTD engines."
-        },
-        {
-          "id": "em-simulation-l3-fc3",
-          "type": "flashcard",
-          "front": "What are the canonical analytic numbers for a half-wave dipole that a simulation should reproduce?",
-          "back": "Input impedance approximately 73 + j42.5 ohms (about 73 ohms resistive when trimmed to resonance) and gain approximately 2.15 dBi. A correct simulation should land near these.",
-          "hint": "About 73 ohms and roughly 2.15 dBi."
-        },
-        {
-          "id": "em-simulation-l3-fc4",
-          "type": "flashcard",
-          "front": "Name common physical reasons a full-wave simulation disagrees with the analytic prediction.",
-          "back": "Mutual coupling between elements, a finite or imperfect ground plane (vs the assumed infinite/ideal one), connector and feed parasitics, and real material/conductor loss the analytic model neglected.",
-          "hint": "All the idealizations the closed-form made."
-        },
-        {
-          "id": "em-simulation-l3-fc5",
-          "type": "flashcard",
-          "front": "Match these commercial tools to their method/role: HFSS, CST, FEKO, ADS.",
-          "back": "HFSS = FEM (frequency-domain). CST = time-domain / Finite Integration Technique. FEKO = MoM and hybrid methods. ADS = circuit simulation with EM co-simulation.",
-          "hint": "FEM, time-domain, MoM/hybrid, circuit+EM."
-        },
         {
           "id": "em-simulation-l3-mcq1",
           "type": "mcq",
-          "prompt": "You simulate a half-wave dipole and read an input impedance of about 73 + j42.5 ohms. How should you interpret this?",
+          "prompt": "FDTD is best described in plain terms as:",
           "choices": [
-            "The simulation is broken; a dipole should be 50 ohms",
-            "It closely matches the classic analytic value, validating the setup",
-            "The mesh must be infinitely refined to be trusted",
-            "The result is meaningless without a PEC outer boundary"
+            "Marching the fields forward in time across a grid, like a stop-motion movie of a wave spreading",
+            "Solving the whole problem instantly with a single formula",
+            "Putting cells only on metal surfaces",
+            "Ignoring time completely"
           ],
-          "answerIndex": 1,
-          "explanation": "Roughly 73 + j42.5 ohms is the textbook input impedance of a half-wave dipole, so landing there is strong evidence the model, mesh, and ports are set up correctly."
+          "answerIndex": 0,
+          "explanation": "FDTD steps through time in tiny increments on a grid, with each cell updating its neighbors, so replaying the steps shows the wave move like stop-motion animation. That time-marching style suits antennas and broadband signals. Putting cells only on surfaces describes MoM, not FDTD.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/em-simulation-5.svg"
         },
         {
           "id": "em-simulation-l3-mcq2",
           "type": "mcq",
-          "prompt": "What is the correct role of a VNA measurement in this workflow?",
+          "prompt": "FEM is the natural choice when your design has:",
           "choices": [
-            "It replaces simulation entirely",
-            "It is the final arbiter: measured S-parameters on real hardware confirm or correct both analytic and simulated results",
-            "It only works above 60 GHz",
-            "It computes the near-to-far-field transformation"
+            "Only a single straight wire in empty space",
+            "A complex, detailed shape with curves and fine features, because small triangles can hug it closely",
+            "No shape at all",
+            "Nothing but open air and no object"
           ],
           "answerIndex": 1,
-          "explanation": "Closed-form gives insight, simulation captures non-ideal effects, and the VNA measures the actual built hardware, serving as ground truth. Overlaying measured S11 in scikit-rf closes the loop."
+          "explanation": "FEM fills a shape with many small triangles (or pyramid-like 3D pieces) that conform to curves and detail, so it handles intricate, complex geometry well. A lone straight wire in open space is the classic MoM case, not where FEM's strength shows.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/em-simulation-6.svg"
         },
         {
           "id": "em-simulation-l3-mcq3",
           "type": "mcq",
-          "prompt": "Which statement best captures the analytic-vs-simulation compute tradeoff?",
+          "prompt": "What makes MoM efficient for a metal antenna in open air?",
           "choices": [
-            "Always run a full-wave solve; closed-form is obsolete",
-            "Closed-form formulas are instant and insightful; use them first, then simulate only to capture effects formulas cannot, since full-wave solves can take minutes to days",
-            "Simulation is always faster than evaluating a formula",
-            "Compute cost is independent of mesh size and time steps"
+            "It fills the entire sky with cells",
+            "It puts cells only on the metal surfaces and solves the currents there, letting the open space take care of itself",
+            "It refuses to handle metal",
+            "It only works inside sealed metal boxes"
           ],
           "answerIndex": 1,
-          "explanation": "Good practice uses the cheapest adequate model: analytic for sanity and design, full-wave simulation for non-ideal geometry, and measurement to finalize. Full-wave cost scales with mesh count and, for FDTD, number of time steps."
+          "explanation": "Instead of meshing all the surrounding air, MoM focuses on the metal surfaces and solves for the currents on them. The open space around is handled automatically, so it is efficient for metal radiators like wire antennas sitting in the open.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/em-simulation-6.svg"
         },
         {
           "id": "em-simulation-l3-mcq4",
           "type": "mcq",
-          "prompt": "Your developer background is a differentiator in EM simulation chiefly because you can:",
+          "prompt": "Why do solvers use 'absorbing' boundaries at the edges of the simulation box?",
           "choices": [
-            "Avoid ever needing to validate against measurement",
-            "Script parameter and frequency sweeps and automate post-processing (e.g. openEMS + scikit-rf) to explore designs at scale",
-            "Eliminate the Courant condition",
-            "Run FEM without a mesh"
+            "To make the box walls reflect waves like mirrors",
+            "To soak up outgoing waves so the finite box acts like endless open space, with nothing bouncing back to corrupt the result",
+            "To make the simulation run forever",
+            "To color the edges of the picture"
           ],
           "answerIndex": 1,
-          "explanation": "Scripting sweeps and automating Touchstone post-processing/plotting (openEMS or NEC driven from Python, results crunched in scikit-rf) lets you explore far more of the design space than manual GUI runs, which is exactly where a software skillset pays off."
+          "explanation": "Real antennas radiate into open space, but a simulation box is finite. If the walls reflected the waves, those fake echoes would ruin the answer. Absorbing edges swallow outgoing waves so the box behaves as if it opened onto infinity.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/em-simulation-5.svg"
+        },
+        {
+          "id": "em-simulation-l3-mcq5",
+          "type": "mcq",
+          "prompt": "What does 'garbage in, garbage out' warn you about in simulation?",
+          "choices": [
+            "The software literally produces trash",
+            "If your shape, materials, or settings are wrong, the result is wrong no matter how nice it looks",
+            "You should never save your files",
+            "Simulations are always perfectly correct"
+          ],
+          "answerIndex": 1,
+          "explanation": "A simulation only solves the problem you actually give it. Feed it a wrong shape or wrong material values and it confidently returns a wrong answer. A clean-looking plot is not proof of correctness, which is why you must validate.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/em-simulation-6.svg"
+        },
+        {
+          "id": "em-simulation-l3-mcq6",
+          "type": "mcq",
+          "prompt": "What does a 'convergence' check look like in practice?",
+          "choices": [
+            "Running the simulation once and trusting whatever appears",
+            "Refining the mesh and re-running until the answer stops changing, which signals the mesh is fine enough",
+            "Making the mesh as coarse as possible to save time",
+            "Deleting the model and starting over"
+          ],
+          "answerIndex": 1,
+          "explanation": "Convergence means you keep using a finer mesh and re-solving until the result settles down and no longer shifts. When refining stops changing the answer, you can trust the mesh was detailed enough. A single coarse run gives no such assurance.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/em-simulation-5.svg"
+        },
+        {
+          "id": "em-simulation-l3-mcq7",
+          "type": "mcq",
+          "prompt": "How do you 'validate' a simulation?",
+          "choices": [
+            "By trusting it because the picture is colorful",
+            "By comparing it against a known simple case or a real-world measurement to confirm the setup is sound",
+            "By making the mesh coarser until it agrees with your hopes",
+            "By running it on a faster computer"
+          ],
+          "answerIndex": 1,
+          "explanation": "Validation means checking the simulation against something you can trust: a textbook simple case with a known answer, or measurements of real hardware. If they agree, your setup is likely sound. A faster computer or a prettier plot proves nothing about correctness.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/em-simulation-6.svg"
+        },
+        {
+          "id": "em-simulation-l3-mcq8",
+          "type": "mcq",
+          "prompt": "You want to model a simple metal wire antenna radiating into open air. Which method family fits most naturally?",
+          "choices": [
+            "FEM, because the wire is extremely complex",
+            "MoM, because it solves the currents on metal surfaces and handles open space efficiently",
+            "No method can model a wire antenna",
+            "A method that fills the entire sky with cells is required"
+          ],
+          "answerIndex": 1,
+          "explanation": "A metal wire in open space is the textbook strength of MoM: cells go on the metal, currents are solved there, and the surrounding open air is handled without meshing it all. FEM shines on intricate detailed shapes, which a plain wire is not.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/em-simulation-6.svg"
+        },
+        {
+          "id": "em-simulation-l3-mcq9",
+          "type": "mcq",
+          "prompt": "Modern simulation tools increasingly run faster by using:",
+          "choices": [
+            "Slower, older processors on purpose",
+            "Powerful graphics chips (GPUs) and AI-assisted techniques, though validating against reality still matters",
+            "Removing the mesh entirely",
+            "Never refining the mesh"
+          ],
+          "answerIndex": 1,
+          "explanation": "Today's solvers often run on GPUs (graphics chips built for many parallel calculations) and increasingly use AI to speed things up. Faster tools are great, but the unchanging rule is still to validate against real measurements and check convergence.",
+          "image": "https://raw.githubusercontent.com/GoldCoin1987/Learning-App/main/packs/wave-propagation/images/em-simulation-5.svg"
         }
       ]
     }
